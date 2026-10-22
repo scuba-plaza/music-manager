@@ -87,13 +87,18 @@ func plural(n int, word string) string {
 }
 
 func (m Model) bodyView(l layoutInfo) string {
+	inspector := func() string {
+		return box("Details", m.inspectorLines(l.right-2, l.body-2), l.right, l.body, m.focus == paneInspector)
+	}
+	if l.mode == modeOnePane && m.focus == paneInspector {
+		return inspector() // one pane at a time: the fields take the place of the tree
+	}
 	lines, bar := m.browserContent(l.left - 2)
-	left := boxWithBar("Library", lines, bar, l.left, l.body, true)
+	left := boxWithBar("Library", lines, bar, l.left, l.body, m.focus == paneBrowser)
 	if l.mode == modeOnePane {
 		return left
 	}
-	right := box("Details", m.inspectorLines(l.right-2, l.body-2), l.right, l.body, m.focus == paneInspector)
-	return joinPanes(left, right)
+	return joinPanes(left, inspector())
 }
 
 // joinPanes puts two boxes of the same height side by side.
@@ -122,7 +127,26 @@ func (m Model) footerView() string {
 		}
 		line += st.Render(m.status) + styles.keyDesc.Render("  ·  ")
 	}
-	return fit(line+renderKeys(m.footerKeys()), m.w)
+	return fit(line+renderKeysWithin(m.footerKeys(), m.w-ansi.StringWidth(line)), m.w)
+}
+
+// renderKeysWithin is renderKeys, but when the keys do not fit in w columns
+// it leaves some out, working back from the end, rather than cut one in
+// half. The last two (help and quit) always stay.
+func renderKeysWithin(bindings []key.Binding, w int) string {
+	enabled := make([]key.Binding, 0, len(bindings))
+	for _, b := range bindings {
+		if b.Enabled() {
+			enabled = append(enabled, b)
+		}
+	}
+	for n := len(enabled) - 2; n > 0; n-- {
+		kept := append(append([]key.Binding(nil), enabled[:n]...), enabled[len(enabled)-2:]...)
+		if s := renderKeys(kept); ansi.StringWidth(s) <= w {
+			return s
+		}
+	}
+	return renderKeys(enabled[max(len(enabled)-2, 0):])
 }
 
 // renderKeys draws bindings as "key description" pairs.

@@ -46,8 +46,9 @@ type keyMap struct {
 	// looking up
 	Identify, IdentifyAll, Adopt key.Binding
 
-	Add  key.Binding
-	Sync key.Binding
+	Add    key.Binding
+	Sync   key.Binding
+	Doctor key.Binding
 
 	// marking, and acting on several tracks
 	Mark, MarkAll, ClearMarks key.Binding
@@ -104,8 +105,9 @@ func newKeyMap() keyMap {
 
 		RemoveCover: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "remove")),
 
-		Add:  key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add")),
-		Sync: key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sync")),
+		Add:    key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add")),
+		Sync:   key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sync")),
+		Doctor: key.NewBinding(key.WithKeys("D"), key.WithHelp("D", "check")),
 
 		Identify:    key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "identify")),
 		IdentifyAll: key.NewBinding(key.WithKeys("I"), key.WithHelp("I", "identify all")),

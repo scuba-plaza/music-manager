@@ -16,6 +16,7 @@ type syncStatusMsg struct {
 	n     int
 	known bool
 	err   error
+	keep  bool // nothing new was learned: leave the count as it is
 }
 
 // refreshSync works out the header's count. With scan set it may also scan
@@ -24,8 +25,13 @@ func (m Model) refreshSync(scan bool) tea.Cmd {
 	lib := m.lib
 	return func() tea.Msg {
 		n, known, err := lib.Unsynced()
-		if err != nil || known || !scan {
-			return syncStatusMsg{n, known, err}
+		if err != nil || known {
+			return syncStatusMsg{n: n, known: known, err: err}
+		}
+		if !scan {
+			// Never synced, and scanning the folder again for every edit would
+			// be slow. The count from the one scan is still a fair account.
+			return syncStatusMsg{keep: true}
 		}
 		plan, err := lib.PlanSync(app.SyncOptions{})
 		if err != nil {
@@ -53,7 +59,7 @@ func (m Model) recordSynced() tea.Cmd {
 }
 
 func (m Model) syncStatus(msg syncStatusMsg) (tea.Model, tea.Cmd) {
-	if msg.err == nil {
+	if msg.err == nil && !msg.keep {
 		m.syncN, m.syncKnown = msg.n, msg.known
 	}
 	return m, nil

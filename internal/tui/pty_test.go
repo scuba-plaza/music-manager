@@ -441,3 +441,29 @@ func TestPTYSyncWritesTheLibraryFolder(t *testing.T) {
 		t.Error("the stray should be gone")
 	}
 }
+
+// mouseClick is what a terminal sends for a left click at column x, row y
+// (counted from 0), pressed and released.
+func mouseClick(x, y int) string {
+	return fmt.Sprintf("\x1b[<0;%d;%dM\x1b[<0;%d;%dm", x+1, y+1, x+1, y+1)
+}
+
+func TestPTYTheMouseSelectsOpensAndEdits(t *testing.T) {
+	lib := ptyLibrary(t,
+		seedTrack{"The Wanderer", "Shawn James", "Shadows", 1, 12, 0},
+		seedTrack{"Current", "Phoria", "", 0, 0, 0})
+	s := startMM(t, 120, 36, lib)
+	s.MustSee("Phoria", "Shawn James")
+
+	s.Type(mouseClick(10, 4)) // the second row, Shawn James
+	s.Type(mouseClick(10, 4)) // again: it opens
+	s.MustSee("Shadows")
+	s.Type(mouseClick(10, 5)) // the album
+	s.Type(mouseClick(10, 5))
+	s.MustSee("The Wanderer")
+	s.Type(mouseClick(14, 6)) // the track
+	s.Type(mouseClick(14, 6)) // again: into its fields
+	s.MustSee("Cut start")
+	s.Type(mouseClick(80, 3)) // the title field, already chosen: edit
+	s.MustSee("enter save")
+}

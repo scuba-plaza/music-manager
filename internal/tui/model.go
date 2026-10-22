@@ -1,14 +1,20 @@
 package tui
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 
 	"music-manager/internal/manifest"
 )
+
+// filterHint is what the empty filter box says when there is room.
+const filterHint = "filter  (e.g. shawn, status:unidentified)"
 
 // pane is which half of the screen has the keyboard.
 type pane int
@@ -76,9 +82,16 @@ type Model struct {
 
 	// How far the library folder lags behind the records, and what is needed to
 	// keep that up to date: rev changes whenever the tracks do.
-	syncN         int
-	syncKnown     bool
-	rev, syncRev  int
+	syncN        int
+	syncKnown    bool
+	rev, syncRev int
+
+	// Looking for changes made elsewhere, and telling double clicks apart.
+	stamp        string
+	now          func() time.Time
+	lastClickKey string
+	lastClick    time.Time
+
 	baselineTried bool
 	mounts        func() []string // the drives to offer; detectMounts if nil
 
@@ -111,7 +124,7 @@ func New(lib Library, opts ...Option) Model {
 	in := textinput.New()
 	in.Prompt = "/ "
 	in.PromptStyle = styles.accent
-	in.Placeholder = "filter  (e.g. shawn, status:unidentified)"
+	in.Placeholder = filterHint
 	in.PlaceholderStyle = styles.dim
 	in.Cursor.SetMode(cursor.CursorStatic)
 	m := Model{
@@ -128,16 +141,36 @@ func New(lib Library, opts ...Option) Model {
 type loadedMsg struct {
 	tracks []manifest.Track
 	err    error
+	stamp  string
 }
 
 func (m Model) load() tea.Cmd {
 	return func() tea.Msg {
+		stamp, _ := m.lib.Stamp() // taken first, so a change during the load is seen next time
 		ts, err := m.lib.Tracks()
-		return loadedMsg{ts, err}
+		return loadedMsg{ts, err, stamp}
 	}
 }
 
-func (m Model) Init() tea.Cmd { return m.load() }
+// polling says whether the interface keeps looking for changes made by other
+// programs. Tests switch it off, as they do animation.
+var polling = true
+
+// pollEvery is how often the library is looked at for outside changes.
+const pollEvery = 2 * time.Second
+
+// pollMsg says it is time to look; stampMsg is what the look found.
+type pollMsg struct{}
+type stampMsg struct{ stamp string }
+
+func (m Model) poll() tea.Cmd {
+	if !polling {
+		return nil
+	}
+	return tea.Tick(pollEvery, func(time.Time) tea.Msg { return pollMsg{} })
+}
+
+func (m Model) Init() tea.Cmd { return tea.Batch(m.load(), m.poll()) }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
@@ -162,13 +195,33 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		m.filterInput.Width = max(m.leftInner()-6, 1)
+		m.filterInput.Placeholder = filterHint
+		if m.filterInput.Width < ansi.StringWidth(filterHint) {
+			m.filterInput.Placeholder = "filter"
+		}
 		m.scrollToCursor()
 		return m, nil
 	case loadedMsg:
-		m.loaded, m.loadErr, m.tracks = true, msg.err, msg.tracks
+		m.loaded, m.loadErr, m.tracks, m.stamp = true, msg.err, msg.tracks, msg.stamp
 		m.rev++
 		m.rebuild()
 		return m, nil
+	case pollMsg:
+		lib := m.lib
+		return m, tea.Batch(m.poll(), func() tea.Msg {
+			s, _ := lib.Stamp()
+			return stampMsg{s}
+		})
+	case stampMsg:
+		if msg.stamp != "" && msg.stamp != m.stamp && !m.busy {
+			m.stamp = msg.stamp
+			return m, m.load()
+		}
+		return m, nil
+	case doctorMsg:
+		return m.doctored(msg)
+	case tea.MouseMsg:
+		return m.mouse(msg)
 	case syncStatusMsg:
 		return m.syncStatus(msg)
 	case syncEventMsg:
@@ -258,6 +311,10 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openBulk()
 	case key.Matches(msg, k.Remove):
 		return m.openRemove()
+	case key.Matches(msg, k.Help):
+		m.overlay = helpScreen{}
+	case key.Matches(msg, k.Doctor):
+		return m.openDoctor()
 	case key.Matches(msg, k.Add):
 		return m.openAdd()
 	case key.Matches(msg, k.Sync):

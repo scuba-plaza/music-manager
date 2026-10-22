@@ -16,7 +16,7 @@ import (
 	"music-manager/internal/testmp3"
 )
 
-func init() { animate = false }
+func init() { animate, polling = false, false }
 
 // testApp returns an empty library in a temporary directory.
 func testApp(t *testing.T) *app.App {

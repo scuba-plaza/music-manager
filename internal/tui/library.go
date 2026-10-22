@@ -3,8 +3,10 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"music-manager/internal/render"
 	"os"
+	"path/filepath"
 	"time"
 
 	"music-manager/internal/app"
@@ -29,6 +31,12 @@ type Library interface {
 	// PlanSync works out what writing the library folder (or target, if
 	// set) would change, without changing anything.
 	PlanSync(opts app.SyncOptions) (Plan, error)
+	// Doctor checks the stores for missing or damaged files.
+	Doctor() ([]app.Problem, error)
+	// Stamp is a short text that changes whenever the library's records
+	// change, however that happens: it is how changes made by another
+	// program are noticed.
+	Stamp() (string, error)
 	// RecordSynced notes that the library folder matches the records.
 	RecordSynced() error
 	// Unsynced counts the tracks whose output would change in the library
@@ -89,6 +97,14 @@ func NewLibrary(a *app.App, opts ...LibraryOption) Library {
 }
 
 func (l appLibrary) Lookup() bool { return l.source != nil }
+
+func (l appLibrary) Stamp() (string, error) {
+	info, err := os.Stat(filepath.Join(l.Root(), "library.json"))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%d:%d", info.ModTime().UnixNano(), info.Size()), nil
+}
 
 func (l appLibrary) PlanSync(opts app.SyncOptions) (Plan, error) {
 	p, err := l.App.PlanSync(opts)

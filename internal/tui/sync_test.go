@@ -284,3 +284,14 @@ func TestLongPlansScroll(t *testing.T) {
 	contains(t, m, "30 - ")
 	lacks(t, m, "01 - Song")
 }
+
+func TestEditingInALibraryNeverSyncedStillSaysSomethingNeedsSyncing(t *testing.T) {
+	m, _ := syncModel(t)
+	m = selectTrack(t, m, "Flow")
+	m = keys(t, m, "right", "enter")
+	m = typed(t, m, "!")
+	m = keys(t, m, "enter")
+	if first := lines(m)[0]; !strings.Contains(first, "to sync") {
+		t.Errorf("after an edit the header = %q", first)
+	}
+}

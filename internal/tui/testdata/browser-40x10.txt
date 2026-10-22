@@ -1,0 +1,10 @@
+                                        
+                                        
+                                        
+           Terminal too small           
+ mm needs at least 60×16, this is 40×10 
+  Make the window bigger, or q to quit  
+                                        
+                                        
+                                        
+                                        

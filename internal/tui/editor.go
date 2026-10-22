@@ -42,6 +42,10 @@ func (m Model) updateInspector(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.field = min(m.field+1, len(trackFields)-1)
 	case key.Matches(msg, k.Edit):
 		return m, m.startEdit()
+	case key.Matches(msg, k.Help):
+		m.overlay = helpScreen{}
+	case key.Matches(msg, k.Doctor):
+		return m.openDoctor()
 	case key.Matches(msg, k.Add):
 		return m.openAdd()
 	case key.Matches(msg, k.Sync):
