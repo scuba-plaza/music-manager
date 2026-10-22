@@ -84,6 +84,9 @@ func (a *App) Ingest(paths []string) (IngestReport, error) {
 	}
 	for _, p := range paths {
 		err := filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
+			if err == nil && d.IsDir() && d.Name() == ".mm" {
+				return filepath.SkipDir // the library's own store
+			}
 			if err != nil || d.IsDir() || !strings.EqualFold(filepath.Ext(path), ".mp3") {
 				return err
 			}

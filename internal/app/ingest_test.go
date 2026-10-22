@@ -155,3 +155,19 @@ func TestIngestAcceptsASingleFilePath(t *testing.T) {
 		t.Errorf("rep = %+v, err = %v", rep, err)
 	}
 }
+
+func TestIngestSkipsTheLibrarysOwnStore(t *testing.T) {
+	a := openLib(t)
+	writeFile(t, filepath.Join(a.Root(), "Old", "song.mp3"), testmp3.Silent(10))
+	if rep, err := a.Ingest([]string{a.Root()}); err != nil || len(rep.Added) != 1 {
+		t.Fatalf("first ingest: %+v, %v", rep, err)
+	}
+	// The stored copy of that song now sits in .mm/audio inside the root.
+	rep, err := a.Ingest([]string{a.Root()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Added) != 0 || len(rep.Duplicates) != 1 || len(rep.Failed) != 0 {
+		t.Errorf("second ingest = %+v; only Old/song.mp3 should be seen, as a duplicate", rep)
+	}
+}
