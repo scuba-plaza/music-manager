@@ -24,6 +24,8 @@ type Info struct {
 	Album       string
 	TrackNumber int
 	TrackTotal  int
+	// Released is when the track came out, if the source says: 1999, 1999-05 or 1999-05-17.
+	Released string
 }
 
 // Downloaded is an MP3 file fetched by a Downloader.
@@ -214,7 +216,7 @@ func (a *App) lookup(ctx context.Context, req AddRequest, info Info) *Candidate 
 func infoFrom(c Candidate) Info {
 	return Info{
 		Title: c.Title, Artist: c.Artist, ArtistASCII: c.ArtistASCII, Album: c.Album,
-		TrackNumber: c.TrackNumber, TrackTotal: c.TrackTotal,
+		TrackNumber: c.TrackNumber, TrackTotal: c.TrackTotal, Released: leadingDate(c.Date),
 	}
 }
 
@@ -305,6 +307,14 @@ func collect(given Edit, info Info, p Prompter) (Edit, error) {
 	if err := number("of", "Tracks on the album", positive(info.TrackTotal), &e.TrackTotal); err != nil {
 		return e, err
 	}
+	if e.Released == nil {
+		v, err := ask(Question{Key: "released", Label: "Released (1999, 1999-05 or 1999-05-17, empty if unknown)", Default: info.Released, Validate: validDate})
+		if err != nil {
+			return e, err
+		}
+		v = strings.TrimSpace(v)
+		e.Released = &v
+	}
 
 	trim := func(key, label string, dst **time.Duration) error {
 		if *dst != nil {
@@ -358,5 +368,10 @@ func validTimecode(s string) error {
 		return nil
 	}
 	_, err := timecode.Parse(s)
+	return err
+}
+
+func validDate(s string) error {
+	_, err := NormalizeDate(s)
 	return err
 }

@@ -439,3 +439,31 @@ func TestIdentifyReportsEachResultAsItHappens(t *testing.T) {
 		t.Errorf("callback saw %v, want every track in order %v", seen, want)
 	}
 }
+
+func TestIdentifyTakesTheReleaseDateOfTheMatch(t *testing.T) {
+	a, tr := hinted(t, "dream", "Dream 3", "Max Richter")
+	src := &fakeSource{results: map[string][]app.Candidate{"Dream 3|Max Richter": {dream3}}}
+	if _, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true}); err != nil {
+		t.Fatal(err)
+	}
+	if got := tracks(t, a)[0]; got.Released != "2015-09-04" {
+		t.Errorf("released = %q, want the match's 2015-09-04 (track %s)", got.Released, tr.ID)
+	}
+}
+
+func TestAMatchWithoutAUsableDateKeepsTheOneWeHave(t *testing.T) {
+	for _, date := range []string{"", "0000", "??"} {
+		a, tr := hinted(t, "dream", "Dream 3", "Max Richter")
+		if _, err := a.Edit(tr.ID, app.Edit{Released: ptr("2014")}); err != nil {
+			t.Fatal(err)
+		}
+		c := dream3
+		c.Date = date
+		if _, err := a.ApplyCandidate(context.Background(), tr.ID, c, &fakeSource{}); err != nil {
+			t.Fatalf("date %q: %v", date, err)
+		}
+		if got := tracks(t, a)[0]; got.Released != "2014" || got.Title != "Dream 3" {
+			t.Errorf("date %q: released = %q, title %q", date, got.Released, got.Title)
+		}
+	}
+}

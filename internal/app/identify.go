@@ -289,6 +289,9 @@ func (a *App) applyCandidate(ctx context.Context, t manifest.Track, c Candidate,
 	if c.ArtistASCII != "" {
 		e.ArtistASCII = &c.ArtistASCII
 	}
+	if d := leadingDate(c.Date); d != "" { // a match that does not know the date keeps ours
+		e.Released = &d
+	}
 	t, err := applyEdit(t, e)
 	if err != nil {
 		return t, err

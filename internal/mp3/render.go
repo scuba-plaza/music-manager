@@ -15,6 +15,7 @@ import (
 type TagSet struct {
 	Title, Artist, Album string
 	Track, Total         int               // track n of total; zero if unknown
+	Date                 string            // release date: 1999, 1999-05 or 1999-05-17; empty if unknown
 	Length               time.Duration     // playing length, stored as TLEN
 	Extra                map[string]string // custom TXXX frames by description
 	Cover                []byte
@@ -42,6 +43,7 @@ func Render(audio []byte, ts TagSet) ([]byte, error) {
 		}
 		text("TRCK", trck)
 	}
+	text("TDRC", ts.Date)
 	if ts.Length > 0 {
 		text("TLEN", strconv.FormatInt(ts.Length.Milliseconds(), 10))
 	}
@@ -101,6 +103,12 @@ func ReadTagSet(data []byte) TagSet {
 		n, total, _ := strings.Cut(f.Text, "/")
 		ts.Track, _ = strconv.Atoi(n)
 		ts.Total, _ = strconv.Atoi(total)
+	}
+	for _, id := range []string{"TDRC", "TYER"} { // the 2.4 frame first, then the older year
+		if f, ok := tag.GetLastFrame(id).(id3v2.TextFrame); ok && strings.TrimSpace(f.Text) != "" {
+			ts.Date = strings.TrimSpace(f.Text)
+			break
+		}
 	}
 	if f, ok := tag.GetLastFrame("TLEN").(id3v2.TextFrame); ok {
 		if ms, err := strconv.ParseInt(f.Text, 10, 64); err == nil {

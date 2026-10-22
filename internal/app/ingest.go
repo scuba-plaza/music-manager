@@ -67,7 +67,7 @@ func newTrack(s staged, sourceURL string) manifest.Track {
 		CoverSHA256:  s.coverSHA,
 		Hint: manifest.Hint{
 			Title: s.tags.Title, Artist: s.tags.Artist, Album: s.tags.Album,
-			Track: s.tags.Track, Total: s.tags.Total, Filename: s.name,
+			Track: s.tags.Track, Total: s.tags.Total, Date: leadingDate(s.tags.Date), Filename: s.name,
 		},
 		AddedAt:   now,
 		UpdatedAt: now,

@@ -50,15 +50,23 @@ func WithTags(audio []byte, title, artist, album string) []byte {
 
 // WithTagsTrack is WithTags with a track field such as "3" or "3/12".
 func WithTagsTrack(audio []byte, title, artist, album, track string) []byte {
+	return WithTextFrames(audio, [2]string{"TIT2", title}, [2]string{"TPE1", artist}, [2]string{"TALB", album}, [2]string{"TRCK", track})
+}
+
+// WithTextFrames prepends an ID3v2.4 tag holding UTF-8 text frames, given as
+// {frame id, text} pairs in the order they are written. Empty texts are
+// omitted.
+func WithTextFrames(audio []byte, frames ...[2]string) []byte {
 	var body []byte
-	for _, f := range []struct{ id, text string }{{"TIT2", title}, {"TPE1", artist}, {"TALB", album}, {"TRCK", track}} {
-		if f.text == "" {
+	for _, f := range frames {
+		id, text := f[0], f[1]
+		if text == "" {
 			continue
 		}
-		n := 1 + len(f.text) // encoding byte + text
-		body = append(body, f.id...)
+		n := 1 + len(text) // encoding byte + text
+		body = append(body, id...)
 		body = append(body, byte(n>>21&0x7F), byte(n>>14&0x7F), byte(n>>7&0x7F), byte(n&0x7F), 0, 0, 3)
-		body = append(body, f.text...)
+		body = append(body, text...)
 	}
 	tag := WithID3v2(nil, 4, len(body))
 	copy(tag[10:], body)

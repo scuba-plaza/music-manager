@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -132,5 +133,54 @@ func TestEditUnknownID(t *testing.T) {
 	a, _ := ingested(t)
 	if _, err := a.Edit("nope", app.Edit{Title: ptr("x")}); err == nil {
 		t.Error("edit of unknown id succeeded")
+	}
+}
+
+func TestEditReleaseDate(t *testing.T) {
+	a, tr := ingested(t)
+	for _, c := range []struct{ in, want string }{
+		{"1999", "1999"},
+		{"1999-05", "1999-05"},
+		{" 1999-05-17 ", "1999-05-17"},
+		{"1996-02-29", "1996-02-29"},
+		{"", ""},
+	} {
+		got, err := a.Edit(tr.ID, app.Edit{Released: ptr(c.in)})
+		if err != nil || got.Released != c.want {
+			t.Errorf("%q: released = %q, %v; want %q", c.in, got.Released, err, c.want)
+		}
+		if saved := tracks(t, a)[0]; saved.Released != c.want {
+			t.Errorf("%q: saved as %q", c.in, saved.Released)
+		}
+	}
+}
+
+func TestEditRejectsDatesThatAreNotDates(t *testing.T) {
+	a, tr := ingested(t)
+	a.Edit(tr.ID, app.Edit{Released: ptr("2001-02")})
+	before := tracks(t, a)[0]
+	for _, bad := range []string{"99", "yesterday", "1999-13", "1999-00", "1999-02-30", "1999-5-7", "1999/05/17", "19990517", "0000", "1999-05-17T10:00"} {
+		_, err := a.Edit(tr.ID, app.Edit{Released: ptr(bad)})
+		if err == nil {
+			t.Errorf("%q accepted", bad)
+			continue
+		}
+		if !strings.Contains(err.Error(), "1999-05-17") {
+			t.Errorf("%q: error %q does not show the format", bad, err)
+		}
+	}
+	if after := tracks(t, a)[0]; after.Released != "2001-02" || !after.UpdatedAt.Equal(before.UpdatedAt) {
+		t.Errorf("a rejected edit changed the record: %+v", after)
+	}
+}
+
+func TestEditingTheReleaseDateCountsAsAnEdit(t *testing.T) {
+	a, tr := ingested(t)
+	got, err := a.Edit(tr.ID, app.Edit{Released: ptr("1975")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.UpdatedAt.After(tr.UpdatedAt) || !got.AddedAt.Equal(tr.AddedAt) {
+		t.Errorf("added %v → %v, updated %v → %v", tr.AddedAt, got.AddedAt, tr.UpdatedAt, got.UpdatedAt)
 	}
 }

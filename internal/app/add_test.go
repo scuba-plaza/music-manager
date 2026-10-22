@@ -87,7 +87,7 @@ func TestAddWithEverythingGivenNeverAsksAndRecordsTheSource(t *testing.T) {
 	a, dl, p := openLib(t), newDownloader(), &scriptedPrompter{}
 	got, err := a.Add(context.Background(), app.AddRequest{
 		URL:  "https://youtu.be/xyz",
-		Edit: app.Edit{Title: strp("وطني"), Artist: strp("فيروز"), Album: strp("Hits"), TrackNumber: ptr(3), TrackTotal: ptr(12), TrimStart: ptr(time.Second), TrimEnd: ptr(0 * time.Second)},
+		Edit: app.Edit{Title: strp("وطني"), Artist: strp("فيروز"), Album: strp("Hits"), TrackNumber: ptr(3), TrackTotal: ptr(12), Released: strp("1999-05"), TrimStart: ptr(time.Second), TrimEnd: ptr(0 * time.Second)},
 	}, dl, p)
 	if err != nil {
 		t.Fatal(err)
@@ -97,7 +97,7 @@ func TestAddWithEverythingGivenNeverAsksAndRecordsTheSource(t *testing.T) {
 	}
 	if got.Status != manifest.Identified || got.SourceURL != "https://youtu.be/xyz" ||
 		got.Title != "Wtni" || got.OriginalTitle != "وطني" || got.Artist != "Firuz" || got.Album != "Hits" ||
-		got.TrackNumber != 3 || got.TrackTotal != 12 || got.TrimStart != time.Second {
+		got.TrackNumber != 3 || got.TrackTotal != 12 || got.Released != "1999-05" || got.TrimStart != time.Second {
 		t.Errorf("track = %+v", got)
 	}
 	if saved := tracks(t, a); len(saved) != 1 || saved[0].ID != got.ID {
@@ -148,7 +148,7 @@ func TestAddAsksEachFieldWithDefaultsFromTheDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantAsked := []string{"title", "title-ascii", "artist", "artist-ascii", "album", "track", "of", "trim-start", "trim-end"}
+	wantAsked := []string{"title", "title-ascii", "artist", "artist-ascii", "album", "track", "of", "released", "trim-start", "trim-end"}
 	if strings.Join(p.asked, ",") != strings.Join(wantAsked, ",") {
 		t.Errorf("asked %v, want %v", p.asked, wantAsked)
 	}
@@ -170,7 +170,7 @@ func TestAddOnlyAsksForFieldsNotGivenAsFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "artist,track,of,trim-start"; strings.Join(p.asked, ",") != want {
+	if want := "artist,track,of,released,trim-start"; strings.Join(p.asked, ",") != want {
 		t.Errorf("asked %v, want %s", p.asked, want)
 	}
 }
@@ -464,5 +464,68 @@ func TestFinishFailuresAddNothing(t *testing.T) {
 	}
 	if len(tracks(t, a)) != 0 {
 		t.Error("a failed finish added a track")
+	}
+}
+
+func TestAddOffersTheReleaseDateOfTheMatchAndTakesWhatIsTyped(t *testing.T) {
+	dl := newDownloader()
+	dl.info = app.Info{Title: "Dream 3 (Official Video)", Uploader: "Some Channel"}
+	src := &fakeSource{results: map[string][]app.Candidate{"Dream 3 (Official Video)|Some Channel": {dream3}}}
+	ctx := context.Background()
+
+	// Without a prompter the match's date is simply taken.
+	got, err := openLib(t).Add(ctx, app.AddRequest{URL: "u", Source: src}, dl, nil)
+	if err != nil || got.Released != "2015-09-04" {
+		t.Errorf("non-interactive: released %q, %v", got.Released, err)
+	}
+
+	// With one, it is the default and can be replaced.
+	for answer, want := range map[string]string{"": "2015-09-04", "2014": "2014"} {
+		p := &scriptedPrompter{answers: map[string]string{}}
+		if answer != "" {
+			p.answers["released"] = answer
+		}
+		got, err := openLib(t).Add(ctx, app.AddRequest{URL: "u", Source: src}, dl, p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.defaults["released"] != "2015-09-04" {
+			t.Errorf("default = %q", p.defaults["released"])
+		}
+		if got.Released != want {
+			t.Errorf("answer %q: released %q, want %q", answer, got.Released, want)
+		}
+	}
+
+	// A given date is never asked about, and a bad one stops the add.
+	p := &scriptedPrompter{}
+	got, err = openLib(t).Add(ctx, app.AddRequest{URL: "u", Source: src, Edit: app.Edit{Released: strp("1999")}}, dl, p)
+	if err != nil || got.Released != "1999" || strings.Contains(strings.Join(p.asked, ","), "released") {
+		t.Errorf("given: released %q, asked %v, %v", got.Released, p.asked, err)
+	}
+	if _, err := openLib(t).Add(ctx, app.AddRequest{URL: "u", Edit: app.Edit{Released: strp("soon")}}, dl, nil); err == nil {
+		t.Error("an invalid date was accepted")
+	}
+}
+
+func TestAddValidatesTheReleaseDateAnswer(t *testing.T) {
+	a, dl, p := openLib(t), newDownloader(), &scriptedPrompter{}
+	var questions []app.Question
+	if _, err := a.Add(context.Background(), app.AddRequest{URL: "u"}, dl, recordingPrompter{inner: p, got: &questions}); err != nil {
+		t.Fatal(err)
+	}
+	var released app.Question
+	for _, q := range questions {
+		if q.Key == "released" {
+			released = q
+		}
+	}
+	if released.Validate == nil || released.Required {
+		t.Fatalf("question = %+v", released)
+	}
+	for in, ok := range map[string]bool{"": true, "1999": true, "1999-05": true, "1999-05-17": true, "99": false, "May 1999": false} {
+		if err := released.Validate(in); (err == nil) != ok {
+			t.Errorf("validate(%q) = %v, want ok=%v", in, err, ok)
+		}
 	}
 }

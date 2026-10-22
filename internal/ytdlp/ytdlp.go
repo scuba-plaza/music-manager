@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -75,6 +76,8 @@ func parseInfo(out []byte) (parsed, error) {
 		Uploader    string  `json:"uploader"`
 		Album       string  `json:"album"`
 		TrackNumber float64 `json:"track_number"`
+		ReleaseDate string  `json:"release_date"`
+		ReleaseYear float64 `json:"release_year"`
 	}
 	var found bool
 	for _, line := range strings.Split(string(out), "\n") {
@@ -94,10 +97,28 @@ func parseInfo(out []byte) (parsed, error) {
 	}
 	return parsed{id: raw.ID, Info: app.Info{
 		Title: title, Artist: raw.Artist, Uploader: raw.Uploader, Album: raw.Album, TrackNumber: int(raw.TrackNumber),
+		Released: released(raw.ReleaseDate, raw.ReleaseYear),
 	}}, nil
 }
 
 func lastLine(s string) string {
 	lines := strings.Split(strings.TrimSpace(s), "\n")
 	return strings.TrimSpace(lines[len(lines)-1])
+}
+
+// released is when the track came out, from yt-dlp's release_date
+// (20150904) or release_year, or "" if it does not say. The upload date is
+// when the video went up, which says nothing about the music.
+func released(date string, year float64) string {
+	if len(date) == 8 {
+		if d, err := app.NormalizeDate(date[:4] + "-" + date[4:6] + "-" + date[6:]); err == nil {
+			return d
+		}
+	}
+	if year > 0 {
+		if d, err := app.NormalizeDate(strconv.Itoa(int(year))); err == nil {
+			return d
+		}
+	}
+	return ""
 }

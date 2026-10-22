@@ -38,11 +38,14 @@ type Track struct {
 	TrimStart      time.Duration `json:"trim_start_ns"`
 	TrimEnd        time.Duration `json:"trim_end_ns"`
 	Hint           Hint          `json:"hint,omitzero"`
-	CoverSHA256    string        `json:"cover_sha256"`
-	MBRecordingID  string        `json:"mb_recording_id"`
-	MBReleaseID    string        `json:"mb_release_id"`
-	AddedAt        time.Time     `json:"added_at"`
-	UpdatedAt      time.Time     `json:"updated_at"`
+	// Released is when the track first came out, as precisely as is known:
+	// 1999, 1999-05 or 1999-05-17.
+	Released      string    `json:"released,omitempty"`
+	CoverSHA256   string    `json:"cover_sha256"`
+	MBRecordingID string    `json:"mb_recording_id"`
+	MBReleaseID   string    `json:"mb_release_id"`
+	AddedAt       time.Time `json:"added_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // Hint carries what an ingested file said about itself. It only seeds the
@@ -53,6 +56,7 @@ type Hint struct {
 	Album    string `json:"album,omitempty"`
 	Track    int    `json:"track,omitempty"`
 	Total    int    `json:"of,omitempty"`
+	Date     string `json:"date,omitempty"`
 	Filename string `json:"filename,omitempty"`
 }
 

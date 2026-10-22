@@ -150,3 +150,24 @@ func indexOf(s []string, v string) int {
 	}
 	return -1
 }
+
+func TestDownloadReportsWhenTheTrackCameOutButNotWhenTheVideoWasUploaded(t *testing.T) {
+	for name, c := range map[string]struct{ json, want string }{
+		"a full release date": {`{"id":"vid123","title":"T","release_date":"20150904","release_year":2015,"upload_date":"20230101"}`, "2015-09-04"},
+		"only a year":         {`{"id":"vid123","title":"T","release_year":2012,"upload_date":"20230101"}`, "2012"},
+		"only an upload date": {`{"id":"vid123","title":"T","upload_date":"20230101"}`, ""},
+		"null date":           {`{"id":"vid123","title":"T","release_date":null,"release_year":null}`, ""},
+		"nonsense":            {`{"id":"vid123","title":"T","release_date":"soon"}`, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fakeBin(t, c.json+"\n", 0)
+			got, err := ytdlp.New().Download(context.Background(), "u", t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Info.Released != c.want {
+				t.Errorf("released = %q, want %q", got.Info.Released, c.want)
+			}
+		})
+	}
+}

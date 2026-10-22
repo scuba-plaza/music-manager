@@ -145,6 +145,7 @@ func TestRenderWritesATagThatReadsBackExactly(t *testing.T) {
 	want := mp3.TagSet{
 		Title: "Wtni", Artist: "Firuz", Album: "Hits",
 		Track: 3, Total: 12,
+		Date:   "1999-05-17",
 		Length: 523 * time.Millisecond,
 		Extra: map[string]string{
 			"ORIGINAL_TITLE":  "وطني",
@@ -182,7 +183,7 @@ func TestRenderIsDeterministicAndOmitsEmptyFields(t *testing.T) {
 		}
 	}
 	got := mp3.ReadTagSet(first)
-	if got.Album != "" || got.Track != 0 || got.Cover != nil || got.Length != 0 {
+	if got.Album != "" || got.Track != 0 || got.Cover != nil || got.Length != 0 || got.Date != "" {
 		t.Errorf("empty fields were written: %+v", got)
 	}
 }
@@ -203,6 +204,9 @@ func TestReadTagSetOfForeignTags(t *testing.T) {
 		{"all three", testmp3.WithTags(audio, "فيروز", "Max Richter", "Sleep"), mp3.TagSet{Title: "فيروز", Artist: "Max Richter", Album: "Sleep"}},
 		{"some missing", testmp3.WithTags(audio, "Only Title", "", ""), mp3.TagSet{Title: "Only Title"}},
 		{"tag that is only padding", testmp3.WithID3v2(audio, 4, 200), mp3.TagSet{}},
+		{"recording date", testmp3.WithTextFrames(audio, [2]string{"TIT2", "Song"}, [2]string{"TDRC", "2015-09-04"}), mp3.TagSet{Title: "Song", Date: "2015-09-04"}},
+		{"year of an older tag", testmp3.WithTextFrames(audio, [2]string{"TYER", "1987"}), mp3.TagSet{Date: "1987"}},
+		{"both: the newer frame wins", testmp3.WithTextFrames(audio, [2]string{"TYER", "1987"}, [2]string{"TDRC", "1987-06"}), mp3.TagSet{Date: "1987-06"}},
 		{"cover only", testmp3.WithCover(audio, "image/png", testmp3.PNG), mp3.TagSet{Cover: testmp3.PNG, CoverMIME: "image/png"}},
 	}
 	for _, c := range cases {

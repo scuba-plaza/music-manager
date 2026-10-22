@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,6 +21,9 @@ type Edit struct {
 	TitleASCII, ArtistASCII, AlbumASCII *string
 	TrackNumber, TrackTotal             *int
 	TrimStart, TrimEnd                  *time.Duration
+	// Released is when the track first came out: 1999, 1999-05 or 1999-05-17,
+	// or "" for unknown.
+	Released *string
 }
 
 // Edit applies e to the track with the given ID and returns the result. A
@@ -60,6 +64,13 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 	if e.TrimEnd != nil {
 		t.TrimEnd = *e.TrimEnd
 	}
+	if e.Released != nil {
+		d, err := NormalizeDate(*e.Released)
+		if err != nil {
+			return t, err
+		}
+		t.Released = d
+	}
 	if err := validate(t); err != nil {
 		return t, err
 	}
@@ -93,6 +104,22 @@ func setName(ascii, orig string, newOrig, newASCII *string) (string, string) {
 	return ascii, orig
 }
 
+// NormalizeDate checks a release date and returns it trimmed. It may be as
+// precise as a year (1999), a month (1999-05) or a day (1999-05-17); empty
+// means unknown.
+func NormalizeDate(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", nil
+	}
+	for _, layout := range []string{"2006", "2006-01", "2006-01-02"} {
+		if d, err := time.Parse(layout, s); err == nil && d.Year() >= 1000 {
+			return s, nil
+		}
+	}
+	return "", fmt.Errorf("release date %q is not a date: use 1999, 1999-05 or 1999-05-17", s)
+}
+
 func validate(t manifest.Track) error {
 	switch {
 	case t.TrimStart < 0 || t.TrimEnd < 0:
@@ -103,4 +130,22 @@ func validate(t manifest.Track) error {
 		return fmt.Errorf("track numbers cannot be negative")
 	}
 	return nil
+}
+
+var leadingDigits = regexp.MustCompile(`^\d{4}(-\d{2}(-\d{2})?)?`)
+
+// leadingDate is the date that s starts with, as precise as it is valid:
+// tag editors write "2015-09-04T10:00:00", and "2015-02-30" still means
+// 2015. It is empty if s does not start with a date.
+func leadingDate(s string) string {
+	s = leadingDigits.FindString(strings.TrimSpace(s))
+	for _, n := range []int{len(s), 7, 4} {
+		if n > len(s) {
+			continue
+		}
+		if d, err := NormalizeDate(s[:n]); err == nil {
+			return d
+		}
+	}
+	return ""
 }

@@ -19,11 +19,11 @@ func addCmd(open opener, deps Deps) *cobra.Command {
 		Long: `Download the audio at a URL with yt-dlp and add it to the library.
 
 In a terminal you are asked for each detail of the track (title, artist,
-album, track number, number of tracks, and how much to cut off the start and
-end), with what yt-dlp reported filled in. Any detail given as a flag is not
-asked. With --no-input, or when not in a terminal, nothing is asked: the
-flags and what yt-dlp reported are used, and the command fails if the title or
-artist is still unknown.
+album, track number, number of tracks, release date, and how much to cut off
+the start and end), with what yt-dlp reported filled in. Any detail given as a
+flag is not asked. With --no-input, or when not in a terminal, nothing is
+asked: the flags and what yt-dlp reported are used, and the command fails if
+the title or artist is still unknown.
 
 The track is also looked up on MusicBrainz, and a confident match supplies the
 defaults instead (--no-lookup skips this). If the lookup fails, the add goes on

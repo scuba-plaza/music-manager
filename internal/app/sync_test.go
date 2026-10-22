@@ -261,3 +261,43 @@ func equalStrings(a, b []string) bool {
 	}
 	return true
 }
+
+func TestSyncWritesTheReleaseDateIntoTheTag(t *testing.T) {
+	a := libWithTracks(t, 40, 41)
+	ts := tracks(t, a)
+	identify(t, a, ts[0].ID, "Dated", "Band", "", 0, 0)
+	identify(t, a, ts[1].ID, "Undated", "Band", "", 0, 0)
+	if _, err := a.Edit(ts[0].ID, app.Edit{Released: ptr("1999-05")}); err != nil {
+		t.Fatal(err)
+	}
+	mustSync(t, a, app.SyncOptions{})
+	if got := mp3.ReadTagSet(readFile(t, a.Root(), "Band/Dated.mp3")).Date; got != "1999-05" {
+		t.Errorf("date in the tag = %q", got)
+	}
+	if got := mp3.ReadTagSet(readFile(t, a.Root(), "Band/Undated.mp3")).Date; got != "" {
+		t.Errorf("a track with no date got %q", got)
+	}
+}
+
+func TestChangingTheReleaseDateNeedsASyncButEditingTheClockDoesNot(t *testing.T) {
+	a := libWithTracks(t, 40)
+	tr := tracks(t, a)[0]
+	identify(t, a, tr.ID, "Song", "Band", "", 0, 0)
+	mustSync(t, a, app.SyncOptions{})
+
+	if _, err := a.Edit(tr.ID, app.Edit{Released: ptr("")}); err != nil { // no change, but a save
+		t.Fatal(err)
+	}
+	if n, _ := unsynced(t, a); n != 0 {
+		t.Errorf("saving without a change: %d to sync", n)
+	}
+	if _, err := a.Edit(tr.ID, app.Edit{Released: ptr("1975")}); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := unsynced(t, a); n != 1 {
+		t.Errorf("after setting a date: %d to sync, want 1", n)
+	}
+	if ops := mustSync(t, a, app.SyncOptions{}); len(ops) != 1 {
+		t.Errorf("the date should rewrite the file: %v", ops)
+	}
+}

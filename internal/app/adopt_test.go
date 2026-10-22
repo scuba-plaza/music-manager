@@ -93,3 +93,32 @@ func TestAdoptOnlyTouchesUnidentifiedTracksAndNamedOnes(t *testing.T) {
 		t.Error("unknown id accepted")
 	}
 }
+
+func TestAdoptTakesTheDateTheOldTagsSaid(t *testing.T) {
+	for _, c := range []struct{ tag, want string }{
+		{"1987", "1987"},
+		{"2015-09-04", "2015-09-04"},
+		{"2015-09-04T10:00:00", "2015-09-04"}, // tag editors write full timestamps
+		{"sometime", ""},
+		{"", ""},
+	} {
+		a := openLib(t)
+		f := filepath.Join(t.TempDir(), "x.mp3")
+		writeFile(t, f, testmp3.WithTextFrames(testmp3.Silent(30),
+			[2]string{"TIT2", "Song"}, [2]string{"TPE1", "Band"}, [2]string{"TDRC", c.tag}))
+		rep, err := a.Ingest([]string{f})
+		if err != nil || len(rep.Added) != 1 {
+			t.Fatalf("%q: %+v, %v", c.tag, rep, err)
+		}
+		if got := rep.Added[0].Hint.Date; got != c.want {
+			t.Errorf("tag %q: hint date = %q, want %q", c.tag, got, c.want)
+		}
+		if _, err := a.Adopt(nil); err != nil {
+			t.Fatal(err)
+		}
+		got := tracks(t, a)[0]
+		if got.Released != c.want || got.Hint != (manifest.Hint{}) {
+			t.Errorf("tag %q: released = %q, hint %+v; want %q", c.tag, got.Released, got.Hint, c.want)
+		}
+	}
+}

@@ -8,7 +8,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
+	"music-manager/internal/app"
 	"music-manager/internal/cli"
 	"music-manager/internal/testmp3"
 )
@@ -262,5 +264,114 @@ func TestVersionFlag(t *testing.T) {
 	code, out, errs := run(t, filepath.Join(t.TempDir(), "lib"), "--version")
 	if code != 0 || !strings.HasPrefix(out, "mm ") || strings.Contains(errs, "mm:") {
 		t.Errorf("code %d, out %q, err %q", code, out, errs)
+	}
+}
+
+// ingestFrames ingests a track of the given number of silent frames and
+// returns its ID. Tracks of different lengths are different tracks.
+func ingestFrames(t *testing.T, lib string, frames int) string {
+	t.Helper()
+	f := filepath.Join(t.TempDir(), "song.mp3")
+	writeMP3(t, f, testmp3.Silent(frames))
+	if code, _, errs := run(t, lib, "ingest", f); code != 0 {
+		t.Fatalf("ingest failed: %s", errs)
+	}
+	_, out, _ := run(t, lib, "ls")
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	return strings.Fields(lines[len(lines)-1])[0]
+}
+
+func TestEditTheReleaseDateAndShowAllThreeDates(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib)
+
+	if code, _, errs := run(t, lib, "edit", id, "--released", "1999-05"); code != 0 {
+		t.Fatalf("edit: code %d, err %q", code, errs)
+	}
+	_, out, _ := run(t, lib, "show", id)
+	today := time.Now().Format("2006-01-02")
+	for _, want := range []string{"Released 1999-05", "Added " + today, "Edited " + today} {
+		if !strings.Contains(squash(out), want) {
+			t.Errorf("show lacks %q:\n%s", want, out)
+		}
+	}
+
+	run(t, lib, "edit", id, "--released", "")
+	if _, out, _ := run(t, lib, "show", id); strings.Contains(out, "Released") {
+		t.Errorf("a cleared date is still shown:\n%s", out)
+	}
+
+	code, _, errs := run(t, lib, "edit", id, "--released", "last summer")
+	if code == 0 || !strings.Contains(errs, "1999-05-17") {
+		t.Errorf("a bad date: code %d, err %q; want a failure that shows the format", code, errs)
+	}
+}
+
+func TestAddTakesTheReleaseDateFromAFlag(t *testing.T) {
+	dl := &fakeDownloader{info: app.Info{Title: "Song", Uploader: "Band - Topic"}}
+	lib := filepath.Join(t.TempDir(), "lib")
+	code, _, errs := runWith(t, cli.Deps{Downloader: dl}, lib, "add", "u1", "--no-input", "--released", "2001")
+	if code != 0 {
+		t.Fatalf("code %d, err %q", code, errs)
+	}
+	_, out, _ := run(t, lib, "ls")
+	id := strings.Fields(strings.Split(strings.TrimSpace(out), "\n")[1])[0]
+	if _, out, _ := run(t, lib, "show", id); !strings.Contains(squash(out), "Released 2001") {
+		t.Errorf("show:\n%s", out)
+	}
+}
+
+func TestListSortedByAnyField(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	long := ingestFrames(t, lib, 300)
+	mid := ingestFrames(t, lib, 200)
+	short := ingestFrames(t, lib, 100)
+	run(t, lib, "edit", long, "--title", "Beta", "--artist", "Zed", "--album", "Second", "--released", "2001")
+	run(t, lib, "edit", mid, "--title", "Gamma", "--artist", "Abe", "--album", "First", "--released", "1999-05")
+	run(t, lib, "edit", short, "--title", "Alpha", "--artist", "Mo", "--released", "")
+
+	titles := func(args ...string) string {
+		t.Helper()
+		code, out, errs := run(t, lib, append([]string{"ls"}, args...)...)
+		if code != 0 {
+			t.Fatalf("ls %v: code %d, err %q", args, code, errs)
+		}
+		var got []string
+		for _, l := range strings.Split(strings.TrimSpace(out), "\n")[1:] {
+			for _, name := range []string{"Alpha", "Beta", "Gamma"} {
+				if strings.Contains(l, name) {
+					got = append(got, name)
+				}
+			}
+		}
+		return strings.Join(got, " ")
+	}
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--sort", "title"}, "Alpha Beta Gamma"},
+		{[]string{"--sort", "title", "--reverse"}, "Gamma Beta Alpha"},
+		{[]string{"--sort", "artist"}, "Gamma Alpha Beta"},
+		{[]string{"--sort", "length"}, "Alpha Gamma Beta"},
+		{[]string{"--sort", "released"}, "Beta Gamma Alpha"}, // newest first; no date goes last
+		{[]string{"--sort", "released", "--reverse"}, "Gamma Beta Alpha"},
+		{[]string{"--sort", "added"}, "Alpha Gamma Beta"}, // the last one added comes first
+		{[]string{"--sort", "TITLE", "beta"}, "Beta"},     // a query still filters; the key is not case sensitive
+	} {
+		if got := titles(c.args...); got != c.want {
+			t.Errorf("ls %v = %s, want %s", c.args, got, c.want)
+		}
+	}
+
+	if _, out, _ := run(t, lib, "ls", "--sort", "released"); !strings.Contains(squash(out), "RELEASED") || !strings.Contains(out, "1999-05") {
+		t.Errorf("sorting by a date should show it:\n%s", out)
+	}
+	if _, out, _ := run(t, lib, "ls", "--sort", "title"); strings.Contains(out, "RELEASED") {
+		t.Errorf("a date column without a date sort:\n%s", out)
+	}
+	code, _, errs := run(t, lib, "ls", "--sort", "colour")
+	if code == 0 || !strings.Contains(errs, "artist") || !strings.Contains(errs, "released") {
+		t.Errorf("unknown key: code %d, err %q; want the valid keys listed", code, errs)
 	}
 }
