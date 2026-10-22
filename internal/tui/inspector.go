@@ -8,7 +8,6 @@ import (
 	"music-manager/internal/app"
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
-	"music-manager/internal/timecode"
 	"music-manager/internal/translit"
 )
 
@@ -23,15 +22,17 @@ func (m Model) inspectorLines(w int) []string {
 	}
 	switch r.Kind {
 	case kindTrack:
-		return trackLines(r.Track, w)
+		return m.trackLines(r.Track, w)
 	case kindGroup:
 		return groupLines(r, w)
 	}
 	return m.summaryLines(r, w)
 }
 
+func rule(w int) string { return " " + styles.dim.Render(strings.Repeat("─", max(w-2, 0))) }
+
 func groupLines(r Row, w int) []string {
-	lines := []string{"", " " + styles.bold.Render(r.Label), " " + styles.dim.Render(strings.Repeat("─", max(w-2, 0))), ""}
+	lines := []string{"", " " + styles.bold.Render(r.Label), rule(w), ""}
 	text := "These tracks have not been identified yet, so they have no proper title or artist and sit in the _Inbox folder."
 	for _, l := range wrap(text, w-2) {
 		lines = append(lines, " "+l)
@@ -41,7 +42,7 @@ func groupLines(r Row, w int) []string {
 
 // summaryLines describes an artist or album: how much is in it.
 func (m Model) summaryLines(r Row, w int) []string {
-	lines := []string{"", " " + styles.bold.Render(r.Label), " " + styles.dim.Render(strings.Repeat("─", max(w-2, 0))), ""}
+	lines := []string{"", " " + styles.bold.Render(r.Label), rule(w), ""}
 	lines = append(lines, " "+plural(r.Count, "track"))
 	if r.Kind == kindArtist {
 		albums := map[string]bool{}
@@ -57,73 +58,101 @@ func (m Model) summaryLines(r Row, w int) []string {
 	return lines
 }
 
-const labelWidth = 11
+// labelWidth is the width of the label column, including the focus marker.
+const labelWidth = 12
 
-// trackLines shows a track's details.
-func trackLines(t manifest.Track, w int) []string {
-	artist, title, album := app.Display(t)
-	lines := []string{"", " " + styles.bold.Render(fit(title, w-2)), " " + styles.dim.Render(strings.Repeat("─", max(w-2, 0)))}
-	field := func(name, value string) {
-		lines = append(lines, " "+styles.dim.Render(fit(name, labelWidth))+value)
-	}
-
+// trackLines shows a track's fields, with the one being edited open.
+func (m Model) trackLines(t manifest.Track, w int) []string {
+	_, title, _ := app.Display(t)
+	lines := []string{"", " " + styles.bold.Render(fit(title, w-2)), rule(w)}
 	if t.Status != manifest.Identified {
-		lines = append(lines, "")
-		lines = append(lines, " "+styles.warn.Render("Not identified yet. This is what the file said:"))
-		field("Title", title)
-		field("Artist", artist)
-		field("Album", album)
-		return lines
+		lines = append(lines, " "+styles.warn.Render("Not identified yet. Dim values are from the file's old tags."))
 	}
 
-	nameField := func(name, original, ascii string) {
-		shown := original
-		if shown == "" {
-			shown = ascii
-		}
-		if shown == "" {
-			shown = styles.dim.Render("—")
-		}
-		field(name, shown)
-		if original != "" && original != ascii {
-			kind := "auto"
-			if ascii != translit.ToASCII(original) {
-				kind = "custom"
-			}
-			lines = append(lines, " "+strings.Repeat(" ", labelWidth)+styles.dim.Render("ascii  "+ascii+" · "+kind))
-		}
+	for i, f := range trackFields {
+		lines = append(lines, m.fieldLines(t, f, m.focus == paneInspector && i == m.field, w)...)
 	}
-	nameField("Title", t.OriginalTitle, t.Title)
-	nameField("Artist", t.OriginalArtist, t.Artist)
-	if t.Album == "" {
-		field("Album", styles.dim.Render("— (a single)"))
-	} else {
-		nameField("Album", t.OriginalAlbum, t.Album)
-	}
-	switch {
-	case t.TrackNumber > 0 && t.TrackTotal > 0:
-		field("Track", fmt.Sprintf("%d of %d", t.TrackNumber, t.TrackTotal))
-	case t.TrackNumber > 0:
-		field("Track", fmt.Sprintf("%d", t.TrackNumber))
-	default:
-		field("Track", styles.dim.Render("—"))
-	}
-	field("Cut start", timecode.Format(t.TrimStart))
-	field("Cut end", timecode.Format(t.TrimEnd))
 
-	lines = append(lines, " "+styles.dim.Render(strings.Repeat("─", max(w-2, 0))))
-	for i, l := range wrap(layout.PathFor(t), w-4) {
+	lines = append(lines, rule(w))
+	shown := t
+	if m.editing {
+		shown = previewTrack(t, m.dr)
+	}
+	for i, l := range wrap(layout.PathFor(shown), w-4) {
 		prefix := "   "
 		if i == 0 {
 			prefix = " → "
 		}
 		lines = append(lines, prefix+styles.accent.Render(l))
 	}
-	about := clock(t.PlayingLength()) + " plays · identified"
+	about := clock(t.PlayingLength()) + " plays"
+	if t.Status == manifest.Identified {
+		about += " · identified"
+	}
 	if t.SourceURL != "" {
 		about += " · from " + t.SourceURL
 	}
-	lines = append(lines, " "+styles.dim.Render(fit(about, w-2)))
+	return append(lines, " "+styles.dim.Render(fit(about, w-2)))
+}
+
+// fieldLines is one field: its label, its value or its open inputs, and
+// beneath them the ASCII form of a name and any error.
+func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int) []string {
+	marker, label := " ", styles.dim.Render(fit(f.label(), labelWidth-2))
+	if current {
+		marker, label = styles.accent.Render("▌"), styles.accent.Render(fit(f.label(), labelWidth-2))
+	}
+	prefix := " " + marker + label + " "
+	indent := strings.Repeat(" ", labelWidth+1)
+	vw := max(w-labelWidth-2, 1)
+
+	if m.editing && current {
+		return m.editorLines(prefix, indent, vw)
+	}
+
+	value := displayValue(t, f)
+	var lines []string
+	switch {
+	case value == "" && f == fAlbum:
+		lines = append(lines, prefix+styles.dim.Render("— (a single)"))
+	case value == "":
+		lines = append(lines, prefix+styles.dim.Render("—"))
+	case prefilledFrom(t, f):
+		lines = append(lines, prefix+styles.dim.Render(fit(value, vw)))
+	default:
+		lines = append(lines, prefix+fit(value, vw))
+	}
+	if f.isName() && t.Status == manifest.Identified {
+		original, ascii := names(t, f)
+		if original != "" && original != ascii {
+			kind := "auto"
+			if ascii != translit.ToASCII(original) {
+				kind = "custom"
+			}
+			lines = append(lines, indent+styles.dim.Render(fit("ascii  "+ascii+" · "+kind, vw)))
+		}
+	}
+	return lines
+}
+
+// editorLines draws the open inputs of the field being edited.
+func (m Model) editorLines(prefix, indent string, vw int) []string {
+	first, second := m.in[0], m.in[1]
+	var lines []string
+	switch {
+	case m.dr.field.isName():
+		first.Width, second.Width = max(vw-1, 1), max(vw-8, 1)
+		lines = append(lines, prefix+first.View(), indent+styles.dim.Render("ascii  ")+second.View())
+	case m.dr.field == fTrack:
+		first.Width, second.Width = 5, 5
+		lines = append(lines, prefix+first.View()+styles.dim.Render(" of ")+second.View())
+	default:
+		first.Width = max(vw-24, 1)
+		lines = append(lines, prefix+first.View()+styles.dim.Render("  e.g. 0:12 or 1:30.5"))
+	}
+	if m.editErr != "" {
+		lines = append(lines, indent+styles.bad.Render(fit(m.editErr, vw)))
+	}
 	return lines
 }
 

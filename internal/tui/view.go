@@ -93,7 +93,15 @@ func joinPanes(left, right string) string {
 }
 
 func (m Model) footerView() string {
-	return fit(" "+renderKeys(m.footerKeys()), m.w)
+	line := " "
+	if m.status != "" {
+		st := styles.good
+		if m.statusBad {
+			st = styles.bad
+		}
+		line += st.Render(m.status) + styles.keyDesc.Render("  ·  ")
+	}
+	return fit(line+renderKeys(m.footerKeys()), m.w)
 }
 
 // renderKeys draws bindings as "key description" pairs.
@@ -117,12 +125,28 @@ func wrap(s string, w int) []string {
 // footerKeys are the keys worth showing now.
 func (m Model) footerKeys() []key.Binding {
 	k := m.keys
-	if m.filtering {
+	switch {
+	case m.editing:
+		bindings := []key.Binding{k.Save, k.Cancel}
+		if m.hasSecond() {
+			bindings = append(bindings, k.NextInput)
+		}
+		return bindings
+	case m.filtering:
 		return []key.Binding{k.FilterKeep, k.FilterClear}
 	}
-	bindings := []key.Binding{k.Up, k.Open, k.Filter}
-	if m.filter != "" {
-		bindings = append(bindings, k.ClearFilter)
+
+	var bindings []key.Binding
+	if m.focus == paneInspector {
+		bindings = []key.Binding{k.Field, k.Edit, k.Back}
+	} else {
+		bindings = []key.Binding{k.Up, k.Open, k.Filter}
+		if m.filter != "" {
+			bindings = append(bindings, k.ClearFilter)
+		}
+	}
+	if len(m.undoStack) > 0 {
+		bindings = append(bindings, k.Undo)
 	}
 	return append(bindings, k.Help, k.Quit)
 }

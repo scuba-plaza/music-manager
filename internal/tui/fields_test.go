@@ -1,0 +1,266 @@
+package tui
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"music-manager/internal/layout"
+	"music-manager/internal/manifest"
+)
+
+func identified() manifest.Track {
+	return manifest.Track{
+		ID: "k7f2qd", Status: manifest.Identified,
+		Title: "Wtni", OriginalTitle: "وطني",
+		Artist: "Firuz", OriginalArtist: "فيروز",
+		Album: "Hits", OriginalAlbum: "Hits",
+		TrackNumber: 3, TrackTotal: 12,
+		SourceLength: 3 * time.Minute, TrimStart: 2 * time.Second, TrimEnd: 1500 * time.Millisecond,
+	}
+}
+
+func TestFieldsAreInTheOrderOfTheInspector(t *testing.T) {
+	want := []fieldKind{fTitle, fArtist, fAlbum, fTrack, fCutStart, fCutEnd}
+	if len(trackFields) != len(want) {
+		t.Fatalf("fields = %v", trackFields)
+	}
+	for i := range want {
+		if trackFields[i] != want[i] {
+			t.Errorf("field %d = %v, want %v", i, trackFields[i], want[i])
+		}
+	}
+	if fTitle.label() != "Title" || fCutStart.label() != "Cut start" || fTrack.label() != "Track" {
+		t.Error("labels")
+	}
+	if !fTitle.isName() || !fArtist.isName() || !fAlbum.isName() || fTrack.isName() || fCutEnd.isName() {
+		t.Error("only title, artist and album are names")
+	}
+}
+
+func TestANewDraftStartsFromTheTracksCurrentValues(t *testing.T) {
+	tr := identified()
+	cases := []struct {
+		f            fieldKind
+		text, second string
+	}{
+		{fTitle, "وطني", "Wtni"},
+		{fArtist, "فيروز", "Firuz"},
+		{fAlbum, "Hits", "Hits"},
+		{fTrack, "3", "12"},
+		{fCutStart, "0:02", ""},
+		{fCutEnd, "0:01.5", ""},
+	}
+	for _, c := range cases {
+		d := newDraft(tr, c.f)
+		if d.text != c.text || d.second != c.second {
+			t.Errorf("%s: draft = %q / %q, want %q / %q", c.f.label(), d.text, d.second, c.text, c.second)
+		}
+	}
+	tr.TrackNumber, tr.TrackTotal, tr.TrimStart = 0, 0, 0
+	if d := newDraft(tr, fTrack); d.text != "" || d.second != "" {
+		t.Errorf("unknown numbers should start empty: %q / %q", d.text, d.second)
+	}
+	if d := newDraft(tr, fCutStart); d.text != "" {
+		t.Errorf("no cut should start empty, got %q", d.text)
+	}
+}
+
+func TestADraftOfAnUnidentifiedTrackStartsFromWhatTheFileSaid(t *testing.T) {
+	tr := manifest.Track{ID: "u", Status: manifest.Unidentified, Hint: manifest.Hint{Title: "Bahlam Bek", Artist: "Abdel Halim", Album: "Rawaeaa", Track: 4, Total: 7, Filename: "04 Bahlam Bek"}}
+	for f, want := range map[fieldKind]string{fTitle: "Bahlam Bek", fArtist: "Abdel Halim", fAlbum: "Rawaeaa", fTrack: "4"} {
+		if d := newDraft(tr, f); d.text != want {
+			t.Errorf("%s starts as %q, want %q", f.label(), d.text, want)
+		}
+	}
+	if d := newDraft(tr, fTrack); d.second != "7" {
+		t.Errorf("total = %q", d.second)
+	}
+	tr.Hint.Title = ""
+	if d := newDraft(tr, fTitle); d.text != "Bahlam Bek" {
+		t.Errorf("without a tag the file name should do, got %q", d.text)
+	}
+}
+
+func TestTheASCIIFormFollowsTheTextUntilTheUserTouchesIt(t *testing.T) {
+	d := newDraft(identified(), fTitle)
+	d.setText("ليته")
+	if d.second != "Lith" {
+		t.Errorf("ascii = %q, want it to follow the text (an auto form follows)", d.second)
+	}
+	d.setSecond("Layteh")
+	d.setText("ليته في")
+	if d.second != "Layteh" {
+		t.Errorf("ascii = %q: once the user wrote it, it must stay", d.second)
+	}
+}
+
+func TestACustomASCIIFormStaysWhenTheTextChanges(t *testing.T) {
+	tr := identified()
+	tr.Artist = "Fairuz" // not what transliteration gives, so it is a custom form
+	d := newDraft(tr, fArtist)
+	d.setText("فيروز ")
+	if d.second != "Fairuz" {
+		t.Errorf("ascii = %q: a custom form is kept, like the app does", d.second)
+	}
+}
+
+func TestEditBuildsWhatTheAppNeeds(t *testing.T) {
+	tr := identified()
+	d := newDraft(tr, fTitle)
+	d.setText("  Watani ")
+	e, err := d.edit()
+	if err != nil || e.Title == nil || *e.Title != "Watani" || e.TitleASCII != nil {
+		t.Fatalf("untouched ascii: %+v, %v", e, err)
+	}
+
+	d.setSecond("Wtani")
+	e, _ = d.edit()
+	if e.TitleASCII == nil || *e.TitleASCII != "Wtani" {
+		t.Errorf("a written ascii form must be sent: %+v", e)
+	}
+	d.setSecond("")
+	if e, _ = d.edit(); e.TitleASCII == nil || *e.TitleASCII != "" {
+		t.Errorf("clearing the ascii form means back to automatic: %+v", e)
+	}
+	d.setText("Wtni")
+	d.setSecond("Wtni") // the same as the automatic form: no override
+	if e, _ = d.edit(); e.TitleASCII == nil || *e.TitleASCII != "" {
+		t.Errorf("an ascii form equal to the automatic one is no override: %+v", e)
+	}
+
+	a := newDraft(tr, fAlbum)
+	a.setText("")
+	if e, err := a.edit(); err != nil || e.Album == nil || *e.Album != "" {
+		t.Errorf("an empty album is a single: %+v, %v", e, err)
+	}
+}
+
+func TestEditRefusesWhatWouldBreakTheTrack(t *testing.T) {
+	tr := identified()
+	for _, c := range []struct {
+		f        fieldKind
+		text, of string
+		wantErr  string
+	}{
+		{fTitle, "  ", "", "Title"},
+		{fArtist, "", "", "Artist"},
+		{fTrack, "abc", "", "whole number"},
+		{fTrack, "-3", "", "whole number"},
+		{fTrack, "3", "x", "whole number"},
+		{fCutStart, "1:99", "", "below 60"},
+		{fCutEnd, "-5", "", "invalid"},
+		{fCutEnd, "soon", "", "invalid"},
+	} {
+		d := newDraft(tr, c.f)
+		d.text = c.text
+		if c.f == fTrack {
+			d.second = c.of
+		}
+		_, err := d.edit()
+		if err == nil || !strings.Contains(err.Error(), c.wantErr) {
+			t.Errorf("%s %q/%q: err = %v, want one mentioning %q", c.f.label(), c.text, c.of, err, c.wantErr)
+		}
+	}
+}
+
+func TestEditParsesNumbersAndTimecodes(t *testing.T) {
+	tr := identified()
+	d := newDraft(tr, fTrack)
+	d.text, d.second = "5", "9"
+	e, err := d.edit()
+	if err != nil || *e.TrackNumber != 5 || *e.TrackTotal != 9 {
+		t.Errorf("%+v, %v", e, err)
+	}
+	d.text, d.second = "", ""
+	if e, _ := d.edit(); *e.TrackNumber != 0 || *e.TrackTotal != 0 {
+		t.Errorf("empty means unknown: %+v", e)
+	}
+
+	c := newDraft(tr, fCutStart)
+	c.text = "1:30.5"
+	if e, err := c.edit(); err != nil || *e.TrimStart != 90*time.Second+500*time.Millisecond {
+		t.Errorf("%+v, %v", e, err)
+	}
+	c.text = ""
+	if e, _ := c.edit(); *e.TrimStart != 0 {
+		t.Errorf("empty means no cut: %+v", e)
+	}
+	end := newDraft(tr, fCutEnd)
+	end.text = "0:03"
+	if e, _ := end.edit(); e.TrimEnd == nil || *e.TrimEnd != 3*time.Second || e.TrimStart != nil {
+		t.Errorf("only the end cut should be set: %+v", e)
+	}
+}
+
+func TestPreviewShowsWhereTheFileWillGo(t *testing.T) {
+	tr := identified()
+	base := layout.PathFor(tr)
+	if base != "Firuz/Hits/03 - Wtni.mp3" {
+		t.Fatalf("setup: %q", base)
+	}
+
+	title := newDraft(tr, fTitle)
+	title.setText("Watani")
+	if got := layout.PathFor(previewTrack(tr, title)); got != "Firuz/Hits/03 - Watani.mp3" {
+		t.Errorf("title preview = %q", got)
+	}
+
+	album := newDraft(tr, fAlbum)
+	album.setText("")
+	if got := layout.PathFor(previewTrack(tr, album)); got != "Firuz/Wtni.mp3" {
+		t.Errorf("a single = %q", got)
+	}
+
+	num := newDraft(tr, fTrack)
+	num.text, num.second = "7", "120"
+	if got := layout.PathFor(previewTrack(tr, num)); got != "Firuz/Hits/007 - Wtni.mp3" {
+		t.Errorf("numbered = %q", got)
+	}
+
+	artist := newDraft(tr, fArtist)
+	artist.setText("فيروز")
+	artist.setSecond("Fairuz")
+	if got := layout.PathFor(previewTrack(tr, artist)); got != "Fairuz/Hits/03 - Wtni.mp3" {
+		t.Errorf("custom ascii = %q", got)
+	}
+
+	cut := newDraft(tr, fCutStart)
+	cut.text = "0:10"
+	if layout.PathFor(previewTrack(tr, cut)) != base {
+		t.Error("a cut does not change the path")
+	}
+}
+
+func TestPreviewOfAnUnidentifiedTrackBecomesIdentifiedOnceItHasATitleAndArtist(t *testing.T) {
+	tr := manifest.Track{ID: "abc123", Status: manifest.Unidentified, Hint: manifest.Hint{Title: "Song", Artist: "Band", Filename: "x"}}
+	title := newDraft(tr, fTitle)
+	if got := layout.PathFor(previewTrack(tr, title)); got != "_Inbox/abc123 - x.mp3" {
+		t.Errorf("with only a title it is still in the inbox, got %q", got)
+	}
+	tr.Artist, tr.OriginalArtist = "Band", "Band"
+	if got := layout.PathFor(previewTrack(tr, title)); got != "Band/Song.mp3" {
+		t.Errorf("with both it gets a place, got %q", got)
+	}
+}
+
+func TestDisplayValues(t *testing.T) {
+	tr := identified()
+	if got := displayValue(tr, fTrack); got != "3 of 12" {
+		t.Errorf("= %q", got)
+	}
+	tr.TrackTotal = 0
+	if got := displayValue(tr, fTrack); got != "3" {
+		t.Errorf("= %q", got)
+	}
+	tr.TrackNumber = 0
+	if got := displayValue(tr, fTrack); got != "" {
+		t.Errorf("= %q", got)
+	}
+	if got := displayValue(identified(), fCutEnd); got != "0:01.5" {
+		t.Errorf("= %q", got)
+	}
+	if got := displayValue(manifest.Track{}, fCutEnd); got != "0:00" {
+		t.Errorf("no cut should read 0:00, got %q", got)
+	}
+}

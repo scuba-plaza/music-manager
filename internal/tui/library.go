@@ -13,6 +13,10 @@ type Library interface {
 	Root() string
 	// Tracks returns every record.
 	Tracks() ([]manifest.Track, error)
+	// Edit changes a track and returns it as saved.
+	Edit(id string, e app.Edit) (manifest.Track, error)
+	// Restore puts a record back exactly as it was; undo is built on it.
+	Restore(t manifest.Track) error
 }
 
 type appLibrary struct{ *app.App }

@@ -24,6 +24,7 @@ func (m *Model) rebuild() {
 			if r.Key == m.selKey {
 				m.cursor = i
 				m.scrollToCursor()
+				m.checkFocus()
 				return
 			}
 		}
@@ -31,6 +32,15 @@ func (m *Model) rebuild() {
 	m.cursor = clamp(m.cursor, 0, max(len(m.rows)-1, 0))
 	m.syncSelection()
 	m.scrollToCursor()
+	m.checkFocus()
+}
+
+// checkFocus hands the keyboard back to the tree if what is selected has no
+// fields to edit.
+func (m *Model) checkFocus() {
+	if r, ok := m.selectedRow(); !ok || r.Kind != kindTrack {
+		m.focus, m.editing = paneBrowser, false
+	}
 }
 
 // syncSelection records which row the cursor is on.

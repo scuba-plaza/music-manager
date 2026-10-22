@@ -95,11 +95,30 @@ func (s *session) close() {
 // Screen is the text currently on the screen.
 func (s *session) Screen() string { return ansi.Strip(s.em.Render()) }
 
-// Type sends keystrokes. Control keys are written as their bytes.
+// Type sends keystrokes one at a time, as typing would, so the program sees
+// separate key presses rather than one paste. Escape sequences such as the
+// arrow keys (ESC [ A) are kept whole; control keys are written as their bytes.
 func (s *session) Type(text string) {
 	s.t.Helper()
-	if _, err := s.ptmx.WriteString(text); err != nil {
-		s.t.Fatal(err)
+	for i := 0; i < len(text); {
+		n := 1
+		switch {
+		case text[i] == 0x1b && i+1 < len(text) && text[i+1] == '[':
+			n = 2
+			for i+n < len(text) && !(text[i+n] >= 0x40 && text[i+n] <= 0x7e) {
+				n++
+			}
+			n = min(n+1, len(text)-i)
+		case text[i] >= 0x80: // a multi-byte character
+			for i+n < len(text) && text[i+n]&0xC0 == 0x80 {
+				n++
+			}
+		}
+		if _, err := s.ptmx.WriteString(text[i : i+n]); err != nil {
+			s.t.Fatal(err)
+		}
+		i += n
+		time.Sleep(15 * time.Millisecond)
 	}
 }
 
@@ -193,4 +212,39 @@ func TestPTYExplore(t *testing.T) {
 		time.Sleep(250 * time.Millisecond)
 	}
 	t.Logf("\n%s", s.Screen())
+}
+
+func TestPTYEditATitleAndItIsSaved(t *testing.T) {
+	a := testApp(t)
+	seed(t, a,
+		seedTrack{"The Wanderer", "Shawn James", "Shadows", 1, 12, 0},
+		seedTrack{"Flow", "Shawn James", "Shadows", 7, 12, 0})
+	s := startMM(t, 100, 30, a.Root())
+	s.MustSee("Shawn James")
+
+	s.Type("/flow\r")            // find it
+	s.Type("\x1b[B\x1b[B\x1b[B") // down to the track
+	s.Type("\x1b[C")             // into the inspector
+	s.Type("\r")                 // edit the title
+	s.MustSee("enter save")
+	s.Type("\x15Flow Again") // clear the field and type
+	s.MustSee("Shawn James/Shadows/07 - Flow Again.mp3")
+	s.Type("\r")
+	s.MustSee("Saved")
+
+	s.Type("q")
+	if exited, err := s.Exited(3 * time.Second); !exited || err != nil {
+		t.Fatalf("exited %v, err %v\n%s", exited, err, s.Screen())
+	}
+	m, err := a.Manifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, tr := range m.Tracks {
+		found = found || tr.Title == "Flow Again"
+	}
+	if !found {
+		t.Errorf("the edit never reached library.json: %+v", m.Tracks)
+	}
 }

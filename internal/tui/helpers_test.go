@@ -148,6 +148,8 @@ func press(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyCtrlC}
 	case "ctrl+r":
 		return tea.KeyMsg{Type: tea.KeyCtrlR}
+	case "ctrl+u":
+		return tea.KeyMsg{Type: tea.KeyCtrlU}
 	case "ctrl+a":
 		return tea.KeyMsg{Type: tea.KeyCtrlA}
 	case "ctrl+s":
@@ -214,3 +216,70 @@ func quits(cmd tea.Cmd) bool {
 }
 
 var _ = context.Background
+
+// libTracks reads the records straight from the library.
+func libTracks(t *testing.T, lib Library) []manifest.Track {
+	t.Helper()
+	ts, err := lib.Tracks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ts
+}
+
+// trackNamed finds a record by its title (or its old title if not identified).
+func trackNamed(t *testing.T, lib Library, title string) manifest.Track {
+	t.Helper()
+	for _, tr := range libTracks(t, lib) {
+		if tr.Title == title || tr.OriginalTitle == title || tr.Hint.Title == title {
+			return tr
+		}
+	}
+	t.Fatalf("no track titled %q", title)
+	return manifest.Track{}
+}
+
+// selectTrack opens the tree down to the track with the title and selects it.
+func selectTrack(t *testing.T, m Model, title string) Model {
+	t.Helper()
+	for _, tr := range m.tracks {
+		if tr.Title == title || tr.OriginalTitle == title || tr.Hint.Title == title {
+			m.revealTrack(tr)
+			return m
+		}
+	}
+	t.Fatalf("no track titled %q on screen", title)
+	return m
+}
+
+// clearField empties the input being edited, as ctrl+u does.
+func clearField(t *testing.T, m Model) Model { return keys(t, m, "ctrl+u") }
+
+// editWith wraps a Library so tests can watch or break a call.
+type editHook struct {
+	Library
+	calls int
+	err   error
+}
+
+func (h *editHook) Edit(id string, e app.Edit) (manifest.Track, error) {
+	h.calls++
+	if h.err != nil {
+		return manifest.Track{}, h.err
+	}
+	return h.Library.Edit(id, e)
+}
+
+// seedTagged ingests a file whose old tags are given, so it has hints.
+func seedTagged(t *testing.T, a *app.App, name, title, artist, album, track string) manifest.Track {
+	t.Helper()
+	f := filepath.Join(t.TempDir(), name+".mp3")
+	if err := os.WriteFile(f, testmp3.WithTagsTrack(testmp3.Silent(60+len(name)), title, artist, album, track), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := a.Ingest([]string{f})
+	if err != nil || len(rep.Added) != 1 {
+		t.Fatalf("ingest %s: %+v, %v", name, rep, err)
+	}
+	return rep.Added[0]
+}
