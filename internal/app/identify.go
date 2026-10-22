@@ -24,6 +24,8 @@ type IdentifyOptions struct {
 	// MinScore, and skips the track otherwise.
 	Yes      bool
 	MinScore int // 95 if zero
+	// OnResult, if set, is called with each track's result as soon as it is known.
+	OnResult func(IdentifyResult)
 }
 
 // IdentifyResult says what happened to one track.
@@ -66,36 +68,41 @@ func (a *App) Identify(ctx context.Context, ids []string, src MetadataSource, p 
 	}
 
 	var results []IdentifyResult
+	record := func(r IdentifyResult) {
+		results = append(results, r)
+		if opts.OnResult != nil {
+			opts.OnResult(r)
+		}
+	}
 	for _, t := range todo {
 		if err := ctx.Err(); err != nil {
 			return results, err
 		}
 		res := IdentifyResult{TrackID: t.ID}
-		q := queryFor(t)
-		if q.Title == "" {
-			res.Reason = "nothing to search for"
-			results = append(results, res)
+		cands, err := a.search(ctx, t, src, nil)
+		if errors.Is(err, errNothingToSearch) {
+			res.Reason = err.Error()
+			record(res)
 			continue
 		}
-		cands, err := src.Search(ctx, q)
 		if err != nil {
 			res.Err = err
-			results = append(results, res)
+			record(res)
 			continue
 		}
-		pick, reason, err := choose(t, preferHint(cands, t.Hint), p, opts)
+		pick, reason, err := choose(t, cands, p, opts)
 		if err != nil {
 			return results, err
 		}
 		if pick == nil {
 			res.Reason = reason
-			results = append(results, res)
+			record(res)
 			continue
 		}
 		updated, err := a.applyCandidate(ctx, t, *pick, src)
 		if err != nil {
 			res.Err = err
-			results = append(results, res)
+			record(res)
 			continue
 		}
 		m.Update(updated)
@@ -103,9 +110,67 @@ func (a *App) Identify(ctx context.Context, ids []string, src MetadataSource, p 
 			return results, err
 		}
 		res.Applied = pick
-		results = append(results, res)
+		record(res)
 	}
 	return results, nil
+}
+
+var errNothingToSearch = errors.New("nothing to search for")
+
+// search looks t up in src, by q if given and otherwise by what t is known
+// by, and returns the candidates ordered so those fitting the file's old
+// album and track number come first.
+func (a *App) search(ctx context.Context, t manifest.Track, src MetadataSource, q *Query) ([]Candidate, error) {
+	query := queryFor(t)
+	if q != nil {
+		query = *q
+	}
+	if strings.TrimSpace(query.Title) == "" {
+		return nil, errNothingToSearch
+	}
+	cands, err := src.Search(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	return preferHint(cands, t.Hint), nil
+}
+
+// Candidates lists what the track with the given id could be, best first and
+// at most maxChoices of them, without changing anything. q overrides the
+// words searched for, which is how to find a track whose name is romanised.
+func (a *App) Candidates(ctx context.Context, id string, src MetadataSource, q *Query) ([]Candidate, error) {
+	m, err := a.store.Load()
+	if err != nil {
+		return nil, err
+	}
+	t, ok := m.Get(id)
+	if !ok {
+		return nil, fmt.Errorf("no track with id %q", id)
+	}
+	cands, err := a.search(ctx, t, src, q)
+	if err != nil {
+		return nil, err
+	}
+	return cands[:min(len(cands), maxChoices)], nil
+}
+
+// ApplyCandidate identifies the track with the given id as c, fetching a
+// cover if it has none, and returns the updated track.
+func (a *App) ApplyCandidate(ctx context.Context, id string, c Candidate, src MetadataSource) (manifest.Track, error) {
+	m, err := a.store.Load()
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	t, ok := m.Get(id)
+	if !ok {
+		return manifest.Track{}, fmt.Errorf("no track with id %q", id)
+	}
+	updated, err := a.applyCandidate(ctx, t, c, src)
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	m.Update(updated)
+	return updated, a.store.Save(m)
 }
 
 // queryFor is what to search for to find t.

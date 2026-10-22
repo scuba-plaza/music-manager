@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strings"
 
-	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
 	"music-manager/internal/render"
@@ -24,6 +23,9 @@ import (
 type SyncOptions struct {
 	Target string // directory to render into; the library root if empty
 	Prune  bool   // delete stray files instead of only reporting them
+	// OnProgress, if set, hears how many tracks have been prepared so far
+	// while the plan is made.
+	OnProgress func(done, total int)
 }
 
 // SyncPlan is the set of operations that turns a target directory into the
@@ -37,6 +39,8 @@ type SyncPlan struct {
 	target                string
 	build                 map[string]func() ([]byte, error)
 	keepAudio, keepCovers map[string]bool
+	desired, existing     render.Tree
+	sigs                  map[string]string
 }
 
 // Root is the library directory.
@@ -58,11 +62,10 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 		keepAudio[t.AudioSHA256] = true
 		keepCovers[t.CoverSHA256] = true
 	}
-	paths := layout.Assign(m.Tracks)
+	paths, albumCovers := renderInputs(m.Tracks)
 	desired := render.Tree{}
 	build := map[string]func() ([]byte, error){}
-	albumCovers := map[string]manifest.Track{} // folder -> the oldest track with a cover
-	for _, t := range m.Tracks {
+	for i, t := range m.Tracks {
 		t := t
 		p := paths[t.ID]
 		build[p] = func() ([]byte, error) { return a.renderTrack(t) }
@@ -71,12 +74,8 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 			return nil, fmt.Errorf("track %s: %w", t.ID, err)
 		}
 		desired[p] = fingerprint(data)
-
-		if t.Status == manifest.Identified && t.Album != "" && t.CoverSHA256 != "" {
-			dir := path.Dir(p)
-			if cur, ok := albumCovers[dir]; !ok || older(t, cur) {
-				albumCovers[dir] = t
-			}
+		if opts.OnProgress != nil {
+			opts.OnProgress(i+1, len(m.Tracks))
 		}
 	}
 	for dir, t := range albumCovers {
@@ -98,15 +97,30 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 	return &SyncPlan{
 		Ops: render.Plan(desired, existing, opts.Prune), a: a, target: target, build: build,
 		keepAudio: keepAudio, keepCovers: keepCovers,
+		desired: desired, existing: existing, sigs: signatures(m.Tracks),
 	}, nil
+}
+
+// WithPrune returns the same plan with stray files marked for removal (or,
+// with false, only reported), without scanning anything again.
+func (p *SyncPlan) WithPrune(prune bool) *SyncPlan {
+	q := *p
+	q.Ops = render.Plan(p.desired, p.existing, prune)
+	q.Collected = 0
+	return &q
 }
 
 // Apply carries out the plan: it writes created and updated files and
 // removes the files the plan marks for removal, along with directories left
 // empty. Strays are left alone. Finally it deletes audio and cover blobs that
 // no record uses any more.
-func (p *SyncPlan) Apply() error {
-	for _, op := range p.Ops {
+func (p *SyncPlan) Apply() error { return p.ApplyWith(nil) }
+
+// ApplyWith is Apply that reports how many of the plan's operations are done.
+// After a sync into the library folder it also records what was synced, for
+// Unsynced.
+func (p *SyncPlan) ApplyWith(progress func(done, total int)) error {
+	for i, op := range p.Ops {
 		if !filepath.IsLocal(filepath.FromSlash(op.Path)) {
 			return fmt.Errorf("refusing to touch %q outside the target", op.Path)
 		}
@@ -125,6 +139,9 @@ func (p *SyncPlan) Apply() error {
 				return err
 			}
 		}
+		if progress != nil {
+			progress(i+1, len(p.Ops))
+		}
 	}
 	if err := removeEmptyDirs(p.target); err != nil {
 		return err
@@ -135,7 +152,13 @@ func (p *SyncPlan) Apply() error {
 	}
 	covers, err := p.a.covers.GC(p.keepCovers)
 	p.Collected = len(audio) + len(covers)
-	return err
+	if err != nil {
+		return err
+	}
+	if sameDir(p.target, p.a.root) {
+		return p.a.writeSynced(p.sigs)
+	}
+	return nil
 }
 
 func (a *App) renderTrack(t manifest.Track) ([]byte, error) {

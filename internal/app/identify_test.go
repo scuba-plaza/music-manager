@@ -347,3 +347,95 @@ func TestIdentifyYesKeepsTheOldAlbumWhenNoReleaseMatchesIt(t *testing.T) {
 		}
 	})
 }
+
+func TestCandidatesListsMatchesBestFitFirstAndCapped(t *testing.T) {
+	a := openLib(t)
+	tr := ingestTagged(t, a, "x", "Flow", "Shawn James", "Shadows", "")
+	var cands []app.Candidate
+	for i := 0; i < 30; i++ {
+		c := app.Candidate{ReleaseID: fmt.Sprint("rel-", i), Title: "Flow", Artist: "Shawn James", Album: fmt.Sprint("Album ", i), Score: 100}
+		if i == 20 {
+			c.Album = "Shadows"
+		}
+		cands = append(cands, c)
+	}
+	src := &fakeSource{results: map[string][]app.Candidate{"Flow|Shawn James": cands}}
+	got, err := a.Candidates(context.Background(), tr.ID, src, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 15 || got[0].ReleaseID != "rel-20" {
+		t.Errorf("%d candidates, first %q; want 15 with the Shadows release first", len(got), got[0].ReleaseID)
+	}
+	if tracks(t, a)[0].Status != manifest.Unidentified {
+		t.Error("listing candidates must not change the track")
+	}
+}
+
+func TestCandidatesWithYourOwnWords(t *testing.T) {
+	a := openLib(t)
+	tr := ingestTagged(t, a, "x", "Ya Roubou'a Biladi", "Fairouz", "", "")
+	src := &fakeSource{results: map[string][]app.Candidate{"يا ربوع بلادي|فيروز": {dream3}}}
+	got, err := a.Candidates(context.Background(), tr.ID, src, &app.Query{Title: "يا ربوع بلادي", Artist: "فيروز"})
+	if err != nil || len(got) != 1 {
+		t.Fatalf("%v, %v", got, err)
+	}
+	if len(src.queries) != 1 || src.queries[0].Artist != "فيروز" {
+		t.Errorf("searched for %+v, want the given words", src.queries)
+	}
+}
+
+func TestCandidatesNeedsSomethingToSearchFor(t *testing.T) {
+	a := openLib(t)
+	f := filepath.Join(t.TempDir(), "123.mp3")
+	writeFile(t, f, testmp3.Silent(5))
+	a.Ingest([]string{f})
+	if _, err := a.Candidates(context.Background(), tracks(t, a)[0].ID, &fakeSource{}, nil); err == nil {
+		t.Error("searched for nothing")
+	}
+	if _, err := a.Candidates(context.Background(), "nope", &fakeSource{}, nil); err == nil {
+		t.Error("unknown id accepted")
+	}
+	failing := &fakeSource{errs: map[string]error{"123|": errors.New("offline")}}
+	if _, err := a.Candidates(context.Background(), tracks(t, a)[0].ID, failing, &app.Query{Title: "123"}); err == nil || !strings.Contains(err.Error(), "offline") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestApplyCandidateIdentifiesTheTrackAsChosen(t *testing.T) {
+	a := openLib(t)
+	tr := ingestTagged(t, a, "x", "Dream 3", "Max Richter", "Whatever", "")
+	src := &fakeSource{covers: map[string][]byte{"rel-2": testmp3.JPEG}}
+	got, err := a.ApplyCandidate(context.Background(), tr.ID, dream3Voyager, src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != manifest.Identified || got.Album != "Voyager" || got.TrackNumber != 9 || got.MBReleaseID != "rel-2" || got.CoverSHA256 == "" {
+		t.Errorf("track = %+v", got)
+	}
+	if saved := tracks(t, a)[0]; saved.Album != "Voyager" {
+		t.Errorf("not saved: %+v", saved)
+	}
+	if _, err := a.ApplyCandidate(context.Background(), "nope", dream3, src); err == nil {
+		t.Error("unknown id accepted")
+	}
+}
+
+func TestIdentifyReportsEachResultAsItHappens(t *testing.T) {
+	a := libWithTracks(t, 10, 20, 30)
+	src := &fakeSource{results: map[string][]app.Candidate{"b|": {dream3}}}
+	var seen []string
+	_, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true, OnResult: func(r app.IdentifyResult) {
+		seen = append(seen, r.TrackID)
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []string
+	for _, tr := range tracks(t, a) {
+		want = append(want, tr.ID)
+	}
+	if strings.Join(seen, ",") != strings.Join(want, ",") {
+		t.Errorf("callback saw %v, want every track in order %v", seen, want)
+	}
+}

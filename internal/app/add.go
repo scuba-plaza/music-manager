@@ -77,71 +77,112 @@ type AddRequest struct {
 	OnWarning func(error)
 }
 
-// Add downloads the audio at req.URL into the library as an identified
-// track. Fields not given in req.Edit are asked with p, offering what the
-// download reported as the default; with a nil p they simply take that
-// default. Nothing is added if anything fails.
-func (a *App) Add(ctx context.Context, req AddRequest, dl Downloader, p Prompter) (manifest.Track, error) {
+// Draft is a downloaded track waiting for its details. Its audio is already
+// in the library's store but it has no record yet; Finish creates the record.
+// A draft that is never finished leaves a blob that the next sync collects.
+type Draft struct {
+	URL string
+	// Info is what to offer as the defaults for the details: the
+	// MusicBrainz match if there is one, otherwise what the download said.
+	Info Info
+	// Downloaded is what the download itself reported, for when the match is
+	// declined.
+	Downloaded Info
+	// Match is a confident MusicBrainz match, or nil.
+	Match *Candidate
+	// Length is the length of the downloaded audio.
+	Length time.Duration
+
+	staged staged
+	source MetadataSource
+}
+
+// Fetch downloads the audio at req.URL and prepares a Draft, without adding
+// anything to the library. It fails with a *DuplicateError if the audio is
+// already there. Fields set in req.Edit only steer the MusicBrainz search.
+func (a *App) Fetch(ctx context.Context, req AddRequest, dl Downloader) (*Draft, error) {
 	if err := os.MkdirAll(filepath.Join(a.root, ".mm"), 0o755); err != nil {
-		return manifest.Track{}, err
+		return nil, err
 	}
 	dir, err := os.MkdirTemp(filepath.Join(a.root, ".mm"), "download-")
 	if err != nil {
-		return manifest.Track{}, err
+		return nil, err
 	}
 	defer os.RemoveAll(dir)
 
 	d, err := dl.Download(ctx, req.URL, dir)
 	if err != nil {
-		return manifest.Track{}, fmt.Errorf("download %s: %w", req.URL, err)
+		return nil, fmt.Errorf("download %s: %w", req.URL, err)
 	}
 	s, err := a.stage(d.Path)
 	if err != nil {
-		return manifest.Track{}, fmt.Errorf("downloaded file: %w", err)
+		return nil, fmt.Errorf("downloaded file: %w", err)
 	}
+	m, err := a.store.Load()
+	if err != nil {
+		return nil, err
+	}
+	if dup, ok := m.FindByAudio(s.sha); ok {
+		return nil, &DuplicateError{ID: dup.ID}
+	}
+	if len(req.Cover) > 0 {
+		if s.coverSHA, err = a.storeCover(req.Cover); err != nil {
+			return nil, err
+		}
+	}
+
+	draft := &Draft{URL: req.URL, Info: d.Info, Downloaded: d.Info, Length: s.length, staged: s, source: req.Source}
+	if req.Source != nil && (req.Edit.Title == nil || req.Edit.Artist == nil) {
+		if draft.Match = a.lookup(ctx, req, d.Info); draft.Match != nil {
+			draft.Info = infoFrom(*draft.Match)
+		}
+	}
+	return draft, nil
+}
+
+// Finish records the draft as an identified track with the details in e.
+// Nothing is added if e is invalid or the audio has meanwhile been added.
+func (a *App) Finish(ctx context.Context, d *Draft, e Edit) (manifest.Track, error) {
 	m, err := a.store.Load()
 	if err != nil {
 		return manifest.Track{}, err
 	}
-	if dup, ok := m.FindByAudio(s.sha); ok {
+	if dup, ok := m.FindByAudio(d.staged.sha); ok {
 		return manifest.Track{}, &DuplicateError{ID: dup.ID}
 	}
-	if len(req.Cover) > 0 {
-		if s.coverSHA, err = a.storeCover(req.Cover); err != nil {
-			return manifest.Track{}, err
-		}
-	}
-
-	info := d.Info
-	var match *Candidate
-	if req.Source != nil && (req.Edit.Title == nil || req.Edit.Artist == nil) {
-		match = a.lookup(ctx, req, info)
-		if match != nil {
-			info = infoFrom(*match)
-		}
-	}
-
-	e, err := collect(req.Edit, info, p)
-	if err != nil {
-		return manifest.Track{}, err
-	}
-	t, err := applyEdit(newTrack(s, req.URL), e)
+	t, err := applyEdit(newTrack(d.staged, d.URL), e)
 	if err != nil {
 		return manifest.Track{}, err
 	}
 	if t.Status != manifest.Identified {
 		return manifest.Track{}, missingFields(t)
 	}
-	if match != nil && t.OriginalTitle == match.Title && t.OriginalArtist == match.Artist {
+	if match := d.Match; match != nil && t.OriginalTitle == match.Title && t.OriginalArtist == match.Artist {
 		t.MBRecordingID, t.MBReleaseID = match.RecordingID, match.ReleaseID
-		if t.CoverSHA256 == "" {
-			if img, err := req.Source.CoverFront(ctx, match.ReleaseID); err == nil && len(img) > 0 {
+		if t.CoverSHA256 == "" && d.source != nil {
+			if img, err := d.source.CoverFront(ctx, match.ReleaseID); err == nil && len(img) > 0 {
 				t.CoverSHA256, _ = a.storeCover(img)
 			}
 		}
 	}
 	t = m.Add(t)
 	return t, a.store.Save(m)
+}
+
+// Add downloads the audio at req.URL into the library as an identified
+// track. Fields not given in req.Edit are asked with p, offering what the
+// download reported as the default; with a nil p they simply take that
+// default. Nothing is added if anything fails.
+func (a *App) Add(ctx context.Context, req AddRequest, dl Downloader, p Prompter) (manifest.Track, error) {
+	d, err := a.Fetch(ctx, req, dl)
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	e, err := collect(req.Edit, d.Info, p)
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	return a.Finish(ctx, d, e)
 }
 
 // lookup searches req.Source for what the download is, returning the best

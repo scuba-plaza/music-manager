@@ -369,3 +369,100 @@ func TestAddCarriesTheLatinAliasOfAnArabicArtist(t *testing.T) {
 		}
 	}
 }
+
+func TestFetchPreparesADraftWithoutAddingAnything(t *testing.T) {
+	a, dl := openLib(t), newDownloader()
+	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "https://youtu.be/x"}, dl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.URL != "https://youtu.be/x" || d.Info != dl.info || d.Downloaded != dl.info || d.Match != nil {
+		t.Errorf("draft = %+v", d)
+	}
+	if diff := d.Length - 2612*time.Millisecond; diff < -time.Millisecond || diff > time.Millisecond {
+		t.Errorf("Length = %v", d.Length)
+	}
+	if len(tracks(t, a)) != 0 {
+		t.Error("a draft must not add a track")
+	}
+	if _, err := os.Stat(dl.dirs[0]); !os.IsNotExist(err) {
+		t.Errorf("download directory %s was left behind", dl.dirs[0])
+	}
+}
+
+func TestFetchOffersAConfidentMatchAndKeepsWhatTheDownloadSaid(t *testing.T) {
+	a, dl := openLib(t), newDownloader()
+	dl.info = app.Info{Title: "Dream 3 (Official Video)", Uploader: "Some Channel"}
+	src := &fakeSource{results: map[string][]app.Candidate{"Dream 3 (Official Video)|Some Channel": {dream3}}}
+	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "u", Source: src}, dl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Match == nil || d.Match.ReleaseID != "rel-1" || d.Info.Title != "Dream 3" || d.Info.Album != "From Sleep" || d.Info.TrackNumber != 1 {
+		t.Errorf("draft = %+v", d)
+	}
+	if d.Downloaded.Title != "Dream 3 (Official Video)" {
+		t.Errorf("Downloaded = %+v; the original report should be kept so a match can be declined", d.Downloaded)
+	}
+}
+
+func TestFetchRefusesADuplicate(t *testing.T) {
+	a, dl := openLib(t), newDownloader()
+	first, err := a.Add(context.Background(), app.AddRequest{URL: "u1"}, dl, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = a.Fetch(context.Background(), app.AddRequest{URL: "u2"}, dl)
+	var dup *app.DuplicateError
+	if !errors.As(err, &dup) || dup.ID != first.ID {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestFinishSavesTheTrackWithTheGivenDetails(t *testing.T) {
+	a, dl := openLib(t), newDownloader()
+	src := &fakeSource{results: map[string][]app.Candidate{"Song Title|Some Band": {dream3}}, covers: map[string][]byte{"rel-1": testmp3.JPEG}}
+	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "https://youtu.be/x", Source: src}, dl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := a.Finish(context.Background(), d, app.Edit{
+		Title: strp("Dream 3"), Artist: strp("Max Richter"), Album: strp("From Sleep"), TrackNumber: ptr(1), TrackTotal: ptr(7),
+		TrimStart: ptr(time.Second),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != manifest.Identified || got.SourceURL != "https://youtu.be/x" || got.TrimStart != time.Second ||
+		got.MBRecordingID != "rec-1" || got.MBReleaseID != "rel-1" || got.CoverSHA256 == "" {
+		t.Errorf("track = %+v", got)
+	}
+	if saved := tracks(t, a); len(saved) != 1 || saved[0].ID != got.ID {
+		t.Errorf("manifest = %+v", saved)
+	}
+	// A second Finish of the same draft must not add the audio twice.
+	_, err = a.Finish(context.Background(), d, app.Edit{Title: strp("Again"), Artist: strp("Band")})
+	var dup *app.DuplicateError
+	if !errors.As(err, &dup) || len(tracks(t, a)) != 1 {
+		t.Errorf("second finish: err %v, %d tracks", err, len(tracks(t, a)))
+	}
+}
+
+func TestFinishFailuresAddNothing(t *testing.T) {
+	a, dl := openLib(t), newDownloader()
+	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "u"}, dl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, e := range map[string]app.Edit{
+		"no artist":     {Title: strp("T"), Artist: strp("")},
+		"trims too big": {Title: strp("T"), Artist: strp("A"), TrimStart: ptr(time.Hour)},
+	} {
+		if _, err := a.Finish(context.Background(), d, e); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	if len(tracks(t, a)) != 0 {
+		t.Error("a failed finish added a track")
+	}
+}
