@@ -171,3 +171,34 @@ func TestSyncWritesThePlaylistsMadeOnTheCommandLine(t *testing.T) {
 		t.Errorf("Study.m3u = %q, want %q", got, want)
 	}
 }
+
+func TestImportingAPlaylistFileOfThePlayer(t *testing.T) {
+	// Three entries: two whole names, and one the player cut at 26 characters.
+	const file = "../app/testdata/userpl-sample.pl"
+	lib, id := libWithSongs(t, "Alpha Song", "Beta Song", "Gamma Song With A Very Long Title", "Unrelated")
+
+	code, out, errs := run(t, lib, "playlist", "import", file, "Old", "--dry-run")
+	if code != 0 || !strings.Contains(out, "Alpha Song.mp3") || !strings.Contains(out, id["Gamma Song With A Very Long Title"]) {
+		t.Fatalf("dry run: code %d, out %q, err %q", code, out, errs)
+	}
+	if _, out, _ := run(t, lib, "playlist", "ls"); strings.Contains(out, "Old") {
+		t.Error("a dry run made the playlist")
+	}
+
+	code, out, errs = run(t, lib, "playlist", "import", file, "Old")
+	if code != 0 || !strings.Contains(out, "created Old with 3 tracks") {
+		t.Fatalf("import: code %d, out %q, err %q", code, out, errs)
+	}
+	if got := strings.Join(order(t, lib, "Old"), ","); got != "Alpha,Beta,Gamma" { // the third column of `show` is the first word of the title
+		t.Errorf("Old = %s", got)
+	}
+
+	if code, _, errs := run(t, lib, "playlist", "import", file, "Old"); code == 0 || !strings.Contains(errs, "already a playlist") {
+		t.Errorf("importing under a name that is taken: code %d, err %q", code, errs)
+	}
+	bad := filepath.Join(t.TempDir(), "x.pl")
+	os.WriteFile(bad, []byte("nope"), 0o644)
+	if code, _, errs := run(t, lib, "playlist", "import", bad, "X"); code == 0 || !strings.Contains(errs, "not a playlist file of the player") {
+		t.Errorf("importing a file that is not a playlist: code %d, err %q", code, errs)
+	}
+}

@@ -2,12 +2,14 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"music-manager/internal/app"
 	"music-manager/internal/manifest"
 )
 
@@ -20,7 +22,7 @@ file in the Playlists folder, which the player lists as a playlist.`,
 	}
 	cmd.AddCommand(playlistNewCmd(open), playlistLsCmd(open), playlistShowCmd(open),
 		playlistAddCmd(open), playlistRmCmd(open), playlistMoveCmd(open),
-		playlistRenameCmd(open), playlistDeleteCmd(open))
+		playlistRenameCmd(open), playlistDeleteCmd(open), playlistImportCmd(open))
 	return cmd
 }
 
@@ -229,4 +231,81 @@ func playlistDeleteCmd(open opener) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func playlistImportCmd(open opener) *cobra.Command {
+	var dryRun bool
+	cmd := &cobra.Command{
+		Use:   "import <USERPLn.PL> <name>",
+		Short: "Make a playlist from one of the player's own playlist files",
+		Long: `Read a playlist file from the player (USERPL1.PL to USERPL3.PL, in the player's
+root folder) and make a playlist of its songs. The player keeps only the old
+file names, cut to 26 characters, so each is matched to a track by its title;
+a leading track number tells apart songs of the same title.
+
+Every entry is listed. A "~" marks one matched by the start of the title only,
+a "?" one that fits several tracks (not added; the candidates are listed) and a
+"-" one that was not found. Check them, and use "mm playlist add" for what is
+missing. --dry-run only lists.`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := os.ReadFile(args[0])
+			if err != nil {
+				return err
+			}
+			names, err := app.ReadPlayerPlaylist(data)
+			if err != nil {
+				return fmt.Errorf("%s: %w", args[0], err)
+			}
+			a, err := open()
+			if err != nil {
+				return err
+			}
+			matches, err := a.MatchPlayerNames(names)
+			if err != nil {
+				return err
+			}
+
+			out := cmd.OutOrStdout()
+			var ids []string
+			problems := 0
+			for _, m := range matches {
+				switch {
+				case m.Track != nil:
+					artist, title, _ := display(*m.Track)
+					mark := " "
+					if m.Partial {
+						mark, problems = "~", problems+1
+					}
+					fmt.Fprintf(out, "%s %-28s %s  %s - %s\n", mark, m.Name, m.Track.ID, artist, title)
+					ids = append(ids, m.Track.ID)
+				case len(m.Candidates) > 0:
+					problems++
+					fmt.Fprintf(out, "? %-28s fits %d tracks:\n", m.Name, len(m.Candidates))
+					for _, c := range m.Candidates {
+						artist, title, album := display(c)
+						fmt.Fprintf(out, "      %s  %s - %s (%s)\n", c.ID, artist, title, album)
+					}
+				default:
+					problems++
+					fmt.Fprintf(out, "- %-28s not found\n", m.Name)
+				}
+			}
+			if dryRun {
+				fmt.Fprintf(out, "%s found of %d; nothing was made\n", tracksText(len(ids)), len(names))
+				return nil
+			}
+			if err := a.CreatePlaylist(args[1], ids...); err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "created %s with %s", args[1], tracksText(len(ids)))
+			if problems > 0 {
+				fmt.Fprintf(out, "; %d of the %d entries need a look (~ ? -)", problems, len(names))
+			}
+			fmt.Fprintln(out)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "only list what each entry matches")
+	return cmd
 }

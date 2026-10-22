@@ -73,7 +73,7 @@ changes the library while the interface is open, the change appears within a cou
 | `mm ls [words] [status:identified\|unidentified] [--sort KEY] [--reverse]` / `mm show <id>` | look at records; `--sort` takes `artist`, `album`, `title`, `track`, `length`, `released`, `added` or `edited` |
 | `mm sync [--target DIR] [--dry-run] [--prune --yes]` | render the folder; `--prune` deletes files the records don't account for |
 | `mm rm <id>…` | remove records (audio is deleted by the next sync) |
-| `mm playlist <new, add, rm, move, rename, delete, ls, show>` | make and change playlists (see Playlists below) |
+| `mm playlist <new, add, rm, move, rename, delete, import, ls, show>` | make and change playlists (see Playlists below) |
 | `mm doctor` | check the stores for missing or damaged files |
 | `mm tui` | the full-screen interface (also what plain `mm` opens in a terminal) |
 
@@ -103,9 +103,12 @@ mm playlist rm Study 9xw4ap             # take a track out (it stays in the libr
 mm playlist show Study
 mm playlist rename Study Exams
 mm playlist delete Exams
+mm playlist import USERPL1.PL Resistance --dry-run   # bring in a playlist made on the player itself
 ```
 
 `mm sync` writes each playlist as `Playlists/<name>.m3u`, with the player-friendly form found by experiment on a Wolfang WMP01: paths from the root of the card with backslashes (`\Artist\Album\01 - Title.mp3`), one per line, plain UTF-8, Windows line endings. The player lists every `.m3u` on the card as a playlist; it ignores paths written with slashes or relative to the playlist. Removing a track from the library takes it out of its playlists. Playlist files count in the `N to sync` of the interface, and a deleted playlist's file is a stray that `mm sync --prune` removes.
+
+The playlists made on the player (`USERPL1.PL` to `USERPL3.PL` on the card) cannot be written by `mm`, but they can be read: `mm playlist import` takes the file names in one and finds the tracks they were by title, ignoring the track number, case and punctuation. It lists what it found (`~` matched on the start of a title only, `?` fits several tracks, `-` not found), and with `--dry-run` makes nothing. Fix the rest with `mm playlist add` and `mm playlist move`.
 
 Trims are stored on the record and applied when rendering, on MP3 frame
 boundaries (about 26 ms), without re-encoding. The stored audio is never
