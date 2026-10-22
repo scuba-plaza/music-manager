@@ -65,7 +65,27 @@ const labelWidth = 12
 
 // trackHead is everything in the inspector above the cover: the title, and
 // the fields, with the one being edited open.
-func (m Model) trackHead(t manifest.Track, w int) []string {
+func (m Model) trackHead(t manifest.Track, w, h int) []string {
+	return m.headLines(t, w, m.compact(t, w, h))
+}
+
+// compact says whether the inspector leaves out the ASCII forms under the
+// names, because the cover would be smaller than comfortCoverRows with them
+// and fits (at least minCoverRows) without. The answer depends only on the
+// size of the pane and the track, never on what is being typed, so the
+// layout does not jump about.
+func (m Model) compact(t manifest.Track, w, h int) bool {
+	if t.CoverSHA256 == "" {
+		return false // nothing to make room for
+	}
+	quiet := m
+	quiet.editing, quiet.focus = false, paneBrowser
+	room := func(compact bool) int { return quiet.coverRoom(t, w, h, len(quiet.headLines(t, w, compact))) }
+	return room(false) < comfortCoverRows && room(true) >= minCoverRows
+}
+
+// headLines is trackHead with the ASCII forms of the names left out if compact.
+func (m Model) headLines(t manifest.Track, w int, compact bool) []string {
 	_, title, _ := app.Display(t)
 	lines := []string{"", " " + styles.bold.Render(fit(title, w-2)), rule(w)}
 	if t.Status != manifest.Identified {
@@ -73,7 +93,7 @@ func (m Model) trackHead(t manifest.Track, w int) []string {
 	}
 
 	for i, f := range trackFields {
-		lines = append(lines, m.fieldLines(t, f, m.focus == paneInspector && i == m.field, w)...)
+		lines = append(lines, m.fieldLines(t, f, m.focus == paneInspector && i == m.field, w, compact)...)
 		if f == fCutEnd {
 			lines = append(lines, m.barLines(t, w))
 		}
@@ -83,14 +103,21 @@ func (m Model) trackHead(t manifest.Track, w int) []string {
 
 // trackLines shows a track's fields, with the one being edited open.
 func (m Model) trackLines(t manifest.Track, w, h int) []string {
-	lines := m.trackHead(t, w)
-	lines = append(lines, m.thumbLines(t, w, h, len(lines))...)
-
-	lines = append(lines, rule(w))
 	shown := t
 	if m.editing {
 		shown = previewTrack(t, m.dr)
 	}
+	lines := m.trackHead(t, w, h)
+	foot := m.footLines(t, shown, w)
+	lines = append(lines, m.thumbLines(t, w, h, h-len(lines)-len(foot)-coverSlack)...)
+	return append(lines, foot...)
+}
+
+// footLines is what the inspector shows under the cover: where the file will
+// be, when the track was added and edited, and what else is known about it.
+// shown is the track as it will be once what is being typed is saved.
+func (m Model) footLines(t, shown manifest.Track, w int) []string {
+	lines := []string{rule(w)}
 	for i, l := range wrap(layout.PathFor(shown), w-4) {
 		prefix := "   "
 		if i == 0 {
@@ -111,7 +138,7 @@ func (m Model) trackLines(t manifest.Track, w, h int) []string {
 
 // fieldLines is one field: its label, its value or its open inputs, and
 // beneath them the ASCII form of a name and any error.
-func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int) []string {
+func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int, compact bool) []string {
 	marker, label := " ", styles.dim.Render(fit(f.label(), labelWidth-2))
 	if current {
 		marker, label = styles.accent.Render("▌"), styles.accent.Render(fit(f.label(), labelWidth-2))
@@ -140,7 +167,7 @@ func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int) []
 	default:
 		lines = append(lines, prefix+fit(value, vw))
 	}
-	if f.isName() && t.Status == manifest.Identified {
+	if f.isName() && t.Status == manifest.Identified && !compact {
 		original, ascii := names(t, f)
 		if original != "" && original != ascii {
 			kind := "auto"
@@ -166,32 +193,45 @@ func (m Model) coverText(t manifest.Track) string {
 }
 
 // The cover sits under its row. It needs at least minCoverRows lines and
-// minCoverCols columns to be worth drawing, and coverReserve lines are kept
-// below it for the file's path and what is known about it.
+// minCoverCols columns to be worth drawing. Below it come the footer lines,
+// and coverSlack more: typing a title can make the path wrap onto another
+// line, and the cover is not to be sent again at another size for that.
 const (
 	minCoverRows = 3
 	minCoverCols = 6
-	coverReserve = 7
+	coverSlack   = 1
+
+	// comfortCoverRows is the size the cover is worth keeping: below it the
+	// ASCII forms under the names give way to it.
+	comfortCoverRows = 8
 )
 
+// coverRoom is how many lines the cover may take in an inspector w wide and
+// h high, when headLen lines come above it, as it is planned: with nothing
+// being typed.
+func (m Model) coverRoom(t manifest.Track, w, h, headLen int) int {
+	return h - headLen - len(m.footLines(t, t, w)) - coverSlack
+}
+
 // thumbLines draws the cover under its row, if there is a cover and room
-// for it. headLen is the number of lines above it, in an inspector w wide
-// and h high.
-func (m Model) thumbLines(t manifest.Track, w, h, headLen int) []string {
+// for it: room lines, in an inspector w wide and h high.
+func (m Model) thumbLines(t manifest.Track, w, h, room int) []string {
 	th, ok := m.thumbs[t.CoverSHA256]
 	if t.CoverSHA256 == "" || !ok || th.img == nil {
 		return nil
 	}
-	room := h - headLen - coverReserve
 	indent := strings.Repeat(" ", labelWidth+1)
 
 	// In full resolution, once the terminal has the picture; the blocks stand
 	// in until then, and wherever the picture is not possible.
 	if m.gfx != nil && th.kitty != nil {
 		cols, rows := m.coverPlan(t, th, w, h)
-		if p, sent := m.pictures[t.CoverSHA256]; sent && p.cols == cols && p.rows == rows && rows <= room {
+		if p, sent := m.pictures[t.CoverSHA256]; sent && p.cols == cols && p.rows == rows && min(rows, room) >= minCoverRows {
+			// While a field is being edited there can be a line or two less room
+			// than was planned. The picture is then cut off at the bottom, rather
+			// than sent again at another size for every key that is typed.
 			var lines []string
-			for _, l := range placeholderLines(p.id, cols, rows) {
+			for _, l := range placeholderLines(p.id, cols, rows)[:min(rows, room)] {
 				lines = append(lines, indent+l)
 			}
 			return lines

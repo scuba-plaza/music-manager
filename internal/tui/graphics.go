@@ -69,7 +69,7 @@ type pictureMsg struct {
 func (m Model) coverPlan(t manifest.Track, th thumb, w, h int) (cols, rows int) {
 	quiet := m
 	quiet.editing, quiet.focus = false, paneBrowser
-	room := h - len(quiet.trackHead(t, w)) - coverReserve
+	room := quiet.coverRoom(t, w, h, len(quiet.trackHead(t, w, h)))
 	cw, ch := m.gfx.cellSize()
 	return placementSize(th.kw, th.kh, w-labelWidth-4, min(room, maxCoverRows), cw, ch)
 }

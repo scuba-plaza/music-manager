@@ -22,7 +22,8 @@ const (
 
 // fieldStarts returns, for each field of the track, the line of the
 // inspector at which it starts, so a click can be traced to a field.
-func (m Model) fieldStarts(t manifest.Track, w int) []int {
+func (m Model) fieldStarts(t manifest.Track, w, h int) []int {
+	compact := m.compact(t, w, h)
 	line := 3 // a blank line, the title and a rule
 	if t.Status != manifest.Identified {
 		line++ // the note that it is not identified
@@ -30,7 +31,7 @@ func (m Model) fieldStarts(t manifest.Track, w int) []int {
 	starts := make([]int, len(trackFields))
 	for i, f := range trackFields {
 		starts[i] = line
-		line += len(m.fieldLines(t, f, false, w))
+		line += len(m.fieldLines(t, f, false, w, compact))
 		if f == fCutEnd {
 			line++ // the bar of what the cuts keep
 		}
@@ -120,7 +121,7 @@ func (m Model) clickInspector(msg tea.MouseMsg, l layoutInfo) (tea.Model, tea.Cm
 	if l.mode == modeOnePane {
 		w = l.left - 2
 	}
-	starts := m.fieldStarts(r.Track, w)
+	starts := m.fieldStarts(r.Track, w, l.body-2)
 	line := msg.Y - firstContentRow
 	field := -1
 	for i, s := range starts {

@@ -54,7 +54,7 @@ matter right now. Without a terminal, plain `mm` prints help as before.
 | `s` | sync: choose the folder (or a mounted player), see what will change, apply. The header says `N to sync · press s` when something is waiting; clicking it works too |
 | `d` `u` `ctrl+r` `D` | remove (asks first: `y` or `enter` agrees), undo, redo, check the library for damage |
 
-Covers are shown in full resolution in terminals that speak the kitty graphics protocol (kitty, Ghostty), and as coloured half-blocks everywhere else. `MM_COVERS=blocks` or `MM_COVERS=kitty` overrides the guess; inside tmux or screen, which do not pass pictures on, blocks are used.
+Covers are shown in full resolution in terminals that speak the kitty graphics protocol (kitty, Ghostty), and as coloured half-blocks everywhere else. `MM_COVERS=blocks` or `MM_COVERS=kitty` overrides the guess; inside tmux or screen, which do not pass pictures on, blocks are used. The cover takes the room the fields leave below them, so in a short window (a large font does that) the dim ASCII forms under the names are left out to give it room; they are back when the window is taller, and the field you are editing always shows its ASCII form.
 
 The mouse works too: click to select, click again to open, double-click a folder row to open it, wheel
 to scroll. Colours follow your terminal's light or dark background and honour `NO_COLOR`. If another `mm`
