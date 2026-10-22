@@ -257,3 +257,10 @@ func TestDoctor(t *testing.T) {
 		t.Errorf("empty library: code %d, out %q", code, out)
 	}
 }
+
+func TestVersionFlag(t *testing.T) {
+	code, out, errs := run(t, filepath.Join(t.TempDir(), "lib"), "--version")
+	if code != 0 || !strings.HasPrefix(out, "mm ") || strings.Contains(errs, "mm:") {
+		t.Errorf("code %d, out %q, err %q", code, out, errs)
+	}
+}

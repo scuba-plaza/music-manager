@@ -71,9 +71,38 @@ mm sync --prune --yes
 
 Needs `yt-dlp` (and `ffmpeg`, which yt-dlp uses) on `PATH` for `mm add`.
 
+## Installing with Nix
+
+The repository is a flake. It provides `packages.<system>.music-manager` (the
+program is `mm`) and an overlay that adds `pkgs.music-manager`. The Nix package
+puts `yt-dlp` and `ffmpeg` at the end of the program's `PATH`, so ones you
+already have take precedence.
+
+```sh
+nix run github:OWNER/music-manager -- --help        # try it
+nix profile install github:OWNER/music-manager      # or install it
+```
+
+With home-manager, add the flake as an input of your system flake, apply its
+overlay, and list the package:
+
+```nix
+inputs.music-manager = {
+  url = "github:OWNER/music-manager";   # or "git+file:///path/to/music-manager"
+  inputs.nixpkgs.follows = "nixpkgs";
+};
+# in the overlays list:   music-manager.overlays.default
+# in home.packages:       music-manager
+```
+
+When the Go dependencies change, set `vendorHash = lib.fakeHash;` in
+`nix/package.nix`, build once, and paste in the hash Nix prints. Nix only sees
+files git knows about, so `git add` new files before `nix build`.
+
 ## Development
 
 ```sh
 go test ./...
+nix build                                                    # builds the package and runs the tests in the sandbox
 go test -tags live ./internal/musicbrainz ./internal/ytdlp   # real MusicBrainz, real yt-dlp
 ```

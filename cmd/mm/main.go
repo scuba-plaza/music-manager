@@ -10,10 +10,9 @@ import (
 	"music-manager/internal/cli"
 	"music-manager/internal/musicbrainz"
 	"music-manager/internal/prompt"
+	"music-manager/internal/version"
 	"music-manager/internal/ytdlp"
 )
-
-const version = "0.1"
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -29,7 +28,7 @@ func main() {
 // userAgent identifies this program to MusicBrainz. MusicBrainz asks for a
 // contact address; set MM_CONTACT to an email or URL to include one.
 func userAgent() string {
-	ua := "music-manager/" + version
+	ua := "music-manager/" + version.String()
 	if contact := os.Getenv("MM_CONTACT"); contact != "" {
 		ua += " ( " + contact + " )"
 	}

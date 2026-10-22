@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"music-manager/internal/app"
+	"music-manager/internal/version"
 )
 
 // IO bundles the standard streams so tests can substitute them.
@@ -38,9 +39,11 @@ func Run(ctx context.Context, args []string, streams IO, deps Deps) int {
 	root := &cobra.Command{
 		Use:           "mm",
 		Short:         "Manage a music library for an MP3 player",
+		Version:       version.String(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	root.SetVersionTemplate("mm {{.Version}}\n")
 	root.SetIn(streams.In)
 	root.SetOut(streams.Out)
 	root.SetErr(streams.Err)
