@@ -26,6 +26,9 @@ type Deps struct {
 	Downloader app.Downloader
 	Metadata   app.MetadataSource
 	Prompter   app.Prompter
+	// RunTUI runs the full-screen interface on a library. It is set only
+	// when there is a terminal for it; without it plain "mm" prints help.
+	RunTUI func(ctx context.Context, a *app.App) error
 }
 
 // opener lazily opens the library, so commands that fail on bad flags never
@@ -36,12 +39,20 @@ type opener func() (*app.App, error)
 // process exit code.
 func Run(ctx context.Context, args []string, streams IO, deps Deps) int {
 	var library string
+	open := func() (*app.App, error) { return app.Open(library) }
 	root := &cobra.Command{
 		Use:           "mm",
 		Short:         "Manage a music library for an MP3 player",
 		Version:       version.String(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		// With no subcommand, open the interface if there is a terminal for it.
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if deps.RunTUI == nil {
+				return cmd.Help()
+			}
+			return runTUI(cmd, open, deps)
+		},
 	}
 	root.SetVersionTemplate("mm {{.Version}}\n")
 	root.SetIn(streams.In)
@@ -50,8 +61,7 @@ func Run(ctx context.Context, args []string, streams IO, deps Deps) int {
 	root.SetArgs(args)
 	root.PersistentFlags().StringVar(&library, "library", defaultLibrary(), "library directory (env MM_LIBRARY)")
 
-	open := func() (*app.App, error) { return app.Open(library) }
-	root.AddCommand(ingestCmd(open), lsCmd(open), showCmd(open), editCmd(open), syncCmd(open), addCmd(open, deps), rmCmd(open), doctorCmd(open), identifyCmd(open, deps), adoptCmd(open))
+	root.AddCommand(ingestCmd(open), lsCmd(open), showCmd(open), editCmd(open), syncCmd(open), addCmd(open, deps), rmCmd(open), doctorCmd(open), identifyCmd(open, deps), adoptCmd(open), tuiCmd(open, deps))
 
 	if err := root.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(streams.Err, "mm:", err)
