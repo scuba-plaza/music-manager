@@ -365,9 +365,7 @@ func (d *addDialog) tick(msg spinner.TickMsg) tea.Cmd {
 	if d.state != addFetching && d.state != addSaving {
 		return nil
 	}
-	var cmd tea.Cmd
-	d.spin, cmd = d.spin.Update(msg)
-	return cmd
+	return advance(&d.spin, msg)
 }
 
 func (d *addDialog) close(m *Model) {

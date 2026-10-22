@@ -147,6 +147,7 @@ func (m *Model) dropTracks(ts []manifest.Track) {
 		gone[t.ID] = true
 		delete(m.marks, t.ID)
 	}
+	m.rev++
 	kept := m.tracks[:0:0]
 	for _, t := range m.tracks {
 		if !gone[t.ID] {

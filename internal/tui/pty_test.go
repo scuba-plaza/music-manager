@@ -397,3 +397,47 @@ func TestPTYAddFromALinkWithAFakeYtDlp(t *testing.T) {
 		t.Errorf("the added track is not in library.json: %+v", m.Tracks)
 	}
 }
+
+func TestPTYSyncWritesTheLibraryFolder(t *testing.T) {
+	a := testApp(t)
+	seed(t, a,
+		seedTrack{"The Wanderer", "Shawn James", "Shadows", 1, 12, 0},
+		seedTrack{"Flow", "Shawn James", "Shadows", 7, 12, 0},
+		seedTrack{"Current", "Phoria", "Caught a Black Rabbit", 4, 10, 0})
+	stray := filepath.Join(a.Root(), "Old", "leftover.mp3")
+	os.MkdirAll(filepath.Dir(stray), 0o755)
+	os.WriteFile(stray, []byte("old"), 0o644)
+
+	s := startMM(t, 110, 32, a.Root())
+	s.MustSee("3 tracks", "3 to sync")
+	s.Type("s")
+	s.MustSee("Where should the music be written?", "Library folder", "Another folder")
+	s.Type("\r")
+	s.MustSee("3 to create", "1 stray", "Shawn James/Shadows/07 - Flow.mp3", "Old/leftover.mp3")
+	t.Logf("\n%s", s.Screen())
+
+	s.Type("p")
+	s.MustSee("1 to delete", "will be deleted")
+	s.Type("\r")
+	s.MustSee("Type delete")
+	s.Type("delete\r")
+	s.MustSee("Done", "3 created", "1 deleted")
+	s.Type("\r")
+	if strings.Contains(s.Screen(), "to sync") {
+		// the status line catches up a moment later
+		time.Sleep(300 * time.Millisecond)
+	}
+	if strings.Contains(s.Screen(), "to sync") {
+		t.Errorf("still says there is something to sync:\n%s", s.Screen())
+	}
+	s.Type("q")
+	if exited, err := s.Exited(3 * time.Second); !exited || err != nil {
+		t.Fatalf("exited %v, err %v", exited, err)
+	}
+	if _, err := os.Stat(filepath.Join(a.Root(), "Phoria", "Caught a Black Rabbit", "04 - Current.mp3")); err != nil {
+		t.Errorf("not written: %v", err)
+	}
+	if _, err := os.Stat(stray); !os.IsNotExist(err) {
+		t.Error("the stray should be gone")
+	}
+}

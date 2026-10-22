@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -21,6 +22,22 @@ type overlay interface {
 	key(m *Model, msg tea.KeyMsg) tea.Cmd
 	// hints are the keys to show in the footer.
 	hints(k keyMap) []key.Binding
+}
+
+// animate says whether spinners keep turning. Tests switch it off, since
+// their harness runs commands one after another and would sit through every
+// frame of the animation.
+var animate = true
+
+// advance turns a spinner one frame and returns the command for the next, or
+// nothing when animation is off.
+func advance(sp *spinner.Model, msg spinner.TickMsg) tea.Cmd {
+	if !animate {
+		return nil
+	}
+	var cmd tea.Cmd
+	*sp, cmd = sp.Update(msg)
+	return cmd
 }
 
 // overlayView draws the model's overlay over the lines of base, centred.

@@ -64,6 +64,9 @@ func (m Model) summary() string {
 	default:
 		s += fmt.Sprintf(" · %d need work", needs)
 	}
+	if m.syncN > 0 {
+		s += fmt.Sprintf(" · %d to sync", m.syncN)
+	}
 	if n := len(m.marks); n > 0 {
 		s += fmt.Sprintf(" · %d marked", n)
 	}

@@ -74,6 +74,14 @@ type Model struct {
 	thumbs       map[string]thumb
 	thumbPending map[string]bool
 
+	// How far the library folder lags behind the records, and what is needed to
+	// keep that up to date: rev changes whenever the tracks do.
+	syncN         int
+	syncKnown     bool
+	rev, syncRev  int
+	baselineTried bool
+	mounts        func() []string // the drives to offer; detectMounts if nil
+
 	// runs counts the batch identifications started, to tell one from the next.
 	runs int
 
@@ -134,8 +142,15 @@ func (m Model) Init() tea.Cmd { return m.load() }
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
 	nm := next.(Model)
-	// Whatever happened, the cover now selected may still need loading.
-	return nm, tea.Batch(cmd, nm.wantThumb())
+	cmds := []tea.Cmd{cmd, nm.wantThumb()} // the cover now selected may need loading
+	if nm.loaded && nm.rev != nm.syncRev {
+		// The tracks changed: see how far behind the folder is now. Scanning the
+		// folder is only ever needed once, if it was never synced.
+		nm.syncRev = nm.rev
+		cmds = append(cmds, nm.refreshSync(!nm.baselineTried))
+		nm.baselineTried = true
+	}
+	return nm, tea.Batch(cmds...)
 }
 
 func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -151,8 +166,13 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case loadedMsg:
 		m.loaded, m.loadErr, m.tracks = true, msg.err, msg.tracks
+		m.rev++
 		m.rebuild()
 		return m, nil
+	case syncStatusMsg:
+		return m.syncStatus(msg)
+	case syncEventMsg:
+		return m.syncEvent(msg)
 	case editedMsg:
 		return m.edited(msg)
 	case restoredMsg:
@@ -240,6 +260,8 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openRemove()
 	case key.Matches(msg, k.Add):
 		return m.openAdd()
+	case key.Matches(msg, k.Sync):
+		return m.openSync()
 	case key.Matches(msg, k.Identify):
 		return m.openPicker()
 	case key.Matches(msg, k.IdentifyAll):

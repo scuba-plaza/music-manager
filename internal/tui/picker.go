@@ -158,9 +158,7 @@ func (p *picker) tick(msg spinner.TickMsg) tea.Cmd {
 	if p.state != pickSearching && p.state != pickApplying {
 		return nil
 	}
-	var cmd tea.Cmd
-	p.spin, cmd = p.spin.Update(msg)
-	return cmd
+	return advance(&p.spin, msg)
 }
 
 func (p *picker) close(m *Model) {

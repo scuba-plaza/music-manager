@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"music-manager/internal/render"
 	"os"
 	"time"
 
@@ -25,6 +26,14 @@ type Library interface {
 	// PreviewTrim writes the audio around one of a track's cuts to a
 	// temporary file; the caller removes it with cleanup.
 	PreviewTrim(id string, edge app.Edge, window time.Duration) (path string, cleanup func(), err error)
+	// PlanSync works out what writing the library folder (or target, if
+	// set) would change, without changing anything.
+	PlanSync(opts app.SyncOptions) (Plan, error)
+	// RecordSynced notes that the library folder matches the records.
+	RecordSynced() error
+	// Unsynced counts the tracks whose output would change in the library
+	// folder; known is false until it has been synced once.
+	Unsynced() (n int, known bool, err error)
 	// CanAdd reports whether tracks can be downloaded; Fetch downloads one and
 	// prepares it, Finish adds it to the library with the given details.
 	CanAdd() bool
@@ -80,6 +89,14 @@ func NewLibrary(a *app.App, opts ...LibraryOption) Library {
 }
 
 func (l appLibrary) Lookup() bool { return l.source != nil }
+
+func (l appLibrary) PlanSync(opts app.SyncOptions) (Plan, error) {
+	p, err := l.App.PlanSync(opts)
+	if err != nil {
+		return nil, err
+	}
+	return appPlan{p}, nil
+}
 
 func (l appLibrary) CanAdd() bool { return l.downloader != nil }
 
@@ -146,3 +163,21 @@ func (l appLibrary) Tracks() ([]manifest.Track, error) {
 }
 
 var errNoLookup = errors.New("lookup is not available")
+
+// Plan is what a sync would do, ready to be carried out.
+type Plan interface {
+	Ops() []render.Op
+	// WithPrune is the same plan with stray files marked for deletion or not.
+	WithPrune(prune bool) Plan
+	// Apply carries the plan out, reporting how far it has got.
+	Apply(progress func(done, total int)) error
+	// Collected is how many unused audio and cover files Apply deleted.
+	Collected() int
+}
+
+type appPlan struct{ p *app.SyncPlan }
+
+func (a appPlan) Ops() []render.Op                           { return a.p.Ops }
+func (a appPlan) WithPrune(prune bool) Plan                  { return appPlan{a.p.WithPrune(prune)} }
+func (a appPlan) Collected() int                             { return a.p.Collected }
+func (a appPlan) Apply(progress func(done, total int)) error { return a.p.ApplyWith(progress) }

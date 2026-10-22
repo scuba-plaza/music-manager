@@ -44,6 +44,8 @@ func (m Model) updateInspector(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.startEdit()
 	case key.Matches(msg, k.Add):
 		return m.openAdd()
+	case key.Matches(msg, k.Sync):
+		return m.openSync()
 	case key.Matches(msg, k.Identify):
 		return m.openPicker()
 	case key.Matches(msg, k.Adopt):
@@ -287,10 +289,12 @@ func (m *Model) upsert(t manifest.Track) {
 	for i := range m.tracks {
 		if m.tracks[i].ID == t.ID {
 			m.tracks[i] = t
+			m.rev++
 			return
 		}
 	}
 	m.tracks = append(m.tracks, t)
+	m.rev++
 }
 
 // record remembers a change so it can be undone, and forgets what could
