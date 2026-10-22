@@ -173,7 +173,14 @@ func choose(t manifest.Track, cands []Candidate, p Prompter, opts IdentifyOption
 		if cands[0].Score < opts.MinScore {
 			return nil, fmt.Sprintf("best match scores only %d", cands[0].Score), nil
 		}
-		return &cands[0], "", nil
+		best := cands[0]
+		if h := t.Hint; h.Album != "" && albumKey(best.Album) != albumKey(h.Album) {
+			// No release of this recording is the album the file was filed
+			// under. Keep that album, so its tracks stay together, and take
+			// only the recording from the database.
+			best.Album, best.TrackNumber, best.TrackTotal, best.ReleaseID = h.Album, h.Track, h.Total, ""
+		}
+		return &best, "", nil
 	}
 	cands = cands[:min(len(cands), maxChoices)]
 	options := make([]string, 0, len(cands)+1)

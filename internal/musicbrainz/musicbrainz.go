@@ -49,7 +49,7 @@ func New(userAgent string) *Client {
 		CoverURL:  "https://coverartarchive.org",
 		UserAgent: userAgent,
 		HTTP:      &http.Client{Timeout: 30 * time.Second},
-		Interval:  time.Second,
+		Interval:  1200 * time.Millisecond, // the service allows one request a second on average
 		Sleep:     time.Sleep,
 		Now:       time.Now,
 	}

@@ -245,7 +245,7 @@ func TestIdentifyPrefersTheReleaseTheFileWasAlreadyFiledUnder(t *testing.T) {
 		"the same album":                    {"Shadows", "rel-shadows"},
 		"case and punctuation are ignored":  {"SHADOWS!", "rel-shadows"},
 		"an EP or single suffix is ignored": {"Live at the Heartbreak House - EP", "rel-live"},
-		"an album nobody lists":             {"Something Else", "rel-single"}, // falls back to the source's order
+		"an album nobody lists":             {"Something Else", ""}, // the source's first pick, without its release
 		"no album at all":                   {"", "rel-single"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -255,7 +255,10 @@ func TestIdentifyPrefersTheReleaseTheFileWasAlreadyFiledUnder(t *testing.T) {
 			ingestTagged(t, a, "x", "Flow", "Shawn James", c.album, "")
 			res, err := a.Identify(context.Background(), nil, &fakeSource{results: key}, nil, app.IdentifyOptions{Yes: true})
 			if err != nil || len(res) != 1 || res[0].Applied == nil || res[0].Applied.ReleaseID != c.want {
-				t.Errorf("picked %+v, want %s (%v)", res, c.want, err)
+				t.Fatalf("picked %+v, want release %q (%v)", res, c.want, err)
+			}
+			if c.want == "" && res[0].Applied.RecordingID != "r-single" {
+				t.Errorf("picked recording %q, want the source's first", res[0].Applied.RecordingID)
 			}
 		})
 	}
@@ -276,11 +279,11 @@ func TestIdentifyPrefersTheCandidateWithTheSameTrackNumber(t *testing.T) {
 func TestIdentifyNeverLetsTheHintOutweighTheScore(t *testing.T) {
 	a := openLib(t)
 	ingestTagged(t, a, "x", "Flow", "Shawn James", "Right Album", "")
-	best := app.Candidate{ReleaseID: "rel-best", Title: "Flow", Artist: "Shawn James", Album: "Other", Score: 100}
-	worse := app.Candidate{ReleaseID: "rel-worse", Title: "Flow", Artist: "Shawn James", Album: "Right Album", Score: 96}
+	best := app.Candidate{RecordingID: "rec-best", ReleaseID: "rel-best", Title: "Flow", Artist: "Shawn James", Album: "Other", Score: 100}
+	worse := app.Candidate{RecordingID: "rec-worse", ReleaseID: "rel-worse", Title: "Flow", Artist: "Shawn James", Album: "Right Album", Score: 96}
 	src := &fakeSource{results: map[string][]app.Candidate{"Flow|Shawn James": {best, worse}}}
 	res, _ := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
-	if res[0].Applied == nil || res[0].Applied.ReleaseID != "rel-best" {
+	if res[0].Applied == nil || res[0].Applied.RecordingID != "rec-best" {
 		t.Errorf("picked %+v", res[0].Applied)
 	}
 }
@@ -304,4 +307,43 @@ func TestIdentifyOffersAtMostFifteenChoicesWithTheBestFitFirst(t *testing.T) {
 	if len(p.options) != 16 || !strings.Contains(p.options[0], "Shadows") {
 		t.Errorf("%d options, first %q; want 15 candidates and the way out, best fit first", len(p.options), p.options[0])
 	}
+}
+
+func TestIdentifyYesKeepsTheOldAlbumWhenNoReleaseMatchesIt(t *testing.T) {
+	compilation := app.Candidate{RecordingID: "rec-9", ReleaseID: "rel-9", Title: "Ahwak", Artist: "Abdel Halim Hafez", Album: "Anthology 1955-1959", TrackNumber: 1, TrackTotal: 7, Score: 100}
+	src := &fakeSource{results: map[string][]app.Candidate{"Ahwak|Abdel Halim Hafez": {compilation}}}
+
+	t.Run("automatic: the album the file was filed under stays", func(t *testing.T) {
+		a := openLib(t)
+		ingestTagged(t, a, "01 Ahwak", "Ahwak", "Abdel Halim Hafez", "Rawaeaa Abd El Halim 5", "1/7")
+		res, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+		if err != nil || res[0].Applied == nil {
+			t.Fatalf("%+v, %v", res, err)
+		}
+		got := tracks(t, a)[0]
+		if got.Album != "Rawaeaa Abd El Halim 5" || got.TrackNumber != 1 || got.TrackTotal != 7 {
+			t.Errorf("album %q %d/%d, want the old one", got.Album, got.TrackNumber, got.TrackTotal)
+		}
+		if got.MBRecordingID != "rec-9" || got.MBReleaseID != "" {
+			t.Errorf("recording %q release %q: the recording is known, the release is not", got.MBRecordingID, got.MBReleaseID)
+		}
+	})
+
+	t.Run("a file with no album takes the candidate's", func(t *testing.T) {
+		a := openLib(t)
+		ingestTagged(t, a, "01 Ahwak", "Ahwak", "Abdel Halim Hafez", "", "")
+		a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+		if got := tracks(t, a)[0]; got.Album != "Anthology 1955-1959" || got.MBReleaseID != "rel-9" {
+			t.Errorf("track = %+v", got)
+		}
+	})
+
+	t.Run("choosing by hand is taken as meant", func(t *testing.T) {
+		a := openLib(t)
+		ingestTagged(t, a, "01 Ahwak", "Ahwak", "Abdel Halim Hafez", "Rawaeaa Abd El Halim 5", "1/7")
+		a.Identify(context.Background(), nil, src, &scriptedPrompter{choice: 0}, app.IdentifyOptions{})
+		if got := tracks(t, a)[0]; got.Album != "Anthology 1955-1959" {
+			t.Errorf("album = %q, want the one the user picked", got.Album)
+		}
+	})
 }
