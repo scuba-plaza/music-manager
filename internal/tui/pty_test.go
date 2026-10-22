@@ -290,10 +290,10 @@ func TestPTYTrimWithAPreview(t *testing.T) {
 	}
 	s := startMM(t, 110, 30, a.Root(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	s.MustSee("Shawn James")
-	s.Type("/flow\r\x1b[B\x1b[B\x1b[B") // find the track
-	s.Type("\x1b[C")                    // inspector
-	s.Type("\x1b[B\x1b[B\x1b[B\x1b[B")  // down to Cut start
-	s.Type("}}")                        // cut two seconds
+	s.Type("/flow\r\x1b[B\x1b[B\x1b[B")      // find the track
+	s.Type("\x1b[C")                         // inspector
+	s.Type("\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B") // down to Cut start, below Title, Artist, Album, Track and Released
+	s.Type("}}")                             // cut two seconds
 	s.MustSee("Saved", "Kept", "░")
 	t.Logf("\n%s", s.Screen())
 
@@ -492,4 +492,29 @@ func TestPTYTheMouseSelectsOpensAndEdits(t *testing.T) {
 	s.MustSee("Cut start")
 	s.Type(mouseClick(80, 3)) // the title field, already chosen: edit
 	s.MustSee("enter save")
+}
+
+func TestPTYSortTheListByDateAdded(t *testing.T) {
+	a := testApp(t)
+	seed(t, a,
+		seedTrack{"The Wanderer", "Shawn James", "Shadows", 1, 12, 0},
+		seedTrack{"Flow", "Shawn James", "Shadows", 7, 12, 0},
+		seedTrack{"Current", "Phoria", "Rabbit", 4, 10, 0})
+	s := startMM(t, 100, 30, a.Root())
+	s.MustSee("Shawn James")
+
+	s.Type("S")
+	s.MustSee("Sort", "Date added", "newest first", "reverse: off")
+	s.Type("8")
+	s.MustSee("Library · Date added ▼", "Current", "Flow", "The Wanderer")
+	screen := s.Screen()
+	if c, f, w := strings.Index(screen, "Current  "), strings.Index(screen, "Flow  "), strings.Index(screen, "The Wanderer  "); !(c >= 0 && c < f && f < w) {
+		t.Errorf("the newest track should come first:\n%s", screen)
+	}
+
+	s.Type("Sr3") // by album, reversed
+	s.MustSee("Library · Album ▼")
+	s.Type("S1") // and back to the tree
+	s.MustSee("Library", "▸")
+	s.Type("q")
 }

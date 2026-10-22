@@ -23,15 +23,16 @@ const (
 	fArtist
 	fAlbum
 	fTrack
+	fReleased
 	fCutStart
 	fCutEnd
 	fCover
 )
 
-var trackFields = []fieldKind{fTitle, fArtist, fAlbum, fTrack, fCutStart, fCutEnd, fCover}
+var trackFields = []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fCutStart, fCutEnd, fCover}
 
 func (f fieldKind) label() string {
-	return [...]string{"Title", "Artist", "Album", "Track", "Cut start", "Cut end", "Cover"}[f]
+	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Cut start", "Cut end", "Cover"}[f]
 }
 
 // isName reports whether the field is text that also has an ASCII form.
@@ -88,6 +89,15 @@ func numberText(n int) string {
 	return strconv.Itoa(n)
 }
 
+// releasedText is a track's release date, falling back to the one in the old
+// tags of a track that is not identified.
+func releasedText(t manifest.Track) string {
+	if t.Released == "" && t.Status != manifest.Identified {
+		return t.Hint.Date
+	}
+	return t.Released
+}
+
 func cutText(f fieldKind, t manifest.Track) string {
 	d := t.TrimStart
 	if f == fCutEnd {
@@ -114,6 +124,8 @@ func displayValue(t manifest.Track, f fieldKind) string {
 			return strconv.Itoa(n)
 		}
 		return ""
+	case fReleased:
+		return releasedText(t)
 	}
 	if s := cutText(f, t); s != "" {
 		return s
@@ -145,6 +157,8 @@ func newDraft(t manifest.Track, f fieldKind) draft {
 		d.text, d.second = numberText(n), numberText(of)
 	case f == fCover:
 		// the text is the path of a new image
+	case f == fReleased:
+		d.text = releasedText(t)
 	default:
 		d.text = cutText(f, t)
 	}
@@ -198,6 +212,12 @@ func (d draft) edit() (app.Edit, error) {
 			return e, errors.New("Tracks on the album must be a whole number, or empty")
 		}
 		e.TrackNumber, e.TrackTotal = &n, &of
+	case fReleased:
+		date, err := app.NormalizeDate(d.text)
+		if err != nil {
+			return e, err
+		}
+		e.Released = &date
 	case fCutStart, fCutEnd:
 		var cut time.Duration
 		if s := strings.TrimSpace(d.text); s != "" {

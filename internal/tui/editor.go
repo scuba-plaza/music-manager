@@ -103,6 +103,8 @@ func prefilledFrom(t manifest.Track, f fieldKind) bool {
 		return t.OriginalAlbum == "" && t.Hint.Album != ""
 	case fTrack:
 		return t.TrackNumber == 0 && t.Hint.Track > 0
+	case fReleased:
+		return t.Released == "" && t.Hint.Date != ""
 	}
 	return false
 }

@@ -234,3 +234,27 @@ func TestNumberingNeedsTheWholeAlbumInView(t *testing.T) {
 		t.Error("renumbered a filtered view")
 	}
 }
+
+func TestTheBulkFormSetsTheReleaseDateOfTheMarkedTracks(t *testing.T) {
+	m, hook := editingModel(t, "Flow")
+	m = keys(t, m, "space", "e")
+	contains(t, m, "Released")
+	m = keys(t, m, "tab", "tab", "tab") // artist, album, tracks on album, released
+	m = typed(t, m, "never")
+	m = keys(t, m, "enter")
+	contains(t, m, "is not a date")
+	if hook.manyCalls != 0 {
+		t.Error("a bad date was saved")
+	}
+
+	m = keys(t, m, "ctrl+u")
+	m = typed(t, m, "2012")
+	contains(t, m, "Released → 2012")
+	m = keys(t, m, "enter")
+	if got := trackNamed(t, hook.Library, "Flow"); got.Released != "2012" {
+		t.Errorf("saved %+v", got)
+	}
+	if got := trackNamed(t, hook.Library, "The Wanderer"); got.Released != "" {
+		t.Errorf("an unmarked track was changed: %+v", got)
+	}
+}

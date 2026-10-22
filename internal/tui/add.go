@@ -20,7 +20,7 @@ import (
 )
 
 // addValues are the texts the add form starts with.
-type addValues struct{ title, artist, album, track, of string }
+type addValues struct{ title, artist, album, track, of, released string }
 
 // addDefaults is what to offer for a downloaded track: what the MusicBrainz
 // match says, if there is one and it is wanted, and otherwise what the
@@ -35,7 +35,7 @@ func addDefaults(d *app.Draft, useMatch bool) addValues {
 	if artist == "" {
 		artist = strings.TrimSuffix(info.Uploader, " - Topic")
 	}
-	return addValues{info.Title, artist, info.Album, numberText(info.TrackNumber), numberText(info.TrackTotal)}
+	return addValues{info.Title, artist, info.Album, numberText(info.TrackNumber), numberText(info.TrackTotal), info.Released}
 }
 
 type addState int
@@ -56,6 +56,7 @@ const (
 	addAlbum
 	addTrack
 	addOf
+	addReleased
 	addCutStart
 	addCutEnd
 	addFields
@@ -104,7 +105,7 @@ func (d *addDialog) width() int    { return 78 }
 
 // fill puts v into the inputs the user has not typed in.
 func (d *addDialog) fill(v addValues) {
-	for i, text := range []string{v.title, v.artist, v.album, v.track, v.of} {
+	for i, text := range []string{v.title, v.artist, v.album, v.track, v.of, v.released} {
 		if !d.touched[i] {
 			d.in[i].SetValue(text)
 		}
@@ -209,6 +210,7 @@ func (d *addDialog) formLines(w int) []string {
 		trackLabel = label(addTrack, "Track")
 	}
 	lines = append(lines, " "+trackLabel+" "+track.View()+styles.dim.Render(" of ")+of.View())
+	row(addReleased, "Released")
 	row(addCutStart, "Cut start")
 	row(addCutEnd, "Cut end")
 
@@ -253,6 +255,7 @@ func (d *addDialog) edit() (app.Edit, error) {
 		{field: fArtist, text: d.in[addArtist].Value()},
 		{field: fAlbum, text: d.in[addAlbum].Value()},
 		{field: fTrack, text: d.in[addTrack].Value(), second: d.in[addOf].Value()},
+		{field: fReleased, text: d.in[addReleased].Value()},
 		{field: fCutStart, text: d.in[addCutStart].Value()},
 		{field: fCutEnd, text: d.in[addCutEnd].Value()},
 	}
@@ -295,6 +298,9 @@ func mergeEdits(a, b app.Edit) app.Edit {
 	}
 	if b.TrackTotal != nil {
 		a.TrackTotal = b.TrackTotal
+	}
+	if b.Released != nil {
+		a.Released = b.Released
 	}
 	if b.TrimStart != nil {
 		a.TrimStart = b.TrimStart

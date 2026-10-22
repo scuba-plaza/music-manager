@@ -98,6 +98,7 @@ func (m Model) trackLines(t manifest.Track, w, h int) []string {
 		}
 		lines = append(lines, prefix+styles.accent.Render(l))
 	}
+	lines = append(lines, " "+styles.dim.Render(fit(datesText(t), w-2)))
 	about := clock(t.PlayingLength()) + " plays"
 	if t.Status == manifest.Identified {
 		about += " · identified"
@@ -170,7 +171,7 @@ func (m Model) coverText(t manifest.Track) string {
 const (
 	minCoverRows = 3
 	minCoverCols = 6
-	coverReserve = 6
+	coverReserve = 7
 )
 
 // thumbLines draws the cover under its row, if there is a cover and room
@@ -249,6 +250,9 @@ func (m Model) editorLines(prefix, indent string, vw int) []string {
 	case m.dr.field == fCover:
 		first.Width = max(vw-1, 1)
 		lines = append(lines, prefix+first.View(), indent+styles.dim.Render(fit("a JPEG or PNG file · empty removes the cover", vw)))
+	case m.dr.field == fReleased:
+		first.Width = max(vw-1, 1)
+		lines = append(lines, prefix+first.View(), indent+styles.dim.Render(fit("e.g. 1999, 1999-05 or 1999-05-17 · empty if unknown", vw)))
 	default:
 		first.Width = max(vw-24, 1)
 		lines = append(lines, prefix+first.View()+styles.dim.Render("  e.g. 0:12 or 1:30.5"))
@@ -268,3 +272,15 @@ func clock(d time.Duration) string {
 }
 
 func itoa(n int) string { return fmt.Sprintf("%d", n) }
+
+// datesText says when a track was added to the library and last edited.
+func datesText(t manifest.Track) string {
+	var parts []string
+	if d := app.SortValue(t, app.SortAdded); d != "" {
+		parts = append(parts, "added "+d)
+	}
+	if d := app.SortValue(t, app.SortEdited); d != "" {
+		parts = append(parts, "edited "+d)
+	}
+	return strings.Join(parts, " · ")
+}

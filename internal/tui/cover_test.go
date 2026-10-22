@@ -226,7 +226,8 @@ func TestAPastedPathMayBeQuotedEscapedOrUnderHome(t *testing.T) {
 		"spaces":  "  " + path + "  ",
 	} {
 		m, hook := editingModel(t, "Flow")
-		m = keys(t, m, "right", "down", "down", "down", "down", "down", "down", "enter")
+		m = focusField(t, m, fCover)
+		m = keys(t, m, "enter")
 		m = typed(t, m, typedPath)
 		m = keys(t, m, "enter")
 		if got := trackNamed(t, hook.Library, "Flow"); got.CoverSHA256 == "" {
@@ -243,7 +244,8 @@ func TestACoverThatCannotBeUsedIsExplained(t *testing.T) {
 		"a folder": {filepath.Dir(text), "is a directory"},
 	} {
 		m, hook := editingModel(t, "Flow")
-		m = keys(t, m, "right", "down", "down", "down", "down", "down", "down", "enter")
+		m = focusField(t, m, fCover)
+		m = keys(t, m, "enter")
 		m = typed(t, m, c.path)
 		m = keys(t, m, "enter")
 		contains(t, m, c.want)
@@ -259,7 +261,8 @@ func TestACoverThatCannotBeUsedIsExplained(t *testing.T) {
 func TestXRemovesTheCoverAndUndoBringsItBack(t *testing.T) {
 	m, hook := coverModel(t)
 	before := trackNamed(t, hook.Library, "Flow").CoverSHA256
-	m = keys(t, m, "right", "down", "down", "down", "down", "down", "down", "x")
+	m = focusField(t, m, fCover)
+	m = keys(t, m, "x")
 	if got := trackNamed(t, hook.Library, "Flow"); got.CoverSHA256 != "" {
 		t.Fatalf("still has a cover: %s", got.CoverSHA256)
 	}
@@ -273,7 +276,8 @@ func TestXRemovesTheCoverAndUndoBringsItBack(t *testing.T) {
 
 func TestEmptyPathRemovesTheCover(t *testing.T) {
 	m, hook := coverModel(t)
-	m = keys(t, m, "right", "down", "down", "down", "down", "down", "down", "enter", "enter")
+	m = focusField(t, m, fCover)
+	m = keys(t, m, "enter", "enter")
 	if trackNamed(t, hook.Library, "Flow").CoverSHA256 != "" {
 		t.Error("an empty path should remove the cover")
 	}

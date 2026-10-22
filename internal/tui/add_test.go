@@ -19,16 +19,16 @@ import (
 
 func TestAddDefaultsComeFromTheDownloadOrTheMatch(t *testing.T) {
 	d := &app.Draft{
-		Downloaded: app.Info{Title: "Song (Official Video)", Uploader: "Some Band - Topic", Album: "Yt Album", TrackNumber: 4},
-		Info:       app.Info{Title: "Song", Artist: "Some Band", ArtistASCII: "", Album: "Real Album", TrackNumber: 2, TrackTotal: 9},
+		Downloaded: app.Info{Title: "Song (Official Video)", Uploader: "Some Band - Topic", Album: "Yt Album", TrackNumber: 4, Released: "2012"},
+		Info:       app.Info{Title: "Song", Artist: "Some Band", ArtistASCII: "", Album: "Real Album", TrackNumber: 2, TrackTotal: 9, Released: "2015-09-04"},
 		Match:      &app.Candidate{Title: "Song"},
 	}
 	got := addDefaults(d, true)
-	if got.title != "Song" || got.artist != "Some Band" || got.album != "Real Album" || got.track != "2" || got.of != "9" {
+	if got.title != "Song" || got.artist != "Some Band" || got.album != "Real Album" || got.track != "2" || got.of != "9" || got.released != "2015-09-04" {
 		t.Errorf("with the match: %+v", got)
 	}
 	got = addDefaults(d, false)
-	if got.title != "Song (Official Video)" || got.artist != "Some Band" || got.album != "Yt Album" || got.track != "4" || got.of != "" {
+	if got.title != "Song (Official Video)" || got.artist != "Some Band" || got.album != "Yt Album" || got.track != "4" || got.of != "" || got.released != "2012" {
 		t.Errorf("without it: %+v (a '- Topic' uploader is the artist)", got)
 	}
 	d.Match = nil
@@ -127,7 +127,7 @@ func TestTheFormStartsFromWhatTheDownloadSaid(t *testing.T) {
 	if len(dl.calls) != 1 || dl.calls[0] != "https://youtu.be/abc123" {
 		t.Fatalf("downloaded %v", dl.calls)
 	}
-	contains(t, m, "Title", "Artist", "Album", "Track", "Cut start", "Cut end")
+	contains(t, m, "Title", "Artist", "Album", "Track", "Released", "Cut start", "Cut end")
 	d := asAdd(t, m)
 	if d.in[addTitle].Value() != "Song Title" || d.in[addArtist].Value() != "Some Band" || d.in[addAlbum].Value() != "Yt Album" || d.in[addTrack].Value() != "4" {
 		t.Errorf("fields = %q %q %q %q", d.in[addTitle].Value(), d.in[addArtist].Value(), d.in[addAlbum].Value(), d.in[addTrack].Value())
@@ -176,11 +176,12 @@ func TestEverythingInTheFormIsUsed(t *testing.T) {
 	set(addAlbum, "")
 	set(addTrack, "3")
 	set(addOf, "12")
+	set(addReleased, "1999-05")
 	set(addCutStart, "0:01")
 	set(addCutEnd, "0:00.5")
 	m = keys(t, m, "enter")
 	got := trackNamed(t, hook.Library, "Fancy")
-	if got.OriginalArtist != "فيروز" || got.Artist != "Firuz" || got.Album != "" || got.TrackNumber != 3 || got.TrackTotal != 12 ||
+	if got.OriginalArtist != "فيروز" || got.Artist != "Firuz" || got.Album != "" || got.TrackNumber != 3 || got.TrackTotal != 12 || got.Released != "1999-05" ||
 		got.TrimStart != time.Second || got.TrimEnd != 500*time.Millisecond {
 		t.Errorf("track = %+v", got)
 	}
@@ -194,6 +195,10 @@ func TestMistakesInTheFormAreExplainedAndNothingIsAdded(t *testing.T) {
 	m = keys(t, m, "enter")
 	contains(t, m, "Title cannot be empty")
 	d.in[addTitle].SetValue("Ok")
+	d.in[addReleased].SetValue("last year")
+	m = keys(t, m, "enter")
+	contains(t, m, "is not a date")
+	d.in[addReleased].SetValue("")
 	d.in[addCutStart].SetValue("1:99")
 	m = keys(t, m, "enter")
 	contains(t, m, "below 60")
@@ -222,6 +227,9 @@ func TestAConfidentMatchFillsTheFormAndCtrlTSwitchesToYouTubesWords(t *testing.T
 	m = fetched(t, m)
 	contains(t, m, "Matched on MusicBrainz", "Max Richter", "From Sleep")
 	d := asAdd(t, m)
+	if got := d.in[addReleased].Value(); got != "2015-09-04" {
+		t.Errorf("released = %q, want the release date of the match", got)
+	}
 	if d.in[addTitle].Value() != "Dream 3" || d.in[addArtist].Value() != "Max Richter" || d.in[addAlbum].Value() != "From Sleep" || d.in[addTrack].Value() != "1" || d.in[addOf].Value() != "7" {
 		t.Fatalf("fields = %q %q %q %q/%q", d.in[addTitle].Value(), d.in[addArtist].Value(), d.in[addAlbum].Value(), d.in[addTrack].Value(), d.in[addOf].Value())
 	}

@@ -40,6 +40,7 @@ type Row struct {
 	Label  string   // the artist, album or title
 	Detail string   // secondary text, e.g. the artist of a track nobody has identified
 	Num    string   // a track's number, padded to its album's width, or ""
+	Right  string   // shown at the right of a track in place of its length, or ""
 	Count  int      // how many tracks are beneath a group, artist or album
 	IDs    []string // which tracks, in the order they are listed
 

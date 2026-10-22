@@ -44,7 +44,7 @@ func TestTrimBarShowsWhatIsKeptAndWhatIsCut(t *testing.T) {
 
 func TestNudgingTheCutsFromTheKeyboard(t *testing.T) {
 	m, hook := editingModel(t, "Flow")
-	m = keys(t, m, "right", "down", "down", "down", "down") // Cut start
+	m = focusField(t, m, fCutStart)
 	if trackFields[m.field] != fCutStart {
 		t.Fatalf("on %v", trackFields[m.field])
 	}
@@ -83,7 +83,7 @@ func TestNudgingTheCutsFromTheKeyboard(t *testing.T) {
 
 func TestACutCannotSwallowTheWholeTrack(t *testing.T) {
 	m, hook := editingModel(t, "Flow") // about 2.6s long
-	m = keys(t, m, "right", "down", "down", "down", "down")
+	m = focusField(t, m, fCutStart)
 	for i := 0; i < 6; i++ {
 		m = keys(t, m, "}")
 	}
@@ -100,7 +100,7 @@ func TestACutCannotSwallowTheWholeTrack(t *testing.T) {
 
 func TestOneUndoRevertsAWholeRunOfNudges(t *testing.T) {
 	m, hook := editingModel(t, "Flow")
-	m = keys(t, m, "right", "down", "down", "down", "down")
+	m = focusField(t, m, fCutStart)
 	m = keys(t, m, "]", "]", "]", "}")
 	if got := trackNamed(t, hook.Library, "Flow").TrimStart; got != 1300*time.Millisecond {
 		t.Fatalf("setup: %v", got)
@@ -128,7 +128,8 @@ func TestTheBarFollowsTheCuts(t *testing.T) {
 	if before == 0 {
 		t.Fatal("no bar on screen")
 	}
-	m = keys(t, m, "right", "down", "down", "down", "down", "}", "}")
+	m = focusField(t, m, fCutStart)
+	m = keys(t, m, "}", "}")
 	if after := count(); after >= before {
 		t.Errorf("cutting %d cells of bar became %d", before, after)
 	}
@@ -137,7 +138,7 @@ func TestTheBarFollowsTheCuts(t *testing.T) {
 
 func TestTheBarFollowsATypedCutBeforeItIsSaved(t *testing.T) {
 	m, _ := editingModel(t, "Flow")
-	m = keys(t, m, "right", "down", "down", "down", "down")
+	m = focusField(t, m, fCutStart)
 	whole := strings.Count(screen(m), "█")
 	m = keys(t, m, "enter")
 	m = typed(t, m, "0:01")
@@ -188,7 +189,8 @@ func TestPreviewPlaysTheAudioAroundTheCut(t *testing.T) {
 	}
 	m = send(t, m, m.load())
 
-	m = keys(t, m, "right", "down", "down", "down", "down", "p")
+	m = focusField(t, m, fCutStart)
+	m = keys(t, m, "p")
 	if len(p.played) != 1 {
 		t.Fatalf("played %v", p.played)
 	}
@@ -214,7 +216,8 @@ func TestPreviewPlaysTheAudioAroundTheCut(t *testing.T) {
 func TestPreviewEndsByItselfAndCleansUp(t *testing.T) {
 	p := newFakePlayer()
 	m, _ := playerModel(t, "Flow", p)
-	m = keys(t, m, "right", "down", "down", "down", "down", "down", "p") // the end cut
+	m = focusField(t, m, fCutEnd) // the end cut
+	m = keys(t, m, "p")
 	path := p.played[0]
 	p.finished <- nil
 	m = send(t, m, playbackDoneMsg{id: m.playing.id})
@@ -229,7 +232,8 @@ func TestPreviewEndsByItselfAndCleansUp(t *testing.T) {
 func TestEscapeStopsThePreview(t *testing.T) {
 	p := newFakePlayer()
 	m, _ := playerModel(t, "Flow", p)
-	m = keys(t, m, "right", "down", "down", "down", "down", "p", "esc")
+	m = focusField(t, m, fCutStart)
+	m = keys(t, m, "p", "esc")
 	if p.stopped != 1 || m.playing != nil {
 		t.Errorf("stopped %d, playing %v", p.stopped, m.playing)
 	}
@@ -241,7 +245,8 @@ func TestEscapeStopsThePreview(t *testing.T) {
 func TestQuittingStopsThePreview(t *testing.T) {
 	p := newFakePlayer()
 	m, _ := playerModel(t, "Flow", p)
-	m = keys(t, m, "right", "down", "down", "down", "down", "p")
+	m = focusField(t, m, fCutStart)
+	m = keys(t, m, "p")
 	if _, cmd := m.Update(press("ctrl+c")); !quits(cmd) || p.stopped != 1 {
 		t.Errorf("stopped %d", p.stopped)
 	}
@@ -258,13 +263,15 @@ func TestPreviewOnlyWorksOnTheCuts(t *testing.T) {
 
 func TestWithoutAPlayerPreviewExplainsWhatToInstall(t *testing.T) {
 	m, _ := playerModel(t, "Flow", nil)
-	m = keys(t, m, "right", "down", "down", "down", "down", "p")
+	m = focusField(t, m, fCutStart)
+	m = keys(t, m, "p")
 	contains(t, m, "ffplay", "mpv")
 }
 
 func TestAPlayerThatCannotStartIsReported(t *testing.T) {
 	m, _ := playerModel(t, "Flow", brokenPlayer{})
-	m = keys(t, m, "right", "down", "down", "down", "down", "p")
+	m = focusField(t, m, fCutStart)
+	m = keys(t, m, "p")
 	contains(t, m, "no sound card")
 	if m.playing != nil {
 		t.Error("playing after a failure")

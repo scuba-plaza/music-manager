@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
+	"music-manager/internal/app"
 	"music-manager/internal/manifest"
 )
 
@@ -48,6 +49,11 @@ type Model struct {
 	cursor      int
 	offset      int
 	selKey      string
+
+	// How the list is ordered: "" for the tree of artists and albums, or the
+	// field that all tracks are sorted by in one flat list.
+	sortKey     app.SortKey
+	sortReverse bool
 
 	// The inspector: which field the cursor is on and, while one is being
 	// edited, its draft and inputs (the text, and a second one for the ASCII
@@ -329,6 +335,8 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openDoctor()
 	case key.Matches(msg, k.Add):
 		return m.openAdd()
+	case key.Matches(msg, k.Sort):
+		m.overlay = newSortMenu(m.sortKey, m.sortReverse)
 	case key.Matches(msg, k.Sync):
 		return m.openSync()
 	case key.Matches(msg, k.Identify):

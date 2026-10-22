@@ -7,17 +7,30 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/x/ansi"
+
+	"music-manager/internal/manifest"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden screens in testdata")
 
-// atMusic is a library that says its folder is somewhere fixed, so the
-// header reads the same on every machine.
+// atMusic is a library that says its folder is somewhere fixed, and that
+// every track was added and last edited on fixed days, so the screen reads
+// the same on every machine and every day.
 type atMusic struct{ Library }
 
 func (atMusic) Root() string { return "/home/me/Music/mp3-player" }
+
+func (a atMusic) Tracks() ([]manifest.Track, error) {
+	ts, err := a.Library.Tracks()
+	for i := range ts {
+		ts[i].AddedAt = time.Date(2024, 3, 5, 12, 0, 0, 0, time.UTC)
+		ts[i].UpdatedAt = time.Date(2024, 3, 9, 12, 0, 0, 0, time.UTC)
+	}
+	return ts, err
+}
 
 // goldenScreen is the browser with an album open and a track selected,
 // drawn at the given size.

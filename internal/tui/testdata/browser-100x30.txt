@@ -7,12 +7,14 @@
 │ ▾ Shawn James                      3 ││  Artist     Shawn James                                  │
 │   ▾ Shadows                        3 ││  Album      Shadows                                      │
 │       01 The Wanderer           0:02 ││  Track      7 of 12                                      │
-│       07 Flow                   0:02 ││  Cut start  0:00                                         │
-│       12 Along Our Way          0:02 ││  Cut end    0:00                                         │
+│       07 Flow                   0:02 ││  Released   —                                            │
+│       12 Along Our Way          0:02 ││  Cut start  0:00                                         │
+│                                      ││  Cut end    0:00                                         │
 │                                      ││  Kept       ██████████████████████████████  0:02 of 0:02 │
 │                                      ││  Cover      none                                         │
 │                                      ││ ──────────────────────────────────────────────────────── │
 │                                      ││ → Shawn James/Shadows/07 - Flow.mp3                      │
+│                                      ││ added 2024-03-05 · edited 2024-03-09                     │
 │                                      ││ 0:02 plays · identified                                  │
 │                                      ││                                                          │
 │                                      ││                                                          │
@@ -24,7 +26,5 @@
 │                                      ││                                                          │
 │                                      ││                                                          │
 │                                      ││                                                          │
-│                                      ││                                                          │
-│                                      ││                                                          │
 ╰──────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯
- ↑↓ move  ·  → open  ·  s sync  ·  space mark  ·  / filter  ·  ? help  ·  q quit                    
+ ↑↓ move  ·  → open  ·  s sync  ·  space mark  ·  / filter  ·  S sort  ·  ? help  ·  q quit         

@@ -104,7 +104,7 @@ func (m Model) bodyView(l layoutInfo) string {
 		return inspector() // one pane at a time: the fields take the place of the tree
 	}
 	lines, bar := m.browserContent(l.left - 2)
-	left := boxWithBar("Library", lines, bar, l.left, l.body, m.focus == paneBrowser)
+	left := boxWithBar(m.libraryTitle(), lines, bar, l.left, l.body, m.focus == paneBrowser)
 	if l.mode == modeOnePane {
 		return left
 	}
@@ -203,7 +203,7 @@ func (m Model) footerKeys() []key.Binding {
 			bindings = append(bindings, k.RemoveCover)
 		}
 	} else {
-		bindings = []key.Binding{k.Up, k.Open, k.Sync, k.Mark, k.Filter}
+		bindings = []key.Binding{k.Up, k.Open, k.Sync, k.Mark, k.Filter, k.Sort}
 		if len(m.marks) > 0 {
 			bindings = []key.Binding{k.Up, k.EditMany, k.Mark, k.ClearMarks}
 		}

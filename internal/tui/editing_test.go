@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"music-manager/internal/app"
+
 	"music-manager/internal/manifest"
 )
 
@@ -221,7 +223,8 @@ func TestEditingTheTrackNumberAndTheAlbumSize(t *testing.T) {
 
 func TestEditingACut(t *testing.T) {
 	m, hook := editingModel(t, "Flow")
-	m = keys(t, m, "right", "down", "down", "down", "down", "enter")
+	m = focusField(t, m, fCutStart)
+	m = keys(t, m, "enter")
 	m = typed(t, m, "0:01")
 	m = keys(t, m, "enter")
 	if got := trackNamed(t, hook.Library, "Flow"); got.TrimStart.Seconds() != 1 {
@@ -310,4 +313,57 @@ func TestATrackNobodyIdentifiedStartsFromWhatTheFileSaid(t *testing.T) {
 		t.Errorf("the selection should follow the track out of Needs work, got %+v", r)
 	}
 	lacks(t, m, "Not identified")
+}
+
+// focusField opens the inspector on the selected track and moves to field f.
+func focusField(t *testing.T, m Model, f fieldKind) Model {
+	t.Helper()
+	m = keys(t, m, "right")
+	for trackFields[m.field] != f {
+		before := m.field
+		m = keys(t, m, "down")
+		if m.field == before {
+			t.Fatalf("no field %v", f)
+		}
+	}
+	return m
+}
+
+func TestEditingTheReleaseDate(t *testing.T) {
+	m, hook := editingModel(t, "Flow")
+	m = focusField(t, m, fReleased)
+	contains(t, m, "Released")
+	m = keys(t, m, "enter")
+	contains(t, m, "1999-05-17") // the format is explained
+	m = typed(t, m, "2012-03")
+	m = keys(t, m, "enter")
+
+	if got := trackNamed(t, hook.Library, "Flow"); got.Released != "2012-03" {
+		t.Errorf("saved %+v", got)
+	}
+	contains(t, m, "Saved", "2012-03")
+
+	m = keys(t, m, "enter")
+	m = clearField(t, m)
+	m = keys(t, m, "enter")
+	if got := trackNamed(t, hook.Library, "Flow"); got.Released != "" {
+		t.Errorf("an empty date should forget it: %q", got.Released)
+	}
+}
+
+func TestABadReleaseDateIsExplainedAndNothingIsSaved(t *testing.T) {
+	m, hook := editingModel(t, "Flow")
+	m = focusField(t, m, fReleased)
+	m = typed(t, keys(t, m, "enter"), "next spring")
+	m = keys(t, m, "enter")
+	if !m.editing || hook.calls != 0 {
+		t.Errorf("editing %v, library calls %d", m.editing, hook.calls)
+	}
+	contains(t, m, "is not a date", "1999-05-17")
+}
+
+func TestTheInspectorSaysWhenATrackWasAddedAndLastEdited(t *testing.T) {
+	m, hook := editingModel(t, "Flow")
+	tr := trackNamed(t, hook.Library, "Flow")
+	contains(t, m, "added "+app.SortValue(tr, app.SortAdded), "edited "+app.SortValue(tr, app.SortEdited))
 }

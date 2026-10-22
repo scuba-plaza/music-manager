@@ -25,8 +25,8 @@ mm sync                            # write it into the library folder
 mm sync --target /run/media/me/PLAYER
 ```
 
-`mm add` asks for title, artist, album, track number, tracks on the album and
-how much to cut off the start and end, with defaults filled in. Anything given
+`mm add` asks for title, artist, album, track number, tracks on the album, the
+release date and how much to cut off the start and end, with defaults filled in. Anything given
 as a flag is not asked. Without a terminal (or with `--no-input`) it never
 asks and fails if the title or artist is unknown.
 
@@ -42,6 +42,7 @@ matter right now. Without a terminal, plain `mm` prints help as before.
 |---|---|
 | `↑↓` `→←` `/` | move, open and close, filter (same words as `mm ls`, e.g. `status:unidentified`) |
 | `z` | centre the cursor in the list, like `zz` in vim |
+| `S` | sort the list by artist, album, title, track number, length or any of the three dates (see below); the menu also reverses the order and goes back to the tree |
 | `+` `-` | open the tree one more level (artists, then albums) / close all of it |
 | `→` `enter` | from a track into its fields; `enter` edits a field, `enter` saves, `esc` cancels |
 | `tab` | while editing a name: switch between the text and its ASCII form |
@@ -67,12 +68,26 @@ changes the library while the interface is open, the change appears within a cou
 | `mm identify [id…] [--yes]` | look tracks up on MusicBrainz; pick from a list, or `--yes` for confident matches |
 | `mm adopt [id…]` | identify tracks by what their old tags said, for what MusicBrainz does not know |
 | `mm add <url>` | download with yt-dlp and add |
-| `mm edit <id> --title … --artist … --album … --track N --of N --trim-start T --trim-end T --cover FILE` | change a track; `--title-ascii` etc. override the derived ASCII |
-| `mm ls [words] [status:identified\|unidentified]` / `mm show <id>` | look at records |
+| `mm edit <id> --title … --artist … --album … --track N --of N --released DATE --trim-start T --trim-end T --cover FILE` | change a track; `--title-ascii` etc. override the derived ASCII |
+| `mm ls [words] [status:identified\|unidentified] [--sort KEY] [--reverse]` / `mm show <id>` | look at records; `--sort` takes `artist`, `album`, `title`, `track`, `length`, `released`, `added` or `edited` |
 | `mm sync [--target DIR] [--dry-run] [--prune --yes]` | render the folder; `--prune` deletes files the records don't account for |
 | `mm rm <id>…` | remove records (audio is deleted by the next sync) |
 | `mm doctor` | check the stores for missing or damaged files |
 | `mm tui` | the full-screen interface (also what plain `mm` opens in a terminal) |
+
+## Dates and sorting
+
+Every track has three dates:
+
+- **released**: when the track first came out, as precisely as is known: `1999`, `1999-05` or `1999-05-17`. You set it (`mm edit --released`, the `Released` field in the interface, or in the bulk-edit form for many tracks at once). It is also filled in from a MusicBrainz match, from yt-dlp's `release_date`, and from the old `TDRC` or `TYER` tag when a file is adopted; and it is written into the synced file as its `TDRC` tag, so players show the year.
+- **added**: when the track entered the library. It never changes.
+- **edited**: when its record was last changed.
+
+The last two are kept by `mm` and shown in `mm show` and under the track in the interface. Any of the three, and
+artist, album, title, track number and length, can order the list: `mm ls --sort added`, or `S` in the interface, which shows
+all tracks in one flat list in that order (with the date beside each) until you choose the tree again. Text and numbers sort
+lowest first and dates newest first; `--reverse` (or `r` in the menu) turns that around. Tracks that have no value, such as
+no release date, always come last, and ties are ordered by artist, album, track number and title.
 
 Trims are stored on the record and applied when rendering, on MP3 frame
 boundaries (about 26 ms), without re-encoding. The stored audio is never

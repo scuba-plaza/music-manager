@@ -18,7 +18,11 @@ func (m Model) viewRows() int { return max(computeLayout(m.w, m.h).body-3, 1) }
 // rebuild derives the rows again, keeping the selected row selected if it
 // still exists, and otherwise the row at the same position.
 func (m *Model) rebuild() {
-	m.rows = buildRows(m.tracks, m.filter, m.expanded)
+	if m.sortKey != "" {
+		m.rows = buildSortedRows(m.tracks, m.filter, m.sortKey, m.sortReverse)
+	} else {
+		m.rows = buildRows(m.tracks, m.filter, m.expanded)
+	}
 	if m.selKey != "" {
 		for i, r := range m.rows {
 			if r.Key == m.selKey {
@@ -137,6 +141,10 @@ func (m *Model) close() {
 // the artists first, then their albums. Pressed again it goes one level
 // deeper, so the tree can be opened as far as wanted and no further.
 func (m *Model) openLevel() {
+	if m.sortKey != "" {
+		m.say(sortedNotTree, false)
+		return
+	}
 	if m.filter != "" {
 		return // a filtered tree is shown open already
 	}
@@ -161,6 +169,10 @@ func (m *Model) openLevel() {
 // closeAll closes everything, down to the artists. The selection goes to the
 // row that held it, so you do not lose your place.
 func (m *Model) closeAll() {
+	if m.sortKey != "" {
+		m.say(sortedNotTree, false)
+		return
+	}
 	if m.filter != "" {
 		return
 	}
@@ -262,6 +274,9 @@ func renderRow(r Row, w int, selected bool, mark string) string {
 	switch r.Kind {
 	case kindTrack:
 		right = clock(r.Track.PlayingLength())
+		if r.Right != "" {
+			right = r.Right
+		}
 	default:
 		right = itoa(r.Count)
 	}

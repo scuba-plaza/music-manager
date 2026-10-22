@@ -59,6 +59,7 @@ var helpRight = []helpSection{
 	}},
 	{"Library", []helpEntry{
 		{"s", "sync: write the folder"},
+		{"S", "sort the list"},
 		{"u  ctrl+r", "undo / redo"},
 		{"D", "check the library"},
 		{"?  q", "this help / quit"},

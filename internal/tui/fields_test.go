@@ -21,7 +21,7 @@ func identified() manifest.Track {
 }
 
 func TestFieldsAreInTheOrderOfTheInspector(t *testing.T) {
-	want := []fieldKind{fTitle, fArtist, fAlbum, fTrack, fCutStart, fCutEnd, fCover}
+	want := []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fCutStart, fCutEnd, fCover}
 	if len(trackFields) != len(want) {
 		t.Fatalf("fields = %v", trackFields)
 	}
@@ -30,7 +30,7 @@ func TestFieldsAreInTheOrderOfTheInspector(t *testing.T) {
 			t.Errorf("field %d = %v, want %v", i, trackFields[i], want[i])
 		}
 	}
-	if fTitle.label() != "Title" || fCutStart.label() != "Cut start" || fTrack.label() != "Track" {
+	if fTitle.label() != "Title" || fCutStart.label() != "Cut start" || fTrack.label() != "Track" || fReleased.label() != "Released" {
 		t.Error("labels")
 	}
 	if !fTitle.isName() || !fArtist.isName() || !fAlbum.isName() || fTrack.isName() || fCutEnd.isName() {
@@ -262,5 +262,45 @@ func TestDisplayValues(t *testing.T) {
 	}
 	if got := displayValue(manifest.Track{}, fCutEnd); got != "0:00" {
 		t.Errorf("no cut should read 0:00, got %q", got)
+	}
+}
+
+func TestTheReleaseDateIsShownEditedAndChecked(t *testing.T) {
+	tr := identified()
+	tr.Released = "1999-05"
+	if got := displayValue(tr, fReleased); got != "1999-05" {
+		t.Errorf("shown as %q", got)
+	}
+	d := newDraft(tr, fReleased)
+	if d.text != "1999-05" || d.second != "" {
+		t.Errorf("draft = %q / %q", d.text, d.second)
+	}
+
+	d.setText(" 2001-02-03 ")
+	e, err := d.edit()
+	if err != nil || e.Released == nil || *e.Released != "2001-02-03" || e.Title != nil || e.TrackNumber != nil {
+		t.Errorf("edit = %+v, %v", e, err)
+	}
+	d.setText("")
+	if e, err := d.edit(); err != nil || e.Released == nil || *e.Released != "" {
+		t.Errorf("an empty date forgets the date: %+v, %v", e, err)
+	}
+	d.setText("soon")
+	if _, err := d.edit(); err == nil || !strings.Contains(err.Error(), "1999-05-17") {
+		t.Errorf("a bad date: %v; want a message showing the format", err)
+	}
+}
+
+func TestATrackNobodyIdentifiedOffersTheDateOfItsOldTags(t *testing.T) {
+	tr := manifest.Track{ID: "x", Hint: manifest.Hint{Title: "Song", Date: "1987"}}
+	if got := displayValue(tr, fReleased); got != "1987" || !prefilledFrom(tr, fReleased) {
+		t.Errorf("shown %q, prefilled %v", got, prefilledFrom(tr, fReleased))
+	}
+	if d := newDraft(tr, fReleased); d.text != "1987" {
+		t.Errorf("draft = %q", d.text)
+	}
+	tr.Released = "1990"
+	if got := displayValue(tr, fReleased); got != "1990" || prefilledFrom(tr, fReleased) {
+		t.Errorf("a date of its own wins: shown %q", got)
 	}
 }

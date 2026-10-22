@@ -93,3 +93,33 @@ func TestBulkSummaryDescribesTheChange(t *testing.T) {
 		t.Errorf("nothing to say about nothing: %q", got)
 	}
 }
+
+func TestBulkSetsAndClearsTheReleaseDate(t *testing.T) {
+	ts := album(3)
+	ts[1].Released = "1999"
+	edits, changed, err := bulkPlan(ts, bulkValues{released: " 1999-05 "})
+	if err != nil || changed != 3 {
+		t.Fatalf("changed %d, err %v", changed, err)
+	}
+	if e := edits[ts[0].ID]; e.Released == nil || *e.Released != "1999-05" {
+		t.Errorf("= %+v", e)
+	}
+
+	edits, changed, err = bulkPlan(ts, bulkValues{released: "-"})
+	if err != nil || changed != 1 { // only the track that has a date changes
+		t.Fatalf("clearing: changed %d, err %v", changed, err)
+	}
+	if e := edits[ts[1].ID]; e.Released == nil || *e.Released != "" {
+		t.Errorf("= %+v", e)
+	}
+
+	if _, _, err := bulkPlan(ts, bulkValues{released: "soon"}); err == nil || !strings.Contains(err.Error(), "1999-05-17") {
+		t.Errorf("a bad date: %v", err)
+	}
+	if got := bulkSummary(bulkValues{released: "1999", cutEnd: "-"}); !strings.Contains(got, "Released → 1999") {
+		t.Errorf("summary %q", got)
+	}
+	if got := bulkSummary(bulkValues{released: "-"}); !strings.Contains(got, "Released → unknown") {
+		t.Errorf("summary %q", got)
+	}
+}

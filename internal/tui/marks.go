@@ -127,6 +127,10 @@ func (m Model) changed(msg changedMsg) (tea.Model, tea.Cmd) {
 // moveTrack swaps the selected track's number with its neighbour's, which
 // moves it up or down its album.
 func (m Model) moveTrack(dir int) (tea.Model, tea.Cmd) {
+	if m.sortKey != "" {
+		m.say("Moving a track needs the tree view · S, then Tree", true)
+		return m, nil
+	}
 	r, ok := m.selectedRow()
 	if !ok || r.Kind != kindTrack || !strings.HasPrefix(r.Parent, "album") {
 		m.say("Only tracks of an album can be moved", true)
@@ -158,6 +162,10 @@ func (m Model) moveTrack(dir int) (tea.Model, tea.Cmd) {
 
 // renumber numbers the album of the selected row 1..N in the order shown.
 func (m Model) renumber() (tea.Model, tea.Cmd) {
+	if m.sortKey != "" {
+		m.say("Numbering an album needs the tree view · S, then Tree", true)
+		return m, nil
+	}
 	r, ok := m.selectedRow()
 	if !ok {
 		return m, nil

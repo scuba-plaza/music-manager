@@ -50,6 +50,7 @@ type keyMap struct {
 
 	Add    key.Binding
 	Sync   key.Binding
+	Sort   key.Binding
 	Doctor key.Binding
 
 	// marking, and acting on several tracks
@@ -112,6 +113,7 @@ func newKeyMap() keyMap {
 
 		Add:    key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add")),
 		Sync:   key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sync")),
+		Sort:   key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "sort")),
 		Doctor: key.NewBinding(key.WithKeys("D"), key.WithHelp("D", "check")),
 
 		Identify:    key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "identify")),
