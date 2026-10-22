@@ -45,8 +45,13 @@ func WithAPE(audio []byte) []byte {
 // WithTags prepends an ID3v2.4 tag holding UTF-8 title, artist and album
 // frames. Empty values are omitted.
 func WithTags(audio []byte, title, artist, album string) []byte {
+	return WithTagsTrack(audio, title, artist, album, "")
+}
+
+// WithTagsTrack is WithTags with a track field such as "3" or "3/12".
+func WithTagsTrack(audio []byte, title, artist, album, track string) []byte {
 	var body []byte
-	for _, f := range []struct{ id, text string }{{"TIT2", title}, {"TPE1", artist}, {"TALB", album}} {
+	for _, f := range []struct{ id, text string }{{"TIT2", title}, {"TPE1", artist}, {"TALB", album}, {"TRCK", track}} {
 		if f.text == "" {
 			continue
 		}

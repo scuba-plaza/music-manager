@@ -51,6 +51,8 @@ type Hint struct {
 	Title    string `json:"title,omitempty"`
 	Artist   string `json:"artist,omitempty"`
 	Album    string `json:"album,omitempty"`
+	Track    int    `json:"track,omitempty"`
+	Total    int    `json:"of,omitempty"`
 	Filename string `json:"filename,omitempty"`
 }
 

@@ -134,3 +134,22 @@ func TestAddLooksTheTrackUpAndUsesItAsTheDefault(t *testing.T) {
 		t.Errorf("failing lookup: code %d, out %q, err %q", code, out, errs)
 	}
 }
+
+func TestAdopt(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	src := t.TempDir()
+	writeMP3(t, filepath.Join(src, "01 Good.mp3"), testmp3.WithTagsTrack(testmp3.Silent(30), "Good Song", "Band", "Album", "1/9"))
+	writeMP3(t, filepath.Join(src, "bad.mp3"), testmp3.WithTags(testmp3.Silent(40), "", "", ""))
+	run(t, lib, "ingest", src)
+
+	code, out, errs := run(t, lib, "adopt")
+	if code != 0 || !strings.Contains(out, "adopted 1, left 1") || !strings.Contains(out, "no title and artist") {
+		t.Errorf("code %d, out %q, err %q", code, out, errs)
+	}
+	if _, out, _ := run(t, lib, "ls", "status:identified"); !strings.Contains(out, "Good Song") || strings.Contains(out, "bad") {
+		t.Errorf("ls:\n%s", out)
+	}
+	if code, _, errs := run(t, lib, "adopt", "nope"); code == 0 || !strings.Contains(errs, "nope") {
+		t.Errorf("unknown id: code %d, err %q", code, errs)
+	}
+}

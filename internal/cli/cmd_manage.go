@@ -78,3 +78,42 @@ func doctorCmd(open opener) *cobra.Command {
 		},
 	}
 }
+
+func adoptCmd(open opener) *cobra.Command {
+	return &cobra.Command{
+		Use:   "adopt [id...]",
+		Short: "Identify tracks by what their old tags said",
+		Long: `Identify tracks that are not identified yet by the title, artist, album and
+track number their file carried when it was ingested. Use it for what
+"mm identify" cannot find, such as speeches or recordings from YouTube.`,
+		Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, ids []string) error {
+			a, err := open()
+			if err != nil {
+				return err
+			}
+			results, err := a.Adopt(ids)
+			if err != nil {
+				return err
+			}
+			m, err := a.Manifest()
+			if err != nil {
+				return err
+			}
+			out := cmd.OutOrStdout()
+			adopted, left := 0, 0
+			for _, r := range results {
+				if r.Adopted {
+					adopted++
+					continue
+				}
+				left++
+				t, _ := m.Get(r.TrackID)
+				artist, title, _ := display(t)
+				fmt.Fprintf(out, "%s  left alone: %s - %s (%s)\n", r.TrackID, artist, title, r.Reason)
+			}
+			fmt.Fprintf(out, "adopted %d, left %d\n", adopted, left)
+			return nil
+		},
+	}
+}
