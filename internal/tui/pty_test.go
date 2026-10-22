@@ -289,3 +289,22 @@ func TestPTYTrimWithAPreview(t *testing.T) {
 		t.Fatalf("exited %v, err %v", exited, err)
 	}
 }
+
+func TestPTYCoverIsDrawnInColour(t *testing.T) {
+	a := testApp(t)
+	tr := seed(t, a, seedTrack{"Flow", "Shawn James", "Shadows", 7, 12, 0})[0]
+	if err := a.SetCover(tr.ID, encodePNGBytes(t)); err != nil {
+		t.Fatal(err)
+	}
+	s := startMM(t, 110, 34, a.Root(), "COLORTERM=truecolor")
+	s.MustSee("Shawn James")
+	s.Type("/flow\r\x1b[B\x1b[B\x1b[B") // the track
+	s.MustSee("40×40 PNG", "▀")
+
+	raw := s.em.Render() // with the colour codes
+	for name, rgb := range map[string]string{"red": "255;0;0", "blue": "0;0;255"} {
+		if !strings.Contains(raw, rgb) {
+			t.Errorf("no %s (%s) in the picture's colour codes", name, rgb)
+		}
+	}
+}

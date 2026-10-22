@@ -69,6 +69,10 @@ type Model struct {
 	playing  *playback
 	previews int
 
+	// Covers: shrunken copies of the ones shown, loaded in the background.
+	thumbs       map[string]thumb
+	thumbPending map[string]bool
+
 	// nudgeKey names the cut that was just nudged, so that a run of nudges
 	// of one cut is one step to undo.
 	nudgeKey string
@@ -94,7 +98,10 @@ func New(lib Library, opts ...Option) Model {
 	in.Placeholder = "filter  (e.g. shawn, status:unidentified)"
 	in.PlaceholderStyle = styles.dim
 	in.Cursor.SetMode(cursor.CursorStatic)
-	m := Model{lib: lib, keys: newKeyMap(), expanded: map[string]bool{}, filterInput: in}
+	m := Model{
+		lib: lib, keys: newKeyMap(), expanded: map[string]bool{}, filterInput: in,
+		thumbs: map[string]thumb{}, thumbPending: map[string]bool{},
+	}
 	for _, o := range opts {
 		o(&m)
 	}
@@ -116,7 +123,18 @@ func (m Model) load() tea.Cmd {
 func (m Model) Init() tea.Cmd { return m.load() }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	nm := next.(Model)
+	// Whatever happened, the cover now selected may still need loading.
+	return nm, tea.Batch(cmd, nm.wantThumb())
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case thumbMsg:
+		delete(m.thumbPending, msg.sha)
+		m.thumbs[msg.sha] = msg.thumb
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		m.filterInput.Width = max(m.leftInner()-6, 1)

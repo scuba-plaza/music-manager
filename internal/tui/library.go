@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"time"
 
 	"music-manager/internal/app"
@@ -22,12 +23,31 @@ type Library interface {
 	// PreviewTrim writes the audio around one of a track's cuts to a
 	// temporary file; the caller removes it with cleanup.
 	PreviewTrim(id string, edge app.Edge, window time.Duration) (path string, cleanup func(), err error)
+	// SetCover sets a track's cover image (JPEG or PNG), or removes it if
+	// image is empty, and returns the track as saved.
+	SetCover(id string, image []byte) (manifest.Track, error)
+	// CoverImage returns the stored cover image with the given SHA.
+	CoverImage(sha string) ([]byte, error)
 }
 
 type appLibrary struct{ *app.App }
 
 // NewLibrary returns the Library backed by a.
 func NewLibrary(a *app.App) Library { return appLibrary{a} }
+
+func (l appLibrary) SetCover(id string, image []byte) (manifest.Track, error) {
+	if err := l.App.SetCover(id, image); err != nil {
+		return manifest.Track{}, err
+	}
+	m, err := l.Manifest()
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	t, _ := m.Get(id)
+	return t, nil
+}
+
+func (l appLibrary) CoverImage(sha string) ([]byte, error) { return os.ReadFile(l.CoverPath(sha)) }
 
 func (l appLibrary) Tracks() ([]manifest.Track, error) {
 	m, err := l.Manifest()

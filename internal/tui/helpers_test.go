@@ -245,11 +245,24 @@ func selectTrack(t *testing.T, m Model, title string) Model {
 	for _, tr := range m.tracks {
 		if tr.Title == title || tr.OriginalTitle == title || tr.Hint.Title == title {
 			m.revealTrack(tr)
-			return m
+			return send(t, m, tea.WindowSizeMsg{Width: m.w, Height: m.h}) // a no-op that lets covers load
 		}
 	}
 	t.Fatalf("no track titled %q on screen", title)
 	return m
+}
+
+// appOf returns the app behind a Library, however it is wrapped.
+func appOf(t *testing.T, lib Library) *app.App {
+	t.Helper()
+	switch l := lib.(type) {
+	case *editHook:
+		return appOf(t, l.Library)
+	case appLibrary:
+		return l.App
+	}
+	t.Fatalf("no app behind %T", lib)
+	return nil
 }
 
 // clearField empties the input being edited, as ctrl+u does.
@@ -282,4 +295,10 @@ func seedTagged(t *testing.T, a *app.App, name, title, artist, album, track stri
 		t.Fatalf("ingest %s: %+v, %v", name, rep, err)
 	}
 	return rep.Added[0]
+}
+
+// encodePNGBytes is a 40×40 picture, red on the left and blue on the right.
+func encodePNGBytes(t *testing.T) []byte {
+	t.Helper()
+	return encodePNG(t, twoTone(40, 40))
 }

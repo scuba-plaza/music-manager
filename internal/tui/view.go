@@ -80,7 +80,7 @@ func (m Model) bodyView(l layoutInfo) string {
 	if l.mode == modeOnePane {
 		return left
 	}
-	right := box("Details", m.inspectorLines(l.right-2), l.right, l.body, false)
+	right := box("Details", m.inspectorLines(l.right-2, l.body-2), l.right, l.body, m.focus == paneInspector)
 	return joinPanes(left, right)
 }
 
@@ -148,8 +148,11 @@ func (m Model) footerKeys() []key.Binding {
 	var bindings []key.Binding
 	if m.focus == paneInspector {
 		bindings = []key.Binding{k.Field, k.Edit, k.Back}
-		if f := trackFields[m.field]; f == fCutStart || f == fCutEnd {
+		switch trackFields[m.field] {
+		case fCutStart, fCutEnd:
 			bindings = append(bindings, k.Less, k.Play)
+		case fCover:
+			bindings = append(bindings, k.RemoveCover)
 		}
 	} else {
 		bindings = []key.Binding{k.Up, k.Open, k.Filter}

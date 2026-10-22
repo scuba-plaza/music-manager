@@ -14,7 +14,7 @@ import (
 )
 
 // inspectorLines draws the right pane for whatever is selected.
-func (m Model) inspectorLines(w int) []string {
+func (m Model) inspectorLines(w, h int) []string {
 	r, ok := m.selectedRow()
 	if !ok {
 		if len(m.tracks) == 0 {
@@ -24,7 +24,7 @@ func (m Model) inspectorLines(w int) []string {
 	}
 	switch r.Kind {
 	case kindTrack:
-		return m.trackLines(r.Track, w)
+		return m.trackLines(r.Track, w, h)
 	case kindGroup:
 		return groupLines(r, w)
 	}
@@ -64,7 +64,7 @@ func (m Model) summaryLines(r Row, w int) []string {
 const labelWidth = 12
 
 // trackLines shows a track's fields, with the one being edited open.
-func (m Model) trackLines(t manifest.Track, w int) []string {
+func (m Model) trackLines(t manifest.Track, w, h int) []string {
 	_, title, _ := app.Display(t)
 	lines := []string{"", " " + styles.bold.Render(fit(title, w-2)), rule(w)}
 	if t.Status != manifest.Identified {
@@ -77,6 +77,8 @@ func (m Model) trackLines(t manifest.Track, w int) []string {
 			lines = append(lines, m.barLines(t, w))
 		}
 	}
+
+	lines = append(lines, m.thumbLines(t, w, h-len(lines)-6)...)
 
 	lines = append(lines, rule(w))
 	shown := t
@@ -115,6 +117,10 @@ func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int) []
 		return m.editorLines(prefix, indent, vw)
 	}
 
+	if f == fCover {
+		return []string{prefix + m.coverText(t)}
+	}
+
 	value := displayValue(t, f)
 	var lines []string
 	switch {
@@ -136,6 +142,37 @@ func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int) []
 			}
 			lines = append(lines, indent+styles.dim.Render(fit("ascii  "+ascii+" · "+kind, vw)))
 		}
+	}
+	return lines
+}
+
+// coverText says what a track's cover is.
+func (m Model) coverText(t manifest.Track) string {
+	switch th, ok := m.thumbs[t.CoverSHA256]; {
+	case t.CoverSHA256 == "":
+		return styles.dim.Render("none")
+	case !ok:
+		return styles.dim.Render("loading…")
+	default:
+		return th.info
+	}
+}
+
+// thumbLines draws the cover under its row, if there is a cover and room
+// for at least a few lines of it.
+func (m Model) thumbLines(t manifest.Track, w, room int) []string {
+	th, ok := m.thumbs[t.CoverSHA256]
+	if t.CoverSHA256 == "" || !ok || th.img == nil {
+		return nil
+	}
+	cols := min(w-labelWidth-4, 28)
+	rows := min(cols/2, room)
+	if rows < 3 {
+		return nil
+	}
+	var lines []string
+	for _, l := range renderThumb(thumbCells(th.img, cols, rows)) {
+		lines = append(lines, strings.Repeat(" ", labelWidth+1)+l)
 	}
 	return lines
 }
@@ -177,12 +214,17 @@ func (m Model) editorLines(prefix, indent string, vw int) []string {
 	case m.dr.field == fTrack:
 		first.Width, second.Width = 5, 5
 		lines = append(lines, prefix+first.View()+styles.dim.Render(" of ")+second.View())
+	case m.dr.field == fCover:
+		first.Width = max(vw-1, 1)
+		lines = append(lines, prefix+first.View(), indent+styles.dim.Render(fit("a JPEG or PNG file · empty removes the cover", vw)))
 	default:
 		first.Width = max(vw-24, 1)
 		lines = append(lines, prefix+first.View()+styles.dim.Render("  e.g. 0:12 or 1:30.5"))
 	}
 	if m.editErr != "" {
-		lines = append(lines, indent+styles.bad.Render(fit(m.editErr, vw)))
+		for _, l := range wrap(m.editErr, vw) {
+			lines = append(lines, indent+styles.bad.Render(l))
+		}
 	}
 	return lines
 }

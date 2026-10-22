@@ -1,6 +1,11 @@
 package tui
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/charmbracelet/bubbles/cursor"
@@ -39,6 +44,8 @@ func (m Model) updateInspector(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.startEdit()
 	case key.Matches(msg, k.Play):
 		return m.togglePreview()
+	case key.Matches(msg, k.RemoveCover) && trackFields[m.field] == fCover:
+		return m.setCover("")
 	case key.Matches(msg, k.Less):
 		return m.nudge(-100 * time.Millisecond)
 	case key.Matches(msg, k.More):
@@ -147,6 +154,46 @@ func (m Model) save(t manifest.Track, e app.Edit, label, nudge string) tea.Cmd {
 	}
 }
 
+// setCover gives the selected track the image in the file at path, or removes
+// its cover if path is empty.
+func (m Model) setCover(path string) (tea.Model, tea.Cmd) {
+	r, ok := m.selectedRow()
+	if !ok {
+		return m, nil
+	}
+	t, path := r.Track, cleanPath(path)
+	if path == "" && t.CoverSHA256 == "" {
+		m.editing = false // no cover to remove
+		return m, nil
+	}
+	m.busy = true
+	lib, label := m.lib, "change of cover"
+	if path == "" {
+		label = "removal of the cover"
+	}
+	return m, func() tea.Msg {
+		var data []byte
+		if path != "" {
+			var err error
+			if data, err = os.ReadFile(path); err != nil {
+				return editedMsg{label: label, before: t, err: friendlyFileError(path, err)}
+			}
+		}
+		after, err := lib.SetCover(t.ID, data)
+		return editedMsg{label: label, before: t, after: after, err: err}
+	}
+}
+
+// friendlyFileError shortens a file error to the file's name and the reason,
+// "front.png: no such file or directory".
+func friendlyFileError(path string, err error) error {
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		return fmt.Errorf("%s: %s", filepath.Base(path), pe.Err)
+	}
+	return err
+}
+
 // minKept is the least audio a cut may leave of a track.
 const minKept = 100 * time.Millisecond
 
@@ -193,6 +240,9 @@ func (m Model) commit() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	t := r.Track
+	if m.dr.field == fCover {
+		return m.setCover(m.dr.text)
+	}
 	e, err := m.dr.edit()
 	if err != nil {
 		m.editErr = err.Error()

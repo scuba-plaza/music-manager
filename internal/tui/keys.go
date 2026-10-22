@@ -37,6 +37,9 @@ type keyMap struct {
 	// on a cut
 	Less, More, LessBig, MoreBig, ClearCut key.Binding
 	Play                                   key.Binding
+
+	// on the cover
+	RemoveCover key.Binding
 }
 
 // isNudge reports whether msg is one of the keys that nudge a cut.
@@ -81,5 +84,7 @@ func newKeyMap() keyMap {
 		MoreBig:  key.NewBinding(key.WithKeys("}")),
 		ClearCut: key.NewBinding(key.WithKeys("0"), key.WithHelp("0", "no cut")),
 		Play:     key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "hear")),
+
+		RemoveCover: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "remove")),
 	}
 }

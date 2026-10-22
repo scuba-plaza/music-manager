@@ -25,12 +25,13 @@ const (
 	fTrack
 	fCutStart
 	fCutEnd
+	fCover
 )
 
-var trackFields = []fieldKind{fTitle, fArtist, fAlbum, fTrack, fCutStart, fCutEnd}
+var trackFields = []fieldKind{fTitle, fArtist, fAlbum, fTrack, fCutStart, fCutEnd, fCover}
 
 func (f fieldKind) label() string {
-	return [...]string{"Title", "Artist", "Album", "Track", "Cut start", "Cut end"}[f]
+	return [...]string{"Title", "Artist", "Album", "Track", "Cut start", "Cut end", "Cover"}[f]
 }
 
 // isName reports whether the field is text that also has an ASCII form.
@@ -142,6 +143,8 @@ func newDraft(t manifest.Track, f fieldKind) draft {
 	case f == fTrack:
 		n, of := numbers(t)
 		d.text, d.second = numberText(n), numberText(of)
+	case f == fCover:
+		// the text is the path of a new image
 	default:
 		d.text = cutText(f, t)
 	}
