@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"strings"
 
 	"golang.org/x/term"
 
@@ -20,11 +21,18 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	deps := cli.Deps{Downloader: ytdlp.New(), Metadata: musicbrainz.New(userAgent())}
+	lookup := musicbrainz.New(userAgent())
+	if url := os.Getenv("MM_MUSICBRAINZ_URL"); url != "" { // a mirror, or a stand-in for tests
+		lookup.BaseURL = strings.TrimRight(url, "/")
+	}
+	if url := os.Getenv("MM_COVERART_URL"); url != "" { // likewise for cover art
+		lookup.CoverURL = strings.TrimRight(url, "/")
+	}
+	deps := cli.Deps{Downloader: ytdlp.New(), Metadata: lookup}
 	if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 		deps.Prompter = prompt.New(os.Stdin, os.Stderr)
 		deps.RunTUI = func(ctx context.Context, a *app.App) error {
-			return tui.Run(ctx, tui.NewLibrary(a), tui.WithPlayer(tui.DetectPlayer()))
+			return tui.Run(ctx, tui.NewLibrary(a, tui.WithSource(lookup)), tui.WithPlayer(tui.DetectPlayer()))
 		}
 	}
 	os.Exit(cli.Run(ctx, os.Args[1:], cli.IO{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}, deps))

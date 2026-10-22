@@ -318,3 +318,5 @@ func (h *editHook) RemoveMany(ids []string) ([]manifest.Track, error) {
 	h.manyCalls++
 	return h.Library.RemoveMany(ids)
 }
+
+func ansiStrip(s string) string { return ansi.Strip(s) }

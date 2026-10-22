@@ -11,6 +11,8 @@ package tui
 import (
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -306,5 +308,44 @@ func TestPTYCoverIsDrawnInColour(t *testing.T) {
 		if !strings.Contains(raw, rgb) {
 			t.Errorf("no %s (%s) in the picture's colour codes", name, rgb)
 		}
+	}
+}
+
+func TestPTYIdentifyThroughThePicker(t *testing.T) {
+	// A stand-in MusicBrainz that answers every search with a recorded response.
+	canned, err := os.ReadFile("../musicbrainz/testdata/search_dream3.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/ws/2/recording") {
+			w.Write(canned)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	a := testApp(t)
+	seedTagged(t, a, "01 Dream", "Dream 3", "Max Richter", "From Sleep", "1/7")
+	s := startMM(t, 120, 34, a.Root(), "MM_MUSICBRAINZ_URL="+srv.URL, "MM_COVERART_URL="+srv.URL)
+	s.MustSee("Needs work")
+	s.Type("\r\x1b[B\x1b[C") // open the group, go to the track, into the inspector
+	s.Type("i")
+	s.MustSee("Identify", "From Sleep", "This would change")
+	t.Logf("\n%s", s.Screen())
+
+	s.Type("\r")
+	s.MustSee("Identified as")
+	s.Type("q")
+	if exited, err := s.Exited(3 * time.Second); !exited || err != nil {
+		t.Fatalf("exited %v, err %v\n%s", exited, err, s.Screen())
+	}
+	m, err := a.Manifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.Tracks[0]; got.Status != "identified" || got.MBRecordingID == "" || got.Album != "From Sleep" {
+		t.Errorf("track = %+v", got)
 	}
 }

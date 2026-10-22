@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"context"
+	"errors"
 	"os"
 	"time"
 
@@ -23,6 +25,17 @@ type Library interface {
 	// PreviewTrim writes the audio around one of a track's cuts to a
 	// temporary file; the caller removes it with cleanup.
 	PreviewTrim(id string, edge app.Edge, window time.Duration) (path string, cleanup func(), err error)
+	// Lookup reports whether a music database can be searched at all.
+	Lookup() bool
+	// Candidates searches the database for what a track could be (or for q,
+	// if given); ApplyCandidate identifies the track as one of them.
+	Candidates(ctx context.Context, id string, q *app.Query) ([]app.Candidate, error)
+	ApplyCandidate(ctx context.Context, id string, c app.Candidate) (manifest.Track, error)
+	// IdentifyAll takes the confident match for every track that needs work,
+	// telling each as it goes.
+	IdentifyAll(ctx context.Context, each func(app.IdentifyResult, manifest.Track)) ([]app.IdentifyResult, error)
+	// Adopt identifies tracks by the tags their files had.
+	Adopt(ids []string) ([]app.AdoptResult, error)
 	// RemoveMany removes tracks, all or none; their audio stays stored until
 	// a sync collects it.
 	RemoveMany(ids []string) ([]manifest.Track, error)
@@ -37,10 +50,56 @@ type Library interface {
 	CoverImage(sha string) ([]byte, error)
 }
 
-type appLibrary struct{ *app.App }
+type appLibrary struct {
+	*app.App
+	source app.MetadataSource
+}
+
+// LibraryOption adds a capability to the library built by NewLibrary.
+type LibraryOption func(*appLibrary)
+
+// WithSource lets the library look tracks up in a music database.
+func WithSource(s app.MetadataSource) LibraryOption { return func(l *appLibrary) { l.source = s } }
 
 // NewLibrary returns the Library backed by a.
-func NewLibrary(a *app.App) Library { return appLibrary{a} }
+func NewLibrary(a *app.App, opts ...LibraryOption) Library {
+	l := appLibrary{App: a}
+	for _, o := range opts {
+		o(&l)
+	}
+	return l
+}
+
+func (l appLibrary) Lookup() bool { return l.source != nil }
+
+func (l appLibrary) Candidates(ctx context.Context, id string, q *app.Query) ([]app.Candidate, error) {
+	if l.source == nil {
+		return nil, errNoLookup
+	}
+	return l.App.Candidates(ctx, id, l.source, q)
+}
+
+func (l appLibrary) ApplyCandidate(ctx context.Context, id string, c app.Candidate) (manifest.Track, error) {
+	if l.source == nil {
+		return manifest.Track{}, errNoLookup
+	}
+	return l.App.ApplyCandidate(ctx, id, c, l.source)
+}
+
+func (l appLibrary) IdentifyAll(ctx context.Context, each func(app.IdentifyResult, manifest.Track)) ([]app.IdentifyResult, error) {
+	if l.source == nil {
+		return nil, errNoLookup
+	}
+	return l.App.Identify(ctx, nil, l.source, nil, app.IdentifyOptions{Yes: true, OnResult: func(r app.IdentifyResult) {
+		var t manifest.Track
+		if r.Applied != nil { // what was saved, for the screen to show
+			if m, err := l.Manifest(); err == nil {
+				t, _ = m.Get(r.TrackID)
+			}
+		}
+		each(r, t)
+	}})
+}
 
 func (l appLibrary) SetCover(id string, image []byte) (manifest.Track, error) {
 	if err := l.App.SetCover(id, image); err != nil {
@@ -63,3 +122,5 @@ func (l appLibrary) Tracks() ([]manifest.Track, error) {
 	}
 	return m.Tracks, nil
 }
+
+var errNoLookup = errors.New("lookup is not available")

@@ -3,6 +3,7 @@ package tui
 import (
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -72,6 +73,9 @@ type Model struct {
 	// Covers: shrunken copies of the ones shown, loaded in the background.
 	thumbs       map[string]thumb
 	thumbPending map[string]bool
+
+	// runs counts the batch identifications started, to tell one from the next.
+	runs int
 
 	// Marked tracks (by id), and the dialog that is open, if any.
 	marks   map[string]bool
@@ -157,6 +161,22 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.changed(msg)
 	case removedMsg:
 		return m.removed(msg)
+	case candidatesMsg:
+		if p, ok := m.overlay.(*picker); ok && p.gen == msg.gen {
+			p.received(msg)
+		}
+		return m, nil
+	case identifiedMsg:
+		return m.identified(msg)
+	case identifyEventMsg:
+		return m.identifyEvent(msg)
+	case adoptedMsg:
+		return m.adopted(msg)
+	case spinner.TickMsg:
+		if t, ok := m.overlay.(interface{ tick(spinner.TickMsg) tea.Cmd }); ok {
+			return m, t.tick(msg)
+		}
+		return m, nil
 	case playbackStartedMsg:
 		return m.playbackStarted(msg)
 	case playbackDoneMsg:
@@ -211,6 +231,12 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openBulk()
 	case key.Matches(msg, k.Remove):
 		return m.openRemove()
+	case key.Matches(msg, k.Identify):
+		return m.openPicker()
+	case key.Matches(msg, k.IdentifyAll):
+		return m.openIdentifyAll()
+	case key.Matches(msg, k.Adopt):
+		return m.adoptOld()
 	case key.Matches(msg, k.MoveDown):
 		return m.moveTrack(1)
 	case key.Matches(msg, k.MoveUp):

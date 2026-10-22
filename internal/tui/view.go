@@ -74,7 +74,13 @@ func plural(n int, word string) string {
 	if n == 1 {
 		return fmt.Sprintf("1 %s", word)
 	}
-	return fmt.Sprintf("%d %ss", n, word)
+	suffix := "s"
+	for _, end := range []string{"ch", "sh", "s", "x"} {
+		if strings.HasSuffix(word, end) {
+			suffix = "es"
+		}
+	}
+	return fmt.Sprintf("%d %s%s", n, word, suffix)
 }
 
 func (m Model) bodyView(l layoutInfo) string {

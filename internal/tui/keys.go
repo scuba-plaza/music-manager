@@ -43,6 +43,9 @@ type keyMap struct {
 
 	Remove key.Binding
 
+	// looking up
+	Identify, IdentifyAll, Adopt key.Binding
+
 	// marking, and acting on several tracks
 	Mark, MarkAll, ClearMarks key.Binding
 	EditMany                  key.Binding
@@ -97,6 +100,10 @@ func newKeyMap() keyMap {
 		Play:     key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "hear")),
 
 		RemoveCover: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "remove")),
+
+		Identify:    key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "identify")),
+		IdentifyAll: key.NewBinding(key.WithKeys("I"), key.WithHelp("I", "identify all")),
+		Adopt:       key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "use old tags")),
 
 		Remove: key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "remove")),
 
