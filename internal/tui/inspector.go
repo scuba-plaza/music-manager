@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"music-manager/internal/app"
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
@@ -71,6 +73,9 @@ func (m Model) trackLines(t manifest.Track, w int) []string {
 
 	for i, f := range trackFields {
 		lines = append(lines, m.fieldLines(t, f, m.focus == paneInspector && i == m.field, w)...)
+		if f == fCutEnd {
+			lines = append(lines, m.barLines(t, w))
+		}
 	}
 
 	lines = append(lines, rule(w))
@@ -133,6 +138,32 @@ func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int) []
 		}
 	}
 	return lines
+}
+
+// cuts are the cuts the bar shows: the track's own, unless one is being typed.
+func (m Model) cuts(t manifest.Track) (start, end time.Duration) {
+	start, end = t.TrimStart, t.TrimEnd
+	if m.editing && (m.dr.field == fCutStart || m.dr.field == fCutEnd) {
+		if e, err := m.dr.edit(); err == nil {
+			if e.TrimStart != nil {
+				start = *e.TrimStart
+			}
+			if e.TrimEnd != nil {
+				end = *e.TrimEnd
+			}
+		}
+	}
+	return start, end
+}
+
+// barLines draws what the cuts keep of the track.
+func (m Model) barLines(t manifest.Track, w int) string {
+	start, end := m.cuts(t)
+	kept := max(t.SourceLength-start-end, 0)
+	text := clock(kept) + " of " + clock(t.SourceLength)
+	prefix := " " + " " + styles.dim.Render(fit("Kept", labelWidth-2)) + " "
+	width := max(w-labelWidth-2-ansi.StringWidth(text)-2, 8)
+	return prefix + trimBar(t.SourceLength, start, end, width) + "  " + styles.dim.Render(text)
 }
 
 // editorLines draws the open inputs of the field being edited.

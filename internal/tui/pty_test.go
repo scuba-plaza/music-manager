@@ -248,3 +248,44 @@ func TestPTYEditATitleAndItIsSaved(t *testing.T) {
 		t.Errorf("the edit never reached library.json: %+v", m.Tracks)
 	}
 }
+
+func TestPTYTrimWithAPreview(t *testing.T) {
+	a := testApp(t)
+	seed(t, a, seedTrack{"Flow", "Shawn James", "Shadows", 7, 12, 400})
+	bin := t.TempDir()
+	argsFile := filepath.Join(bin, "args")
+	existed := filepath.Join(bin, "existed")
+	fake := "#!/bin/sh\necho \"$@\" > " + argsFile + "\nfor a in \"$@\"; do [ -f \"$a\" ] && echo yes > " + existed + "; done\nsleep 30\n"
+	if err := os.WriteFile(filepath.Join(bin, "ffplay"), []byte(fake), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s := startMM(t, 110, 30, a.Root(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	s.MustSee("Shawn James")
+	s.Type("/flow\r\x1b[B\x1b[B\x1b[B") // find the track
+	s.Type("\x1b[C")                    // inspector
+	s.Type("\x1b[B\x1b[B\x1b[B\x1b[B")  // down to Cut start
+	s.Type("}}")                        // cut two seconds
+	s.MustSee("Saved", "Kept", "░")
+	t.Logf("\n%s", s.Screen())
+
+	s.Type("p")
+	s.MustSee("Playing the start cut")
+	time.Sleep(300 * time.Millisecond)
+	args, _ := os.ReadFile(argsFile)
+	if !strings.Contains(string(args), "-nodisp") || !strings.Contains(string(args), ".mp3") {
+		t.Errorf("ffplay was run with %q", args)
+	}
+	if _, err := os.Stat(existed); err != nil {
+		t.Error("the preview file did not exist while it was being played")
+	}
+
+	s.Type("\x1b") // esc stops the sound
+	time.Sleep(300 * time.Millisecond)
+	if strings.Contains(s.Screen(), "Playing the") {
+		t.Errorf("still playing after esc:\n%s", s.Screen())
+	}
+	s.Type("q")
+	if exited, err := s.Exited(3 * time.Second); !exited || err != nil {
+		t.Fatalf("exited %v, err %v", exited, err)
+	}
+}

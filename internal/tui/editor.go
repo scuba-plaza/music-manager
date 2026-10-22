@@ -1,10 +1,13 @@
 package tui
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"music-manager/internal/app"
 
 	"music-manager/internal/manifest"
 	"strings"
@@ -34,6 +37,18 @@ func (m Model) updateInspector(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.field = min(m.field+1, len(trackFields)-1)
 	case key.Matches(msg, k.Edit):
 		return m, m.startEdit()
+	case key.Matches(msg, k.Play):
+		return m.togglePreview()
+	case key.Matches(msg, k.Less):
+		return m.nudge(-100 * time.Millisecond)
+	case key.Matches(msg, k.More):
+		return m.nudge(100 * time.Millisecond)
+	case key.Matches(msg, k.LessBig):
+		return m.nudge(-time.Second)
+	case key.Matches(msg, k.MoreBig):
+		return m.nudge(time.Second)
+	case key.Matches(msg, k.ClearCut):
+		return m.setCut(0, "")
 	case key.Matches(msg, k.Undo):
 		return m.undo()
 	case key.Matches(msg, k.Redo):
@@ -113,11 +128,63 @@ func (m Model) updateEditing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// editedMsg is the result of saving a change.
+// editedMsg is the result of saving a change. A change with a nudge key is
+// one of a run of nudges of the same cut.
 type editedMsg struct {
 	label         string
+	nudge         string
 	before, after manifest.Track
 	err           error
+}
+
+// save sends a change to the library, and says how it turned out in an
+// editedMsg.
+func (m Model) save(t manifest.Track, e app.Edit, label, nudge string) tea.Cmd {
+	lib := m.lib
+	return func() tea.Msg {
+		after, err := lib.Edit(t.ID, e)
+		return editedMsg{label: label, nudge: nudge, before: t, after: after, err: err}
+	}
+}
+
+// minKept is the least audio a cut may leave of a track.
+const minKept = 100 * time.Millisecond
+
+// nudge moves the cut being looked at by step, within what the track allows.
+func (m Model) nudge(step time.Duration) (tea.Model, tea.Cmd) {
+	f := trackFields[m.field]
+	r, ok := m.selectedRow()
+	if !ok || (f != fCutStart && f != fCutEnd) {
+		return m, nil
+	}
+	t := r.Track
+	cur, other := t.TrimStart, t.TrimEnd
+	if f == fCutEnd {
+		cur, other = other, cur
+	}
+	next := clamp(int(cur+step), 0, int(max(t.SourceLength-other-minKept, 0)))
+	d := time.Duration(next).Round(time.Millisecond)
+	if d == cur {
+		return m, nil
+	}
+	return m.setCut(d, t.ID+"\x00"+f.label())
+}
+
+// setCut saves the cut being looked at as d.
+func (m Model) setCut(d time.Duration, nudge string) (tea.Model, tea.Cmd) {
+	f := trackFields[m.field]
+	r, ok := m.selectedRow()
+	if !ok || (f != fCutStart && f != fCutEnd) {
+		return m, nil
+	}
+	var e app.Edit
+	if f == fCutStart {
+		e.TrimStart = &d
+	} else {
+		e.TrimEnd = &d
+	}
+	m.busy = true
+	return m, m.save(r.Track, e, "change of "+strings.ToLower(f.label()), nudge)
 }
 
 func (m Model) commit() (tea.Model, tea.Cmd) {
@@ -136,11 +203,7 @@ func (m Model) commit() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.busy = true
-	lib, label := m.lib, "change of "+strings.ToLower(m.dr.field.label())
-	return m, func() tea.Msg {
-		after, err := lib.Edit(t.ID, e)
-		return editedMsg{label: label, before: t, after: after, err: err}
-	}
+	return m, m.save(t, e, "change of "+strings.ToLower(m.dr.field.label()), "")
 }
 
 func (m Model) edited(msg editedMsg) (tea.Model, tea.Cmd) {
@@ -151,7 +214,13 @@ func (m Model) edited(msg editedMsg) (tea.Model, tea.Cmd) {
 	}
 	m.editing, m.editErr = false, ""
 	m.upsert(msg.after)
-	m.record(change{label: msg.label, before: []manifest.Track{msg.before}, after: []manifest.Track{msg.after}})
+	if top := len(m.undoStack) - 1; msg.nudge != "" && msg.nudge == m.nudgeKey && top >= 0 {
+		m.undoStack[top].after = []manifest.Track{msg.after} // one more step of the same run
+		m.redoStack = nil
+	} else {
+		m.record(change{label: msg.label, before: []manifest.Track{msg.before}, after: []manifest.Track{msg.after}})
+	}
+	m.nudgeKey = msg.nudge
 	m.say("Saved", false)
 	m.revealTrack(msg.after)
 	return m, nil

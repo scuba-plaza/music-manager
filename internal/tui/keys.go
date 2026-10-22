@@ -1,6 +1,9 @@
 package tui
 
-import "github.com/charmbracelet/bubbles/key"
+import (
+	"github.com/charmbracelet/bubbles/key"
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 // keyMap holds every key binding. The footer and the help screen are built
 // from the descriptions here, so a key is documented where it is defined.
@@ -30,6 +33,15 @@ type keyMap struct {
 
 	// while editing a field
 	Save, Cancel, NextInput key.Binding
+
+	// on a cut
+	Less, More, LessBig, MoreBig, ClearCut key.Binding
+	Play                                   key.Binding
+}
+
+// isNudge reports whether msg is one of the keys that nudge a cut.
+func (k keyMap) isNudge(msg tea.KeyMsg) bool {
+	return key.Matches(msg, k.Less, k.More, k.LessBig, k.MoreBig)
 }
 
 func newKeyMap() keyMap {
@@ -62,5 +74,12 @@ func newKeyMap() keyMap {
 		Save:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "save")),
 		Cancel:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
 		NextInput: key.NewBinding(key.WithKeys("tab", "shift+tab"), key.WithHelp("tab", "other form")),
+
+		Less:     key.NewBinding(key.WithKeys("["), key.WithHelp("[ ]", "nudge")),
+		More:     key.NewBinding(key.WithKeys("]")),
+		LessBig:  key.NewBinding(key.WithKeys("{")),
+		MoreBig:  key.NewBinding(key.WithKeys("}")),
+		ClearCut: key.NewBinding(key.WithKeys("0"), key.WithHelp("0", "no cut")),
+		Play:     key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "hear")),
 	}
 }

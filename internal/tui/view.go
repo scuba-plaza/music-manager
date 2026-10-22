@@ -7,6 +7,8 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/x/ansi"
 
+	"music-manager/internal/app"
+
 	"music-manager/internal/manifest"
 )
 
@@ -94,6 +96,13 @@ func joinPanes(left, right string) string {
 
 func (m Model) footerView() string {
 	line := " "
+	if m.playing != nil {
+		edge := "start"
+		if m.playing.edge == app.EdgeEnd {
+			edge = "end"
+		}
+		line += styles.accent.Render("▶ Playing the "+edge+" cut") + styles.keyDesc.Render("  ·  esc stops  ·  ")
+	}
 	if m.status != "" {
 		st := styles.good
 		if m.statusBad {
@@ -139,6 +148,9 @@ func (m Model) footerKeys() []key.Binding {
 	var bindings []key.Binding
 	if m.focus == paneInspector {
 		bindings = []key.Binding{k.Field, k.Edit, k.Back}
+		if f := trackFields[m.field]; f == fCutStart || f == fCutEnd {
+			bindings = append(bindings, k.Less, k.Play)
+		}
 	} else {
 		bindings = []key.Binding{k.Up, k.Open, k.Filter}
 		if m.filter != "" {

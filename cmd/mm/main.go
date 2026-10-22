@@ -24,7 +24,7 @@ func main() {
 	if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 		deps.Prompter = prompt.New(os.Stdin, os.Stderr)
 		deps.RunTUI = func(ctx context.Context, a *app.App) error {
-			return tui.Run(ctx, tui.NewLibrary(a))
+			return tui.Run(ctx, tui.NewLibrary(a), tui.WithPlayer(tui.DetectPlayer()))
 		}
 	}
 	os.Exit(cli.Run(ctx, os.Args[1:], cli.IO{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}, deps))

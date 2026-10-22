@@ -10,8 +10,8 @@ import (
 
 // Run shows the interface on lib until the user quits or ctx ends. It takes
 // over the whole terminal and puts it back as it was afterwards.
-func Run(ctx context.Context, lib Library) error {
-	p := tea.NewProgram(New(lib),
+func Run(ctx context.Context, lib Library, opts ...Option) error {
+	p := tea.NewProgram(New(lib, opts...),
 		tea.WithContext(ctx),
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),

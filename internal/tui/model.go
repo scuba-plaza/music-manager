@@ -62,7 +62,23 @@ type Model struct {
 	statusBad bool
 
 	busy bool // a change is being saved
+
+	// Hearing a cut: the player (nil if none is installed), what is playing
+	// now, and a counter that tells one preview from the next.
+	player   Player
+	playing  *playback
+	previews int
+
+	// nudgeKey names the cut that was just nudged, so that a run of nudges
+	// of one cut is one step to undo.
+	nudgeKey string
 }
+
+// Option adjusts a Model.
+type Option func(*Model)
+
+// WithPlayer lets the interface play previews of the cuts.
+func WithPlayer(p Player) Option { return func(m *Model) { m.player = p } }
 
 // change is one undoable step: the tracks as they were and as they became.
 type change struct {
@@ -71,14 +87,18 @@ type change struct {
 }
 
 // New returns the interface on lib. Init loads the tracks.
-func New(lib Library) Model {
+func New(lib Library, opts ...Option) Model {
 	in := textinput.New()
 	in.Prompt = "/ "
 	in.PromptStyle = styles.accent
 	in.Placeholder = "filter  (e.g. shawn, status:unidentified)"
 	in.PlaceholderStyle = styles.dim
 	in.Cursor.SetMode(cursor.CursorStatic)
-	return Model{lib: lib, keys: newKeyMap(), expanded: map[string]bool{}, filterInput: in}
+	m := Model{lib: lib, keys: newKeyMap(), expanded: map[string]bool{}, filterInput: in}
+	for _, o := range opts {
+		o(&m)
+	}
+	return m
 }
 
 type loadedMsg struct {
@@ -110,14 +130,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.edited(msg)
 	case restoredMsg:
 		return m.restored(msg)
+	case playbackStartedMsg:
+		return m.playbackStarted(msg)
+	case playbackDoneMsg:
+		return m.playbackDone(msg)
 	case tea.KeyMsg:
 		m.status, m.statusBad = "", false
+		if !m.keys.isNudge(msg) {
+			m.nudgeKey = ""
+		}
 		switch {
 		case key.Matches(msg, m.keys.Quit) && !m.editing && !m.filtering:
+			m.stopPlayback()
 			return m, tea.Quit
 		case msg.Type == tea.KeyCtrlC:
+			m.stopPlayback()
 			return m, tea.Quit
 		case m.busy:
+			return m, nil
+		case msg.Type == tea.KeyEsc && m.playing != nil && !m.editing && !m.filtering:
+			m.stopPlayback()
 			return m, nil
 		case m.editing:
 			return m.updateEditing(msg)

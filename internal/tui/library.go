@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"time"
+
 	"music-manager/internal/app"
 	"music-manager/internal/manifest"
 )
@@ -17,6 +19,9 @@ type Library interface {
 	Edit(id string, e app.Edit) (manifest.Track, error)
 	// Restore puts a record back exactly as it was; undo is built on it.
 	Restore(t manifest.Track) error
+	// PreviewTrim writes the audio around one of a track's cuts to a
+	// temporary file; the caller removes it with cleanup.
+	PreviewTrim(id string, edge app.Edge, window time.Duration) (path string, cleanup func(), err error)
 }
 
 type appLibrary struct{ *app.App }
