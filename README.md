@@ -36,6 +36,7 @@ asks and fails if the title or artist is unknown.
 |---|---|
 | `mm ingest <file\|dir>…` | add existing MP3s as unidentified tracks (the files are only read) |
 | `mm identify [id…] [--yes]` | look tracks up on MusicBrainz; pick from a list, or `--yes` for confident matches |
+| `mm adopt [id…]` | identify tracks by what their old tags said, for what MusicBrainz does not know |
 | `mm add <url>` | download with yt-dlp and add |
 | `mm edit <id> --title … --artist … --album … --track N --of N --trim-start T --trim-end T --cover FILE` | change a track; `--title-ascii` etc. override the derived ASCII |
 | `mm ls [words] [status:identified\|unidentified]` / `mm show <id>` | look at records |
@@ -55,7 +56,9 @@ the result with `--dry-run`, and only then prune:
 ```sh
 cp -r ~/Music/mp3-player ~/mp3-player.backup
 mm ingest ~/Music/mp3-player
-mm identify --yes          # then `mm identify` for the rest, or `mm edit`
+mm identify --yes          # confident MusicBrainz matches; `mm identify` lets you pick for the rest
+mm adopt                   # whatever is left: take the old tags as they are
+mm doctor
 mm sync --dry-run --prune
 mm sync --prune --yes
 ```

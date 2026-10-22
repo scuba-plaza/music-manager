@@ -5,10 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
+	"unicode"
 
 	"music-manager/internal/manifest"
 )
+
+// maxChoices is how many candidates an interactive choice lists.
+const maxChoices = 15
 
 // defaultMinScore is how well a candidate must match to be taken without asking.
 const defaultMinScore = 95
@@ -78,7 +83,7 @@ func (a *App) Identify(ctx context.Context, ids []string, src MetadataSource, p 
 			results = append(results, res)
 			continue
 		}
-		pick, reason, err := choose(t, cands, p, opts)
+		pick, reason, err := choose(t, preferHint(cands, t.Hint), p, opts)
 		if err != nil {
 			return results, err
 		}
@@ -124,6 +129,41 @@ var onlyDigits = regexp.MustCompile(`^\d+$`)
 // leadingTrackNumber matches the "01 - " or "07. " that file names start with.
 var leadingTrackNumber = regexp.MustCompile(`^\d+\s*[-._)\]]*\s+`)
 
+// preferHint reorders cands so that among equally good matches, those that
+// fit what the file said about its album and track number come first. A
+// better score always wins: the hint only decides between ties, such as the
+// many releases a single recording appears on.
+func preferHint(cands []Candidate, h manifest.Hint) []Candidate {
+	fit := func(c Candidate) int {
+		n := 0
+		if h.Album != "" && albumKey(c.Album) == albumKey(h.Album) {
+			n += 2
+		}
+		if h.Track > 0 && c.TrackNumber == h.Track && (h.Total == 0 || c.TrackTotal == h.Total) {
+			n++
+		}
+		return n
+	}
+	out := append([]Candidate(nil), cands...)
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Score != out[j].Score {
+			return out[i].Score > out[j].Score
+		}
+		return fit(out[i]) > fit(out[j])
+	})
+	return out
+}
+
+// albumKey reduces an album title to what identifies it: lower-case words
+// without punctuation or a trailing "EP" / "Single".
+func albumKey(s string) string {
+	words := strings.FieldsFunc(strings.ToLower(s), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+	for len(words) > 1 && (words[len(words)-1] == "ep" || words[len(words)-1] == "single") {
+		words = words[:len(words)-1]
+	}
+	return strings.Join(words, " ")
+}
+
 // choose picks one of cands, or returns nil and why not.
 func choose(t manifest.Track, cands []Candidate, p Prompter, opts IdentifyOptions) (*Candidate, string, error) {
 	if len(cands) == 0 {
@@ -135,6 +175,7 @@ func choose(t manifest.Track, cands []Candidate, p Prompter, opts IdentifyOption
 		}
 		return &cands[0], "", nil
 	}
+	cands = cands[:min(len(cands), maxChoices)]
 	options := make([]string, 0, len(cands)+1)
 	for _, c := range cands {
 		options = append(options, describe(c))

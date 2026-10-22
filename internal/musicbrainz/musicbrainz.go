@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	maxCandidates = 15
+	maxCandidates = 50
 	maxRetries    = 3
 	maxBody       = 16 << 20
 )

@@ -3,6 +3,7 @@ package app_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -228,5 +229,79 @@ func TestIdentifyNeedsSomethingToSearchFor(t *testing.T) {
 	}
 	if len(src.queries) != 0 {
 		t.Errorf("searched for %+v", src.queries)
+	}
+}
+
+func TestIdentifyPrefersTheReleaseTheFileWasAlreadyFiledUnder(t *testing.T) {
+	live := app.Candidate{RecordingID: "r-live", ReleaseID: "rel-live", Title: "Flow", Artist: "Shawn James", Album: "Live at the Heartbreak House", TrackNumber: 2, TrackTotal: 10, Score: 100, Date: "2012"}
+	shadows := app.Candidate{RecordingID: "r-live", ReleaseID: "rel-shadows", Title: "Flow", Artist: "Shawn James", Album: "Shadows", TrackNumber: 3, TrackTotal: 12, Score: 100, Date: "2014"}
+	single := app.Candidate{RecordingID: "r-single", ReleaseID: "rel-single", Title: "Flow", Artist: "Shawn James", Album: "Flow", TrackNumber: 1, TrackTotal: 1, Score: 100, Date: "2010"}
+	key := map[string][]app.Candidate{"Flow|Shawn James": {single, live, shadows}}
+
+	for name, c := range map[string]struct {
+		album string
+		want  string
+	}{
+		"the same album":                    {"Shadows", "rel-shadows"},
+		"case and punctuation are ignored":  {"SHADOWS!", "rel-shadows"},
+		"an EP or single suffix is ignored": {"Live at the Heartbreak House - EP", "rel-live"},
+		"an album nobody lists":             {"Something Else", "rel-single"}, // falls back to the source's order
+		"no album at all":                   {"", "rel-single"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			a, _ := hinted(t, "x", "Flow", "Shawn James")
+			// hinted() leaves the album empty; ingest a tagged file with one instead.
+			a = openLib(t)
+			ingestTagged(t, a, "x", "Flow", "Shawn James", c.album, "")
+			res, err := a.Identify(context.Background(), nil, &fakeSource{results: key}, nil, app.IdentifyOptions{Yes: true})
+			if err != nil || len(res) != 1 || res[0].Applied == nil || res[0].Applied.ReleaseID != c.want {
+				t.Errorf("picked %+v, want %s (%v)", res, c.want, err)
+			}
+		})
+	}
+}
+
+func TestIdentifyPrefersTheCandidateWithTheSameTrackNumber(t *testing.T) {
+	a := openLib(t)
+	ingestTagged(t, a, "x", "Flow", "Shawn James", "", "5/12")
+	first := app.Candidate{RecordingID: "r", ReleaseID: "rel-1", Title: "Flow", Artist: "Shawn James", Album: "A", TrackNumber: 2, TrackTotal: 10, Score: 100}
+	second := app.Candidate{RecordingID: "r", ReleaseID: "rel-2", Title: "Flow", Artist: "Shawn James", Album: "B", TrackNumber: 5, TrackTotal: 12, Score: 100}
+	src := &fakeSource{results: map[string][]app.Candidate{"Flow|Shawn James": {first, second}}}
+	res, _ := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+	if res[0].Applied == nil || res[0].Applied.ReleaseID != "rel-2" {
+		t.Errorf("picked %+v", res[0].Applied)
+	}
+}
+
+func TestIdentifyNeverLetsTheHintOutweighTheScore(t *testing.T) {
+	a := openLib(t)
+	ingestTagged(t, a, "x", "Flow", "Shawn James", "Right Album", "")
+	best := app.Candidate{ReleaseID: "rel-best", Title: "Flow", Artist: "Shawn James", Album: "Other", Score: 100}
+	worse := app.Candidate{ReleaseID: "rel-worse", Title: "Flow", Artist: "Shawn James", Album: "Right Album", Score: 96}
+	src := &fakeSource{results: map[string][]app.Candidate{"Flow|Shawn James": {best, worse}}}
+	res, _ := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+	if res[0].Applied == nil || res[0].Applied.ReleaseID != "rel-best" {
+		t.Errorf("picked %+v", res[0].Applied)
+	}
+}
+
+func TestIdentifyOffersAtMostFifteenChoicesWithTheBestFitFirst(t *testing.T) {
+	a := openLib(t)
+	ingestTagged(t, a, "x", "Flow", "Shawn James", "Shadows", "")
+	var cands []app.Candidate
+	for i := 0; i < 30; i++ {
+		c := app.Candidate{ReleaseID: fmt.Sprint("rel-", i), Title: "Flow", Artist: "Shawn James", Album: fmt.Sprint("Album ", i), Score: 100}
+		if i == 25 {
+			c.Album = "Shadows" // far down the source's list
+		}
+		cands = append(cands, c)
+	}
+	p := &scriptedPrompter{choice: 0}
+	res, err := a.Identify(context.Background(), nil, &fakeSource{results: map[string][]app.Candidate{"Flow|Shawn James": cands}}, p, app.IdentifyOptions{})
+	if err != nil || res[0].Applied == nil || res[0].Applied.ReleaseID != "rel-25" {
+		t.Fatalf("%+v, %v", res, err)
+	}
+	if len(p.options) != 16 || !strings.Contains(p.options[0], "Shadows") {
+		t.Errorf("%d options, first %q; want 15 candidates and the way out, best fit first", len(p.options), p.options[0])
 	}
 }
