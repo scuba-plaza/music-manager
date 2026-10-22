@@ -320,16 +320,43 @@ func (m Model) redo() (tea.Model, tea.Cmd) {
 	return m.restoring(m.redoStack[len(m.redoStack)-1], false)
 }
 
+// idsMissingFrom lists the ids of the tracks in a that are not in b.
+func idsMissingFrom(a, b []manifest.Track) []string {
+	have := make(map[string]bool, len(b))
+	for _, t := range b {
+		have[t.ID] = true
+	}
+	var ids []string
+	for _, t := range a {
+		if !have[t.ID] {
+			ids = append(ids, t.ID)
+		}
+	}
+	return ids
+}
+
+// target is what undoing or redoing a change puts back, and gone the ids of
+// the tracks that must vanish for that (those the change added, when
+// undoing; those it removed, when redoing).
+func (c change) target(undone bool) (tracks []manifest.Track, gone []string) {
+	if undone {
+		return c.before, idsMissingFrom(c.after, c.before)
+	}
+	return c.after, idsMissingFrom(c.before, c.after)
+}
+
 func (m Model) restoring(c change, undone bool) (tea.Model, tea.Cmd) {
 	m.busy = true
 	lib := m.lib
 	return m, func() tea.Msg {
-		tracks := c.after
-		if undone {
-			tracks = c.before
-		}
+		tracks, gone := c.target(undone)
 		for _, t := range tracks {
 			if err := lib.Restore(t); err != nil {
+				return restoredMsg{c: c, undone: undone, err: err}
+			}
+		}
+		if len(gone) > 0 {
+			if _, err := lib.RemoveMany(gone); err != nil {
 				return restoredMsg{c: c, undone: undone, err: err}
 			}
 		}
@@ -343,17 +370,30 @@ func (m Model) restored(msg restoredMsg) (tea.Model, tea.Cmd) {
 		m.say(msg.err.Error(), true)
 		return m, nil
 	}
-	tracks, verb := msg.c.after, "Redid"
+	verb := "Redid"
 	if msg.undone {
-		tracks, verb = msg.c.before, "Undid"
+		verb = "Undid"
 		m.undoStack = m.undoStack[:len(m.undoStack)-1]
 		m.redoStack = append(m.redoStack, msg.c)
 	} else {
 		m.redoStack = m.redoStack[:len(m.redoStack)-1]
 		m.undoStack = append(m.undoStack, msg.c)
 	}
+	tracks, gone := msg.c.target(msg.undone)
 	for _, t := range tracks {
 		m.upsert(t)
+	}
+	if len(gone) > 0 {
+		var doomed []manifest.Track
+		for _, t := range m.tracks {
+			for _, id := range gone {
+				if t.ID == id {
+					doomed = append(doomed, t)
+				}
+			}
+		}
+		m.dropTracks(doomed)
+		m.rebuild()
 	}
 	m.say(verb+": "+msg.c.label, false)
 	if len(tracks) > 0 {

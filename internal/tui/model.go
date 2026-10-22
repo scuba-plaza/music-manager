@@ -155,6 +155,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.restored(msg)
 	case changedMsg:
 		return m.changed(msg)
+	case removedMsg:
+		return m.removed(msg)
 	case playbackStartedMsg:
 		return m.playbackStarted(msg)
 	case playbackDoneMsg:
@@ -207,6 +209,8 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.markAll()
 	case key.Matches(msg, k.EditMany):
 		return m.openBulk()
+	case key.Matches(msg, k.Remove):
+		return m.openRemove()
 	case key.Matches(msg, k.MoveDown):
 		return m.moveTrack(1)
 	case key.Matches(msg, k.MoveUp):

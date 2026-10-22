@@ -23,6 +23,9 @@ type Library interface {
 	// PreviewTrim writes the audio around one of a track's cuts to a
 	// temporary file; the caller removes it with cleanup.
 	PreviewTrim(id string, edge app.Edge, window time.Duration) (path string, cleanup func(), err error)
+	// RemoveMany removes tracks, all or none; their audio stays stored until
+	// a sync collects it.
+	RemoveMany(ids []string) ([]manifest.Track, error)
 	// EditMany applies several edits at once: all of them or none.
 	EditMany(edits map[string]app.Edit) (map[string]manifest.Track, error)
 	// Renumber numbers the tracks 1..N in the order given.

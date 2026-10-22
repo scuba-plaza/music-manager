@@ -313,3 +313,8 @@ func (h *editHook) Renumber(ids []string) (map[string]manifest.Track, error) {
 	h.manyCalls++
 	return h.Library.Renumber(ids)
 }
+
+func (h *editHook) RemoveMany(ids []string) ([]manifest.Track, error) {
+	h.manyCalls++
+	return h.Library.RemoveMany(ids)
+}

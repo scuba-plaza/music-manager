@@ -77,3 +77,35 @@ func TestSyncKeepsBlobsSharedAcrossTracksAndTargets(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestRemoveManyRemovesAllOrNone(t *testing.T) {
+	a := libWithTracks(t, 10, 20, 30)
+	ts := tracks(t, a)
+
+	if _, err := a.RemoveMany([]string{ts[0].ID, "nope"}); err == nil {
+		t.Error("an unknown id was accepted")
+	}
+	if len(tracks(t, a)) != 3 {
+		t.Fatal("a failed RemoveMany removed something")
+	}
+	if _, err := a.RemoveMany([]string{ts[0].ID, ts[0].ID}); err == nil {
+		t.Error("an id listed twice was accepted")
+	}
+
+	got, err := a.RemoveMany([]string{ts[2].ID, ts[0].ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].ID != ts[2].ID || got[1].ID != ts[0].ID {
+		t.Errorf("returned %v, want the removed tracks in the order asked", got)
+	}
+	if left := tracks(t, a); len(left) != 1 || left[0].ID != ts[1].ID {
+		t.Errorf("left = %+v", left)
+	}
+	if _, err := os.Stat(a.AudioPath(ts[0].AudioSHA256)); err != nil {
+		t.Errorf("the audio must stay until a sync collects it: %v", err)
+	}
+	if got, err := a.RemoveMany(nil); err != nil || len(got) != 0 {
+		t.Errorf("removing nothing = %v, %v", got, err)
+	}
+}
