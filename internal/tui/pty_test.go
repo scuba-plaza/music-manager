@@ -11,6 +11,7 @@ package tui
 import (
 	"fmt"
 	"io"
+	"music-manager/internal/testmp3"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -347,5 +348,52 @@ func TestPTYIdentifyThroughThePicker(t *testing.T) {
 	}
 	if got := m.Tracks[0]; got.Status != "identified" || got.MBRecordingID == "" || got.Album != "From Sleep" {
 		t.Errorf("track = %+v", got)
+	}
+}
+
+func TestPTYAddFromALinkWithAFakeYtDlp(t *testing.T) {
+	bin := t.TempDir()
+	fixture := filepath.Join(bin, "fixture.mp3")
+	if err := os.WriteFile(fixture, testmp3.Silent(150), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	script := "#!/bin/sh\nprev=\"\"; for a in \"$@\"; do [ \"$prev\" = \"-o\" ] && out=\"$a\"; prev=\"$a\"; done\n" +
+		"file=$(printf '%s' \"$out\" | sed 's/%(id)s/vid123/; s/%(ext)s/mp3/')\ncp " + fixture + " \"$file\"\n" +
+		"printf '%s\\n' '{\"id\":\"vid123\",\"title\":\"Pty Song\",\"uploader\":\"Pty Band - Topic\",\"album\":\"Pty Album\",\"track_number\":2}'\n"
+	if err := os.WriteFile(filepath.Join(bin, "yt-dlp"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// A stand-in MusicBrainz that finds nothing.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{"recordings":[]}`)) }))
+	defer srv.Close()
+
+	a := testApp(t)
+	seed(t, a, seedTrack{"Anchor", "Band", "Album", 1, 1, 0})
+	s := startMM(t, 120, 36, a.Root(),
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "MM_MUSICBRAINZ_URL="+srv.URL)
+	s.MustSee("Band")
+	s.Type("a")
+	s.MustSee("Add from YouTube", "Paste a link")
+	s.Type("https://youtu.be/abc")
+	s.Type("\r")
+	s.MustSee("Pty Song", "Pty Band", "Pty Album", "Pty Band/Pty Album/02 - Pty Song.mp3")
+	t.Logf("\n%s", s.Screen())
+
+	s.Type("\r")
+	s.MustSee("Added")
+	s.Type("q")
+	if exited, err := s.Exited(3 * time.Second); !exited || err != nil {
+		t.Fatalf("exited %v, err %v\n%s", exited, err, s.Screen())
+	}
+	m, err := a.Manifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, tr := range m.Tracks {
+		found = found || (tr.Title == "Pty Song" && tr.SourceURL == "https://youtu.be/abc" && tr.Album == "Pty Album")
+	}
+	if !found {
+		t.Errorf("the added track is not in library.json: %+v", m.Tracks)
 	}
 }

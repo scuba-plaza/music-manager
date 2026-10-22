@@ -25,6 +25,11 @@ type Library interface {
 	// PreviewTrim writes the audio around one of a track's cuts to a
 	// temporary file; the caller removes it with cleanup.
 	PreviewTrim(id string, edge app.Edge, window time.Duration) (path string, cleanup func(), err error)
+	// CanAdd reports whether tracks can be downloaded; Fetch downloads one and
+	// prepares it, Finish adds it to the library with the given details.
+	CanAdd() bool
+	Fetch(ctx context.Context, url string) (*app.Draft, error)
+	Finish(ctx context.Context, d *app.Draft, e app.Edit) (manifest.Track, error)
 	// Lookup reports whether a music database can be searched at all.
 	Lookup() bool
 	// Candidates searches the database for what a track could be (or for q,
@@ -52,8 +57,12 @@ type Library interface {
 
 type appLibrary struct {
 	*app.App
-	source app.MetadataSource
+	source     app.MetadataSource
+	downloader app.Downloader
 }
+
+// WithDownloader lets the library add tracks by downloading them.
+func WithDownloader(d app.Downloader) LibraryOption { return func(l *appLibrary) { l.downloader = d } }
 
 // LibraryOption adds a capability to the library built by NewLibrary.
 type LibraryOption func(*appLibrary)
@@ -71,6 +80,19 @@ func NewLibrary(a *app.App, opts ...LibraryOption) Library {
 }
 
 func (l appLibrary) Lookup() bool { return l.source != nil }
+
+func (l appLibrary) CanAdd() bool { return l.downloader != nil }
+
+func (l appLibrary) Fetch(ctx context.Context, url string) (*app.Draft, error) {
+	if l.downloader == nil {
+		return nil, errors.New("downloading is not available")
+	}
+	return l.App.Fetch(ctx, app.AddRequest{URL: url, Source: l.source}, l.downloader)
+}
+
+func (l appLibrary) Finish(ctx context.Context, d *app.Draft, e app.Edit) (manifest.Track, error) {
+	return l.App.Finish(ctx, d, e)
+}
 
 func (l appLibrary) Candidates(ctx context.Context, id string, q *app.Query) ([]app.Candidate, error) {
 	if l.source == nil {

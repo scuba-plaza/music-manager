@@ -170,6 +170,13 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.identified(msg)
 	case identifyEventMsg:
 		return m.identifyEvent(msg)
+	case fetchedMsg:
+		if d, ok := m.overlay.(*addDialog); ok && d.gen == msg.gen {
+			d.fetched(&m, msg)
+		}
+		return m, nil
+	case addedMsg:
+		return m.added(msg)
 	case adoptedMsg:
 		return m.adopted(msg)
 	case spinner.TickMsg:
@@ -231,6 +238,8 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openBulk()
 	case key.Matches(msg, k.Remove):
 		return m.openRemove()
+	case key.Matches(msg, k.Add):
+		return m.openAdd()
 	case key.Matches(msg, k.Identify):
 		return m.openPicker()
 	case key.Matches(msg, k.IdentifyAll):
