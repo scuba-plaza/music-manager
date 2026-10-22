@@ -179,13 +179,21 @@ func (m Model) browserLines(w int) []string {
 	view := m.viewRows()
 	end := min(m.offset+view, len(m.rows))
 	for i := m.offset; i < end; i++ {
-		lines = append(lines, renderRow(m.rows[i], w, i == m.cursor))
+		marked, of := m.markState(m.rows[i])
+		mark := " "
+		switch {
+		case of > 0 && marked == of:
+			mark = "●"
+		case marked > 0:
+			mark = "◐"
+		}
+		lines = append(lines, renderRow(m.rows[i], w, i == m.cursor, mark))
 	}
 	return lines
 }
 
 // renderRow draws one tree row w columns wide.
-func renderRow(r Row, w int, selected bool) string {
+func renderRow(r Row, w int, selected bool, mark string) string {
 	indent := strings.Repeat("  ", r.Depth)
 	glyph := " "
 	switch {
@@ -208,7 +216,7 @@ func renderRow(r Row, w int, selected bool) string {
 	}
 
 	if selected {
-		left := " " + indent + glyph + " " + label
+		left := mark + indent + glyph + " " + label
 		if r.Detail != "" {
 			left += "  " + r.Detail
 		}
@@ -219,7 +227,11 @@ func renderRow(r Row, w int, selected bool) string {
 	if r.Kind == kindArtist || r.Kind == kindGroup {
 		st = styles.bold
 	}
-	left := " " + indent + styles.dim.Render(glyph) + " "
+	left := " "
+	if mark != " " {
+		left = styles.marked.Render(mark)
+	}
+	left += indent + styles.dim.Render(glyph) + " "
 	if r.Num != "" {
 		left += styles.dim.Render(r.Num) + " "
 	}

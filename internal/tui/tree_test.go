@@ -218,3 +218,24 @@ func TestAncestorKeysSaySoWhatToOpenToRevealATrack(t *testing.T) {
 		t.Errorf("an unidentified track lives under Needs work, got %v", got)
 	}
 }
+
+func TestNonTrackRowsKnowWhichTracksTheyHold(t *testing.T) {
+	rows := buildRows(sampleTracks, "", map[string]bool{artistKey("Fairuz"): true})
+	byLabel := map[string]Row{}
+	for _, r := range rows {
+		byLabel[r.Label] = r
+	}
+	// in the order they are listed: the album, then the singles by title
+	if got := strings.Join(byLabel["Fairuz"].IDs, ","); got != "t6,t7,t5" {
+		t.Errorf("Fairuz holds %v", byLabel["Fairuz"].IDs)
+	}
+	if got := byLabel["Jerusalem in My Heart"].IDs; len(got) != 1 || got[0] != "t6" {
+		t.Errorf("album holds %v", got)
+	}
+	if got := byLabel["Needs work"].IDs; len(got) != 1 || got[0] != "u1" {
+		t.Errorf("Needs work holds %v", got)
+	}
+	if got := byLabel["Shawn James"].IDs; len(got) != 3 {
+		t.Errorf("Shawn James holds %v", got)
+	}
+}

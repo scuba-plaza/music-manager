@@ -20,7 +20,7 @@ func (m Model) View() string {
 	if l.mode == modeTooSmall {
 		return m.tooSmallView()
 	}
-	return strings.Join([]string{m.headerView(), m.bodyView(l), m.footerView()}, "\n")
+	return m.overlayView(strings.Join([]string{m.headerView(), m.bodyView(l), m.footerView()}, "\n"))
 }
 
 func (m Model) tooSmallView() string {
@@ -63,6 +63,9 @@ func (m Model) summary() string {
 		s += " · 1 needs work"
 	default:
 		s += fmt.Sprintf(" · %d need work", needs)
+	}
+	if n := len(m.marks); n > 0 {
+		s += fmt.Sprintf(" · %d marked", n)
 	}
 	return s
 }
@@ -135,6 +138,8 @@ func wrap(s string, w int) []string {
 func (m Model) footerKeys() []key.Binding {
 	k := m.keys
 	switch {
+	case m.overlay != nil:
+		return m.overlay.hints(k)
 	case m.editing:
 		bindings := []key.Binding{k.Save, k.Cancel}
 		if m.hasSecond() {
@@ -155,7 +160,10 @@ func (m Model) footerKeys() []key.Binding {
 			bindings = append(bindings, k.RemoveCover)
 		}
 	} else {
-		bindings = []key.Binding{k.Up, k.Open, k.Filter}
+		bindings = []key.Binding{k.Up, k.Open, k.Mark, k.Filter}
+		if len(m.marks) > 0 {
+			bindings = []key.Binding{k.Up, k.EditMany, k.Mark, k.ClearMarks}
+		}
 		if m.filter != "" {
 			bindings = append(bindings, k.ClearFilter)
 		}

@@ -271,8 +271,9 @@ func clearField(t *testing.T, m Model) Model { return keys(t, m, "ctrl+u") }
 // editWith wraps a Library so tests can watch or break a call.
 type editHook struct {
 	Library
-	calls int
-	err   error
+	calls     int
+	manyCalls int
+	err       error
 }
 
 func (h *editHook) Edit(id string, e app.Edit) (manifest.Track, error) {
@@ -301,4 +302,14 @@ func seedTagged(t *testing.T, a *app.App, name, title, artist, album, track stri
 func encodePNGBytes(t *testing.T) []byte {
 	t.Helper()
 	return encodePNG(t, twoTone(40, 40))
+}
+
+func (h *editHook) EditMany(edits map[string]app.Edit) (map[string]manifest.Track, error) {
+	h.manyCalls++
+	return h.Library.EditMany(edits)
+}
+
+func (h *editHook) Renumber(ids []string) (map[string]manifest.Track, error) {
+	h.manyCalls++
+	return h.Library.Renumber(ids)
 }

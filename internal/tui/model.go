@@ -73,6 +73,10 @@ type Model struct {
 	thumbs       map[string]thumb
 	thumbPending map[string]bool
 
+	// Marked tracks (by id), and the dialog that is open, if any.
+	marks   map[string]bool
+	overlay overlay
+
 	// nudgeKey names the cut that was just nudged, so that a run of nudges
 	// of one cut is one step to undo.
 	nudgeKey string
@@ -101,6 +105,7 @@ func New(lib Library, opts ...Option) Model {
 	m := Model{
 		lib: lib, keys: newKeyMap(), expanded: map[string]bool{}, filterInput: in,
 		thumbs: map[string]thumb{}, thumbPending: map[string]bool{},
+		marks: map[string]bool{},
 	}
 	for _, o := range opts {
 		o(&m)
@@ -148,6 +153,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.edited(msg)
 	case restoredMsg:
 		return m.restored(msg)
+	case changedMsg:
+		return m.changed(msg)
 	case playbackStartedMsg:
 		return m.playbackStarted(msg)
 	case playbackDoneMsg:
@@ -158,7 +165,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.nudgeKey = ""
 		}
 		switch {
-		case key.Matches(msg, m.keys.Quit) && !m.editing && !m.filtering:
+		case key.Matches(msg, m.keys.Quit) && !m.editing && !m.filtering && m.overlay == nil:
 			m.stopPlayback()
 			return m, tea.Quit
 		case msg.Type == tea.KeyCtrlC:
@@ -166,6 +173,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case m.busy:
 			return m, nil
+		case m.overlay != nil:
+			cmd := m.overlay.key(&m, msg)
+			return m, cmd
 		case msg.Type == tea.KeyEsc && m.playing != nil && !m.editing && !m.filtering:
 			m.stopPlayback()
 			return m, nil
@@ -189,6 +199,20 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.filterInput.Focus()
 	case key.Matches(msg, k.ClearFilter) && m.filter != "":
 		m.clearFilter()
+	case key.Matches(msg, k.ClearMarks) && len(m.marks) > 0:
+		m.marks = map[string]bool{}
+	case key.Matches(msg, k.Mark):
+		m.toggleMark()
+	case key.Matches(msg, k.MarkAll):
+		m.markAll()
+	case key.Matches(msg, k.EditMany):
+		return m.openBulk()
+	case key.Matches(msg, k.MoveDown):
+		return m.moveTrack(1)
+	case key.Matches(msg, k.MoveUp):
+		return m.moveTrack(-1)
+	case key.Matches(msg, k.Renumber):
+		return m.renumber()
 	case key.Matches(msg, k.Undo):
 		return m.undo()
 	case key.Matches(msg, k.Redo):

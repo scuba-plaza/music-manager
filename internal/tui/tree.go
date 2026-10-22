@@ -37,10 +37,11 @@ type Row struct {
 	Key    string // identifies the row across rebuilds
 	Parent string // the key of the row above it in the tree, or ""
 
-	Label  string // the artist, album or title
-	Detail string // secondary text, e.g. the artist of a track nobody has identified
-	Num    string // a track's number, padded to its album's width, or ""
-	Count  int    // how many tracks are beneath a group, artist or album
+	Label  string   // the artist, album or title
+	Detail string   // secondary text, e.g. the artist of a track nobody has identified
+	Num    string   // a track's number, padded to its album's width, or ""
+	Count  int      // how many tracks are beneath a group, artist or album
+	IDs    []string // which tracks, in the order they are listed
 
 	Expanded bool
 	Track    manifest.Track // for track rows
@@ -69,9 +70,9 @@ func buildRows(tracks []manifest.Track, filter string, expanded map[string]bool)
 	var rows []Row
 	if len(needs) > 0 {
 		isOpen := open(keyNeedsWork)
-		rows = append(rows, Row{Kind: kindGroup, Key: keyNeedsWork, Label: "Needs work", Count: len(needs), Expanded: isOpen})
+		sort.SliceStable(needs, func(i, j int) bool { return lower(needsLabel(needs[i])) < lower(needsLabel(needs[j])) })
+		rows = append(rows, Row{Kind: kindGroup, Key: keyNeedsWork, Label: "Needs work", Count: len(needs), IDs: idsOf(needs), Expanded: isOpen})
 		if isOpen {
-			sort.SliceStable(needs, func(i, j int) bool { return lower(needsLabel(needs[i])) < lower(needsLabel(needs[j])) })
 			for _, t := range needs {
 				artist, _, _ := app.Display(t)
 				rows = append(rows, Row{
@@ -86,27 +87,33 @@ func buildRows(tracks []manifest.Track, filter string, expanded map[string]bool)
 		ts := byArtist[artist]
 		akey := artistKey(artist)
 		isOpen := open(akey)
-		rows = append(rows, Row{Kind: kindArtist, Key: akey, Label: artist, Count: len(ts), Expanded: isOpen})
-		if !isOpen {
-			continue
-		}
 
 		byAlbum := map[string][]manifest.Track{}
 		for _, t := range ts {
 			byAlbum[t.Album] = append(byAlbum[t.Album], t)
 		}
-		for _, album := range albumOrder(byAlbum) {
+		var ids []string
+		albums := albumOrder(byAlbum)
+		for _, album := range albums {
+			sortTracks(byAlbum[album])
+			ids = append(ids, idsOf(byAlbum[album])...)
+		}
+		rows = append(rows, Row{Kind: kindArtist, Key: akey, Label: artist, Count: len(ts), IDs: ids, Expanded: isOpen})
+		if !isOpen {
+			continue
+		}
+
+		for _, album := range albums {
 			at := byAlbum[album]
 			bkey, label := albumRowKey(artist, album), album
 			if album == "" {
 				bkey, label = singlesKey(artist), "Singles"
 			}
 			albumOpen := open(bkey)
-			rows = append(rows, Row{Kind: kindAlbum, Depth: 1, Key: bkey, Parent: akey, Label: label, Count: len(at), Expanded: albumOpen})
+			rows = append(rows, Row{Kind: kindAlbum, Depth: 1, Key: bkey, Parent: akey, Label: label, Count: len(at), IDs: idsOf(at), Expanded: albumOpen})
 			if !albumOpen {
 				continue
 			}
-			sortTracks(at)
 			width := numberWidth(at)
 			for _, t := range at {
 				num := ""
@@ -130,6 +137,14 @@ func needsLabel(t manifest.Track) string {
 }
 
 func lower(s string) string { return strings.ToLower(s) }
+
+func idsOf(ts []manifest.Track) []string {
+	ids := make([]string, len(ts))
+	for i, t := range ts {
+		ids[i] = t.ID
+	}
+	return ids
+}
 
 // sortedNames returns the keys of m, ignoring case.
 func sortedNames[V any](m map[string]V) []string {

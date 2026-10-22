@@ -40,6 +40,15 @@ type keyMap struct {
 
 	// on the cover
 	RemoveCover key.Binding
+
+	// marking, and acting on several tracks
+	Mark, MarkAll, ClearMarks key.Binding
+	EditMany                  key.Binding
+	MoveDown, MoveUp          key.Binding
+	Renumber                  key.Binding
+
+	// in a dialog
+	Apply, Close2, NextField, PrevField key.Binding
 }
 
 // isNudge reports whether msg is one of the keys that nudge a cut.
@@ -86,5 +95,18 @@ func newKeyMap() keyMap {
 		Play:     key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "hear")),
 
 		RemoveCover: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "remove")),
+
+		Mark:       key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "mark")),
+		MarkAll:    key.NewBinding(key.WithKeys("ctrl+a"), key.WithHelp("ctrl+a", "mark all")),
+		ClearMarks: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear marks")),
+		EditMany:   key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit")),
+		MoveDown:   key.NewBinding(key.WithKeys("J"), key.WithHelp("J K", "move")),
+		MoveUp:     key.NewBinding(key.WithKeys("K")),
+		Renumber:   key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "number")),
+
+		Apply:     key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "apply")),
+		Close2:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+		NextField: key.NewBinding(key.WithKeys("tab", "down"), key.WithHelp("tab", "next")),
+		PrevField: key.NewBinding(key.WithKeys("shift+tab", "up")),
 	}
 }

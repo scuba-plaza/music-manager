@@ -23,6 +23,10 @@ type Library interface {
 	// PreviewTrim writes the audio around one of a track's cuts to a
 	// temporary file; the caller removes it with cleanup.
 	PreviewTrim(id string, edge app.Edge, window time.Duration) (path string, cleanup func(), err error)
+	// EditMany applies several edits at once: all of them or none.
+	EditMany(edits map[string]app.Edit) (map[string]manifest.Track, error)
+	// Renumber numbers the tracks 1..N in the order given.
+	Renumber(ids []string) (map[string]manifest.Track, error)
 	// SetCover sets a track's cover image (JPEG or PNG), or removes it if
 	// image is empty, and returns the track as saved.
 	SetCover(id string, image []byte) (manifest.Track, error)
