@@ -1,0 +1,321 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"music-manager/internal/manifest"
+	"music-manager/internal/timecode"
+	"music-manager/internal/translit"
+)
+
+// Info is what the downloader learned about a download.
+type Info struct {
+	Title       string
+	Artist      string
+	ArtistASCII string // a Latin form of Artist, if one is known
+	Uploader    string
+	Album       string
+	TrackNumber int
+	TrackTotal  int
+}
+
+// Downloaded is an MP3 file fetched by a Downloader.
+type Downloaded struct {
+	Path string
+	Info Info
+}
+
+// Downloader fetches the audio at a URL as an MP3 file into dir.
+type Downloader interface {
+	Download(ctx context.Context, url, dir string) (Downloaded, error)
+}
+
+// Question is one thing to ask the user.
+type Question struct {
+	Key      string // stable name of the field: "title", "trim-start", ...
+	Label    string
+	Default  string // offered when the answer is left empty
+	Required bool
+	Validate func(answer string) error // never nil
+}
+
+// Prompter asks the user questions interactively.
+type Prompter interface {
+	// Ask asks for a piece of text.
+	Ask(Question) (string, error)
+	// Choose asks which of options is meant and returns its index.
+	Choose(title string, options []string) (int, error)
+}
+
+// ErrAborted is returned by a Prompter when the user gives up.
+var ErrAborted = errors.New("aborted")
+
+// DuplicateError says the audio is already in the library.
+type DuplicateError struct{ ID string }
+
+func (e *DuplicateError) Error() string {
+	return fmt.Sprintf("this audio is already in the library as %s", e.ID)
+}
+
+// AddRequest describes a track to download. Fields set in Edit are taken as
+// given and never asked about.
+type AddRequest struct {
+	URL   string
+	Edit  Edit
+	Cover []byte // optional JPEG or PNG
+	// Source, if set, is searched for the track; a confident match replaces
+	// what the download reported as the defaults.
+	Source MetadataSource
+	// OnWarning, if set, hears about problems that do not stop the add.
+	OnWarning func(error)
+}
+
+// Add downloads the audio at req.URL into the library as an identified
+// track. Fields not given in req.Edit are asked with p, offering what the
+// download reported as the default; with a nil p they simply take that
+// default. Nothing is added if anything fails.
+func (a *App) Add(ctx context.Context, req AddRequest, dl Downloader, p Prompter) (manifest.Track, error) {
+	if err := os.MkdirAll(filepath.Join(a.root, ".mm"), 0o755); err != nil {
+		return manifest.Track{}, err
+	}
+	dir, err := os.MkdirTemp(filepath.Join(a.root, ".mm"), "download-")
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	defer os.RemoveAll(dir)
+
+	d, err := dl.Download(ctx, req.URL, dir)
+	if err != nil {
+		return manifest.Track{}, fmt.Errorf("download %s: %w", req.URL, err)
+	}
+	s, err := a.stage(d.Path)
+	if err != nil {
+		return manifest.Track{}, fmt.Errorf("downloaded file: %w", err)
+	}
+	m, err := a.store.Load()
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	if dup, ok := m.FindByAudio(s.sha); ok {
+		return manifest.Track{}, &DuplicateError{ID: dup.ID}
+	}
+	if len(req.Cover) > 0 {
+		if s.coverSHA, err = a.storeCover(req.Cover); err != nil {
+			return manifest.Track{}, err
+		}
+	}
+
+	info := d.Info
+	var match *Candidate
+	if req.Source != nil && (req.Edit.Title == nil || req.Edit.Artist == nil) {
+		match = a.lookup(ctx, req, info)
+		if match != nil {
+			info = infoFrom(*match)
+		}
+	}
+
+	e, err := collect(req.Edit, info, p)
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	t, err := applyEdit(newTrack(s, req.URL), e)
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	if t.Status != manifest.Identified {
+		return manifest.Track{}, missingFields(t)
+	}
+	if match != nil && t.OriginalTitle == match.Title && t.OriginalArtist == match.Artist {
+		t.MBRecordingID, t.MBReleaseID = match.RecordingID, match.ReleaseID
+		if t.CoverSHA256 == "" {
+			if img, err := req.Source.CoverFront(ctx, match.ReleaseID); err == nil && len(img) > 0 {
+				t.CoverSHA256, _ = a.storeCover(img)
+			}
+		}
+	}
+	t = m.Add(t)
+	return t, a.store.Save(m)
+}
+
+// lookup searches req.Source for what the download is, returning the best
+// match if it is a confident one. Failures only produce a warning.
+func (a *App) lookup(ctx context.Context, req AddRequest, info Info) *Candidate {
+	q := Query{Title: info.Title, Artist: info.Artist}
+	if q.Artist == "" {
+		q.Artist = strings.TrimSuffix(info.Uploader, " - Topic")
+	}
+	if req.Edit.Title != nil {
+		q.Title = *req.Edit.Title
+	}
+	if req.Edit.Artist != nil {
+		q.Artist = *req.Edit.Artist
+	}
+	cands, err := req.Source.Search(ctx, q)
+	if err != nil {
+		if req.OnWarning != nil {
+			req.OnWarning(fmt.Errorf("lookup failed, using what the download said: %w", err))
+		}
+		return nil
+	}
+	if len(cands) == 0 || cands[0].Score < defaultMinScore {
+		return nil
+	}
+	return &cands[0]
+}
+
+func infoFrom(c Candidate) Info {
+	return Info{
+		Title: c.Title, Artist: c.Artist, ArtistASCII: c.ArtistASCII, Album: c.Album,
+		TrackNumber: c.TrackNumber, TrackTotal: c.TrackTotal,
+	}
+}
+
+func missingFields(t manifest.Track) error {
+	var missing []string
+	if t.Title == "" {
+		missing = append(missing, "title")
+	}
+	if t.Artist == "" {
+		missing = append(missing, "artist")
+	}
+	return fmt.Errorf("missing %s (pass --%s, or run in a terminal to be asked)",
+		strings.Join(missing, " and "), strings.Join(missing, " and --"))
+}
+
+// collect completes e by asking p, or by taking the defaults if p is nil.
+func collect(given Edit, info Info, p Prompter) (Edit, error) {
+	e := given
+	ask := func(q Question) (string, error) {
+		if p == nil {
+			return q.Default, nil
+		}
+		return p.Ask(q)
+	}
+	// name fills one of title/artist/album and, when the user typed
+	// non-ASCII text, offers its ASCII form.
+	name := func(key, label, def, knownASCII string, required bool, orig, ascii **string) error {
+		if *orig != nil {
+			return nil
+		}
+		var v string
+		var err error
+		if v, err = ask(Question{Key: key, Label: label, Default: def, Required: required, Validate: nonEmptyIf(required)}); err != nil {
+			return err
+		}
+		v = strings.TrimSpace(v)
+		*orig = &v
+		derived := translit.ToASCII(v)
+		if knownASCII != "" && v == def {
+			derived = knownASCII // the source knows a better Latin form
+		}
+		switch {
+		case *ascii != nil:
+		case p != nil && derived != v:
+			a, err := ask(Question{Key: key + "-ascii", Label: label + " (ASCII)", Default: derived, Validate: nonEmptyIf(false)})
+			if err != nil {
+				return err
+			}
+			if a = strings.TrimSpace(a); a != "" && a != translit.ToASCII(v) {
+				*ascii = &a
+			}
+		case p == nil && derived != translit.ToASCII(v):
+			*ascii = &derived
+		}
+		return nil
+	}
+	artist := info.Artist
+	if artist == "" {
+		artist = strings.TrimSuffix(info.Uploader, " - Topic")
+	}
+	if err := name("title", "Title", info.Title, "", true, &e.Title, &e.TitleASCII); err != nil {
+		return e, err
+	}
+	if err := name("artist", "Artist", artist, info.ArtistASCII, true, &e.Artist, &e.ArtistASCII); err != nil {
+		return e, err
+	}
+	if err := name("album", "Album (empty for a single)", info.Album, "", false, &e.Album, &e.AlbumASCII); err != nil {
+		return e, err
+	}
+
+	number := func(key, label, def string, dst **int) error {
+		if *dst != nil {
+			return nil
+		}
+		v, err := ask(Question{Key: key, Label: label, Default: def, Validate: validCount})
+		if err != nil {
+			return err
+		}
+		if v = strings.TrimSpace(v); v != "" {
+			n, _ := strconv.Atoi(v)
+			*dst = &n
+		}
+		return nil
+	}
+	if err := number("track", "Track number", positive(info.TrackNumber), &e.TrackNumber); err != nil {
+		return e, err
+	}
+	if err := number("of", "Tracks on the album", positive(info.TrackTotal), &e.TrackTotal); err != nil {
+		return e, err
+	}
+
+	trim := func(key, label string, dst **time.Duration) error {
+		if *dst != nil {
+			return nil
+		}
+		v, err := ask(Question{Key: key, Label: label, Validate: validTimecode})
+		if err != nil {
+			return err
+		}
+		if v = strings.TrimSpace(v); v != "" {
+			d, _ := timecode.Parse(v)
+			*dst = &d
+		}
+		return nil
+	}
+	if err := trim("trim-start", "Cut off the start (e.g. 0:12, empty for none)", &e.TrimStart); err != nil {
+		return e, err
+	}
+	return e, trim("trim-end", "Cut off the end (e.g. 0:05, empty for none)", &e.TrimEnd)
+}
+
+// positive formats n, or gives "" if it is not known.
+func positive(n int) string {
+	if n > 0 {
+		return strconv.Itoa(n)
+	}
+	return ""
+}
+
+func nonEmptyIf(required bool) func(string) error {
+	return func(s string) error {
+		if required && strings.TrimSpace(s) == "" {
+			return errors.New("required")
+		}
+		return nil
+	}
+}
+
+func validCount(s string) error {
+	if s = strings.TrimSpace(s); s == "" {
+		return nil
+	}
+	if n, err := strconv.Atoi(s); err != nil || n < 0 {
+		return errors.New("enter a whole number, or leave empty")
+	}
+	return nil
+}
+
+func validTimecode(s string) error {
+	if s = strings.TrimSpace(s); s == "" {
+		return nil
+	}
+	_, err := timecode.Parse(s)
+	return err
+}

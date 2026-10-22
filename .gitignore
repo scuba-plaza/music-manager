@@ -1,0 +1,5 @@
+# built binaries and test output
+/mm
+/bin/
+*.test
+*.out
