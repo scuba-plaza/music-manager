@@ -16,6 +16,8 @@ import (
 const (
 	ext          = ".mp3"
 	inbox        = "_Inbox"
+	playlistDir  = "Playlists"
+	playlistExt  = ".m3u"
 	maxComponent = 100 // bytes, well under the 255 most filesystems allow
 )
 
@@ -39,6 +41,12 @@ func PathFor(t manifest.Track) string {
 		title = fmt.Sprintf("%0*d - %s", width, t.TrackNumber, title)
 	}
 	return path.Join(artist, clean(t.Album), truncate(title)+ext)
+}
+
+// PlaylistPath is where the playlist with this name is rendered:
+// Playlists/<name>.m3u, with the name made safe for a file name.
+func PlaylistPath(name string) string {
+	return path.Join(playlistDir, clean(name)+playlistExt)
 }
 
 // Assign returns the path of every track by ID. Tracks that would share a

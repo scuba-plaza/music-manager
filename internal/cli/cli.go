@@ -62,7 +62,7 @@ func Run(ctx context.Context, args []string, streams IO, deps Deps) int {
 	root.SetArgs(args)
 	root.PersistentFlags().StringVar(&library, "library", defaultLibrary(), "library directory (env MM_LIBRARY)")
 
-	root.AddCommand(ingestCmd(open), lsCmd(open), showCmd(open), editCmd(open), syncCmd(open), addCmd(open, deps), rmCmd(open), doctorCmd(open), identifyCmd(open, deps), adoptCmd(open), tuiCmd(open, deps))
+	root.AddCommand(ingestCmd(open), lsCmd(open), showCmd(open), editCmd(open), syncCmd(open), addCmd(open, deps), rmCmd(open), doctorCmd(open), identifyCmd(open, deps), adoptCmd(open), playlistCmd(open), tuiCmd(open, deps))
 
 	if err := root.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(streams.Err, "mm:", err)

@@ -33,10 +33,16 @@ func renderInputs(tracks []manifest.Track) (paths map[string]string, albumCovers
 
 // signatures describes, for every track, everything its rendered output
 // depends on: its record, where it goes and the cover of its album folder.
-func signatures(tracks []manifest.Track) map[string]string {
-	paths, albumCovers := renderInputs(tracks)
-	sigs := make(map[string]string, len(tracks))
-	for _, t := range tracks {
+// Each playlist has one too, under "playlist:" and its name: its name and
+// where each of its tracks goes.
+func signatures(m *manifest.Manifest) map[string]string {
+	paths, albumCovers := renderInputs(m.Tracks)
+	sigs := make(map[string]string, len(m.Tracks)+len(m.Playlists))
+	for _, p := range m.Playlists {
+		sum := sha256.Sum256(append([]byte(p.Name+"\x00"), playlistFile(p, paths)...))
+		sigs[playlistKey+p.Name] = hex.EncodeToString(sum[:])
+	}
+	for _, t := range m.Tracks {
 		p := paths[t.ID]
 		folderCover := ""
 		if t.Status == manifest.Identified && t.Album != "" {
@@ -49,6 +55,10 @@ func signatures(tracks []manifest.Track) map[string]string {
 	}
 	return sigs
 }
+
+// playlistKey starts the keys of playlists in the record of what was synced;
+// track IDs never contain a colon.
+const playlistKey = "playlist:"
 
 type syncedFile struct {
 	Version int               `json:"version"`
@@ -68,9 +78,9 @@ func (a *App) writeSynced(sigs map[string]string) error {
 	return writeAtomic(a.syncedPath(), data)
 }
 
-// Unsynced returns how many tracks would be written, changed or removed by a
-// sync into the library folder, judged from the records alone: it reads no
-// audio. known is false until the library has been synced once (or
+// Unsynced returns how many tracks and playlists would be written, changed
+// or removed by a sync into the library folder, judged from the records
+// alone: it reads no audio. known is false until the library has been synced once (or
 // RecordSynced was called), since there is nothing to compare with.
 func (a *App) Unsynced() (n int, known bool, err error) {
 	data, err := os.ReadFile(a.syncedPath())
@@ -88,7 +98,7 @@ func (a *App) Unsynced() (n int, known bool, err error) {
 	if err != nil {
 		return 0, false, err
 	}
-	current := signatures(m.Tracks)
+	current := signatures(m)
 	for id, sig := range current {
 		if saved.Tracks[id] != sig {
 			n++
@@ -110,7 +120,7 @@ func (a *App) RecordSynced() error {
 	if err != nil {
 		return err
 	}
-	return a.writeSynced(signatures(m.Tracks))
+	return a.writeSynced(signatures(m))
 }
 
 func sameDir(a, b string) bool {

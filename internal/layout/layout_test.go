@@ -106,3 +106,18 @@ func TestAssignTreatsPathsAsCaseInsensitive(t *testing.T) {
 		t.Errorf("paths collide on a case-insensitive filesystem: %v", got)
 	}
 }
+
+func TestPlaylistPath(t *testing.T) {
+	cases := map[string]string{
+		"Study":            "Playlists/Study.m3u",
+		"  Study ":         "Playlists/Study.m3u",
+		"Road trip: 2024?": "Playlists/Road trip- 2024-.m3u",
+		"Café":             "Playlists/Cafe.m3u",
+		"???":              "Playlists/Unknown.m3u",
+	}
+	for name, want := range cases {
+		if got := layout.PlaylistPath(name); got != want {
+			t.Errorf("PlaylistPath(%q) = %q, want %q", name, got, want)
+		}
+	}
+}

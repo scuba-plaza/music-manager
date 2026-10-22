@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
 	"music-manager/internal/render"
@@ -78,6 +79,12 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 			opts.OnProgress(i+1, len(m.Tracks))
 		}
 	}
+	for _, p := range m.Playlists {
+		data := playlistFile(p, paths)
+		name := layout.PlaylistPath(p.Name)
+		build[name] = func() ([]byte, error) { return data, nil }
+		desired[name] = fingerprint(data)
+	}
 	for dir, t := range albumCovers {
 		data, err := os.ReadFile(a.covers.Path(t.CoverSHA256))
 		if err != nil {
@@ -97,7 +104,7 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 	return &SyncPlan{
 		Ops: render.Plan(desired, existing, opts.Prune), a: a, target: target, build: build,
 		keepAudio: keepAudio, keepCovers: keepCovers,
-		desired: desired, existing: existing, sigs: signatures(m.Tracks),
+		desired: desired, existing: existing, sigs: signatures(m),
 	}, nil
 }
 
@@ -214,7 +221,7 @@ func fingerprint(data []byte) render.File {
 	return render.File{Size: int64(len(data)), SHA: hex.EncodeToString(sum[:])}
 }
 
-var mediaExts = map[string]bool{".mp3": true, ".jpg": true, ".jpeg": true, ".png": true}
+var mediaExts = map[string]bool{".mp3": true, ".jpg": true, ".jpeg": true, ".png": true, ".m3u": true}
 
 // scanTree fingerprints the media files under dir, ignoring the library's own
 // .mm directory. Only files that are also wanted and have the wanted size

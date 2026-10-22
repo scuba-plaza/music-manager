@@ -65,8 +65,15 @@ func (t Track) PlayingLength() time.Duration {
 	return max(0, t.SourceLength-t.TrimStart-t.TrimEnd)
 }
 
+// Playlist is a named list of tracks, by ID, in the order they are played.
+type Playlist struct {
+	Name   string   `json:"name"`
+	Tracks []string `json:"tracks"`
+}
+
 type Manifest struct {
-	Tracks []Track `json:"tracks"`
+	Tracks    []Track    `json:"tracks"`
+	Playlists []Playlist `json:"playlists,omitempty"`
 }
 
 type Store struct{ path string }
@@ -74,8 +81,9 @@ type Store struct{ path string }
 func NewStore(path string) *Store { return &Store{path: path} }
 
 type file struct {
-	Version int     `json:"version"`
-	Tracks  []Track `json:"tracks"`
+	Version   int        `json:"version"`
+	Tracks    []Track    `json:"tracks"`
+	Playlists []Playlist `json:"playlists,omitempty"`
 }
 
 func (s *Store) Load() (*Manifest, error) {
@@ -93,13 +101,13 @@ func (s *Store) Load() (*Manifest, error) {
 	if f.Version != schemaVersion {
 		return nil, fmt.Errorf("%s: unsupported library version %d (want %d)", s.path, f.Version, schemaVersion)
 	}
-	return &Manifest{Tracks: f.Tracks}, nil
+	return &Manifest{Tracks: f.Tracks, Playlists: f.Playlists}, nil
 }
 
 // Save writes the manifest atomically: the data goes to a temp file that is
 // renamed over the target, after the previous version is copied to .bak.
 func (s *Store) Save(m *Manifest) error {
-	data, err := json.MarshalIndent(file{Version: schemaVersion, Tracks: m.Tracks}, "", "  ")
+	data, err := json.MarshalIndent(file{Version: schemaVersion, Tracks: m.Tracks, Playlists: m.Playlists}, "", "  ")
 	if err != nil {
 		return err
 	}

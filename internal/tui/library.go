@@ -39,7 +39,7 @@ type Library interface {
 	Stamp() (string, error)
 	// RecordSynced notes that the library folder matches the records.
 	RecordSynced() error
-	// Unsynced counts the tracks whose output would change in the library
+	// Unsynced counts the tracks and playlists whose output would change in the library
 	// folder; known is false until it has been synced once.
 	Unsynced() (n int, known bool, err error)
 	// CanAdd reports whether tracks can be downloaded; Fetch downloads one and

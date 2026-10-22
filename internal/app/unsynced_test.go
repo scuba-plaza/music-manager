@@ -133,3 +133,32 @@ func TestSyncReportsProgress(t *testing.T) {
 		t.Errorf("apply progress = %v for %d ops", applied, n)
 	}
 }
+
+func TestUnsyncedCountsPlaylistsToo(t *testing.T) {
+	a, ts := syncedPlaylistLib(t)
+	mustSync(t, a, app.SyncOptions{})
+	if n, _ := unsynced(t, a); n != 0 {
+		t.Fatalf("after syncing = %d", n)
+	}
+
+	a.CreatePlaylist("Gym")
+	if n, _ := unsynced(t, a); n != 1 {
+		t.Errorf("a new playlist = %d, want 1", n)
+	}
+	a.MoveInPlaylist("Study", ts[2].ID, 0)
+	if n, _ := unsynced(t, a); n != 2 {
+		t.Errorf("and a reordered one = %d, want 2", n)
+	}
+	a.DeletePlaylist("Gym") // never synced: nothing to undo on the card
+	if n, _ := unsynced(t, a); n != 1 {
+		t.Errorf("after deleting the new one = %d, want 1", n)
+	}
+	mustSync(t, a, app.SyncOptions{})
+	if n, _ := unsynced(t, a); n != 0 {
+		t.Errorf("after syncing = %d", n)
+	}
+	a.DeletePlaylist("Study")
+	if n, _ := unsynced(t, a); n != 1 {
+		t.Errorf("a deleted playlist's file is still on the card: %d, want 1", n)
+	}
+}

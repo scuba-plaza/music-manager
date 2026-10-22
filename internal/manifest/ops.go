@@ -3,6 +3,7 @@ package manifest
 import (
 	"crypto/rand"
 	"encoding/base32"
+	"slices"
 	"strings"
 )
 
@@ -48,10 +49,14 @@ func (m *Manifest) Update(t Track) bool {
 	return false
 }
 
+// Remove deletes the track with this ID, and takes it out of every playlist.
 func (m *Manifest) Remove(id string) bool {
 	for i, t := range m.Tracks {
 		if t.ID == id {
 			m.Tracks = append(m.Tracks[:i], m.Tracks[i+1:]...)
+			for j := range m.Playlists {
+				m.Playlists[j].Tracks = slices.DeleteFunc(m.Playlists[j].Tracks, func(s string) bool { return s == id })
+			}
 			return true
 		}
 	}

@@ -72,6 +72,7 @@ changes the library while the interface is open, the change appears within a cou
 | `mm ls [words] [status:identified\|unidentified] [--sort KEY] [--reverse]` / `mm show <id>` | look at records; `--sort` takes `artist`, `album`, `title`, `track`, `length`, `released`, `added` or `edited` |
 | `mm sync [--target DIR] [--dry-run] [--prune --yes]` | render the folder; `--prune` deletes files the records don't account for |
 | `mm rm <id>…` | remove records (audio is deleted by the next sync) |
+| `mm playlist <new, add, rm, move, rename, delete, ls, show>` | make and change playlists (see Playlists below) |
 | `mm doctor` | check the stores for missing or damaged files |
 | `mm tui` | the full-screen interface (also what plain `mm` opens in a terminal) |
 
@@ -88,6 +89,22 @@ artist, album, title, track number and length, can order the list: `mm ls --sort
 all tracks in one flat list in that order (with the date beside each) until you choose the tree again. Text and numbers sort
 lowest first and dates newest first; `--reverse` (or `r` in the menu) turns that around. Tracks that have no value, such as
 no release date, always come last, and ties are ordered by artist, album, track number and title.
+
+## Playlists
+
+A playlist is a named list of tracks in a chosen order; a track can be in as many playlists as you like, but only once in each.
+
+```sh
+mm playlist new Study 3k2fq7 9xw4ap     # make one, with these tracks (ids from mm ls)
+mm playlist add Study m2d8cz            # put tracks at the end
+mm playlist move Study m2d8cz 1         # move a track to position 1
+mm playlist rm Study 9xw4ap             # take a track out (it stays in the library)
+mm playlist show Study
+mm playlist rename Study Exams
+mm playlist delete Exams
+```
+
+`mm sync` writes each playlist as `Playlists/<name>.m3u`, with the player-friendly form found by experiment on a Wolfang WMP01: paths from the root of the card with backslashes (`\Artist\Album\01 - Title.mp3`), one per line, plain UTF-8, Windows line endings. The player lists every `.m3u` on the card as a playlist; it ignores paths written with slashes or relative to the playlist. Removing a track from the library takes it out of its playlists. Playlist files count in the `N to sync` of the interface, and a deleted playlist's file is a stray that `mm sync --prune` removes.
 
 Trims are stored on the record and applied when rendering, on MP3 frame
 boundaries (about 26 ms), without re-encoding. The stored audio is never
