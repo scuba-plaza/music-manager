@@ -30,6 +30,31 @@ how much to cut off the start and end, with defaults filled in. Anything given
 as a flag is not asked. Without a terminal (or with `--no-input`) it never
 asks and fails if the title or artist is unknown.
 
+## The full-screen interface
+
+Run `mm` in a terminal (or `mm tui`) to browse and edit the library on one screen: artists, albums and
+tracks on the left, the selected track's details on the right. Every change is saved at once to
+`library.json`; the music folder only changes when you sync (`s`), and the header says how many tracks
+are waiting (`3 to sync`). Press `?` for the list of keys; the bottom line always shows the ones that
+matter right now. Without a terminal, plain `mm` prints help as before.
+
+| | |
+|---|---|
+| `↑↓` `→←` `/` | move, open and close, filter (same words as `mm ls`, e.g. `status:unidentified`) |
+| `→` `enter` | from a track into its fields; `enter` edits a field, `enter` saves, `esc` cancels |
+| `tab` | while editing a name: switch between the text and its ASCII form |
+| `[` `]` `{` `}` `0` `p` | on a cut: nudge by 0.1 s / 1 s, clear, hear the 8 s around it (needs `ffplay` or `mpv`) |
+| `space` `ctrl+a` `e` | mark tracks (an album marks all of its tracks); edit the marked ones, or rename an artist or album |
+| `J` `K` `n` | move a track down or up in its album; number the album 1…N |
+| `i` `I` `o` | find a track on MusicBrainz and pick the match; do all unidentified tracks; use the file's old tags |
+| `a` | add from a YouTube link: one form, pre-filled from the match |
+| `s` | sync: choose the folder (or a mounted player), see what will change, apply |
+| `d` `u` `ctrl+r` `D` | remove (asks first), undo, redo, check the library for damage |
+
+The mouse works too: click to select, click again to open, double-click a folder row to open it, wheel
+to scroll. Colours follow your terminal's light or dark background and honour `NO_COLOR`. If another `mm`
+changes the library while the interface is open, the change appears within a couple of seconds.
+
 ## Commands
 
 | | |
@@ -43,6 +68,7 @@ asks and fails if the title or artist is unknown.
 | `mm sync [--target DIR] [--dry-run] [--prune --yes]` | render the folder; `--prune` deletes files the records don't account for |
 | `mm rm <id>…` | remove records (audio is deleted by the next sync) |
 | `mm doctor` | check the stores for missing or damaged files |
+| `mm tui` | the full-screen interface (also what plain `mm` opens in a terminal) |
 
 Trims are stored on the record and applied when rendering, on MP3 frame
 boundaries (about 26 ms), without re-encoding. The stored audio is never
@@ -69,7 +95,7 @@ mm sync --prune --yes
 * `MM_CONTACT`: an email or URL added to the User-Agent sent to MusicBrainz, which they ask for.
 * `ACCESSIBLE=1` or `TERM=dumb`: plain line-based questions instead of the full-screen form.
 
-Needs `yt-dlp` (and `ffmpeg`, which yt-dlp uses) on `PATH` for `mm add`.
+Needs `yt-dlp` (and `ffmpeg`, which yt-dlp uses) on `PATH` for `mm add`. Hearing a cut in the interface needs `ffplay` (part of ffmpeg) or `mpv`.
 
 ## Installing with Nix
 
@@ -79,8 +105,8 @@ puts `yt-dlp` and `ffmpeg` at the end of the program's `PATH`, so ones you
 already have take precedence.
 
 ```sh
-nix run github:OWNER/music-manager -- --help        # try it
-nix profile install github:OWNER/music-manager      # or install it
+nix run github:scuba-plaza/music-manager -- --help        # try it
+nix profile install github:scuba-plaza/music-manager      # or install it
 ```
 
 With home-manager, add the flake as an input of your system flake, apply its
@@ -88,7 +114,7 @@ overlay, and list the package:
 
 ```nix
 inputs.music-manager = {
-  url = "github:OWNER/music-manager";   # or "git+file:///path/to/music-manager"
+  url = "github:scuba-plaza/music-manager";   # or "git+file:///path/to/music-manager"
   inputs.nixpkgs.follows = "nixpkgs";
 };
 # in the overlays list:   music-manager.overlays.default
@@ -103,6 +129,8 @@ files git knows about, so `git add` new files before `nix build`.
 
 ```sh
 go test ./...
+go test -tags pty ./internal/tui                          # runs the real binary in a pseudo-terminal
+go test ./internal/tui -update                               # accept changed screens in internal/tui/testdata
 nix build                                                    # builds the package and runs the tests in the sandbox
 go test -tags live ./internal/musicbrainz ./internal/ytdlp   # real MusicBrainz, real yt-dlp
 ```

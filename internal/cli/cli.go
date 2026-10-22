@@ -43,6 +43,7 @@ func Run(ctx context.Context, args []string, streams IO, deps Deps) int {
 	root := &cobra.Command{
 		Use:           "mm",
 		Short:         "Manage a music library for an MP3 player",
+		Long:          "Manage a music library for an MP3 player: one record per track, rendered into a clean folder by sync.\n\nRun mm without a command, in a terminal, to open the full-screen interface.",
 		Version:       version.String(),
 		SilenceUsage:  true,
 		SilenceErrors: true,

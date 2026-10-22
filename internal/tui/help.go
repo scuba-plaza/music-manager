@@ -20,16 +20,16 @@ type helpSection struct {
 var helpLeft = []helpSection{
 	{"Moving", []helpEntry{
 		{"↑↓  j k", "move"},
-		{"→ ←  l h", "open / close, or go to the fields"},
+		{"→ ←  l h", "open / close / into fields"},
 		{"PgUp PgDn", "a page at a time"},
 		{"g G", "top / bottom"},
 		{"/", "filter  (esc clears it)"},
 	}},
 	{"Editing a track", []helpEntry{
-		{"→  enter", "from the tree into the fields"},
+		{"→  enter", "from tree into fields"},
 		{"↑↓", "choose a field"},
 		{"enter", "edit it; enter saves"},
-		{"esc", "cancel; or back to the tree"},
+		{"esc", "cancel, or back to tree"},
 		{"tab", "ascii form / other number"},
 	}},
 	{"Cuts", []helpEntry{
@@ -42,7 +42,7 @@ var helpLeft = []helpSection{
 
 var helpRight = []helpSection{
 	{"Several tracks", []helpEntry{
-		{"space", "mark (an album marks its tracks)"},
+		{"space", "mark (albums mark all)"},
 		{"ctrl+a", "mark everything shown"},
 		{"e", "edit marked, or rename"},
 		{"J K", "move a track down / up"},
