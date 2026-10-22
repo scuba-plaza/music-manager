@@ -54,6 +54,12 @@ func clamp(v, lo, hi int) int { return max(lo, min(hi, v)) }
 // edge. The result is exactly w columns by h lines: longer lines are cut
 // short and missing lines are blank.
 func box(title string, content []string, w, h int, focused bool) string {
+	return boxWithBar(title, content, nil, w, h, focused)
+}
+
+// boxWithBar is box with a scrollbar drawn over the right border: bar[i], if
+// not empty, replaces the border character beside content line i.
+func boxWithBar(title string, content, bar []string, w, h int, focused bool) string {
 	if w < 4 || h < 2 {
 		return strings.TrimRight(strings.Repeat(strings.Repeat(" ", max(w, 0))+"\n", max(h, 0)), "\n")
 	}
@@ -77,7 +83,11 @@ func box(title string, content []string, w, h int, focused bool) string {
 		if i < len(content) {
 			line = content[i]
 		}
-		lines = append(lines, side+fit(line, inner)+side)
+		right := side
+		if i < len(bar) && bar[i] != "" {
+			right = bar[i]
+		}
+		lines = append(lines, side+fit(line, inner)+right)
 	}
 	lines = append(lines, border.Render("╰"+strings.Repeat("─", inner)+"╯"))
 	return strings.Join(lines, "\n")
@@ -127,4 +137,27 @@ func tilde(p string) string {
 		return "~" + strings.TrimPrefix(p, home)
 	}
 	return p
+}
+
+// scrollbar draws a vertical scrollbar of height cells for a list of total
+// rows of which view are visible starting at offset: a solid thumb on a thin
+// track. It returns nil when everything fits.
+func scrollbar(total, view, offset, height int) []string {
+	if total <= view || height <= 0 {
+		return nil
+	}
+	thumb := max(1, height*view/total)
+	pos := 0
+	if span := total - view; span > 0 {
+		pos = (height - thumb) * offset / span
+	}
+	bar := make([]string, height)
+	for i := range bar {
+		if i >= pos && i < pos+thumb {
+			bar[i] = styles.accent.Render("┃")
+		} else {
+			bar[i] = styles.dim.Render("│")
+		}
+	}
+	return bar
 }

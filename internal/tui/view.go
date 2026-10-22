@@ -6,6 +6,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/x/ansi"
+
+	"music-manager/internal/manifest"
 )
 
 func (m Model) View() string {
@@ -40,8 +42,27 @@ func (m Model) tooSmallView() string {
 
 func (m Model) headerView() string {
 	left := " " + styles.header.Render("mm") + "  " + styles.dim.Render(tilde(m.lib.Root()))
-	right := styles.headerRight.Render(plural(len(m.tracks), "track")) + " "
+	right := styles.headerRight.Render(m.summary()) + " "
 	return fit(spread(left, right, m.w), m.w)
+}
+
+// summary is the count shown at the right of the header.
+func (m Model) summary() string {
+	s := plural(len(m.tracks), "track")
+	needs := 0
+	for _, t := range m.tracks {
+		if t.Status != manifest.Identified {
+			needs++
+		}
+	}
+	switch needs {
+	case 0:
+	case 1:
+		s += " · 1 needs work"
+	default:
+		s += fmt.Sprintf(" · %d need work", needs)
+	}
+	return s
 }
 
 func plural(n int, word string) string {
@@ -52,7 +73,8 @@ func plural(n int, word string) string {
 }
 
 func (m Model) bodyView(l layoutInfo) string {
-	left := box("Library", m.browserLines(l.left-2), l.left, l.body, true)
+	lines, bar := m.browserContent(l.left - 2)
+	left := boxWithBar("Library", lines, bar, l.left, l.body, true)
 	if l.mode == modeOnePane {
 		return left
 	}
@@ -70,30 +92,8 @@ func joinPanes(left, right string) string {
 	return strings.Join(out, "\n")
 }
 
-func (m Model) browserLines(w int) []string {
-	switch {
-	case m.loadErr != nil:
-		return wrap(styles.bad.Render("Could not read the library: "+m.loadErr.Error()), w)
-	case !m.loaded:
-		return []string{styles.dim.Render(" Loading…")}
-	case len(m.tracks) == 0:
-		return []string{
-			"",
-			" " + styles.bold.Render("No tracks yet"),
-			"",
-			styles.dim.Render(" Press a to add one from YouTube,"),
-			styles.dim.Render(" or run: mm ingest <folder>"),
-		}
-	}
-	return []string{styles.dim.Render(fmt.Sprintf(" %d tracks", len(m.tracks)))}
-}
-
-func (m Model) inspectorLines(w int) []string {
-	return []string{"", styles.dim.Render(" Select a track")}
-}
-
 func (m Model) footerView() string {
-	return fit(" "+renderKeys([]key.Binding{m.keys.Help, m.keys.Quit}), m.w)
+	return fit(" "+renderKeys(m.footerKeys()), m.w)
 }
 
 // renderKeys draws bindings as "key description" pairs.
@@ -112,4 +112,17 @@ func renderKeys(bindings []key.Binding) string {
 // wrap breaks s into lines of at most w columns.
 func wrap(s string, w int) []string {
 	return strings.Split(ansi.Wrap(s, max(w-1, 1), ""), "\n")
+}
+
+// footerKeys are the keys worth showing now.
+func (m Model) footerKeys() []key.Binding {
+	k := m.keys
+	if m.filtering {
+		return []key.Binding{k.FilterKeep, k.FilterClear}
+	}
+	bindings := []key.Binding{k.Up, k.Open, k.Filter}
+	if m.filter != "" {
+		bindings = append(bindings, k.ClearFilter)
+	}
+	return append(bindings, k.Help, k.Quit)
 }

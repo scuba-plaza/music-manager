@@ -117,3 +117,54 @@ func TestTilde(t *testing.T) {
 		}
 	}
 }
+
+func TestScrollbar(t *testing.T) {
+	if got := scrollbar(10, 10, 0, 5); got != nil {
+		t.Errorf("a list that fits needs no scrollbar, got %v", got)
+	}
+	thumbs := func(bar []string) (first, count int) {
+		first = -1
+		for i, g := range bar {
+			if g == "┃" {
+				if first < 0 {
+					first = i
+				}
+				count++
+			}
+		}
+		return
+	}
+	top := scrollbar(100, 10, 0, 10)
+	if len(top) != 10 {
+		t.Fatalf("%d cells", len(top))
+	}
+	if first, n := thumbs(top); first != 0 || n != 1 {
+		t.Errorf("at the top the thumb is at %d, %d long", first, n)
+	}
+	bottom := scrollbar(100, 10, 90, 10)
+	if first, n := thumbs(bottom); first != 9 || n != 1 {
+		t.Errorf("at the bottom the thumb is at %d, %d long", first, n)
+	}
+	middle := scrollbar(100, 10, 45, 10)
+	if first, _ := thumbs(middle); first < 3 || first > 6 {
+		t.Errorf("in the middle the thumb is at %d", first)
+	}
+	if _, n := thumbs(scrollbar(30, 20, 5, 20)); n < 10 {
+		t.Errorf("a thumb for two thirds of the list should be long, got %d of 20", n)
+	}
+}
+
+func TestBoxWithBarReplacesTheRightBorderBesideTheThumb(t *testing.T) {
+	lines := strings.Split(ansi.Strip(boxWithBar("T", []string{"a", "b", "c"}, []string{"", "┃", ""}, 10, 5, true)), "\n")
+	if !strings.HasSuffix(lines[2], "┃") {
+		t.Errorf("thumb row = %q", lines[2])
+	}
+	if !strings.HasSuffix(lines[1], "│") || !strings.HasSuffix(lines[3], "│") {
+		t.Errorf("other rows should keep the border: %q / %q", lines[1], lines[3])
+	}
+	for i, l := range lines {
+		if ansi.StringWidth(l) != 10 {
+			t.Errorf("line %d is %d wide", i, ansi.StringWidth(l))
+		}
+	}
+}

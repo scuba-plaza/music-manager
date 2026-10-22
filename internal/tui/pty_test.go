@@ -9,6 +9,7 @@ package tui
 //	go test -tags pty -run PTY -v ./internal/tui
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -166,4 +167,30 @@ func TestPTYStartsDrawsAndQuits(t *testing.T) {
 	if s.em.IsAltScreen() {
 		t.Error("the terminal was left in the alternate screen")
 	}
+}
+
+// TestPTYExplore runs mm on a library of your choice and prints the screen,
+// for looking at the interface rather than asserting anything:
+//
+//	MM_PTY_LIB=/some/library MM_PTY_SIZE=120x36 MM_PTY_KEYS=$'/shawn\r' \
+//	  go test -tags pty -run PTYExplore -v ./internal/tui
+func TestPTYExplore(t *testing.T) {
+	lib := os.Getenv("MM_PTY_LIB")
+	if lib == "" {
+		t.Skip("set MM_PTY_LIB to explore")
+	}
+	cols, rows := 120, 36
+	if size := os.Getenv("MM_PTY_SIZE"); size != "" {
+		if _, err := fmt.Sscanf(size, "%dx%d", &cols, &rows); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s := startMM(t, cols, rows, lib)
+	s.MustSee("Library")
+	// Keys are sent in groups separated by "|", with a pause between groups.
+	for _, group := range strings.Split(os.Getenv("MM_PTY_KEYS"), "|") {
+		s.Type(group)
+		time.Sleep(250 * time.Millisecond)
+	}
+	t.Logf("\n%s", s.Screen())
 }
