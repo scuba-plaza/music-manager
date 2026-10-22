@@ -184,3 +184,39 @@ func TestEditingTheReleaseDateCountsAsAnEdit(t *testing.T) {
 		t.Errorf("added %v → %v, updated %v → %v", tr.AddedAt, got.AddedAt, tr.UpdatedAt, got.UpdatedAt)
 	}
 }
+
+func TestEditSourceURL(t *testing.T) {
+	a, tr := ingested(t)
+	for _, c := range []struct{ in, want string }{
+		{"https://www.youtube.com/watch?v=abc123", "https://www.youtube.com/watch?v=abc123"},
+		{"  http://example.org/a  ", "http://example.org/a"},
+		{"", ""},
+	} {
+		got, err := a.Edit(tr.ID, app.Edit{SourceURL: ptr(c.in)})
+		if err != nil || got.SourceURL != c.want {
+			t.Errorf("%q: source = %q, %v; want %q", c.in, got.SourceURL, err, c.want)
+		}
+		if saved := tracks(t, a)[0]; saved.SourceURL != c.want {
+			t.Errorf("%q: saved as %q", c.in, saved.SourceURL)
+		}
+	}
+}
+
+func TestEditRejectsSourcesThatAreNotLinks(t *testing.T) {
+	a, tr := ingested(t)
+	a.Edit(tr.ID, app.Edit{SourceURL: ptr("https://youtu.be/xyz")})
+	before := tracks(t, a)[0]
+	for _, bad := range []string{"youtube.com/watch?v=abc", "watch?v=abc", "ftp://example.org/a", "https://", "not a link", "https://exa mple.org/"} {
+		_, err := a.Edit(tr.ID, app.Edit{SourceURL: ptr(bad)})
+		if err == nil {
+			t.Errorf("%q accepted", bad)
+			continue
+		}
+		if !strings.Contains(err.Error(), "https://") {
+			t.Errorf("%q: error %q does not show what a link looks like", bad, err)
+		}
+	}
+	if after := tracks(t, a)[0]; after.SourceURL != "https://youtu.be/xyz" || !after.UpdatedAt.Equal(before.UpdatedAt) {
+		t.Errorf("a rejected edit changed the record: %+v", after)
+	}
+}

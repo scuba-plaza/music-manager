@@ -20,6 +20,7 @@ Title, artist and album take the original text; their ASCII forms are derived
 automatically. Use --title-ascii (etc.) to set one by hand, or pass "" to go
 back to the derived form. Trims accept 90, 1:30 or 1:30.5. The release date
 takes a year, a month or a day (1999, 1999-05, 1999-05-17); pass "" to forget it.
+The source link (--source-url) is where the track came from; pass "" to forget it.
 A track with a title and an artist counts as identified.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -56,5 +57,6 @@ A track with a title and an artist counts as identified.`,
 		},
 	}
 	tf.register(cmd.Flags())
+	cmd.Flags().StringVar(&tf.sourceURL, "source-url", "", "the link the track came from; \"\" for none")
 	return cmd
 }

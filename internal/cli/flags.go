@@ -18,6 +18,7 @@ type trackFlags struct {
 	track, of                           int
 	trimStart, trimEnd                  string
 	released                            string
+	sourceURL                           string
 	cover                               string
 }
 
@@ -64,6 +65,7 @@ func (tf *trackFlags) build(f *pflag.FlagSet) (p parsed, err error) {
 		e.TrackTotal = &tf.of
 	}
 	str("released", &tf.released, &e.Released)
+	str("source-url", &tf.sourceURL, &e.SourceURL)
 	if e.TrimStart, err = parseTrim(f, "trim-start", tf.trimStart); err != nil {
 		return p, err
 	}

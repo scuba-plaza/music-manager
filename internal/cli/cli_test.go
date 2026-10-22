@@ -375,3 +375,30 @@ func TestListSortedByAnyField(t *testing.T) {
 		t.Errorf("unknown key: code %d, err %q; want the valid keys listed", code, errs)
 	}
 }
+
+func TestEditTheSourceLink(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib)
+
+	if code, _, errs := run(t, lib, "edit", id, "--source-url", "https://www.youtube.com/watch?v=abc123"); code != 0 {
+		t.Fatalf("edit: code %d, err %q", code, errs)
+	}
+	if _, out, _ := run(t, lib, "show", id); !strings.Contains(squash(out), "Source https://www.youtube.com/watch?v=abc123") {
+		t.Errorf("show lacks the link:\n%s", out)
+	}
+
+	run(t, lib, "edit", id, "--source-url", "")
+	if _, out, _ := run(t, lib, "show", id); strings.Contains(out, "Source") {
+		t.Errorf("a cleared link is still shown:\n%s", out)
+	}
+
+	code, _, errs := run(t, lib, "edit", id, "--source-url", "youtube.com/watch?v=abc")
+	if code == 0 || !strings.Contains(errs, "https://") {
+		t.Errorf("a link without a scheme: code %d, err %q; want a failure that shows the form", code, errs)
+	}
+
+	// add takes its link as an argument, so it has no flag for it
+	if code, _, _ := run(t, lib, "add", "u1", "--source-url", "https://x.org/a"); code == 0 {
+		t.Error("add accepted --source-url")
+	}
+}

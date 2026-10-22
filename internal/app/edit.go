@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -24,6 +25,8 @@ type Edit struct {
 	// Released is when the track first came out: 1999, 1999-05 or 1999-05-17,
 	// or "" for unknown.
 	Released *string
+	// SourceURL is the link the track came from, or "" for none.
+	SourceURL *string
 }
 
 // Edit applies e to the track with the given ID and returns the result. A
@@ -70,6 +73,13 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 			return t, err
 		}
 		t.Released = d
+	}
+	if e.SourceURL != nil {
+		u, err := NormalizeSourceURL(*e.SourceURL)
+		if err != nil {
+			return t, err
+		}
+		t.SourceURL = u
 	}
 	if err := validate(t); err != nil {
 		return t, err
@@ -148,4 +158,18 @@ func leadingDate(s string) string {
 		}
 	}
 	return ""
+}
+
+// NormalizeSourceURL checks the link a track came from and returns it
+// trimmed. It must be a web address (http or https); empty means none.
+func NormalizeSourceURL(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", nil
+	}
+	u, err := url.Parse(s)
+	if err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" {
+		return s, nil
+	}
+	return "", fmt.Errorf("source %q is not a web link: use something like https://www.youtube.com/watch?v=...", s)
 }

@@ -68,7 +68,7 @@ changes the library while the interface is open, the change appears within a cou
 | `mm identify [id…] [--yes]` | look tracks up on MusicBrainz; pick from a list, or `--yes` for confident matches |
 | `mm adopt [id…]` | identify tracks by what their old tags said, for what MusicBrainz does not know |
 | `mm add <url>` | download with yt-dlp and add |
-| `mm edit <id> --title … --artist … --album … --track N --of N --released DATE --trim-start T --trim-end T --cover FILE` | change a track; `--title-ascii` etc. override the derived ASCII |
+| `mm edit <id> --title … --artist … --album … --track N --of N --released DATE --source-url LINK --trim-start T --trim-end T --cover FILE` | change a track; `--title-ascii` etc. override the derived ASCII |
 | `mm ls [words] [status:identified\|unidentified] [--sort KEY] [--reverse]` / `mm show <id>` | look at records; `--sort` takes `artist`, `album`, `title`, `track`, `length`, `released`, `added` or `edited` |
 | `mm sync [--target DIR] [--dry-run] [--prune --yes]` | render the folder; `--prune` deletes files the records don't account for |
 | `mm rm <id>…` | remove records (audio is deleted by the next sync) |
