@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -54,6 +55,13 @@ func (c *confirm) key(m *Model, msg tea.KeyMsg) tea.Cmd {
 func (m Model) openRemove() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
 	if !ok {
+		return m, nil
+	}
+	if name, in := playlistOf(r); in {
+		return m.openRemoveInPlaylist(r, name)
+	}
+	if r.Key == playlistsKey {
+		m.say("Select a playlist, or one of its tracks, to take out of it", true)
 		return m, nil
 	}
 	var ts []manifest.Track
@@ -111,8 +119,9 @@ func (m Model) openRemove() (tea.Model, tea.Cmd) {
 
 // removedMsg is the result of removing tracks.
 type removedMsg struct {
-	tracks []manifest.Track
-	err    error
+	tracks    []manifest.Track
+	playlists []manifest.Playlist // the playlists once the tracks are gone from them
+	err       error
 }
 
 func (m Model) removing(ts []manifest.Track) tea.Cmd {
@@ -123,7 +132,11 @@ func (m Model) removing(ts []manifest.Track) tea.Cmd {
 	}
 	return func() tea.Msg {
 		got, err := lib.RemoveMany(ids)
-		return removedMsg{got, err}
+		if err != nil {
+			return removedMsg{err: err}
+		}
+		pls, err := lib.Playlists()
+		return removedMsg{tracks: got, playlists: pls, err: err}
 	}
 }
 
@@ -134,7 +147,12 @@ func (m Model) removed(msg removedMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.dropTracks(msg.tracks)
-	m.record(change{label: "removal of " + plural(len(msg.tracks), "track"), before: msg.tracks})
+	c := change{label: "removal of " + plural(len(msg.tracks), "track"), before: msg.tracks}
+	if !reflect.DeepEqual(m.playlists, msg.playlists) { // the tracks were in playlists, which undo must put them back in
+		c.playlists, c.playlistsBefore, c.playlistsAfter = true, m.playlists, msg.playlists
+		m.playlists = msg.playlists
+	}
+	m.record(c)
 	m.say("Removed "+plural(len(msg.tracks), "track")+" · u undoes it", false)
 	m.rebuild()
 	return m, nil

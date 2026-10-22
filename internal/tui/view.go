@@ -203,9 +203,17 @@ func (m Model) footerKeys() []key.Binding {
 			bindings = append(bindings, k.RemoveCover)
 		}
 	} else {
-		bindings = []key.Binding{k.Up, k.Open, k.Sync, k.Mark, k.Filter, k.Sort}
+		bindings = []key.Binding{k.Up, k.Open, k.Sync, k.Mark, k.Filter, k.Sort, k.Playlist}
 		if len(m.marks) > 0 {
-			bindings = []key.Binding{k.Up, k.EditMany, k.Mark, k.ClearMarks}
+			bindings = []key.Binding{k.Up, k.EditMany, k.Mark, k.Playlist, k.ClearMarks}
+		}
+		if r, ok := m.selectedRow(); ok {
+			switch _, in := playlistOf(r); {
+			case in && r.Kind == kindPlaylist:
+				bindings = []key.Binding{k.Up, k.Open, k.RenamePlaylist, k.DeletePlaylist, k.Mark}
+			case in:
+				bindings = []key.Binding{k.Up, k.MoveDown, k.TakeOut, k.Mark, k.Filter}
+			}
 		}
 		if m.filter != "" {
 			bindings = append(bindings, k.ClearFilter)

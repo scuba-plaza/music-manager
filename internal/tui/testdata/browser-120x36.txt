@@ -33,4 +33,4 @@
 │                                              ││                                                                      │
 │                                              ││                                                                      │
 ╰──────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────╯
- ↑↓ move  ·  → open  ·  s sync  ·  space mark  ·  / filter  ·  S sort  ·  ? help  ·  q quit                             
+ ↑↓ move  ·  → open  ·  s sync  ·  space mark  ·  / filter  ·  S sort  ·  p playlist  ·  ? help  ·  q quit              

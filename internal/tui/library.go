@@ -21,6 +21,8 @@ type Library interface {
 	Root() string
 	// Tracks returns every record.
 	Tracks() ([]manifest.Track, error)
+	// Playlists returns every playlist, in the order they were made.
+	Playlists() ([]manifest.Playlist, error)
 	// Edit changes a track and returns it as saved.
 	Edit(id string, e app.Edit) (manifest.Track, error)
 	// Restore puts a record back exactly as it was; undo is built on it.
@@ -65,6 +67,15 @@ type Library interface {
 	EditMany(edits map[string]app.Edit) (map[string]manifest.Track, error)
 	// Renumber numbers the tracks 1..N in the order given.
 	Renumber(ids []string) (map[string]manifest.Track, error)
+	// The playlist operations are those of the app; ReplacePlaylists puts
+	// back a snapshot, which is what undo is built on.
+	CreatePlaylist(name string, ids ...string) error
+	AddToPlaylist(name string, ids []string) (added int, err error)
+	RemoveFromPlaylist(name string, ids []string) error
+	MoveInPlaylist(name, id string, to int) error
+	RenamePlaylist(name, to string) error
+	DeletePlaylist(name string) error
+	ReplacePlaylists(ps []manifest.Playlist) error
 	// SetCover sets a track's cover image (JPEG or PNG), or removes it if
 	// image is empty, and returns the track as saved.
 	SetCover(id string, image []byte) (manifest.Track, error)
@@ -176,6 +187,14 @@ func (l appLibrary) Tracks() ([]manifest.Track, error) {
 		return nil, err
 	}
 	return m.Tracks, nil
+}
+
+func (l appLibrary) Playlists() ([]manifest.Playlist, error) {
+	m, err := l.Manifest()
+	if err != nil {
+		return nil, err
+	}
+	return m.Playlists, nil
 }
 
 var errNoLookup = errors.New("lookup is not available")

@@ -49,6 +49,7 @@ matter right now. Without a terminal, plain `mm` prints help as before.
 | `[` `]` `{` `}` `0` `p` | on a cut: nudge by 0.1 s / 1 s, clear, hear the 8 s around it (needs `ffplay` or `mpv`) |
 | `space` `ctrl+a` `e` | mark tracks (an album marks all of its tracks); edit the marked ones, or rename an artist or album |
 | `J` `K` `n` | move a track down or up in its album; number the album 1…N |
+| `p` | add the marked tracks (or the selected track, album or artist) to a playlist, or start a new one. The **Playlists** group at the top of the tree opens into each playlist and its tracks in play order; there `J` `K` reorder, `d` takes a track out of the playlist (never out of the library), `d` on the playlist itself deletes it after asking, and `e` renames it |
 | `i` `I` `o` | find a track on MusicBrainz and pick the match; do all unidentified tracks; use the file's old tags |
 | `a` | add from a YouTube link: one form, pre-filled from the match |
 | `s` | sync: choose the folder (or a mounted player), see what will change, apply. The header says `N to sync · press s` when something is waiting; clicking it works too |

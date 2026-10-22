@@ -237,7 +237,7 @@ func (m Model) adoptOld() (tea.Model, tea.Cmd) {
 		}
 	case r.Kind == kindTrack && r.Track.Status != manifest.Identified:
 		ids = []string{r.Track.ID}
-	case r.Kind == kindGroup:
+	case r.Kind == kindGroup && r.Key == keyNeedsWork:
 		ids = r.IDs
 	}
 	if len(ids) == 0 {

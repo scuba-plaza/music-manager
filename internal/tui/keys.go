@@ -58,6 +58,10 @@ type keyMap struct {
 	EditMany                  key.Binding
 	MoveDown, MoveUp          key.Binding
 	Renumber                  key.Binding
+	Playlist                  key.Binding
+
+	// inside the playlists, where d, e and J K mean something else
+	TakeOut, DeletePlaylist, RenamePlaylist key.Binding
 
 	// in a dialog
 	Apply, Close2, NextField, PrevField key.Binding
@@ -129,6 +133,11 @@ func newKeyMap() keyMap {
 		MoveDown:   key.NewBinding(key.WithKeys("J"), key.WithHelp("J K", "move")),
 		MoveUp:     key.NewBinding(key.WithKeys("K")),
 		Renumber:   key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "number")),
+		Playlist:   key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "playlist")),
+
+		TakeOut:        key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "take out")),
+		DeletePlaylist: key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "delete")),
+		RenamePlaylist: key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "rename")),
 
 		Apply:     key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "apply")),
 		Close2:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),

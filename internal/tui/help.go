@@ -49,7 +49,9 @@ var helpRight = []helpSection{
 		{"e", "edit marked, or rename"},
 		{"J K", "move a track down / up"},
 		{"n", "number an album 1…N"},
+		{"p", "add to a playlist"},
 		{"d", "remove (asks first)"},
+		{"d", "take out of a playlist"},
 	}},
 	{"Looking up", []helpEntry{
 		{"a", "add from a YouTube link"},

@@ -131,6 +131,11 @@ func (m Model) moveTrack(dir int) (tea.Model, tea.Cmd) {
 		m.say("Moving a track needs the tree view · S, then Tree", true)
 		return m, nil
 	}
+	if r, ok := m.selectedRow(); ok && r.Kind == kindTrack {
+		if name, in := playlistOf(r); in {
+			return m.movePlaylistTrack(r, name, dir)
+		}
+	}
 	r, ok := m.selectedRow()
 	if !ok || r.Kind != kindTrack || !strings.HasPrefix(r.Parent, "album") {
 		m.say("Only tracks of an album can be moved", true)

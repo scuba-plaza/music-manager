@@ -189,3 +189,42 @@ func playlistFile(p manifest.Playlist, paths map[string]string) []byte {
 	}
 	return []byte(b.String())
 }
+
+// ReplacePlaylists makes the playlists exactly ps, which is what undo
+// needs: a snapshot taken earlier. It refuses a snapshot that no playlist
+// could have: an unknown track, a track twice in a playlist, or names that
+// are empty or would be the same file.
+func (a *App) ReplacePlaylists(ps []manifest.Playlist) error {
+	m, err := a.store.Load()
+	if err != nil {
+		return err
+	}
+	checked := &manifest.Manifest{}
+	for _, p := range ps {
+		if p.Name != strings.TrimSpace(p.Name) {
+			return fmt.Errorf("playlist name %q has spaces around it", p.Name)
+		}
+		if err := checkPlaylistName(checked, p.Name); err != nil {
+			return err
+		}
+		seen := map[string]bool{}
+		for _, id := range p.Tracks {
+			if _, ok := m.Get(id); !ok {
+				return fmt.Errorf("playlist %q: no track with id %q", p.Name, id)
+			}
+			if seen[id] {
+				return fmt.Errorf("playlist %q: track %q is in it twice", p.Name, id)
+			}
+			seen[id] = true
+		}
+		checked.Playlists = append(checked.Playlists, manifest.Playlist{Name: p.Name})
+	}
+	m.Playlists = slices.Clone(ps)
+	for i := range m.Playlists {
+		m.Playlists[i].Tracks = slices.Clone(m.Playlists[i].Tracks)
+		if m.Playlists[i].Tracks == nil {
+			m.Playlists[i].Tracks = []string{}
+		}
+	}
+	return a.store.Save(m)
+}

@@ -172,6 +172,10 @@ func (m Model) openBulk() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch {
+	case r.Kind == kindPlaylist:
+		m.overlay = newPlaylistNamer(r.Label)
+	case r.Key == playlistsKey:
+		m.say("Select a playlist to rename it", true)
 	case len(m.marks) > 0:
 		ts := m.markedTracks()
 		m.overlay = newBulkForm("Edit "+plural(len(ts), "marked track"), ts, bulkArtist, "")

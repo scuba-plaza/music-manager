@@ -354,6 +354,14 @@ func idsMissingFrom(a, b []manifest.Track) []string {
 // target is what undoing or redoing a change puts back, and gone the ids of
 // the tracks that must vanish for that (those the change added, when
 // undoing; those it removed, when redoing).
+// playlistTarget is the playlists as undoing or redoing the change leaves them.
+func (c change) playlistTarget(undone bool) []manifest.Playlist {
+	if undone {
+		return c.playlistsBefore
+	}
+	return c.playlistsAfter
+}
+
 func (c change) target(undone bool) (tracks []manifest.Track, gone []string) {
 	if undone {
 		return c.before, idsMissingFrom(c.after, c.before)
@@ -373,6 +381,11 @@ func (m Model) restoring(c change, undone bool) (tea.Model, tea.Cmd) {
 		}
 		if len(gone) > 0 {
 			if _, err := lib.RemoveMany(gone); err != nil {
+				return restoredMsg{c: c, undone: undone, err: err}
+			}
+		}
+		if c.playlists {
+			if err := lib.ReplacePlaylists(c.playlistTarget(undone)); err != nil {
 				return restoredMsg{c: c, undone: undone, err: err}
 			}
 		}
@@ -398,6 +411,11 @@ func (m Model) restored(msg restoredMsg) (tea.Model, tea.Cmd) {
 	tracks, gone := msg.c.target(msg.undone)
 	for _, t := range tracks {
 		m.upsert(t)
+	}
+	if msg.c.playlists {
+		m.playlists = msg.c.playlistTarget(msg.undone)
+		m.rev++
+		m.rebuild()
 	}
 	if len(gone) > 0 {
 		var doomed []manifest.Track

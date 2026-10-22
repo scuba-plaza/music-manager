@@ -352,3 +352,43 @@ func TestCreatingAPlaylistWithTracksIsAllOrNothing(t *testing.T) {
 		t.Errorf("a failed create left a playlist behind: %+v", got)
 	}
 }
+
+func TestReplacingThePlaylistsPutsBackAnEarlierState(t *testing.T) {
+	a := libWithTracks(t, 10, 20)
+	ts := tracks(t, a)
+	a.CreatePlaylist("Study", ts[1].ID, ts[0].ID)
+	a.CreatePlaylist("Gym")
+	before := playlists(t, a)
+
+	a.DeletePlaylist("Study")
+	a.AddToPlaylist("Gym", idsOf(ts[0]))
+	if err := a.ReplacePlaylists(before); err != nil {
+		t.Fatal(err)
+	}
+	if got := playlists(t, a); !reflect.DeepEqual(got, before) {
+		t.Errorf("playlists = %+v, want %+v", got, before)
+	}
+
+	// A snapshot that does not make sense is refused, and nothing changes.
+	for name, bad := range map[string][]manifest.Playlist{
+		"unknown track": {{Name: "X", Tracks: []string{"zzzzzz"}}},
+		"empty name":    {{Name: " ", Tracks: []string{}}},
+		"same file":     {{Name: "A?", Tracks: []string{}}, {Name: "a-", Tracks: []string{}}},
+		"a track twice": {{Name: "X", Tracks: idsOf(ts[0], ts[0])}},
+	} {
+		if err := a.ReplacePlaylists(bad); err == nil {
+			t.Errorf("%s: ReplacePlaylists succeeded", name)
+		}
+	}
+	if got := playlists(t, a); !reflect.DeepEqual(got, before) {
+		t.Errorf("refused snapshots changed the playlists: %+v", got)
+	}
+
+	// An empty snapshot clears them all.
+	if err := a.ReplacePlaylists(nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := playlists(t, a); len(got) != 0 {
+		t.Errorf("playlists = %+v, want none", got)
+	}
+}

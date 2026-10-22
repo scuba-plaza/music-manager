@@ -21,7 +21,7 @@ func (m *Model) rebuild() {
 	if m.sortKey != "" {
 		m.rows = buildSortedRows(m.tracks, m.filter, m.sortKey, m.sortReverse)
 	} else {
-		m.rows = buildRows(m.tracks, m.filter, m.expanded)
+		m.rows = buildRowsWith(m.tracks, m.playlists, m.filter, m.expanded)
 	}
 	if m.selKey != "" {
 		for i, r := range m.rows {
@@ -197,8 +197,16 @@ func (m *Model) toggle() {
 	m.setOpen(r.Key, !r.Expanded)
 }
 
-// revealTrack opens whatever hides the track and selects it.
+// revealTrack opens whatever hides the track and selects it, unless it is
+// selected as a row of a playlist: that row does not move when the track is
+// edited, and is not to be left for the tree of artists.
 func (m *Model) revealTrack(t manifest.Track) {
+	if r, ok := m.selectedRow(); ok && r.Kind == kindTrack && r.Track.ID == t.ID {
+		if _, inPlaylist := playlistOf(r); inPlaylist {
+			m.rebuild()
+			return
+		}
+	}
 	for _, k := range ancestorKeys(t) {
 		m.expanded[k] = true
 	}

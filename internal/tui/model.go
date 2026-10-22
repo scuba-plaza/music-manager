@@ -34,9 +34,10 @@ type Model struct {
 
 	w, h int
 
-	loaded  bool
-	loadErr error
-	tracks  []manifest.Track
+	loaded    bool
+	loadErr   error
+	tracks    []manifest.Track
+	playlists []manifest.Playlist
 
 	// The tree. rows is derived from tracks, filter and expanded by rebuild;
 	// selKey, not cursor, is what the user selected, so the selection
@@ -130,6 +131,10 @@ func WithPlayer(p Player) Option { return func(m *Model) { m.player = p } }
 type change struct {
 	label         string
 	before, after []manifest.Track
+
+	// A change to the playlists keeps the playlists as they were and became.
+	playlists                       bool
+	playlistsBefore, playlistsAfter []manifest.Playlist
 }
 
 // New returns the interface on lib. Init loads the tracks.
@@ -153,16 +158,21 @@ func New(lib Library, opts ...Option) Model {
 }
 
 type loadedMsg struct {
-	tracks []manifest.Track
-	err    error
-	stamp  string
+	tracks    []manifest.Track
+	playlists []manifest.Playlist
+	err       error
+	stamp     string
 }
 
 func (m Model) load() tea.Cmd {
 	return func() tea.Msg {
 		stamp, _ := m.lib.Stamp() // taken first, so a change during the load is seen next time
 		ts, err := m.lib.Tracks()
-		return loadedMsg{ts, err, stamp}
+		var pls []manifest.Playlist
+		if err == nil {
+			pls, err = m.lib.Playlists()
+		}
+		return loadedMsg{ts, pls, err, stamp}
 	}
 }
 
@@ -218,7 +228,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.scrollToCursor()
 		return m, nil
 	case loadedMsg:
-		m.loaded, m.loadErr, m.tracks, m.stamp = true, msg.err, msg.tracks, msg.stamp
+		m.loaded, m.loadErr, m.tracks, m.playlists, m.stamp = true, msg.err, msg.tracks, msg.playlists, msg.stamp
 		m.rev++
 		m.rebuild()
 		return m, nil
@@ -248,6 +258,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.restored(msg)
 	case changedMsg:
 		return m.changed(msg)
+	case playlistsMsg:
+		return m.playlistsEdited(msg)
 	case removedMsg:
 		return m.removed(msg)
 	case candidatesMsg:
@@ -351,6 +363,8 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.moveTrack(-1)
 	case key.Matches(msg, k.Renumber):
 		return m.renumber()
+	case key.Matches(msg, k.Playlist):
+		return m.openPlaylistPicker()
 	case key.Matches(msg, k.Undo):
 		return m.undo()
 	case key.Matches(msg, k.Redo):
