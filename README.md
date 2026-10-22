@@ -41,6 +41,8 @@ matter right now. Without a terminal, plain `mm` prints help as before.
 | | |
 |---|---|
 | `↑↓` `→←` `/` | move, open and close, filter (same words as `mm ls`, e.g. `status:unidentified`) |
+| `z` | centre the cursor in the list, like `zz` in vim |
+| `+` `-` | open the tree one more level (artists, then albums) / close all of it |
 | `→` `enter` | from a track into its fields; `enter` edits a field, `enter` saves, `esc` cancels |
 | `tab` | while editing a name: switch between the text and its ASCII form |
 | `[` `]` `{` `}` `0` `p` | on a cut: nudge by 0.1 s / 1 s, clear, hear the 8 s around it (needs `ffplay` or `mpv`) |
@@ -48,8 +50,10 @@ matter right now. Without a terminal, plain `mm` prints help as before.
 | `J` `K` `n` | move a track down or up in its album; number the album 1…N |
 | `i` `I` `o` | find a track on MusicBrainz and pick the match; do all unidentified tracks; use the file's old tags |
 | `a` | add from a YouTube link: one form, pre-filled from the match |
-| `s` | sync: choose the folder (or a mounted player), see what will change, apply |
-| `d` `u` `ctrl+r` `D` | remove (asks first), undo, redo, check the library for damage |
+| `s` | sync: choose the folder (or a mounted player), see what will change, apply. The header says `N to sync · press s` when something is waiting; clicking it works too |
+| `d` `u` `ctrl+r` `D` | remove (asks first: `y` or `enter` agrees), undo, redo, check the library for damage |
+
+Covers are shown in full resolution in terminals that speak the kitty graphics protocol (kitty, Ghostty), and as coloured half-blocks everywhere else. `MM_COVERS=blocks` or `MM_COVERS=kitty` overrides the guess; inside tmux or screen, which do not pass pictures on, blocks are used.
 
 The mouse works too: click to select, click again to open, double-click a folder row to open it, wheel
 to scroll. Colours follow your terminal's light or dark background and honour `NO_COLOR`. If another `mm`

@@ -14,12 +14,14 @@ type keyMap struct {
 	Redo key.Binding
 
 	// moving about
-	Up, Down         key.Binding
-	PageUp, PageDown key.Binding
-	Top, Bottom      key.Binding
-	Open, Close      key.Binding
-	Toggle           key.Binding
-	Switch           key.Binding
+	Up, Down          key.Binding
+	PageUp, PageDown  key.Binding
+	Top, Bottom       key.Binding
+	Centre            key.Binding
+	OpenAll, CloseAll key.Binding
+	Open, Close       key.Binding
+	Toggle            key.Binding
+	Switch            key.Binding
 
 	// filtering
 	Filter                  key.Binding
@@ -78,6 +80,9 @@ func newKeyMap() keyMap {
 		PageDown: key.NewBinding(key.WithKeys("pgdown", "ctrl+d")),
 		Top:      key.NewBinding(key.WithKeys("g", "home")),
 		Bottom:   key.NewBinding(key.WithKeys("G", "end")),
+		Centre:   key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "centre")),
+		OpenAll:  key.NewBinding(key.WithKeys("+", "="), key.WithHelp("+", "open all")),
+		CloseAll: key.NewBinding(key.WithKeys("-"), key.WithHelp("-", "close all")),
 		Open:     key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("→", "open")),
 		Close:    key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("←", "close")),
 		Toggle:   key.NewBinding(key.WithKeys("enter")),

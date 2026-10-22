@@ -47,11 +47,11 @@ func TestNothingIsDrawnBeforeTheSizeIsKnown(t *testing.T) {
 }
 
 func TestHeaderNamesTheLibraryAndCountsTracks(t *testing.T) {
-	t.Setenv("HOME", "/nowhere")
-	lib, a := smallLibrary(t)
-	m := newTestModel(t, lib, 120, 36)
+	t.Setenv("HOME", "/home/me")
+	lib, _ := smallLibrary(t)
+	m := newTestModel(t, atMusic{lib}, 120, 36) // a folder with a short name: a long one is cut off
 	first := lines(m)[0]
-	for _, want := range []string{"mm", tilde(a.Root()), "3 tracks"} {
+	for _, want := range []string{"mm", "~/Music/mp3-player", "3 tracks"} {
 		if !strings.Contains(first, want) {
 			t.Errorf("header %q lacks %q", first, want)
 		}

@@ -44,11 +44,24 @@ func (m Model) tooSmallView() string {
 
 func (m Model) headerView() string {
 	left := " " + styles.header.Render("mm") + "  " + styles.dim.Render(tilde(m.lib.Root()))
-	right := styles.headerRight.Render(m.summary()) + " "
+	right := styles.headerRight.Render(m.summary())
+	if chip := m.syncChip(); chip != "" {
+		right += styles.headerRight.Render(" · ") + styles.accent.Render(chip)
+	}
+	right += " "
 	return fit(spread(left, right, m.w), m.w)
 }
 
 // summary is the count shown at the right of the header.
+// syncChip is the header's note that the library folder is behind, with the
+// key that fixes it. It is empty when nothing waits.
+func (m Model) syncChip() string {
+	if m.syncN <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d to sync · press s", m.syncN)
+}
+
 func (m Model) summary() string {
 	s := plural(len(m.tracks), "track")
 	needs := 0
@@ -63,9 +76,6 @@ func (m Model) summary() string {
 		s += " · 1 needs work"
 	default:
 		s += fmt.Sprintf(" · %d need work", needs)
-	}
-	if m.syncN > 0 {
-		s += fmt.Sprintf(" · %d to sync", m.syncN)
 	}
 	if n := len(m.marks); n > 0 {
 		s += fmt.Sprintf(" · %d marked", n)
@@ -193,7 +203,7 @@ func (m Model) footerKeys() []key.Binding {
 			bindings = append(bindings, k.RemoveCover)
 		}
 	} else {
-		bindings = []key.Binding{k.Up, k.Open, k.Mark, k.Filter}
+		bindings = []key.Binding{k.Up, k.Open, k.Sync, k.Mark, k.Filter}
 		if len(m.marks) > 0 {
 			bindings = []key.Binding{k.Up, k.EditMany, k.Mark, k.ClearMarks}
 		}

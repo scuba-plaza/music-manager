@@ -23,6 +23,8 @@ var helpLeft = []helpSection{
 		{"→ ←  l h", "open / close / into fields"},
 		{"PgUp PgDn", "a page at a time"},
 		{"g G", "top / bottom"},
+		{"z", "centre the cursor"},
+		{"+  -", "open a level / close all"},
 		{"/", "filter  (esc clears it)"},
 	}},
 	{"Editing a track", []helpEntry{
@@ -56,7 +58,7 @@ var helpRight = []helpSection{
 		{"o", "use the file's old tags"},
 	}},
 	{"Library", []helpEntry{
-		{"s", "write the folder"},
+		{"s", "sync: write the folder"},
 		{"u  ctrl+r", "undo / redo"},
 		{"D", "check the library"},
 		{"?  q", "this help / quit"},

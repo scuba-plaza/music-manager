@@ -259,3 +259,132 @@ func TestTheInspectorSummarisesArtistsAlbumsAndGroups(t *testing.T) {
 	m = keys(t, m, "right", "right")
 	contains(t, m, "Shadows", "3 tracks")
 }
+
+// treeLine is the line of the tree pane, counted from its first row, on
+// which the label appears, or -1.
+func treeLine(m Model, label string) int {
+	left := computeLayout(m.w, m.h).left
+	for i, l := range lines(m)[3:] {
+		if cells := []rune(l); len(cells) > left && strings.Contains(string(cells[:left]), label) {
+			return i
+		}
+	}
+	return -1
+}
+
+func TestZCentresTheCursorLikeZZInVim(t *testing.T) {
+	m, names := manyArtists(t, 60)
+	for i := 0; i < 30; i++ {
+		m = keys(t, m, "down")
+	}
+	if got := treeLine(m, names[30]); got != m.viewRows()-1 {
+		t.Fatalf("before z the cursor should be at the bottom edge, it is on line %d of %d", got, m.viewRows())
+	}
+	m = keys(t, m, "z")
+	if got, want := treeLine(m, names[30]), m.viewRows()/2; got != want {
+		t.Errorf("after z the cursor is on line %d, want the middle, %d", got, want)
+	}
+	if got := selectedLabel(t, m); got != names[30] {
+		t.Errorf("z moved the selection to %q", got)
+	}
+	m = keys(t, m, "down")
+	if got := treeLine(m, names[31]); got != m.viewRows()/2+1 {
+		t.Errorf("the view should stay where z put it while the cursor moves inside it, line %d", got)
+	}
+}
+
+func TestZNearTheEdgesCentresAsFarAsTheListAllows(t *testing.T) {
+	m, names := manyArtists(t, 60)
+	m = keys(t, m, "down", "down", "z")
+	if got := treeLine(m, names[0]); got != 0 {
+		t.Errorf("near the top the list stays at the top, first artist on line %d", got)
+	}
+	m = keys(t, m, "G", "z")
+	if got := treeLine(m, names[59]); got != m.viewRows()-1 {
+		t.Errorf("at the end the list is not scrolled past its last row, last artist on line %d", got)
+	}
+}
+
+// shown lists the labels of the rows of the tree, indented by depth.
+func shown(m Model) []string {
+	var out []string
+	for _, r := range m.rows {
+		out = append(out, strings.Repeat(" ", r.Depth)+r.Label)
+	}
+	return out
+}
+
+func TestPlusOpensTheTreeOneLevelAtATime(t *testing.T) {
+	m, _ := browserModel(t, 120, 36)
+	if got := len(m.rows); got != 4 {
+		t.Fatalf("starts with %d rows: %v", got, shown(m))
+	}
+
+	m = keys(t, m, "+") // the artists, and the group of tracks to identify
+	if got := shown(m); len(got) != 8 {
+		t.Fatalf("after + : %v", got)
+	}
+	for _, r := range m.rows {
+		if r.Kind == kindTrack && r.Depth == 2 {
+			t.Errorf("one + must not reach the tracks of an album: %v", shown(m))
+		}
+	}
+	contains(t, m, "Shadows", "Singles", "Caught a Black Rabbit")
+
+	m = keys(t, m, "+") // the albums
+	contains(t, m, "The Wanderer", "Flow", "Along Our Way", "Wtni", "Current")
+
+	before := shown(m)
+	m = keys(t, m, "+") // nothing left to open
+	if got := shown(m); strings.Join(got, "|") != strings.Join(before, "|") {
+		t.Errorf("a third + changed the tree:\n%v\n%v", before, got)
+	}
+}
+
+func TestEqualsDoesTheSameAsPlus(t *testing.T) {
+	m, _ := browserModel(t, 120, 36)
+	m = keys(t, m, "=")
+	if len(m.rows) != 8 {
+		t.Errorf("= should open a level, rows: %v", shown(m))
+	}
+}
+
+func TestPlusOpensTheShallowestClosedLevelEvenWhenSomethingIsOpenAlready(t *testing.T) {
+	m, _ := browserModel(t, 120, 36)
+	m = selectTrack(t, m, "Flow") // Shawn James and Shadows are open
+	m = keys(t, m, "+")
+	contains(t, m, "Caught a Black Rabbit", "Singles") // the other artists opened
+	lacks(t, m, "Current")                             // but not their albums
+}
+
+func TestMinusClosesEverythingAtOnceAndKeepsTheSelectionOnItsArtist(t *testing.T) {
+	m, _ := browserModel(t, 120, 36)
+	m = keys(t, m, "+", "+")
+	m = selectTrack(t, m, "Flow")
+	m = keys(t, m, "-")
+	if got := shown(m); len(got) != 4 {
+		t.Fatalf("after - : %v", got)
+	}
+	if got := selectedLabel(t, m); got != "Shawn James" {
+		t.Errorf("the selection should stay with the artist of the track, got %q", got)
+	}
+	m = keys(t, m, "+")
+	for _, r := range m.rows {
+		if r.Kind == kindAlbum && r.Expanded {
+			t.Errorf("closing must forget what was open: %v", shown(m))
+		}
+	}
+}
+
+func TestOpeningAndClosingAllDoNothingWhileFiltering(t *testing.T) {
+	m, _ := browserModel(t, 120, 36)
+	m = keys(t, m, "/")
+	m = typed(t, m, "shawn")
+	m = keys(t, m, "enter")
+	before := shown(m)
+	m = keys(t, m, "+")
+	m = keys(t, m, "-")
+	if got := shown(m); strings.Join(got, "|") != strings.Join(before, "|") {
+		t.Errorf("the filtered tree changed:\n%v\n%v", before, got)
+	}
+}

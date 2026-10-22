@@ -83,6 +83,13 @@ func (m *Model) scrollToCursor() {
 	m.offset = clamp(m.offset, 0, max(len(m.rows)-view, 0))
 }
 
+// centreCursor scrolls the list so the cursor is in the middle of the pane,
+// as far as the list allows: it never scrolls past the first or last row.
+func (m *Model) centreCursor() {
+	view := m.viewRows()
+	m.offset = clamp(m.cursor-view/2, 0, max(len(m.rows)-view, 0))
+}
+
 func (m *Model) setOpen(key string, open bool) {
 	if open {
 		m.expanded[key] = true
@@ -124,6 +131,50 @@ func (m *Model) close() {
 			return
 		}
 	}
+}
+
+// openLevel opens every closed row on the shallowest level that has one:
+// the artists first, then their albums. Pressed again it goes one level
+// deeper, so the tree can be opened as far as wanted and no further.
+func (m *Model) openLevel() {
+	if m.filter != "" {
+		return // a filtered tree is shown open already
+	}
+	depth := -1
+	for _, r := range m.rows {
+		if r.Kind != kindTrack && !r.Expanded && (depth < 0 || r.Depth < depth) {
+			depth = r.Depth
+		}
+	}
+	if depth < 0 {
+		m.say("Everything is open", false)
+		return
+	}
+	for _, r := range m.rows {
+		if r.Kind != kindTrack && !r.Expanded && r.Depth == depth {
+			m.expanded[r.Key] = true
+		}
+	}
+	m.rebuild()
+}
+
+// closeAll closes everything, down to the artists. The selection goes to the
+// row that held it, so you do not lose your place.
+func (m *Model) closeAll() {
+	if m.filter != "" {
+		return
+	}
+	if r, ok := m.selectedRow(); ok {
+		top := r
+		for i := m.cursor; top.Parent != "" && i >= 0; i-- {
+			if m.rows[i].Key == top.Parent {
+				top = m.rows[i]
+			}
+		}
+		m.selKey = top.Key
+	}
+	m.expanded = map[string]bool{}
+	m.rebuild()
 }
 
 func (m *Model) toggle() {

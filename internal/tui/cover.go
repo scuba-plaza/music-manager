@@ -23,7 +23,7 @@ import (
 
 // thumbMaxPixels is the longest side of the shrunken copy that is kept in
 // memory. It is plenty for the few dozen cells the inspector shows.
-const thumbMaxPixels = 96
+const thumbMaxPixels = 128
 
 // cell is one character cell of a thumbnail: its upper and lower pixel.
 type cell struct{ top, bottom color.RGBA }
@@ -32,6 +32,11 @@ type cell struct{ top, bottom color.RGBA }
 type thumb struct {
 	img  *image.RGBA
 	info string // e.g. "500×500 JPEG"
+
+	// For terminals with the graphics protocol: the cover as a PNG of at most
+	// kittyMaxPixels, and its size in pixels.
+	kitty  []byte
+	kw, kh int
 }
 
 // describeCover says how big a cover image is and what format.
@@ -44,7 +49,11 @@ func describeCover(data []byte) (string, error) {
 }
 
 // loadThumb decodes a cover and shrinks it.
-func loadThumb(data []byte) (thumb, error) {
+func loadThumb(data []byte) (thumb, error) { return loadThumbFor(data, false) }
+
+// loadThumbFor is loadThumb that also prepares the full-resolution picture
+// for the graphics protocol if asked to.
+func loadThumbFor(data []byte, graphics bool) (thumb, error) {
 	info, err := describeCover(data)
 	if err != nil {
 		return thumb{}, err
@@ -58,7 +67,14 @@ func loadThumb(data []byte) (thumb, error) {
 	if longest := max(w, h); longest > thumbMaxPixels {
 		w, h = max(w*thumbMaxPixels/longest, 1), max(h*thumbMaxPixels/longest, 1)
 	}
-	return thumb{img: resize(img, w, h), info: info}, nil
+	th := thumb{img: resize(img, w, h), info: info}
+	if graphics {
+		// If this fails the blocks are still there.
+		if th.kitty, th.kw, th.kh, err = encodeForKitty(data); err != nil {
+			th.kitty = nil
+		}
+	}
+	return th, nil
 }
 
 // resize scales img to w×h by averaging the pixels each new pixel covers
@@ -145,12 +161,12 @@ func (m Model) wantThumb() tea.Cmd {
 		return nil
 	}
 	m.thumbPending[sha] = true
-	lib := m.lib
+	lib, graphics := m.lib, m.gfx != nil
 	return func() tea.Msg {
 		data, err := lib.CoverImage(sha)
 		if err == nil {
 			var th thumb
-			if th, err = loadThumb(data); err == nil {
+			if th, err = loadThumbFor(data, graphics); err == nil {
 				return thumbMsg{sha, th}
 			}
 		}

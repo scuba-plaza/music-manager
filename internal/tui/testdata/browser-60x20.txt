@@ -1,4 +1,4 @@
- mm  ~/Music/mp3-player 6 tracks · 1 needs work · 6 to sync 
+ mm  ~/Music… 6 tracks · 1 needs work · 6 to sync · press s 
 ╭ Library ─────────────────────────────────────────────────╮
 │ / filter  (e.g. shawn, status:unidentified)              │
 │ ▸ Needs work                                           1 │
@@ -17,4 +17,4 @@
 │                                                          │
 │                                                          │
 ╰──────────────────────────────────────────────────────────╯
- ↑↓ move  ·  → open  ·  space mark  ·  ? help  ·  q quit    
+ ↑↓ move  ·  → open  ·  s sync  ·  ? help  ·  q quit        

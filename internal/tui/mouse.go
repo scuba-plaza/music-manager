@@ -4,6 +4,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 
 	"music-manager/internal/manifest"
 )
@@ -45,6 +46,9 @@ func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if l.mode == modeTooSmall {
 		return m, nil
 	}
+	if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress && msg.Y == 0 {
+		return m.clickHeader(msg)
+	}
 	inInspector := m.focus == paneInspector && (l.mode == modeOnePane || msg.X >= l.left)
 	if l.mode == modeTwoPane && msg.X >= l.left {
 		inInspector = true
@@ -66,6 +70,16 @@ func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m.clickTree(msg)
 	}
 	return m, nil
+}
+
+// clickHeader opens the sync screen when the note about tracks waiting to
+// be synced is what was clicked.
+func (m Model) clickHeader(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	chip := m.syncChip()
+	if chip == "" || msg.X < m.w-1-ansi.StringWidth(chip) || msg.X >= m.w-1 {
+		return m, nil
+	}
+	return m.openSync()
 }
 
 func (m Model) clickTree(msg tea.MouseMsg) (tea.Model, tea.Cmd) {

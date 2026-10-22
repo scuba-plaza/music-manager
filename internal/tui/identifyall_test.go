@@ -31,7 +31,7 @@ func TestIAsksThenIdentifiesWhatItConfidentlyCan(t *testing.T) {
 	src := &fakeSource{results: map[string][]app.Candidate{"Old Title|Old Artist": {richterA}}}
 	m, hook := pickerModel(t, src)
 	m = keys(t, m, "I")
-	contains(t, m, "Identify 2 tracks", "95", "y identify")
+	contains(t, m, "Identify 2 tracks", "95", "y/enter identify")
 	if m.overlay == nil {
 		t.Fatal("no confirmation")
 	}

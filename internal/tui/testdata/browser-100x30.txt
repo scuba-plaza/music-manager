@@ -1,4 +1,4 @@
- mm  ~/Music/mp3-player                                         6 tracks · 1 needs work · 6 to sync 
+ mm  ~/Music/mp3-player                               6 tracks · 1 needs work · 6 to sync · press s 
 ╭ Library ─────────────────────────────╮╭ Details ─────────────────────────────────────────────────╮
 │ / filter                             ││                                                          │
 │ ▸ Needs work                       1 ││ Flow                                                     │
@@ -27,4 +27,4 @@
 │                                      ││                                                          │
 │                                      ││                                                          │
 ╰──────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯
- ↑↓ move  ·  → open  ·  space mark  ·  / filter  ·  ? help  ·  q quit                               
+ ↑↓ move  ·  → open  ·  s sync  ·  space mark  ·  / filter  ·  ? help  ·  q quit                    

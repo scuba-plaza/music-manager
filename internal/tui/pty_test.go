@@ -64,24 +64,46 @@ type session struct {
 	ptmx *os.File
 	em   *vt.SafeEmulator
 	done chan error
+
+	rawMu sync.Mutex
+	raw   []byte // everything the program wrote to the terminal
 }
 
 func startMM(t *testing.T, cols, rows int, library string, env ...string) *session {
 	t.Helper()
 	bin := builtMM(t)
 	cmd := exec.Command(bin, "--library", library)
-	cmd.Env = append(os.Environ(), "TERM=xterm-256color", "COLORTERM=truecolor", "NO_COLOR=")
+	// Whatever terminal the tests run in, the program sees a plain one, with
+	// covers drawn in blocks, unless a test asks for pictures.
+	cmd.Env = append(os.Environ(), "TERM=xterm-256color", "COLORTERM=truecolor", "NO_COLOR=", "MM_COVERS=blocks")
 	cmd.Env = append(cmd.Env, env...)
 	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: uint16(rows), Cols: uint16(cols)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := &session{t: t, cmd: cmd, ptmx: ptmx, em: vt.NewSafeEmulator(cols, rows), done: make(chan error, 1)}
-	go io.Copy(s.em, ptmx) // what the program draws
-	go io.Copy(ptmx, s.em) // what the terminal answers to its questions
+	go io.Copy(io.MultiWriter(s.em, (*rawLog)(s)), ptmx) // what the program draws
+	go io.Copy(ptmx, s.em)                               // what the terminal answers to its questions
 	go func() { s.done <- cmd.Wait() }()
 	t.Cleanup(s.close)
 	return s
+}
+
+// rawLog lets a session record the bytes the program writes.
+type rawLog session
+
+func (r *rawLog) Write(p []byte) (int, error) {
+	r.rawMu.Lock()
+	defer r.rawMu.Unlock()
+	r.raw = append(r.raw, p...)
+	return len(p), nil
+}
+
+// Raw is everything the program has written to the terminal so far.
+func (s *session) Raw() []byte {
+	s.rawMu.Lock()
+	defer s.rawMu.Unlock()
+	return append([]byte(nil), s.raw...)
 }
 
 func (s *session) close() {
@@ -207,7 +229,11 @@ func TestPTYExplore(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	s := startMM(t, cols, rows, lib)
+	var env []string
+	if covers := os.Getenv("MM_PTY_COVERS"); covers != "" {
+		env = append(env, "MM_COVERS="+covers)
+	}
+	s := startMM(t, cols, rows, lib, env...)
 	s.MustSee("Library")
 	// Keys are sent in groups separated by "|", with a pause between groups.
 	for _, group := range strings.Split(os.Getenv("MM_PTY_KEYS"), "|") {

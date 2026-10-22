@@ -11,7 +11,7 @@ func TestDOnATrackAsksBeforeRemovingIt(t *testing.T) {
 	m, hook := editingModel(t, "Flow")
 	m = keys(t, m, "d")
 	contains(t, m, `Remove "Flow"?`, "sync", "u brings it back")
-	contains(t, m, "y remove", "esc cancel")
+	contains(t, m, "y/enter remove", "esc cancel")
 	if len(libTracks(t, hook.Library)) != 6 {
 		t.Fatal("removed before being asked")
 	}
@@ -29,10 +29,19 @@ func TestCancellingKeepsTheTrack(t *testing.T) {
 
 func TestOtherKeysDoNothingInTheDialog(t *testing.T) {
 	m, hook := editingModel(t, "Flow")
-	m = keys(t, m, "d", "enter", "x", "j", "d")
+	m = keys(t, m, "d", "x", "j", "d", "space")
 	if m.overlay == nil || len(libTracks(t, hook.Library)) != 6 {
-		t.Error("only y confirms; anything else must leave the dialog as it was")
+		t.Error("only y and enter confirm; anything else must leave the dialog as it was")
 	}
+}
+
+func TestEnterConfirmsJustLikeY(t *testing.T) {
+	m, hook := editingModel(t, "Flow")
+	m = keys(t, m, "d", "enter")
+	if m.overlay != nil || len(libTracks(t, hook.Library)) != 5 {
+		t.Errorf("enter should remove the track: overlay %v, %d tracks left", m.overlay, len(libTracks(t, hook.Library)))
+	}
+	contains(t, m, "Removed 1 track")
 }
 
 func TestYRemovesTheTrackAndUndoBringsItBack(t *testing.T) {

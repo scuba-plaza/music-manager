@@ -80,6 +80,13 @@ type Model struct {
 	thumbs       map[string]thumb
 	thumbPending map[string]bool
 
+	// In a terminal with the graphics protocol, covers are sent to it as
+	// pictures: gfx is the way to it, pictures what has been sent and at what
+	// size, and picturePending what is on its way.
+	gfx            *graphics
+	pictures       map[string]picture
+	picturePending map[string]bool
+
 	// How far the library folder lags behind the records, and what is needed to
 	// keep that up to date: rev changes whenever the tracks do.
 	syncN        int
@@ -130,6 +137,7 @@ func New(lib Library, opts ...Option) Model {
 	m := Model{
 		lib: lib, keys: newKeyMap(), expanded: map[string]bool{}, filterInput: in,
 		thumbs: map[string]thumb{}, thumbPending: map[string]bool{},
+		pictures: map[string]picture{}, picturePending: map[string]bool{},
 		marks: map[string]bool{},
 	}
 	for _, o := range opts {
@@ -175,7 +183,7 @@ func (m Model) Init() tea.Cmd { return tea.Batch(m.load(), m.poll()) }
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
 	nm := next.(Model)
-	cmds := []tea.Cmd{cmd, nm.wantThumb()} // the cover now selected may need loading
+	cmds := []tea.Cmd{cmd, nm.wantThumb(), nm.wantPicture()} // the cover now selected may need loading, and sending
 	if nm.loaded && nm.rev != nm.syncRev {
 		// The tracks changed: see how far behind the folder is now. Scanning the
 		// folder is only ever needed once, if it was never synced.
@@ -188,6 +196,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case pictureMsg:
+		return m.pictured(msg)
 	case thumbMsg:
 		delete(m.thumbPending, msg.sha)
 		m.thumbs[msg.sha] = msg.thumb
@@ -269,9 +279,11 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, m.keys.Quit) && !m.editing && !m.filtering && m.overlay == nil:
 			m.stopPlayback()
+			m.freePictures()
 			return m, tea.Quit
 		case msg.Type == tea.KeyCtrlC:
 			m.stopPlayback()
+			m.freePictures()
 			return m, tea.Quit
 		case m.busy:
 			return m, nil
@@ -349,6 +361,12 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.moveTo(0)
 	case key.Matches(msg, k.Bottom):
 		m.moveTo(len(m.rows) - 1)
+	case key.Matches(msg, k.Centre):
+		m.centreCursor()
+	case key.Matches(msg, k.OpenAll):
+		m.openLevel()
+	case key.Matches(msg, k.CloseAll):
+		m.closeAll()
 	case key.Matches(msg, k.Open):
 		if !m.focusInspector() {
 			m.open()

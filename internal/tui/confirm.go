@@ -11,7 +11,7 @@ import (
 )
 
 // confirm is a dialog that asks before something that cannot be taken back
-// with a single keypress. Only y goes ahead.
+// with a single keypress. Only y and enter go ahead.
 type confirm struct {
 	head    string
 	body    []string
@@ -34,14 +34,14 @@ func (c *confirm) lines(w int) []string {
 
 func (c *confirm) hints(k keyMap) []key.Binding {
 	return []key.Binding{
-		key.NewBinding(key.WithKeys("y"), key.WithHelp("y", c.yesText)),
+		key.NewBinding(key.WithKeys("y", "enter"), key.WithHelp("y/enter", c.yesText)),
 		k.Close2,
 	}
 }
 
 func (c *confirm) key(m *Model, msg tea.KeyMsg) tea.Cmd {
 	switch msg.String() {
-	case "y":
+	case "y", "enter":
 		m.overlay = nil
 		return c.yes(m)
 	case "esc", "n", "q":

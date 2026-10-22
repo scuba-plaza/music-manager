@@ -61,10 +61,12 @@ func syncModel(t *testing.T) (Model, *editHook) {
 }
 
 func TestSOpensTheChooserWithTheLibraryFolderFirst(t *testing.T) {
-	m, hook := syncModel(t)
+	t.Setenv("HOME", "/home/me")
+	m, _ := syncModel(t)
+	m.lib = atMusic{m.lib} // a folder with a short name: a long one is cut off
 	m.mounts = func() []string { return []string{"/run/media/tau/PLAYER"} }
 	m = keys(t, m, "s")
-	contains(t, m, "Sync", "Library folder", tilde(hook.Library.Root()), "/run/media/tau/PLAYER", "Another folder")
+	contains(t, m, "Sync", "Library folder", "~/Music/mp3-player", "/run/media/tau/PLAYER", "Another folder")
 	if d := asSync(t, m); d.cursor != 0 {
 		t.Errorf("cursor = %d, want the library folder", d.cursor)
 	}
@@ -294,4 +296,47 @@ func TestEditingInALibraryNeverSyncedStillSaysSomethingNeedsSyncing(t *testing.T
 	if first := lines(m)[0]; !strings.Contains(first, "to sync") {
 		t.Errorf("after an edit the header = %q", first)
 	}
+}
+
+func TestTheFooterOffersSyncAndTheHeaderSaysWhenSomethingIsWaiting(t *testing.T) {
+	for _, size := range [][2]int{{120, 36}, {80, 24}} {
+		m, _ := browserModel(t, size[0], size[1])
+		if footer := lines(m)[size[1]-1]; !strings.Contains(footer, "s sync") {
+			t.Errorf("%dx%d: nothing in the footer offers a sync: %q", size[0], size[1], footer)
+		}
+		if header := lines(m)[0]; !strings.Contains(header, "6 to sync · press s") {
+			t.Errorf("%dx%d: the header does not say how to sync: %q", size[0], size[1], header)
+		}
+	}
+}
+
+func TestClickingWhatTheHeaderSaysIsWaitingOpensTheSyncScreen(t *testing.T) {
+	m, _ := browserModel(t, 120, 36)
+	header := []rune(lines(m)[0])
+	at := strings.Index(string(header), "to sync")
+	x := len([]rune(string(header)[:at])) // column of the chip
+	m = send(t, m, click(x, 0))
+	if _, ok := m.overlay.(*syncDialog); !ok {
+		t.Fatalf("a click on the sync note in the header opened %T", m.overlay)
+	}
+
+	m, _ = browserModel(t, 120, 36)
+	m = send(t, m, click(10, 0)) // the library's name
+	if m.overlay != nil {
+		t.Errorf("a click elsewhere in the header opened %T", m.overlay)
+	}
+}
+
+func TestTheHeaderStaysQuietWhenNothingNeedsSyncing(t *testing.T) {
+	m, hook := syncModel(t)
+	a := appOf(t, hook.Library)
+	plan, err := a.PlanSync(app.SyncOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := plan.Apply(); err != nil {
+		t.Fatal(err)
+	}
+	m = send(t, m, m.Init())
+	lacks(t, m, "press s")
 }

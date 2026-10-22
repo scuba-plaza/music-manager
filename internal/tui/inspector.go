@@ -63,8 +63,9 @@ func (m Model) summaryLines(r Row, w int) []string {
 // labelWidth is the width of the label column, including the focus marker.
 const labelWidth = 12
 
-// trackLines shows a track's fields, with the one being edited open.
-func (m Model) trackLines(t manifest.Track, w, h int) []string {
+// trackHead is everything in the inspector above the cover: the title, and
+// the fields, with the one being edited open.
+func (m Model) trackHead(t manifest.Track, w int) []string {
 	_, title, _ := app.Display(t)
 	lines := []string{"", " " + styles.bold.Render(fit(title, w-2)), rule(w)}
 	if t.Status != manifest.Identified {
@@ -77,8 +78,13 @@ func (m Model) trackLines(t manifest.Track, w, h int) []string {
 			lines = append(lines, m.barLines(t, w))
 		}
 	}
+	return lines
+}
 
-	lines = append(lines, m.thumbLines(t, w, h-len(lines)-6)...)
+// trackLines shows a track's fields, with the one being edited open.
+func (m Model) trackLines(t manifest.Track, w, h int) []string {
+	lines := m.trackHead(t, w)
+	lines = append(lines, m.thumbLines(t, w, h, len(lines))...)
 
 	lines = append(lines, rule(w))
 	shown := t
@@ -158,21 +164,47 @@ func (m Model) coverText(t manifest.Track) string {
 	}
 }
 
+// The cover sits under its row. It needs at least minCoverRows lines and
+// minCoverCols columns to be worth drawing, and coverReserve lines are kept
+// below it for the file's path and what is known about it.
+const (
+	minCoverRows = 3
+	minCoverCols = 6
+	coverReserve = 6
+)
+
 // thumbLines draws the cover under its row, if there is a cover and room
-// for at least a few lines of it.
-func (m Model) thumbLines(t manifest.Track, w, room int) []string {
+// for it. headLen is the number of lines above it, in an inspector w wide
+// and h high.
+func (m Model) thumbLines(t manifest.Track, w, h, headLen int) []string {
 	th, ok := m.thumbs[t.CoverSHA256]
 	if t.CoverSHA256 == "" || !ok || th.img == nil {
 		return nil
 	}
-	cols := min(w-labelWidth-4, 28)
-	rows := min(cols/2, room)
-	if rows < 3 {
+	room := h - headLen - coverReserve
+	indent := strings.Repeat(" ", labelWidth+1)
+
+	// In full resolution, once the terminal has the picture; the blocks stand
+	// in until then, and wherever the picture is not possible.
+	if m.gfx != nil && th.kitty != nil {
+		cols, rows := m.coverPlan(t, th, w, h)
+		if p, sent := m.pictures[t.CoverSHA256]; sent && p.cols == cols && p.rows == rows && rows <= room {
+			var lines []string
+			for _, l := range placeholderLines(p.id, cols, rows) {
+				lines = append(lines, indent+l)
+			}
+			return lines
+		}
+	}
+
+	cols := w - labelWidth - 4
+	rows := min(room, maxCoverRows)
+	if rows < minCoverRows || cols < minCoverCols {
 		return nil
 	}
 	var lines []string
 	for _, l := range renderThumb(thumbCells(th.img, cols, rows)) {
-		lines = append(lines, strings.Repeat(" ", labelWidth+1)+l)
+		lines = append(lines, indent+l)
 	}
 	return lines
 }
