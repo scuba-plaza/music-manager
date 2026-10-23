@@ -28,6 +28,10 @@ type Edit struct {
 	SourceURL *string
 	// Genre is free text, one line, or "" for none.
 	Genre *string
+	// The Latin forms are how the names and the genre read in Latin letters,
+	// each on one line; "" takes one away and the form worked out from the
+	// name is used again.
+	TitleLatin, ArtistLatin, AlbumLatin, GenreLatin *string
 	// GainDB makes the track louder or quieter by about this much, rounded to
 	// the nearest step the file allows (mp3.StepDB); 0 for no change.
 	GainDB *float64
@@ -68,6 +72,19 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 	}{{e.Title, &t.Title}, {e.Artist, &t.Artist}, {e.Album, &t.Album}} {
 		if f.in != nil {
 			*f.out = strings.TrimSpace(*f.in)
+		}
+	}
+	for _, f := range []struct {
+		name    string
+		in, out *string
+	}{{"title", e.TitleLatin, &t.TitleLatin}, {"artist", e.ArtistLatin, &t.ArtistLatin}, {"album", e.AlbumLatin, &t.AlbumLatin}, {"genre", e.GenreLatin, &t.GenreLatin}} {
+		if f.in == nil {
+			continue
+		}
+		if s := strings.TrimSpace(*f.in); strings.ContainsAny(s, "\r\n") {
+			return t, fmt.Errorf("the Latin form of the %s, %q, must be on one line", f.name, s)
+		} else {
+			*f.out = s
 		}
 	}
 	if e.TrackNumber != nil {
@@ -115,6 +132,7 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 	if err := validate(t); err != nil {
 		return t, err
 	}
+	forgetLatinOfEmptyNames(&t)
 
 	if t.Title != "" && t.Artist != "" {
 		t.Status = manifest.Identified
@@ -124,6 +142,19 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 	}
 	t.UpdatedAt = time.Now().UTC()
 	return t, nil
+}
+
+// forgetLatinOfEmptyNames drops the Latin form of a name that is empty: it
+// would be a form of nothing.
+func forgetLatinOfEmptyNames(t *manifest.Track) {
+	for _, n := range []struct {
+		name  string
+		latin *string
+	}{{t.Title, &t.TitleLatin}, {t.Artist, &t.ArtistLatin}, {t.Album, &t.AlbumLatin}, {t.Genre, &t.GenreLatin}} {
+		if n.name == "" {
+			*n.latin = ""
+		}
+	}
 }
 
 // NormalizeDate checks a release date and returns it trimmed. It may be as

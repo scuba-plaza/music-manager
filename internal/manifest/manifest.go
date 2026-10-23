@@ -42,6 +42,13 @@ type Track struct {
 	Released string `json:"released,omitempty"`
 	// Genre is free text: Folk, Neoclassical, Anthem, whatever the library calls it.
 	Genre string `json:"genre,omitempty"`
+	// The Latin forms are how the true name (and the genre) reads in Latin
+	// letters, where the one worked out from it is not good enough. They are
+	// empty unless set by hand, and say nothing about any one device.
+	TitleLatin  string `json:"title_latin,omitempty"`
+	ArtistLatin string `json:"artist_latin,omitempty"`
+	AlbumLatin  string `json:"album_latin,omitempty"`
+	GenreLatin  string `json:"genre_latin,omitempty"`
 	// GainSteps makes the track louder (or, below zero, quieter) by this many
 	// steps of 1.505 dB. FadeIn and FadeOut are stretches of the original
 	// audio over which the sound rises from nothing or falls to nothing.
@@ -81,8 +88,10 @@ func (t Track) PlayingLength() time.Duration {
 
 // Playlist is a named list of tracks, by ID, in the order they are played.
 type Playlist struct {
-	Name   string   `json:"name"`
-	Tracks []string `json:"tracks"`
+	Name string `json:"name"`
+	// NameLatin is the name in Latin letters where it is set by hand.
+	NameLatin string   `json:"name_latin,omitempty"`
+	Tracks    []string `json:"tracks"`
 }
 
 type Manifest struct {

@@ -574,3 +574,45 @@ func TestShowWolfgangSaysWhatTheWolfgangWillNotShowWell(t *testing.T) {
 		t.Errorf("show warns without --wolfgang:\n%s", out)
 	}
 }
+
+func TestEditSetsTheLatinFormsAndShowSaysSoOnlyWhereTheyAreSet(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib)
+	code, _, errs := run(t, lib, "edit", id, "--title", "وطني", "--artist", "فيروز", "--album", "روائع", "--genre", "طرب",
+		"--title-latin", "Watani", "--artist-latin", "Fairouz", "--album-latin", "Rawa'e", "--genre-latin", "Tarab")
+	if code != 0 {
+		t.Fatalf("code %d, err %q", code, errs)
+	}
+	_, out, _ := run(t, lib, "show", id)
+	for _, want := range []string{"Latin title Watani", "Latin artist Fairouz", "Latin album Rawa'e", "Latin genre Tarab"} {
+		if !strings.Contains(squash(out), want) {
+			t.Errorf("show lacks %q:\n%s", want, out)
+		}
+	}
+	if code, _, errs := run(t, lib, "edit", id, "--artist-latin", ""); code != 0 {
+		t.Fatalf("clearing: code %d, err %q", code, errs)
+	}
+	_, out, _ = run(t, lib, "show", id)
+	if strings.Contains(out, "Latin artist") || !strings.Contains(out, "Latin title") {
+		t.Errorf("after clearing the artist's form:\n%s", out)
+	}
+}
+
+func TestShowWolfgangUsesTheLatinFormsSetByHand(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib)
+	run(t, lib, "edit", id, "--title", "Bahlam Bek", "--artist", "عبد الحليم حافظ", "--album", "روائع",
+		"--artist-latin", "Abdel Halim Hafez", "--album-latin", "Rawaa'e")
+	_, out, _ := run(t, lib, "show", id, "--wolfgang")
+	if !strings.Contains(squash(out), "On the Wolfgang A. H. Hafez · Rawaa'e") {
+		t.Errorf("show --wolfgang:\n%s", out)
+	}
+}
+
+func TestEditRefusesALatinFormOnSeveralLines(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib)
+	if code, _, errs := run(t, lib, "edit", id, "--title-latin", "a\nb"); code == 0 || !strings.Contains(errs, "one line") {
+		t.Errorf("code %d, err %q", code, errs)
+	}
+}

@@ -143,7 +143,7 @@ func matchPlayerName(name string, tracks []manifest.Track) WolfgangMatch {
 func titled(tracks []manifest.Track, key string, prefix bool) []manifest.Track {
 	var out []manifest.Track
 	for _, t := range tracks {
-		for _, title := range []string{t.Title, translit.ToASCII(t.Title)} {
+		for _, title := range []string{t.Title, translit.ToASCII(t.Title), t.LatinTitle()} {
 			k := matchKey(title)
 			if k == key || prefix && strings.HasPrefix(k, key) {
 				out = append(out, t)

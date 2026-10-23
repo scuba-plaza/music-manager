@@ -71,7 +71,8 @@ func (a *App) signatures(m *manifest.Manifest) map[string]string {
 		} else if t.Status == manifest.Identified && t.CoverSHA256 != "" && device.Generic.SingleCovers() {
 			folderCover = "single" // it has a cover file beside it
 		}
-		t.AddedAt, t.UpdatedAt = time.Time{}, time.Time{} // saving a record is not changing it
+		t.AddedAt, t.UpdatedAt = time.Time{}, time.Time{}                        // saving a record is not changing it
+		t.TitleLatin, t.ArtistLatin, t.AlbumLatin, t.GenreLatin = "", "", "", "" // the library folder keeps the true names
 		raw, _ := json.Marshal(t)
 		sum := sha256.Sum256(append(raw, "\x00"+p+"\x00"+folderCover...))
 		sigs[t.ID] = hex.EncodeToString(sum[:])

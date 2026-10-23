@@ -174,11 +174,12 @@ func (wolfgang) Name() string { return "wolfgang-wmp01" }
 // that does not fit in them, ".mp3" included, scrolls when hovered. So the file
 // name is cut where all of it fits.
 func (wolfgang) Layout() layout.Rules {
-	return layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: WolfgangStemWidth}
+	return layout.Rules{Latin: true, Fold: translit.ToASCII, ComponentMax: 100, StemMax: WolfgangStemWidth}
 }
 
 // Tags keep the true title, which the player shows nowhere; the artist and
-// album are the ones it shows, in Latin letters of the width it keeps.
+// album are the ones it shows, in Latin letters of the width it keeps. The genre
+// is in Latin letters too.
 func (wolfgang) Tags(t manifest.Track) mp3.TagSet {
 	if t.Status != manifest.Identified {
 		return mp3.TagSet{Extra: extras(t)}
@@ -186,7 +187,7 @@ func (wolfgang) Tags(t manifest.Track) mp3.TagSet {
 	artist, album := PlayerTags(t)
 	return mp3.TagSet{
 		Title: t.Title, Artist: artist, Album: album,
-		Genre: t.Genre,
+		Genre: t.LatinGenre(),
 		Track: t.TrackNumber, Total: t.TrackTotal,
 		Date:   t.Released,
 		Length: t.PlayingLength(),

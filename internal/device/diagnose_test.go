@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"music-manager/internal/device"
+	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 )
 
@@ -91,5 +92,74 @@ func TestAGenericTargetHasNothingToWarnAbout(t *testing.T) {
 	long.Genre = "Alternative Rock"
 	if ws := device.Generic.Diagnose([]manifest.Track{long}); len(ws) != 0 {
 		t.Errorf("warnings = %+v", ws)
+	}
+}
+
+// The Latin forms set by hand are what the Wolfgang is written from.
+
+func handSet() manifest.Track {
+	return manifest.Track{
+		ID: "k7f2qd", Status: manifest.Identified,
+		Title: "بحلم بيك", Artist: "عبد الحليم حافظ", Album: "روائع", Genre: "طرب",
+		TitleLatin: "Bahlam Bek", ArtistLatin: "Abdel Halim Hafez", AlbumLatin: "Rawaa'e", GenreLatin: "Tarab",
+		TrackNumber: 1, TrackTotal: 6,
+	}
+}
+
+func TestTheWolfgangWritesTheTagsFromTheLatinFormsSetByHand(t *testing.T) {
+	tags := device.Wolfgang.Tags(handSet())
+	if tags.Artist != "A. H. Hafez" || tags.Album != "Rawaa'e" {
+		t.Errorf("artist %q, album %q", tags.Artist, tags.Album)
+	}
+	if tags.Title != "بحلم بيك" {
+		t.Errorf("the title is %q; the player shows file names, so it stays the true one", tags.Title)
+	}
+	if tags.Genre != "Tarab" {
+		t.Errorf("genre %q", tags.Genre)
+	}
+}
+
+func TestTheWolfgangsSingleCarriesItsLatinTitleAsTheAlbum(t *testing.T) {
+	tr := handSet()
+	tr.Album, tr.AlbumLatin = "", ""
+	if got := device.Wolfgang.Tags(tr).Album; got != "Bahlam Bek" {
+		t.Errorf("album of a single = %q", got)
+	}
+}
+
+func TestTheGenericTargetKeepsTheTrueNamesWhateverIsSetByHand(t *testing.T) {
+	tags := device.Generic.Tags(handSet())
+	if tags.Artist != "عبد الحليم حافظ" || tags.Album != "روائع" || tags.Genre != "طرب" {
+		t.Errorf("%+v", tags)
+	}
+}
+
+func TestTheWolfgangNamesTheFilesAfterTheLatinFormsSetByHand(t *testing.T) {
+	got := layout.PathFor(handSet(), device.Wolfgang.Layout())
+	if want := "Abdel Halim Hafez/Rawaa'e/01 - Bahlam Bek.mp3"; got != want {
+		t.Errorf("PathFor = %q, want %q", got, want)
+	}
+	if got := layout.PathFor(handSet(), device.Generic.Layout()); !strings.Contains(got, "عبد الحليم حافظ") {
+		t.Errorf("the generic path lost the true name: %q", got)
+	}
+}
+
+func TestANameWithALatinFormSetByHandIsNotUnknownOnTheWolfgang(t *testing.T) {
+	tr := track("emoji", "🎵🎶", "", "Song")
+	if got := warned(device.Wolfgang.Diagnose([]manifest.Track{tr}), "emoji"); !hasMessage(got, "Unknown") {
+		t.Fatalf("no warning to start with: %q", got)
+	}
+	tr.ArtistLatin = "Music"
+	if got := warned(device.Wolfgang.Diagnose([]manifest.Track{tr}), "emoji"); len(got) != 0 {
+		t.Errorf("a Latin form was set by hand, yet %q", got)
+	}
+}
+
+func TestTheGenreWarningIsAboutWhatIsWritten(t *testing.T) {
+	tr := track("g", "A", "", "S")
+	tr.Genre = "Alternative Rock"
+	tr.GenreLatin = "Alt Rock"
+	if got := warned(device.Wolfgang.Diagnose([]manifest.Track{tr}), "g"); len(got) != 0 {
+		t.Errorf("the Latin genre fits, yet %q", got)
 	}
 }

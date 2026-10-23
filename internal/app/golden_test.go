@@ -40,7 +40,7 @@ func fixture(t *testing.T) (*app.App, map[string]string) {
 		}
 	}
 	set("a", "وطني", "فيروز", "Hits", 3, 12, app.Edit{Genre: ptr("Folk"), Released: ptr("1999")})
-	set("b", "بحلم بيك", "عبد الحليم حافظ", "روائع", 1, 6, app.Edit{})
+	set("b", "بحلم بيك", "عبد الحليم حافظ", "روائع", 1, 6, app.Edit{TitleLatin: ptr("Bahlam Bek"), ArtistLatin: ptr("Abdel Halim Hafez"), AlbumLatin: ptr("Rawa'e")}) // the others have no Latin form set by hand
 	set("c", "A Very Long Title Indeed That Goes On", "Max Richter", "The Long Album Name Here (Deluxe)", 5, 5, app.Edit{})
 	set("d", "A Very Long Title Indeed That Goes On", "Max Richter", "The Long Album Name Here (Deluxe)", 5, 5, app.Edit{})
 	set("e", "Dream", "Keaton Henson", "", 0, 0, app.Edit{Genre: ptr("Folk")})

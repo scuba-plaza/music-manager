@@ -18,6 +18,10 @@ func editCmd(open opener) *cobra.Command {
 		Short: "Change the details of a track",
 		Long: `Change the details of a track. Only the flags you pass are changed.
 
+Title, artist and album are the true names, in any script. The --title-latin,
+--artist-latin, --album-latin and --genre-latin flags set how each reads in Latin
+letters, which a player that cannot show the script gets (mm sync --wolfgang);
+where none is set a form is worked out, and "" goes back to it.
 Title, artist and album are the true names, in any script. Trims accept 90, 1:30 or 1:30.5. The release date
 takes a year, a month or a day (1999, 1999-05, 1999-05-17); pass "" to forget it.
 The source link (--source-url) is where the track came from; pass "" to forget it.
@@ -105,6 +109,7 @@ original, so cutting the track again afterwards does not move them.`,
 		},
 	}
 	tf.register(cmd.Flags())
+	tf.registerLatin(cmd.Flags())
 	cmd.Flags().StringVar(&tf.sourceURL, "source-url", "", "the link the track came from; \"\" for none")
 	cmd.Flags().StringVar(&gain, "gain", "", "make the track louder or quieter by about this many dB, e.g. 3 or -2.5; 0 for no change")
 	cmd.Flags().StringVar(&fadeIn, "fade-in", "", "fade in over this long from where the track starts, e.g. 3, or over a stretch, e.g. 0:02-0:05; \"\" for none")

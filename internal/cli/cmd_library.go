@@ -139,6 +139,9 @@ func showCmd(open opener) *cobra.Command {
 			}
 			row("Released", t.Released)
 			row("Genre", t.Genre)
+			for _, l := range []struct{ label, set string }{{"Latin title", t.TitleLatin}, {"Latin artist", t.ArtistLatin}, {"Latin album", t.AlbumLatin}, {"Latin genre", t.GenreLatin}} {
+				row(l.label, l.set)
+			}
 			if wolfgang && t.Status == manifest.Identified {
 				artist, album := device.PlayerTags(t)
 				row("On the Wolfgang", artist+" · "+album)

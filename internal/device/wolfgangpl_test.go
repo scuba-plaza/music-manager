@@ -87,3 +87,11 @@ func TestMatchingTheOldFileNamesToTracks(t *testing.T) {
 		}
 	}
 }
+
+func TestMatchingAnOldFileNameUsesTheLatinTitleSetByHand(t *testing.T) {
+	tr := manifest.Track{ID: "a", Status: manifest.Identified, Title: "بحلم بيك", Artist: "عبد الحليم حافظ", TitleLatin: "Bahlam Bek"}
+	matches := device.MatchWolfgangNames([]string{"01 Bahlam Bek.mp3"}, []manifest.Track{tr})
+	if matches[0].Track == nil || matches[0].Track.ID != "a" {
+		t.Errorf("%+v", matches[0])
+	}
+}

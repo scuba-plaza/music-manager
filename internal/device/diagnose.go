@@ -37,12 +37,12 @@ func (w wolfgang) Diagnose(tracks []manifest.Track) []Warning {
 		if t.Status != manifest.Identified {
 			continue
 		}
-		if n := utf8.RuneCountInString(t.Genre); n > PlayerFieldWidth {
-			warn(t, "the genre %q is %d characters, the player shows %d", t.Genre, n, PlayerFieldWidth)
+		if genre := t.LatinGenre(); utf8.RuneCountInString(genre) > PlayerFieldWidth {
+			warn(t, "the genre %q is %d characters, the player shows %d", genre, utf8.RuneCountInString(genre), PlayerFieldWidth)
 		}
-		for _, name := range []struct{ kind, value string }{{"artist", t.Artist}, {"album", t.Album}, {"title", t.Title}} {
-			if layout.Component(name.value, whole) != "Unknown" && layout.Component(name.value, cut) == "Unknown" {
-				warn(t, "the %s %q has no Latin letters, it becomes \"Unknown\" on the player", name.kind, name.value)
+		for _, name := range []struct{ kind, value, latin string }{{"artist", t.Artist, t.LatinArtist()}, {"album", t.Album, t.LatinAlbum()}, {"title", t.Title, t.LatinTitle()}} {
+			if layout.Component(name.value, whole) != "Unknown" && layout.Component(name.latin, cut) == "Unknown" {
+				warn(t, "the %s %q has no Latin letters, it becomes \"Unknown\" on the player (set a Latin form for it)", name.kind, name.value)
 			}
 		}
 		if artist.LooksLikeSeveral(t.Artist) {

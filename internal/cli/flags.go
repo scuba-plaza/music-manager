@@ -13,13 +13,14 @@ import (
 
 // trackFlags are the flags that describe a track, shared by add and edit.
 type trackFlags struct {
-	title, artist, album string
-	track, of            int
-	trimStart, trimEnd   string
-	released             string
-	genre                string
-	sourceURL            string
-	cover                string
+	title, artist, album                            string
+	track, of                                       int
+	trimStart, trimEnd                              string
+	released                                        string
+	genre                                           string
+	titleLatin, artistLatin, albumLatin, genreLatin string
+	sourceURL                                       string
+	cover                                           string
 }
 
 func (tf *trackFlags) register(f *pflag.FlagSet) {
@@ -33,6 +34,14 @@ func (tf *trackFlags) register(f *pflag.FlagSet) {
 	f.StringVar(&tf.trimStart, "trim-start", "", "cut this much off the start, e.g. 0:12")
 	f.StringVar(&tf.trimEnd, "trim-end", "", "cut this much off the end, e.g. 0:05.5")
 	f.StringVar(&tf.cover, "cover", "", "cover image file (JPEG or PNG); \"\" means no cover")
+}
+
+// registerLatin adds the flags for the Latin forms of the names, which only edit has.
+func (tf *trackFlags) registerLatin(f *pflag.FlagSet) {
+	f.StringVar(&tf.titleLatin, "title-latin", "", "the title in Latin letters, where the worked-out one is not good enough; \"\" for the worked-out one")
+	f.StringVar(&tf.artistLatin, "artist-latin", "", "the artist in Latin letters; \"\" for the worked-out one")
+	f.StringVar(&tf.albumLatin, "album-latin", "", "the album in Latin letters; \"\" for the worked-out one")
+	f.StringVar(&tf.genreLatin, "genre-latin", "", "the genre in Latin letters; \"\" for the worked-out one")
 }
 
 // parsed is what the user put on the command line.
@@ -61,6 +70,10 @@ func (tf *trackFlags) build(f *pflag.FlagSet) (p parsed, err error) {
 	}
 	str("released", &tf.released, &e.Released)
 	str("genre", &tf.genre, &e.Genre)
+	str("title-latin", &tf.titleLatin, &e.TitleLatin)
+	str("artist-latin", &tf.artistLatin, &e.ArtistLatin)
+	str("album-latin", &tf.albumLatin, &e.AlbumLatin)
+	str("genre-latin", &tf.genreLatin, &e.GenreLatin)
 	str("source-url", &tf.sourceURL, &e.SourceURL)
 	if e.TrimStart, err = parseTrim(f, "trim-start", tf.trimStart); err != nil {
 		return p, err

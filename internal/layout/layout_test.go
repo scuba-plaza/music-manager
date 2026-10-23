@@ -249,3 +249,29 @@ func TestAssignFindsTwoSpellingsOfOneNameCollide(t *testing.T) {
 		t.Errorf("Assign[bbbbbb] = %q, want %q", got["bbbbbb"], want)
 	}
 }
+
+// A target that wants Latin names gets the ones set by hand, and the ones
+// worked out from the true names for the rest.
+
+func TestPathForUsesTheLatinFormsWhenTheRulesWantThem(t *testing.T) {
+	tr := identified("عبد الحليم حافظ", "Hits", "بحلم بيك", 1, 6)
+	tr.ArtistLatin, tr.TitleLatin = "Abdel Halim Hafez", "Bahlam Bek"
+	latin := layout.Rules{Latin: true, Fold: translit.ToASCII}
+	got := layout.PathFor(tr, latin)
+	if want := "Abdel Halim Hafez/Hits/01 - Bahlam Bek.mp3"; got != want {
+		t.Errorf("PathFor = %q, want %q", got, want)
+	}
+	if got, want := layout.PathFor(tr, layout.Rules{}), "عبد الحليم حافظ/Hits/01 - بحلم بيك.mp3"; got != want {
+		t.Errorf("without the Latin forms: %q, want %q", got, want)
+	}
+}
+
+func TestAssignKeepsTwoNamesApartThatShareALatinForm(t *testing.T) {
+	a, b := identified("فيروز", "", "وطني", 0, 0), identified("فيروز", "", "وطنى", 0, 0)
+	a.ID, b.ID = "aaaaaa", "bbbbbb"
+	a.TitleLatin, b.TitleLatin = "Watani", "Watani" // set to the same by hand
+	got := layout.Assign([]manifest.Track{a, b}, layout.Rules{Latin: true})
+	if got["aaaaaa"] == got["bbbbbb"] {
+		t.Errorf("both go to %q", got["aaaaaa"])
+	}
+}

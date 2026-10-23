@@ -26,6 +26,9 @@ const (
 // as they are, cuts a path component at 255 bytes and does not shorten file
 // names.
 type Rules struct {
+	// Latin makes the names the Latin forms of the track's names (the ones set by
+	// hand, or worked out) instead of the true ones.
+	Latin bool
 	// Fold turns a name into what the target keeps of it; nil keeps it as it is.
 	Fold func(string) string
 	// ComponentMax is the most bytes in one path component; 0 means 255.
@@ -59,7 +62,11 @@ func pathFor(t manifest.Track, suffix string, r Rules) string {
 		}
 		return path.Join(inbox, stem(name, room)+suffix+ext)
 	}
-	artist, title := clean(t.Artist, r), clean(t.Title, r)
+	artistName, albumName, titleName := t.Artist, t.Album, t.Title
+	if r.Latin {
+		artistName, albumName, titleName = t.LatinArtist(), t.LatinAlbum(), t.LatinTitle()
+	}
+	artist, title := clean(artistName, r), clean(titleName, r)
 	if t.Album == "" {
 		return path.Join(artist, stem(title, room)+suffix+ext)
 	}
@@ -68,7 +75,7 @@ func pathFor(t manifest.Track, suffix string, r Rules) string {
 		width := max(2, len(strconv.Itoa(t.TrackTotal)))
 		number = fmt.Sprintf("%0*d - ", width, t.TrackNumber)
 	}
-	return path.Join(artist, clean(t.Album, r), number+stem(title, room-len(number))+suffix+ext)
+	return path.Join(artist, clean(albumName, r), number+stem(title, room-len(number))+suffix+ext)
 }
 
 // PlaylistPath is where the playlist with this name is rendered:

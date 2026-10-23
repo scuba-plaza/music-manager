@@ -16,14 +16,15 @@ import (
 const PlayerFieldWidth = 12
 
 // PlayerTags are the artist and album the track's file carries, which is what
-// the player shows: a single has no album, so its title stands in for it
-// (otherwise the player says "Unknown Album").
+// the player shows: worked out from the Latin forms of the names. A single has
+// no album, so its title stands in for it (otherwise the player says "Unknown
+// Album").
 func PlayerTags(t manifest.Track) (artist, album string) {
-	source := t.Album
-	if source == "" {
-		source = t.Title
+	source := t.LatinAlbum()
+	if t.Album == "" {
+		source = t.LatinTitle()
 	}
-	return ArtistName(t.Artist), AlbumName(source, t.Artist)
+	return ArtistName(t.LatinArtist()), AlbumName(source, t.LatinArtist())
 }
 
 // latinName is a name in Latin letters, as one line of words without an
