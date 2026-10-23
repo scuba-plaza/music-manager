@@ -258,3 +258,32 @@ func TestTheTreeShowsTheTrueNamesInTheOrderOfTheirLatinForms(t *testing.T) {
 		t.Errorf("rows = %q, want %q", got, want)
 	}
 }
+
+func TestTheTreeIsInTheOrderOfTheLatinFormsSetByHand(t *testing.T) {
+	// Worked out, فيروز is "Firuz" and falls after "Fb"; set by hand it is
+	// "Fairouz" and falls before it.
+	fairouz := trk("t1", "وطني", "فيروز", "ألبوم", 0)
+	fairouz.ArtistLatin = "Fairouz"
+	other := trk("t2", "Song", "Fb", "", 0)
+	got := labels(buildRows([]manifest.Track{other, fairouz}, "", map[string]bool{}))
+	if want := []string{"فيروز", "Fb"}; !equal(got, want) { // the rows show the true name; only the place follows the form
+		t.Errorf("rows = %q, want %q", got, want)
+	}
+
+	// Albums of one artist and the tracks of an album follow their forms too.
+	a := trk("a", "ب", "X", "ص", 0)
+	a.AlbumLatin = "Alpha"
+	a.TitleLatin = "Zulu"
+	b := trk("b", "ا", "X", "ص", 0)
+	b.AlbumLatin = "Alpha"
+	b.TitleLatin = "Bravo"
+	c := trk("c", "Song", "X", "Beta", 0)
+	tracks := []manifest.Track{c, a, b}
+	rows := labels(buildRows(tracks, "", expandAll(tracks)))
+	for i := range rows {
+		rows[i] = strings.TrimSpace(rows[i])
+	}
+	if want := []string{"X", "ص", "ا", "ب", "Beta", "Song"}; !equal(rows, want) {
+		t.Errorf("rows = %q, want %q", rows, want)
+	}
+}

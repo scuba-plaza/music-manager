@@ -113,7 +113,8 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 		}
 	}
 
-	for _, artist := range sortedNames(byArtist) {
+	artistForms := forms(tracks, func(t manifest.Track) string { return t.Artist }, func(t manifest.Track) string { return t.ArtistLatin })
+	for _, artist := range sortedNames(byArtist, artistForms) {
 		ts := byArtist[artist]
 		akey := artistKey(artist)
 		isOpen := open(akey)
@@ -123,7 +124,7 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 			byAlbum[t.Album] = append(byAlbum[t.Album], t)
 		}
 		var ids []string
-		albums := albumOrder(byAlbum)
+		albums := albumOrder(byAlbum, forms(ts, func(t manifest.Track) string { return t.Album }, func(t manifest.Track) string { return t.AlbumLatin }))
 		for _, album := range albums {
 			sortTracks(byAlbum[album])
 			ids = append(ids, idsOf(byAlbum[album])...)
@@ -174,14 +175,37 @@ func idsOf(ts []manifest.Track) []string {
 	return ids
 }
 
-// sortedNames returns the keys of m in the order of their Latin forms, ignoring case.
-func sortedNames[V any](m map[string]V) []string {
+// forms gives each name among the tracks the text it is put in order by: the
+// Latin form set by hand on any track that has the name, the first in order if
+// several differ. A name with none is put in order by what it is worked out to.
+func forms(tracks []manifest.Track, name, set func(manifest.Track) string) map[string]string {
+	out := map[string]string{}
+	for _, t := range tracks {
+		if f, n := set(t), name(t); f != "" && (out[n] == "" || f < out[n]) {
+			out[n] = f
+		}
+	}
+	return out
+}
+
+// orderText is the text that a name is put in order by: its Latin form if one
+// was set by hand, else the name, of which the order works out the form.
+func orderText(name, set string) string {
+	if set != "" {
+		return set
+	}
+	return name
+}
+
+// sortedNames returns the keys of m in the order of their Latin forms, ignoring
+// case. A name that has a form in forms is put in order by that.
+func sortedNames[V any](m map[string]V, forms map[string]string) []string {
 	names := make([]string, 0, len(m))
 	for n := range m {
 		names = append(names, n)
 	}
 	sort.Slice(names, func(i, j int) bool {
-		if li, lj := translit.SortKey(names[i]), translit.SortKey(names[j]); li != lj {
+		if li, lj := translit.SortKey(orderText(names[i], forms[names[i]])), translit.SortKey(orderText(names[j], forms[names[j]])); li != lj {
 			return li < lj
 		}
 		return names[i] < names[j]
@@ -190,8 +214,8 @@ func sortedNames[V any](m map[string]V) []string {
 }
 
 // albumOrder lists albums alphabetically, with the singles ("") last.
-func albumOrder(byAlbum map[string][]manifest.Track) []string {
-	names := sortedNames(byAlbum)
+func albumOrder(byAlbum map[string][]manifest.Track, forms map[string]string) []string {
+	names := sortedNames(byAlbum, forms)
 	if len(names) > 0 && names[0] == "" { // "" sorts first; move it to the end
 		names = append(names[1:], "")
 	}
@@ -208,7 +232,7 @@ func sortTracks(ts []manifest.Track) {
 		if a.TrackNumber != b.TrackNumber {
 			return a.TrackNumber < b.TrackNumber
 		}
-		if la, lb := translit.SortKey(a.Title), translit.SortKey(b.Title); la != lb {
+		if la, lb := translit.SortKey(orderText(a.Title, a.TitleLatin)), translit.SortKey(orderText(b.Title, b.TitleLatin)); la != lb {
 			return la < lb
 		}
 		return a.ID < b.ID
