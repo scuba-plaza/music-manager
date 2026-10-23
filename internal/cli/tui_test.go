@@ -11,14 +11,16 @@ import (
 )
 
 type tuiProbe struct {
-	calls int
-	root  string
-	err   error
+	calls    int
+	root     string
+	wolfgang bool
+	err      error
 }
 
-func (p *tuiProbe) run(ctx context.Context, a *app.App) error {
+func (p *tuiProbe) run(ctx context.Context, a *app.App, wolfgang bool) error {
 	p.calls++
 	p.root = a.Root()
+	p.wolfgang = wolfgang
 	return p.err
 }
 
@@ -76,5 +78,18 @@ func TestAnErrorFromTheInterfaceIsReported(t *testing.T) {
 	code, _, errs := runWith(t, cli.Deps{RunTUI: p.run}, filepath.Join(t.TempDir(), "lib"))
 	if code == 0 || !strings.Contains(errs, "deadline") {
 		t.Errorf("code %d, err %q", code, errs)
+	}
+}
+
+func TestTheInterfaceShowsTheWolfgangPreviewOnlyWhenAsked(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	for _, c := range []struct {
+		args []string
+		want bool
+	}{{nil, false}, {[]string{"--wolfgang"}, true}, {[]string{"tui"}, false}, {[]string{"tui", "--wolfgang"}, true}, {[]string{"tui", "--wolfang"}, true}} {
+		p := &tuiProbe{}
+		if code, _, errs := runWith(t, cli.Deps{RunTUI: p.run}, lib, c.args...); code != 0 || p.calls != 1 || p.wolfgang != c.want {
+			t.Errorf("mm %v: code %d, calls %d, wolfgang %v, err %q; want wolfgang %v", c.args, code, p.calls, p.wolfgang, errs, c.want)
+		}
 	}
 }

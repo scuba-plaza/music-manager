@@ -101,6 +101,10 @@ func Assign(tracks []manifest.Track, r Rules) map[string]string {
 	return out
 }
 
+// Component is s as one path component under the rules: what a folder or the
+// name of a file is made of it, "Unknown" if nothing is left.
+func Component(s string, r Rules) string { return clean(s, r) }
+
 // clean makes s usable as one path component on any filesystem, with its
 // accents composed so that one name has one spelling.
 func clean(s string, r Rules) string {

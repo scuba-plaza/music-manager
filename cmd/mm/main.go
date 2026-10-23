@@ -31,8 +31,12 @@ func main() {
 	deps := cli.Deps{Downloader: ytdlp.New(), Metadata: lookup}
 	if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 		deps.Prompter = prompt.New(os.Stdin, os.Stderr)
-		deps.RunTUI = func(ctx context.Context, a *app.App) error {
-			return tui.Run(ctx, tui.NewLibrary(a, tui.WithSource(lookup), tui.WithDownloader(deps.Downloader)), tui.WithPlayer(tui.DetectPlayer()))
+		deps.RunTUI = func(ctx context.Context, a *app.App, wolfgang bool) error {
+			opts := []tui.Option{tui.WithPlayer(tui.DetectPlayer())}
+			if wolfgang {
+				opts = append(opts, tui.WithWolfgang())
+			}
+			return tui.Run(ctx, tui.NewLibrary(a, tui.WithSource(lookup), tui.WithDownloader(deps.Downloader)), opts...)
 		}
 	}
 	os.Exit(cli.Run(ctx, os.Args[1:], cli.IO{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}, deps))

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/manifest"
 )
 
@@ -202,6 +203,8 @@ var errNoLookup = errors.New("lookup is not available")
 // Plan is what a sync would do, ready to be carried out.
 type Plan interface {
 	Ops() []render.Op
+	// Warnings is what the device the plan is for will not do well.
+	Warnings() []device.Warning
 	// WithPrune is the same plan with stray files marked for deletion or not.
 	WithPrune(prune bool) Plan
 	// Apply carries the plan out, reporting how far it has got.
@@ -213,6 +216,7 @@ type Plan interface {
 type appPlan struct{ p *app.SyncPlan }
 
 func (a appPlan) Ops() []render.Op                           { return a.p.Ops }
+func (a appPlan) Warnings() []device.Warning                 { return a.p.Warnings }
 func (a appPlan) WithPrune(prune bool) Plan                  { return appPlan{a.p.WithPrune(prune)} }
 func (a appPlan) Collected() int                             { return a.p.Collected }
 func (a appPlan) Apply(progress func(done, total int)) error { return a.p.ApplyWith(progress) }

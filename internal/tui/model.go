@@ -32,6 +32,8 @@ type Model struct {
 	lib  Library
 	keys keyMap
 
+	wolfgang bool // show the preview tab, and start the sync dialog on the Wolfgang format
+
 	w, h int
 
 	loaded    bool

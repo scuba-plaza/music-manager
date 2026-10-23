@@ -50,6 +50,9 @@ Wolfgang WMP01 player instead, with everything its limits call for; it needs
 			if wolfgang {
 				fmt.Fprintln(out, "for the Wolfgang WMP01")
 			}
+			for _, w := range plan.Warnings {
+				fmt.Fprintf(out, "warning  %s  %s\n", w.TrackID, w.Message)
+			}
 			if len(plan.Ops) == 0 {
 				if !dryRun {
 					if err := plan.Apply(); err != nil { // still collects unused blobs

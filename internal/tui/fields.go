@@ -32,6 +32,7 @@ const (
 	fVolume
 	fFadeIn
 	fFadeOut
+	fWolfgang // the read-only preview under --wolfgang
 )
 
 // An inspectorTab is a page of the inspector: some of the fields, under a name.
@@ -43,6 +44,7 @@ type inspectorTab struct {
 var inspectorTabs = []inspectorTab{
 	{"Details", []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fGenre, fCover}},
 	{"Audio", []fieldKind{fCutStart, fCutEnd, fVolume, fFadeIn, fFadeOut}},
+	{"Wolfgang", []fieldKind{fWolfgang}},
 }
 
 // trackFields is every field, tab by tab, in the order the cursor goes through
@@ -79,7 +81,7 @@ func firstFieldOf(tab int) int {
 func (m Model) tab() int { return tabOf(trackFields[m.field]) }
 
 func (f fieldKind) label() string {
-	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Volume", "Fade in", "Fade out"}[f]
+	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Volume", "Fade in", "Fade out", "Wolfgang"}[f]
 }
 
 // isName reports whether the field is the title, the artist or the album.

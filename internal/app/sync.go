@@ -35,6 +35,8 @@ type SyncPlan struct {
 	Ops []render.Op
 	// Collected is how many unused audio and cover blobs Apply deleted.
 	Collected int
+	// Warnings is what the device will not do well for these tracks.
+	Warnings []device.Warning
 
 	a                     *App
 	target                string
@@ -104,6 +106,7 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 		Ops: render.Plan(desired, existing, opts.Prune), a: a, target: target, build: build,
 		keepAudio: keepAudio, keepCovers: keepCovers,
 		desired: desired, existing: existing, sigs: a.signatures(m),
+		Warnings: dev.Diagnose(m.Tracks),
 	}, nil
 }
 

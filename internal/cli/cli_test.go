@@ -549,3 +549,28 @@ func TestVolumeAndFadeFlagsSayWhatIsWrong(t *testing.T) {
 		t.Errorf("a refused edit changed the track:\n%s", out)
 	}
 }
+
+func TestSyncWolfgangListsWhatThePlayerWillNotShowWell(t *testing.T) {
+	lib, target := filepath.Join(t.TempDir(), "lib"), filepath.Join(t.TempDir(), "player")
+	id := ingestOne(t, lib)
+	run(t, lib, "edit", id, "--title", "Song", "--artist", "Band", "--genre", "Alternative Rock")
+	_, out, _ := run(t, lib, "sync", "--wolfgang", "--target", target, "--dry-run")
+	if !strings.Contains(out, "warning") || !strings.Contains(out, id) || !strings.Contains(out, "Alternative Rock") {
+		t.Errorf("the long genre is not reported:\n%s", out)
+	}
+	if _, out, _ := run(t, lib, "sync", "--target", target, "--dry-run"); strings.Contains(out, "warning") {
+		t.Errorf("a plain sync warns about the player:\n%s", out)
+	}
+}
+
+func TestShowWolfgangSaysWhatTheWolfgangWillNotShowWell(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib)
+	run(t, lib, "edit", id, "--title", "Song", "--artist", "Band", "--genre", "Alternative Rock")
+	if _, out, _ := run(t, lib, "show", id, "--wolfgang"); !strings.Contains(squash(out), "Warning the genre") {
+		t.Errorf("show --wolfgang has no warning:\n%s", out)
+	}
+	if _, out, _ := run(t, lib, "show", id); strings.Contains(out, "Warning") {
+		t.Errorf("show warns without --wolfgang:\n%s", out)
+	}
+}

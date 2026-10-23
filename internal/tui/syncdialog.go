@@ -162,6 +162,9 @@ func (d *syncDialog) width() int    { return 84 }
 // listRows is how many operations the review shows at once.
 const listRows = 10
 
+// warningRows is how many warnings the review shows; the rest are counted.
+const warningRows = 4
+
 func (d *syncDialog) hints(k keyMap) []key.Binding {
 	apply := key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "apply"))
 	prune := key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "strays"))
@@ -281,6 +284,16 @@ func (d *syncDialog) reviewLines(w int) []string {
 	}
 	if len(ops) > listRows {
 		lines = append(lines, " "+styles.dim.Render(fmt.Sprintf("%d–%d of %d", d.offset+1, end, len(ops))))
+	}
+	if ws := d.plan.Warnings(); len(ws) > 0 {
+		lines = append(lines, "", " "+styles.warn.Render(plural(len(ws), "warning")+" for the player"))
+		for i, wn := range ws {
+			if i == warningRows {
+				lines = append(lines, " "+styles.dim.Render(fmt.Sprintf("… %d more", len(ws)-i)))
+				break
+			}
+			lines = append(lines, " "+styles.dim.Render(wn.TrackID)+"  "+fit(wn.Message, w-2-len(wn.TrackID)-2))
+		}
 	}
 	lines = append(lines, "")
 	switch {
@@ -498,7 +511,9 @@ func (m Model) openSync() (tea.Model, tea.Cmd) {
 	if mounts == nil {
 		mounts = detectMounts
 	}
-	m.overlay = newSyncDialog(m.lib.Root(), mounts())
+	d := newSyncDialog(m.lib.Root(), mounts())
+	d.wolfgang = m.wolfgang // a drive starts on the format that was asked for; the library folder never takes it
+	m.overlay = d
 	return m, nil
 }
 

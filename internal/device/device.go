@@ -39,11 +39,16 @@ type Target interface {
 	// Playlist is the file of a playlist, given the tracks by ID and where each
 	// is written: its path in the target and its content.
 	Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (name string, data []byte)
+	// Diagnose says what the target will not do well for these tracks.
+	Diagnose(tracks []manifest.Track) []Warning
 }
 
 // Generic is the default: any folder or device that is not known better. It
 // gets the names as they are, in any script.
 var Generic Target = generic{}
+
+// stemWidth is how many characters of a file name the Wolfgang shows.
+const stemWidth = 24
 
 // Wolfgang is the Wolfgang WMP01 player: Latin names of a width it can show.
 var Wolfgang Target = wolfgang{}
@@ -162,7 +167,7 @@ func (wolfgang) Name() string { return "wolfgang-wmp01" }
 // 26 with the extension, so a longer name is cut at 24, where what is shown is
 // the end of the name and not the start of ".mp3".
 func (wolfgang) Layout() layout.Rules {
-	return layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: 24}
+	return layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: stemWidth}
 }
 
 // Tags keep the true title, which the player shows nowhere; the artist and

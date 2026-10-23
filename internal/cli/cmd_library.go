@@ -142,6 +142,11 @@ func showCmd(open opener) *cobra.Command {
 			if wolfgang && t.Status == manifest.Identified {
 				artist, album := device.PlayerTags(t)
 				row("On the Wolfgang", artist+" · "+album)
+				for _, w := range device.Wolfgang.Diagnose(m.Tracks) {
+					if w.TrackID == t.ID {
+						row("Warning", w.Message)
+					}
+				}
 			}
 			row("Length", clock(t.PlayingLength()))
 			if t.GainSteps != 0 {

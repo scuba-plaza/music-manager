@@ -44,3 +44,29 @@ func TestSyncWritesTagsTheWholePlayerCanShow(t *testing.T) {
 		}
 	}
 }
+
+// A plan says what its device will not do well, so that it can be read before
+// anything is written.
+func TestPlanSyncCarriesTheWarningsOfItsDevice(t *testing.T) {
+	a := libWithTracks(t, 40)
+	ts := tracks(t, a)
+	identify(t, a, ts[0].ID, "Song", "Band", "", 0, 0)
+	if _, err := a.Edit(ts[0].ID, app.Edit{Genre: ptr("Alternative Rock")}); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		dev  device.Target
+		want int
+	}{{device.Generic, 0}, {device.Wolfgang, 1}} {
+		plan, err := a.PlanSync(app.SyncOptions{Target: t.TempDir(), Device: c.dev})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(plan.Warnings) != c.want {
+			t.Errorf("%s: warnings = %+v, want %d", c.dev.Name(), plan.Warnings, c.want)
+		}
+		if c.want == 1 && plan.Warnings[0].TrackID != ts[0].ID {
+			t.Errorf("the warning is for %q, want %q", plan.Warnings[0].TrackID, ts[0].ID)
+		}
+	}
+}

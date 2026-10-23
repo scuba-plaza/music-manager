@@ -38,17 +38,19 @@ func (m Model) updateInspector(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, k.PrevTab) && m.tab() > 0:
 		m.field = firstFieldOf(m.tab() - 1)
 	case key.Matches(msg, k.NextTab):
-		if m.tab()+1 < len(inspectorTabs) {
+		if m.tab()+1 < m.tabCount() {
 			m.field = firstFieldOf(m.tab() + 1)
 		}
 	case key.Matches(msg, k.Tabs):
-		m.field = firstFieldOf(int(msg.String()[0] - '1'))
+		if n := int(msg.String()[0] - '1'); n < m.tabCount() {
+			m.field = firstFieldOf(n)
+		}
 	case key.Matches(msg, k.Back), key.Matches(msg, k.Switch):
 		m.focus = paneBrowser
 	case key.Matches(msg, k.Up):
 		m.field = max(m.field-1, 0)
 	case key.Matches(msg, k.Down):
-		m.field = min(m.field+1, len(trackFields)-1)
+		m.field = min(m.field+1, m.lastField())
 	case key.Matches(msg, k.Edit):
 		return m, m.startEdit()
 	case key.Matches(msg, k.Help):
@@ -126,6 +128,9 @@ func (m *Model) startEdit() tea.Cmd {
 		return nil
 	}
 	f := trackFields[m.field]
+	if f == fWolfgang {
+		return nil // a preview
+	}
 	m.dr = newDraft(r.Track, f)
 	m.prefilled = prefilledFrom(r.Track, f)
 	m.in[0], m.in[1] = newInput(m.dr.text), newInput(m.dr.second)

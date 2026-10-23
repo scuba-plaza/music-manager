@@ -146,7 +146,7 @@ func TestClickingAFieldInTheInspectorChoosesItAndAgainEditsIt(t *testing.T) {
 		m = keys(t, m, "right") // into the fields
 		l := computeLayout(m.w, m.h)
 
-		for tab := len(inspectorTabs) - 1; tab >= 0; tab-- {
+		for tab := m.tabCount() - 1; tab >= 0; tab-- {
 			m = keys(t, m, fmt.Sprint(tab+1))            // show the tab
 			for i := len(trackFields) - 1; i >= 0; i-- { // backwards, so no click lands on the field already chosen
 				f := trackFields[i]

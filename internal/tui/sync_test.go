@@ -408,3 +408,20 @@ func TestTheLibraryFolderIsAlwaysPlannedTheStandardWay(t *testing.T) {
 		t.Errorf("the library folder was planned for %v", got)
 	}
 }
+
+func TestTheReviewOfAWolfgangPlanListsWhatThePlayerWillNotShowWell(t *testing.T) {
+	m, _ := driveModel(t)
+	a := appOf(t, m.lib.(*planSpy).Library)
+	for _, tr := range libTracks(t, m.lib) {
+		if tr.Title == "Current" {
+			if _, err := a.Edit(tr.ID, app.Edit{Genre: ptr("Alternative Rock")}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	m = keys(t, m, "s", "down", "enter") // the standard way: nothing to say
+	contains(t, m, "to create")
+	lacks(t, m, "Alternative Rock")
+	m = keys(t, m, "esc", "s", "down", "w", "enter")
+	contains(t, m, "to create", "Wolfgang WMP01", "Alternative Rock", "12")
+}

@@ -108,7 +108,7 @@ func newKeyMap() keyMap {
 		Back:    key.NewBinding(key.WithKeys("esc", "left", "h"), key.WithHelp("←", "back")),
 		PrevTab: key.NewBinding(key.WithKeys("left", "h")),
 		NextTab: key.NewBinding(key.WithKeys("right", "l")),
-		Tabs:    key.NewBinding(key.WithKeys(tabNumbers()...), key.WithHelp(fmt.Sprintf("1-%d", len(inspectorTabs)), "tabs")),
+		Tabs:    key.NewBinding(key.WithKeys(tabNumbers()...), key.WithHelp(fmt.Sprintf("1-%d", len(inspectorTabs)-1), "tabs")),
 
 		Save:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "save")),
 		Cancel:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),

@@ -28,7 +28,8 @@ type Deps struct {
 	Prompter   app.Prompter
 	// RunTUI runs the full-screen interface on a library. It is set only
 	// when there is a terminal for it; without it plain "mm" prints help.
-	RunTUI func(ctx context.Context, a *app.App) error
+	// wolfgang asks for the preview of what a sync for the Wolfgang WMP01 writes.
+	RunTUI func(ctx context.Context, a *app.App, wolfgang bool) error
 }
 
 // opener lazily opens the library, so commands that fail on bad flags never
@@ -39,6 +40,7 @@ type opener func() (*app.App, error)
 // process exit code.
 func Run(ctx context.Context, args []string, streams IO, deps Deps) int {
 	var library string
+	var wolfgang bool
 	open := func() (*app.App, error) { return app.Open(library) }
 	root := &cobra.Command{
 		Use:           "mm",
@@ -52,7 +54,7 @@ func Run(ctx context.Context, args []string, streams IO, deps Deps) int {
 			if deps.RunTUI == nil {
 				return cmd.Help()
 			}
-			return runTUI(cmd, open, deps)
+			return runTUI(cmd, open, deps, wolfgang)
 		},
 	}
 	root.SetVersionTemplate("mm {{.Version}}\n")
@@ -61,6 +63,7 @@ func Run(ctx context.Context, args []string, streams IO, deps Deps) int {
 	root.SetErr(streams.Err)
 	root.SetArgs(args)
 	root.PersistentFlags().StringVar(&library, "library", defaultLibrary(), "library directory (env MM_LIBRARY)")
+	wolfgangFlag(root, &wolfgang)
 
 	root.AddCommand(ingestCmd(open), lsCmd(open), showCmd(open), editCmd(open), syncCmd(open), addCmd(open, deps), rmCmd(open), doctorCmd(open), identifyCmd(open, deps), adoptCmd(open), playlistCmd(open), reviewCmd(open), migrateCmd(open), tuiCmd(open, deps))
 

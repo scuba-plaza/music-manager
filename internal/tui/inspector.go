@@ -112,6 +112,9 @@ func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int) []
 		return m.editorLines(prefix, indent, vw)
 	}
 
+	if f == fWolfgang {
+		return m.wolfgangLines(t, w)
+	}
 	if f == fCover {
 		return []string{prefix + m.coverText(t)}
 	}
@@ -297,8 +300,8 @@ func (m Model) quiet() Model {
 // where each label starts and ends (columns inside the pane) for the mouse.
 func (m Model) tabStrip() (string, [][2]int) {
 	strip, x := " ", 1
-	spans := make([][2]int, len(inspectorTabs))
-	for i, tab := range inspectorTabs {
+	spans := make([][2]int, m.tabCount())
+	for i, tab := range inspectorTabs[:m.tabCount()] {
 		// Each label has the number that jumps to it. The one shown has a mark
 		// as well as the colour, for terminals without colour.
 		st, mark := styles.dim, " "
