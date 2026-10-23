@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"music-manager/internal/layout"
@@ -16,19 +17,31 @@ import (
 )
 
 // renderInputs works out, for tracks, where each one is rendered and which
-// track supplies each album folder's cover (the oldest one that has a cover).
-func renderInputs(tracks []manifest.Track) (paths map[string]string, albumCovers map[string]manifest.Track) {
+// track supplies each cover file: the cover of an album folder comes from the
+// oldest track that has a cover, and a single has a cover file of its own,
+// named like its track. Tracks not identified have no cover file.
+func renderInputs(tracks []manifest.Track) (paths map[string]string, covers map[string]manifest.Track) {
 	paths = layout.Assign(tracks)
-	albumCovers = map[string]manifest.Track{}
+	covers = map[string]manifest.Track{}
 	for _, t := range tracks {
-		if t.Status == manifest.Identified && t.Album != "" && t.CoverSHA256 != "" {
-			dir := path.Dir(paths[t.ID])
-			if cur, ok := albumCovers[dir]; !ok || older(t, cur) {
-				albumCovers[dir] = t
-			}
+		if t.Status != manifest.Identified || t.CoverSHA256 == "" {
+			continue
+		}
+		file := singleCoverPath(paths[t.ID])
+		if t.Album != "" {
+			file = path.Join(path.Dir(paths[t.ID]), "cover.jpg")
+		}
+		if cur, ok := covers[file]; !ok || older(t, cur) {
+			covers[file] = t
 		}
 	}
-	return paths, albumCovers
+	return paths, covers
+}
+
+// singleCoverPath is where the cover of a single goes: beside its file, under
+// the same name.
+func singleCoverPath(trackPath string) string {
+	return strings.TrimSuffix(trackPath, path.Ext(trackPath)) + ".jpg"
 }
 
 // signatures describes, for every track, everything its rendered output
@@ -36,7 +49,7 @@ func renderInputs(tracks []manifest.Track) (paths map[string]string, albumCovers
 // Each playlist has one too, under "playlist:" and its name: its name and
 // where each of its tracks goes.
 func signatures(m *manifest.Manifest) map[string]string {
-	paths, albumCovers := renderInputs(m.Tracks)
+	paths, covers := renderInputs(m.Tracks)
 	sigs := make(map[string]string, len(m.Tracks)+len(m.Playlists))
 	for _, p := range m.Playlists {
 		sum := sha256.Sum256(append([]byte(p.Name+"\x00"), playlistFile(p, paths)...))
@@ -44,9 +57,11 @@ func signatures(m *manifest.Manifest) map[string]string {
 	}
 	for _, t := range m.Tracks {
 		p := paths[t.ID]
-		folderCover := ""
+		folderCover := "" // the cover file this track's own belongs to, or comes from
 		if t.Status == manifest.Identified && t.Album != "" {
-			folderCover = albumCovers[path.Dir(p)].CoverSHA256
+			folderCover = covers[path.Join(path.Dir(p), "cover.jpg")].CoverSHA256
+		} else if t.Status == manifest.Identified && t.CoverSHA256 != "" {
+			folderCover = "single" // it has a cover file beside it
 		}
 		t.AddedAt, t.UpdatedAt = time.Time{}, time.Time{} // saving a record is not changing it
 		raw, _ := json.Marshal(t)

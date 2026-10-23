@@ -96,7 +96,7 @@ func TestAFullResolutionCoverIsSentOnceAndDrawnWithPlaceholders(t *testing.T) {
 		t.Errorf("%d placeholder cells on screen, want %d×%d", got, cols, rows)
 	}
 	lacks(t, m, "▀")
-	contains(t, m, "60×60 PNG")
+	contains(t, m, "60×60 JPEG")
 }
 
 func atoi(s string) int {

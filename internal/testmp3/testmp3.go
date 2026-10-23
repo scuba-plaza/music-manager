@@ -2,7 +2,14 @@
 // MPEG-1 Layer III frames, optionally wrapped in tags.
 package testmp3
 
-import "bytes"
+import (
+	"bytes"
+	"image"
+	"image/color"
+	"image/png"
+
+	"music-manager/internal/coverimg"
+)
 
 // FrameSize is the byte length of one frame (128 kbps, 44.1 kHz, no padding).
 const FrameSize = 417
@@ -83,12 +90,36 @@ func WithInfoFrame(audio []byte, marker string) []byte {
 	return append(frame, audio...)
 }
 
-// JPEG and PNG are stand-ins that look like images to a content sniffer.
+// JPEG and JPEG2 are two small pictures, already in the form covers are kept
+// in (so that storing them does not change them); PNG is a third, in a form
+// that is not.
 var (
-	JPEG  = []byte("\xff\xd8\xff\xe0 pretend jpeg \xff\xd9")
-	JPEG2 = []byte("\xff\xd8\xff\xe0 another jpeg \xff\xd9")
-	PNG   = []byte("\x89PNG\r\n\x1a\n pretend png")
+	JPEG  = cover(color.RGBA{200, 40, 40, 255}, true)
+	JPEG2 = cover(color.RGBA{40, 40, 200, 255}, true)
+	PNG   = cover(color.RGBA{40, 200, 40, 255}, false)
 )
+
+// cover draws a 16×12 picture in col, as a cover JPEG or as a PNG.
+func cover(col color.RGBA, asJPEG bool) []byte {
+	img := image.NewRGBA(image.Rect(0, 0, 16, 12))
+	for y := 0; y < 12; y++ {
+		for x := 0; x < 16; x++ {
+			img.SetRGBA(x, y, color.RGBA{col.R, col.G, uint8(20 * x), 255})
+		}
+	}
+	var b bytes.Buffer
+	if err := png.Encode(&b, img); err != nil {
+		panic(err)
+	}
+	if !asJPEG {
+		return b.Bytes()
+	}
+	out, err := coverimg.Normalize(b.Bytes())
+	if err != nil {
+		panic(err)
+	}
+	return out
+}
 
 // WithCover prepends an ID3v2.4 tag holding a front-cover picture.
 func WithCover(audio []byte, mime string, img []byte) []byte {

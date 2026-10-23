@@ -140,7 +140,7 @@ func TestKittyShowsTheCoverOfTheRealProgram(t *testing.T) {
 	s.MustSee("Shawn James")
 	s.Type("/flow\r")
 	s.Type("\x1b[B\x1b[B\x1b[B")
-	s.MustSee("300×300 PNG")
+	s.MustSee("300×300 JPEG")
 	if !s.WaitFor(5*time.Second, "\U0010EEEE") {
 		t.Fatalf("no placeholders on the screen:\n%s", s.Screen())
 	}
@@ -175,7 +175,7 @@ func TestKittyIsLeftTidyWhenTheProgramQuits(t *testing.T) {
 	s.MustSee("Shawn James")
 	s.Type("/flow\r")
 	s.Type("\x1b[B\x1b[B\x1b[B")
-	s.MustSee("300×300 PNG")
+	s.MustSee("300×300 JPEG")
 	if !s.WaitFor(5*time.Second, "\U0010EEEE") {
 		t.Fatalf("no placeholders:\n%s", s.Screen())
 	}

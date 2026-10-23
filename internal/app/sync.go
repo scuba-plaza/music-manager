@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -63,7 +61,7 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 		keepAudio[t.AudioSHA256] = true
 		keepCovers[t.CoverSHA256] = true
 	}
-	paths, albumCovers := renderInputs(m.Tracks)
+	paths, covers := renderInputs(m.Tracks)
 	desired := render.Tree{}
 	build := map[string]func() ([]byte, error){}
 	for i, t := range m.Tracks {
@@ -85,14 +83,10 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 		build[name] = func() ([]byte, error) { return data, nil }
 		desired[name] = fingerprint(data)
 	}
-	for dir, t := range albumCovers {
-		data, err := os.ReadFile(a.covers.Path(t.CoverSHA256))
+	for name, t := range covers {
+		data, err := a.coverFile(t.CoverSHA256)
 		if err != nil {
 			return nil, fmt.Errorf("cover of track %s: %w", t.ID, err)
-		}
-		name := path.Join(dir, "cover.jpg")
-		if http.DetectContentType(data) == "image/png" {
-			name = path.Join(dir, "cover.png")
 		}
 		build[name] = func() ([]byte, error) { return data, nil }
 		desired[name] = fingerprint(data)
@@ -180,10 +174,10 @@ func (a *App) renderTrack(t manifest.Track) ([]byte, error) {
 	}
 	ts := tagSet(t)
 	if t.Status == manifest.Identified && t.CoverSHA256 != "" {
-		if ts.Cover, err = os.ReadFile(a.covers.Path(t.CoverSHA256)); err != nil {
+		if ts.Cover, err = a.coverFile(t.CoverSHA256); err != nil {
 			return nil, err
 		}
-		ts.CoverMIME = http.DetectContentType(ts.Cover)
+		ts.CoverMIME = "image/jpeg"
 	}
 	return mp3.Render(audio, ts)
 }

@@ -9,6 +9,8 @@ import (
 	"image/png"
 	"math"
 	"strings"
+
+	"music-manager/internal/coverimg"
 )
 
 // This file speaks the part of the kitty graphics protocol that draws the
@@ -158,7 +160,7 @@ func encodeForKitty(data []byte) (encoded []byte, w, h int, err error) {
 	w, h = b.Dx(), b.Dy()
 	if longest := max(w, h); longest > kittyMaxPixels {
 		w, h = max(w*kittyMaxPixels/longest, 1), max(h*kittyMaxPixels/longest, 1)
-		img = resize(img, w, h)
+		img = coverimg.Resize(img, w, h)
 	}
 	var buf bytes.Buffer
 	if err := (&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&buf, img); err != nil {

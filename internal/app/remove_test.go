@@ -45,9 +45,9 @@ func TestRemoveDeletesTheRecordAndSyncCollectsItsBlobs(t *testing.T) {
 	if _, err := os.Stat(a.AudioPath(ts[0].AudioSHA256)); err != nil {
 		t.Errorf("referenced audio was collected: %v", err)
 	}
-	// The rendered file is a stray now, and goes with --prune.
+	// The rendered file and the cover beside it are strays now, and go with --prune.
 	ops := mustSync(t, a, app.SyncOptions{Prune: true})
-	if len(ops) != 1 || ops[0] != (render.Op{Kind: render.Remove, Path: "Band/Drop.mp3"}) {
+	if len(ops) != 2 || ops[0] != (render.Op{Kind: render.Remove, Path: "Band/Drop.jpg"}) || ops[1] != (render.Op{Kind: render.Remove, Path: "Band/Drop.mp3"}) {
 		t.Errorf("ops = %v", ops)
 	}
 }

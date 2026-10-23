@@ -1,0 +1,9 @@
+Small JPEGs of the kinds the mp3 player's photo viewer is known or feared to
+refuse, made with ImageMagick 7 (96x64 pixels):
+
+  magick -size 96x64 gradient:red-blue -interlace Plane -sampling-factor 1x1 progressive-444.jpg
+  magick -size 96x64 gradient:green-yellow -sampling-factor 1x1 -set comment camera baseline-444-exif.jpg
+  magick -size 96x64 gradient:red-blue -colorspace CMYK cmyk.jpg
+  magick -size 96x64 gradient:black-white -colorspace Gray gray.jpg
+  magick -size 96x64 gradient:green-yellow -sampling-factor 2x2 -quality 90 baseline-420-exif.jpg
+  exiftool -overwrite_original -Orientation=1 -Make=Nikon -Model=D70s baseline-420-exif.jpg

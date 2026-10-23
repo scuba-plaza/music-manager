@@ -14,6 +14,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"music-manager/internal/coverimg"
 )
 
 // The cover is drawn with half-block characters: every character cell shows
@@ -67,7 +69,7 @@ func loadThumbFor(data []byte, graphics bool) (thumb, error) {
 	if longest := max(w, h); longest > thumbMaxPixels {
 		w, h = max(w*thumbMaxPixels/longest, 1), max(h*thumbMaxPixels/longest, 1)
 	}
-	th := thumb{img: resize(img, w, h), info: info}
+	th := thumb{img: coverimg.Resize(img, w, h), info: info}
 	if graphics {
 		// If this fails the blocks are still there.
 		if th.kitty, th.kw, th.kh, err = encodeForKitty(data); err != nil {
@@ -75,31 +77,6 @@ func loadThumbFor(data []byte, graphics bool) (thumb, error) {
 		}
 	}
 	return th, nil
-}
-
-// resize scales img to w×h by averaging the pixels each new pixel covers
-// (or repeating pixels when it grows).
-func resize(img image.Image, w, h int) *image.RGBA {
-	b := img.Bounds()
-	sw, sh := b.Dx(), b.Dy()
-	out := image.NewRGBA(image.Rect(0, 0, w, h))
-	for y := 0; y < h; y++ {
-		y0 := y * sh / h
-		y1 := max(y0+1, (y+1)*sh/h)
-		for x := 0; x < w; x++ {
-			x0 := x * sw / w
-			x1 := max(x0+1, (x+1)*sw/w)
-			var r, g, bl, n uint64
-			for sy := y0; sy < y1; sy++ {
-				for sx := x0; sx < x1; sx++ {
-					pr, pg, pb, _ := img.At(b.Min.X+sx, b.Min.Y+sy).RGBA() // premultiplied: transparent reads as black
-					r, g, bl, n = r+uint64(pr>>8), g+uint64(pg>>8), bl+uint64(pb>>8), n+1
-				}
-			}
-			out.SetRGBA(x, y, color.RGBA{uint8(r / n), uint8(g / n), uint8(bl / n), 255})
-		}
-	}
-	return out
 }
 
 // thumbCells fits img into a box of cols×rows character cells, keeping its
@@ -115,7 +92,7 @@ func thumbCells(img image.Image, cols, rows int) [][]cell {
 	h := max(int(math.Round(float64(b.Dy())*scale)), 2)
 	h = min(h+h%2, boxH) // whole cells: an even number of pixel rows
 
-	px := resize(img, w, h)
+	px := coverimg.Resize(img, w, h)
 	cells := make([][]cell, h/2)
 	for y := range cells {
 		cells[y] = make([]cell, w)

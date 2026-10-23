@@ -6,7 +6,7 @@ folder match.
 
 ```
 Artist/Album/03 - Title.mp3     identified tracks (ASCII names, fresh ID3v2.4 tags, cover.jpg per album)
-Artist/Title.mp3                identified singles
+Artist/Title.mp3                identified singles (with Title.jpg, their cover, beside them)
 _Inbox/<id> - old name.mp3      tracks not identified yet
 .mm/                            stored audio and covers (content-addressed), library.json lives beside it
 ```
@@ -73,9 +73,14 @@ changes the library while the interface is open, the change appears within a cou
 | `mm ls [words] [status:identified\|unidentified] [--sort KEY] [--reverse]` / `mm show <id>` | look at records; `--sort` takes `artist`, `album`, `title`, `track`, `length`, `released`, `added` or `edited` |
 | `mm sync [--target DIR] [--dry-run] [--prune --yes]` | render the folder; `--prune` deletes files the records don't account for |
 | `mm rm <id>…` | remove records (audio is deleted by the next sync) |
+| `mm cover normalize [--dry-run]` | make every stored cover a JPEG the player opens (see Covers below) |
 | `mm playlist <new, add, rm, move, rename, delete, import, ls, show>` | make and change playlists (see Playlists below) |
 | `mm doctor` | check the stores for missing or damaged files |
 | `mm tui` | the full-screen interface (also what plain `mm` opens in a terminal) |
+
+## Covers
+
+The player's photo viewer opens baseline JPEG files of modest size. It fails on PNG and progressive files, on 4:4:4 colour and on very large pictures, and does not list PNG files at all. So every cover is stored as a baseline JPEG with a JFIF header, 4:2:0 colour, at most 480 pixels along its longer side (a transparent background becomes white), whatever file it was given; a cover that already is such a file is kept as it is. `mm sync` writes it as `cover.jpg` in an album folder and as `Title.jpg` beside a single. Covers stored by an earlier version are converted when they are synced, and `mm cover normalize` converts them in the library itself. The `cover.png` files they leave on the player are strays that `mm sync --prune` removes.
 
 ## Dates and sorting
 

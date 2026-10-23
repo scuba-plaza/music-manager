@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -328,13 +329,17 @@ func TestPTYCoverIsDrawnInColour(t *testing.T) {
 	s := startMM(t, 110, 34, a.Root(), "COLORTERM=truecolor")
 	s.MustSee("Shawn James")
 	s.Type("/flow\r\x1b[B\x1b[B\x1b[B") // the track
-	s.MustSee("40×40 PNG", "▀")
+	s.MustSee("40×40 JPEG", "▀")
 
 	raw := s.em.Render() // with the colour codes
-	for name, rgb := range map[string]string{"red": "255;0;0", "blue": "0;0;255"} {
-		if !strings.Contains(raw, rgb) {
-			t.Errorf("no %s (%s) in the picture's colour codes", name, rgb)
-		}
+	var red, blue bool   // the cover is kept as a JPEG, so the colours are near red and blue
+	for _, c := range regexp.MustCompile(`[34]8;2;(\d+);(\d+);(\d+)`).FindAllStringSubmatch(raw, -1) {
+		r, g, b := atoi(c[1]), atoi(c[2]), atoi(c[3])
+		red = red || r > 200 && g < 60 && b < 60
+		blue = blue || b > 200 && r < 60 && g < 60
+	}
+	if !red || !blue {
+		t.Errorf("the picture's colour codes lack red (%v) or blue (%v)", red, blue)
 	}
 }
 
