@@ -291,10 +291,10 @@ func TestPTYTrimWithAPreview(t *testing.T) {
 	}
 	s := startMM(t, 110, 30, a.Root(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	s.MustSee("Shawn James")
-	s.Type("/flow\r\x1b[B\x1b[B\x1b[B")      // find the track
-	s.Type("\x1b[C")                         // inspector
-	s.Type("\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B") // down to Cut start, below Title, Artist, Album, Track and Released
-	s.Type("}}")                             // cut two seconds
+	s.Type("/flow\r\x1b[B\x1b[B\x1b[B")            // find the track
+	s.Type("\x1b[C")                               // inspector
+	s.Type("\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B\x1b[B") // down to Cut start (on the Audio tab), below Title, Artist, Album, Track, Released and Cover
+	s.Type("}}")                                   // cut two seconds
 	s.MustSee("Saved", "Kept", "░")
 	t.Logf("\n%s", s.Screen())
 
@@ -494,7 +494,7 @@ func TestPTYTheMouseSelectsOpensAndEdits(t *testing.T) {
 	s.MustSee("The Wanderer")
 	s.Type(mouseClick(14, 6)) // the track
 	s.Type(mouseClick(14, 6)) // again: into its fields
-	s.MustSee("Cut start")
+	s.MustSee("Released")
 	s.Type(mouseClick(80, 3)) // the title field, already chosen: edit
 	s.MustSee("enter save")
 }

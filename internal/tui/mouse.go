@@ -20,17 +20,24 @@ const (
 	firstTreeRow    = 3
 )
 
-// fieldStarts returns, for each field of the track, the line of the
+// fieldStart says at which line of the inspector a field starts.
+type fieldStart struct{ field, line int }
+
+// fieldStarts returns, for each field of the tab shown, the line of the
 // inspector at which it starts, so a click can be traced to a field.
-func (m Model) fieldStarts(t manifest.Track, w, h int) []int {
+func (m Model) fieldStarts(t manifest.Track, w, h int) []fieldStart {
 	compact := m.compact(t, w, h)
-	line := 3 // a blank line, the title and a rule
-	if t.Status != manifest.Identified {
+	tab := m.tab()
+	line := 3 // the strip of tabs, the title and a rule
+	if t.Status != manifest.Identified && tab == 0 {
 		line++ // the note that it is not identified
 	}
-	starts := make([]int, len(trackFields))
+	var starts []fieldStart
 	for i, f := range trackFields {
-		starts[i] = line
+		if tabOf(f) != tab {
+			continue
+		}
+		starts = append(starts, fieldStart{i, line})
 		line += len(m.fieldLines(t, f, false, w, compact))
 		if f == fCutEnd {
 			line++ // the bar of what the cuts keep
@@ -121,15 +128,28 @@ func (m Model) clickInspector(msg tea.MouseMsg, l layoutInfo) (tea.Model, tea.Cm
 	if l.mode == modeOnePane {
 		w = l.left - 2
 	}
-	starts := m.fieldStarts(r.Track, w, l.body-2)
 	line := msg.Y - firstContentRow
+	if line == 0 { // the strip of tabs
+		left := l.left
+		if l.mode == modeOnePane {
+			left = 0
+		}
+		_, spans := m.tabStrip()
+		for i, s := range spans {
+			if x := msg.X - left - 1; x >= s[0] && x < s[1] {
+				m.focus, m.field = paneInspector, firstFieldOf(i)
+			}
+		}
+		return m, nil
+	}
+	starts := m.fieldStarts(r.Track, w, l.body-2)
 	field := -1
-	for i, s := range starts {
-		if line >= s {
-			field = i
+	for _, s := range starts {
+		if line >= s.line {
+			field = s.field
 		}
 	}
-	if line < starts[0] || field < 0 {
+	if len(starts) == 0 || line < starts[0].line || field < 0 {
 		return m, nil
 	}
 	m.focus = paneInspector

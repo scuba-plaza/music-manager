@@ -34,6 +34,14 @@ func (m *Model) focusInspector() bool {
 func (m Model) updateInspector(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	k := m.keys
 	switch {
+	case key.Matches(msg, k.PrevTab) && m.tab() > 0:
+		m.field = firstFieldOf(m.tab() - 1)
+	case key.Matches(msg, k.NextTab):
+		if m.tab()+1 < len(inspectorTabs) {
+			m.field = firstFieldOf(m.tab() + 1)
+		}
+	case key.Matches(msg, k.Tabs):
+		m.field = firstFieldOf(int(msg.String()[0] - '1'))
 	case key.Matches(msg, k.Back), key.Matches(msg, k.Switch):
 		m.focus = paneBrowser
 	case key.Matches(msg, k.Up):

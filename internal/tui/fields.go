@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -29,7 +30,49 @@ const (
 	fCover
 )
 
-var trackFields = []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fCutStart, fCutEnd, fCover}
+// An inspectorTab is a page of the inspector: some of the fields, under a name.
+type inspectorTab struct {
+	name   string
+	fields []fieldKind
+}
+
+var inspectorTabs = []inspectorTab{
+	{"Details", []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fCover}},
+	{"Audio", []fieldKind{fCutStart, fCutEnd}},
+}
+
+// trackFields is every field, tab by tab, in the order the cursor goes through
+// them.
+var trackFields = func() []fieldKind {
+	var all []fieldKind
+	for _, tab := range inspectorTabs {
+		all = append(all, tab.fields...)
+	}
+	return all
+}()
+
+// tabOf is the index of the tab that holds f.
+func tabOf(f fieldKind) int {
+	for i, tab := range inspectorTabs {
+		if slices.Contains(tab.fields, f) {
+			return i
+		}
+	}
+	return 0
+}
+
+// firstFieldOf is the place in trackFields of the first field of a tab.
+func firstFieldOf(tab int) int {
+	n := 0
+	for _, t := range inspectorTabs[:tab] {
+		n += len(t.fields)
+	}
+	return n
+}
+
+// tab is the tab the inspector shows: the one that holds the chosen field, so
+// that it stays the same from track to track.
+func (m Model) tab() int { return tabOf(trackFields[m.field]) }
 
 func (f fieldKind) label() string {
 	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Cut start", "Cut end", "Cover"}[f]

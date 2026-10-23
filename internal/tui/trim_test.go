@@ -123,6 +123,7 @@ func TestOneUndoRevertsAWholeRunOfNudges(t *testing.T) {
 
 func TestTheBarFollowsTheCuts(t *testing.T) {
 	m, _ := editingModel(t, "Flow")
+	m = keys(t, m, "right", "2") // the bar is on the audio tab
 	count := func() int { return strings.Count(screen(m), "█") }
 	before := count()
 	if before == 0 {

@@ -111,8 +111,7 @@ func (m Model) compact(t manifest.Track, w, h int) bool {
 	if t.CoverSHA256 == "" {
 		return false // nothing to make room for
 	}
-	quiet := m
-	quiet.editing, quiet.focus = false, paneBrowser
+	quiet := m.quiet()
 	room := func(compact bool) int { return quiet.coverRoom(t, w, h, len(quiet.headLines(t, w, compact))) }
 	return room(false) < comfortCoverRows && room(true) >= minCoverRows
 }
@@ -120,12 +119,17 @@ func (m Model) compact(t manifest.Track, w, h int) bool {
 // headLines is trackHead with the ASCII forms of the names left out if compact.
 func (m Model) headLines(t manifest.Track, w int, compact bool) []string {
 	_, title, _ := app.Display(t)
-	lines := []string{"", " " + styles.bold.Render(fit(title, w-2)), rule(w)}
-	if t.Status != manifest.Identified {
+	tab := m.tab()
+	strip, _ := m.tabStrip()
+	lines := []string{strip, " " + styles.bold.Render(fit(title, w-2)), rule(w)}
+	if t.Status != manifest.Identified && tab == 0 {
 		lines = append(lines, " "+styles.warn.Render("Not identified yet. Dim values are from the file's old tags."))
 	}
 
 	for i, f := range trackFields {
+		if tabOf(f) != tab {
+			continue
+		}
 		lines = append(lines, m.fieldLines(t, f, m.focus == paneInspector && i == m.field, w, compact)...)
 		if f == fCutEnd {
 			lines = append(lines, m.barLines(t, w))
@@ -142,7 +146,9 @@ func (m Model) trackLines(t manifest.Track, w, h int) []string {
 	}
 	lines := m.trackHead(t, w, h)
 	foot := m.footLines(t, shown, w)
-	lines = append(lines, m.thumbLines(t, w, h, h-len(lines)-len(foot)-coverSlack)...)
+	if m.tab() == 0 { // the cover belongs to the details
+		lines = append(lines, m.thumbLines(t, w, h, h-len(lines)-len(foot)-coverSlack)...)
+	}
 	return append(lines, foot...)
 }
 
@@ -356,4 +362,35 @@ func datesText(t manifest.Track) string {
 		parts = append(parts, "edited "+d)
 	}
 	return strings.Join(parts, " · ")
+}
+
+// quiet is the model as the cover is planned for: looking at the details,
+// with nothing being typed and the keyboard in the tree. The cover is laid out
+// as if so whatever the inspector shows now, so that typing, or another tab,
+// does not make it be sent again at another size.
+func (m Model) quiet() Model {
+	q := m
+	q.editing, q.focus, q.field = false, paneBrowser, 0
+	return q
+}
+
+// tabStrip draws the names of the tabs, the one shown highlighted, and says
+// where each label starts and ends (columns inside the pane) for the mouse.
+func (m Model) tabStrip() (string, [][2]int) {
+	strip, x := " ", 1
+	spans := make([][2]int, len(inspectorTabs))
+	for i, tab := range inspectorTabs {
+		// Each label has the number that jumps to it. The one shown has a mark
+		// as well as the colour, for terminals without colour.
+		st, mark := styles.dim, " "
+		if i == m.tab() {
+			st, mark = styles.selected, "▌"
+		}
+		label := fmt.Sprintf(" %s%d %s ", mark, i+1, tab.name)
+		w := ansi.StringWidth(label)
+		strip += st.Render(label) + " "
+		spans[i] = [2]int{x, x + w}
+		x += w + 1
+	}
+	return strip, spans
 }

@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -32,6 +34,9 @@ type keyMap struct {
 	Field key.Binding
 	Edit  key.Binding
 	Back  key.Binding
+
+	// between the tabs of the inspector
+	PrevTab, NextTab, Tabs key.Binding
 
 	// while editing a field
 	Save, Cancel, NextInput key.Binding
@@ -98,9 +103,12 @@ func newKeyMap() keyMap {
 		FilterClear: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear")),
 		ClearFilter: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear filter")),
 
-		Field: key.NewBinding(key.WithKeys("up", "k", "down", "j"), key.WithHelp("↑↓", "field")),
-		Edit:  key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "edit")),
-		Back:  key.NewBinding(key.WithKeys("esc", "left", "h"), key.WithHelp("←", "back")),
+		Field:   key.NewBinding(key.WithKeys("up", "k", "down", "j"), key.WithHelp("↑↓", "field")),
+		Edit:    key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "edit")),
+		Back:    key.NewBinding(key.WithKeys("esc", "left", "h"), key.WithHelp("←", "back")),
+		PrevTab: key.NewBinding(key.WithKeys("left", "h")),
+		NextTab: key.NewBinding(key.WithKeys("right", "l")),
+		Tabs:    key.NewBinding(key.WithKeys(tabNumbers()...), key.WithHelp(fmt.Sprintf("1-%d", len(inspectorTabs)), "tabs")),
 
 		Save:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "save")),
 		Cancel:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
@@ -144,4 +152,13 @@ func newKeyMap() keyMap {
 		NextField: key.NewBinding(key.WithKeys("tab", "down"), key.WithHelp("tab", "next")),
 		PrevField: key.NewBinding(key.WithKeys("shift+tab", "up")),
 	}
+}
+
+// tabNumbers are the keys that jump to a tab: "1" for the first.
+func tabNumbers() []string {
+	keys := make([]string, len(inspectorTabs))
+	for i := range keys {
+		keys[i] = fmt.Sprint(i + 1)
+	}
+	return keys
 }

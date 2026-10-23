@@ -52,8 +52,11 @@ func TestInTheNarrowLayoutAFieldPaneReplacesTheTree(t *testing.T) {
 	lacks(t, m, "Title")
 
 	m = keys(t, m, "right")
-	contains(t, m, "Title", "Artist", "Cut start")
-	lacks(t, m, "Library", "Along Our Way")
+	contains(t, m, "Title", "Artist")
+	lacks(t, m, "Library", "Along Our Way", "Cut start")
+	m = keys(t, m, "2")
+	contains(t, m, "Cut start")
+	m = keys(t, m, "1")
 
 	m = keys(t, m, "esc")
 	contains(t, m, "Library", "Along Our Way")

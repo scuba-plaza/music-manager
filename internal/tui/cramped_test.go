@@ -80,7 +80,7 @@ func TestClickingAFieldStillFindsItWhenTheAsciiFormsAreHidden(t *testing.T) {
 	for _, c := range []struct {
 		label string
 		field fieldKind
-	}{{"Artist", fArtist}, {"Album", fAlbum}, {"Released", fReleased}, {"Cut start", fCutStart}} {
+	}{{"Artist", fArtist}, {"Album", fAlbum}, {"Released", fReleased}, {"Cover", fCover}} {
 		m.focus = paneBrowser
 		m = send(t, m, click(l.left+8, fieldRow(t, m, c.label)))
 		if m.focus != paneInspector || trackFields[m.field] != c.field {

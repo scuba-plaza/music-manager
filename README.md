@@ -45,6 +45,7 @@ matter right now. Without a terminal, plain `mm` prints help as before.
 | `S` | sort the list by artist, album, title, track number, length or any of the three dates (see below); the menu also reverses the order and goes back to the tree |
 | `+` `-` | open the tree one more level (artists, then albums) / close all of it |
 | `→` `enter` | from a track into its fields; `enter` edits a field, `enter` saves, `esc` cancels |
+| `→` `←` `1` `2` | in the fields: the other tab (Details, Audio); `←` on the first tab goes back to the tree. The tab you are on stays when you select another track |
 | `tab` | while editing a name: switch between the text and its ASCII form |
 | `[` `]` `{` `}` `0` `p` | on a cut: nudge by 0.1 s / 1 s, clear, hear the 8 s around it (needs `ffplay` or `mpv`) |
 | `space` `ctrl+a` `e` | mark tracks (an album marks all of its tracks); edit the marked ones, or rename an artist or album |

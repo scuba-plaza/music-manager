@@ -191,13 +191,7 @@ func writeImage(t *testing.T, name string, data []byte) string {
 func TestChoosingACoverFromAFile(t *testing.T) {
 	m, hook := editingModel(t, "Flow")
 	path := writeImage(t, "front.png", encodePNG(t, twoTone(32, 32)))
-	m = keys(t, m, "right")
-	for i := 0; i < len(trackFields)-1; i++ {
-		m = keys(t, m, "down")
-	}
-	if trackFields[m.field] != fCover {
-		t.Fatalf("on %v", trackFields[m.field])
-	}
+	m = focusField(t, m, fCover)
 	m = keys(t, m, "enter")
 	contains(t, m, "JPEG or PNG")
 	m = typed(t, m, path)

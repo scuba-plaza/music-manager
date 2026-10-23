@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -145,15 +146,21 @@ func TestClickingAFieldInTheInspectorChoosesItAndAgainEditsIt(t *testing.T) {
 		m = keys(t, m, "right") // into the fields
 		l := computeLayout(m.w, m.h)
 
-		for i := len(trackFields) - 1; i >= 0; i-- { // backwards, so no click lands on the field already chosen
-			f := trackFields[i]
-			y := fieldRow(t, m, f.label())
-			m = send(t, m, click(l.left+8, y))
-			if trackFields[m.field] != f {
-				t.Fatalf("%s: a click on the %s row chose %v", track, f.label(), trackFields[m.field])
-			}
-			if m.editing {
-				t.Errorf("%s: the first click only chooses the field", track)
+		for tab := len(inspectorTabs) - 1; tab >= 0; tab-- {
+			m = keys(t, m, fmt.Sprint(tab+1))            // show the tab
+			for i := len(trackFields) - 1; i >= 0; i-- { // backwards, so no click lands on the field already chosen
+				f := trackFields[i]
+				if tabOf(f) != tab {
+					continue
+				}
+				y := fieldRow(t, m, f.label())
+				m = send(t, m, click(l.left+8, y))
+				if trackFields[m.field] != f {
+					t.Fatalf("%s: a click on the %s row chose %v", track, f.label(), trackFields[m.field])
+				}
+				if m.editing {
+					t.Errorf("%s: the first click only chooses the field", track)
+				}
 			}
 		}
 		y := fieldRow(t, m, "Album")
@@ -217,6 +224,7 @@ func TestClickingAFieldOfATrackNotIdentifiedYetFindsTheRightRow(t *testing.T) {
 	if r, _ := m.selectedRow(); r.Kind != kindTrack || r.Track.Status == manifest.Identified {
 		t.Fatalf("want the unidentified track, got %+v", r)
 	}
+	m = keys(t, m, "2") // the cuts are on the audio tab
 	l := computeLayout(m.w, m.h)
 	m = send(t, m, click(l.left+8, fieldRow(t, m, "Cut end")))
 	if trackFields[m.field] != fCutEnd {

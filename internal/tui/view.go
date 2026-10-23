@@ -195,7 +195,7 @@ func (m Model) footerKeys() []key.Binding {
 
 	var bindings []key.Binding
 	if m.focus == paneInspector {
-		bindings = []key.Binding{k.Field, k.Edit, k.Back}
+		bindings = []key.Binding{k.Field, k.Tabs, k.Edit, k.Back}
 		switch trackFields[m.field] {
 		case fCutStart, fCutEnd:
 			bindings = append(bindings, k.Less, k.Play)
