@@ -369,3 +369,76 @@ func TestOHasNothingToDoWithTheGroupOfPlaylists(t *testing.T) {
 	m = keys(t, m, "o")
 	contains(t, m, "Select a track that needs work")
 }
+
+func TestTheRenameBoxHasTheLatinNameOfThePlaylistToo(t *testing.T) {
+	lib, _ := playlistLib(t)
+	m := openStudy(t, newTestModel(t, lib, 120, 36))
+
+	m = keys(t, m, "e")
+	contains(t, m, "Rename the playlist", "Latin name")
+	m = keys(t, m, "tab") // to the Latin name, which starts as the name reads in Latin
+	m = clearField(t, m)
+	m = typed(t, m, "Study hall")
+	m = keys(t, m, "enter")
+	lacks(t, m, "Rename the playlist")
+	pls, _ := lib.Playlists()
+	if pls[0].Name != "Study" || pls[0].NameLatin != "Study hall" || len(pls[0].Tracks) != 2 {
+		t.Errorf("playlists = %+v", pls)
+	}
+	contains(t, m, "Latin name of Study")
+
+	// An empty Latin name takes the one set by hand away.
+	m = keys(t, m, "e", "tab")
+	m = clearField(t, m)
+	m = keys(t, m, "enter")
+	if pls, _ = lib.Playlists(); pls[0].NameLatin != "" {
+		t.Errorf("an empty Latin name should be forgotten: %+v", pls[0])
+	}
+	m = keys(t, m, "u") // and undo puts it back
+	if pls, _ = lib.Playlists(); pls[0].NameLatin != "Study hall" {
+		t.Errorf("undo gave %+v", pls[0])
+	}
+}
+
+func TestRenamingAPlaylistLeavesItsLatinNameToBeWorkedOutUnlessAsked(t *testing.T) {
+	lib, _ := playlistLib(t)
+	m := openStudy(t, newTestModel(t, lib, 120, 36))
+	m = keys(t, m, "e")
+	m = clearField(t, m)
+	m = typed(t, m, "Exams")
+	m = keys(t, m, "enter")
+	if pls, _ := lib.Playlists(); pls[0].Name != "Exams" || pls[0].NameLatin != "" {
+		t.Errorf("the form shown, worked out from the old name, was kept as if set by hand: %+v", pls[0])
+	}
+
+	m = keys(t, m, "e")
+	m = clearField(t, m)
+	m = typed(t, m, "Finals")
+	m = keys(t, m, "tab")
+	m = clearField(t, m)
+	m = typed(t, m, "Nihaiyat")
+	m = keys(t, m, "enter")
+	if pls, _ := lib.Playlists(); pls[0].Name != "Finals" || pls[0].NameLatin != "Nihaiyat" {
+		t.Errorf("playlists = %+v", pls)
+	}
+}
+
+func TestALatinNameThatWouldBeTheFileOfAnotherPlaylistIsRefusedAndNothingChanges(t *testing.T) {
+	lib, _ := playlistLib(t)
+	a := appOf(t, lib)
+	a.CreatePlaylist("Gym")
+	m := openStudy(t, newTestModel(t, lib, 120, 36))
+	m = send(t, m, loadedMsgFor(t, lib))
+
+	m = keys(t, m, "e")
+	m = clearField(t, m)
+	m = typed(t, m, "Exams")
+	m = keys(t, m, "tab")
+	m = clearField(t, m)
+	m = typed(t, m, "gym")
+	m = keys(t, m, "enter")
+	contains(t, m, "Rename the playlist", "same file")
+	if pls, _ := lib.Playlists(); pls[0].Name != "Study" {
+		t.Errorf("the playlist was renamed although its Latin name was refused: %+v", pls)
+	}
+}

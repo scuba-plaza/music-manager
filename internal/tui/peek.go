@@ -167,7 +167,7 @@ func (m Model) albumPeek(r Row, w int) (info, list []string) {
 func (m Model) playlistPeek(r Row, w int) (info, list []string) {
 	ts := m.tracksFor(r.IDs)
 	info = []string{" " + plural(r.Count, "track") + " · " + clock(lengthOf(ts)) + " plays", ""}
-	for i, l := range wrap(device.Generic.PlaylistFile(r.Label), w-4) {
+	for i, l := range wrap(device.Generic.PlaylistFile(manifest.Playlist{Name: r.Label}), w-4) {
 		prefix := "   "
 		if i == 0 {
 			prefix = " → "

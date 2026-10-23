@@ -32,7 +32,7 @@ func (fakeTarget) Cover([]byte) ([]byte, string, error) {
 
 func (fakeTarget) SingleCovers() bool { return false }
 
-func (fakeTarget) PlaylistFile(name string) string { return "Playlists/fake.m3u" }
+func (fakeTarget) PlaylistFile(manifest.Playlist) string { return "Playlists/fake.m3u" }
 
 func (fakeTarget) Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (string, []byte) {
 	return "Playlists/fake.m3u", []byte("fake playlist of " + p.Name)

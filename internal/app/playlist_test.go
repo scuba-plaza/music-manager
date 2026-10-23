@@ -427,3 +427,88 @@ func TestPlaylistNamesThatAreTheSameFileOnAnyTargetAreRefused(t *testing.T) {
 		t.Errorf("err = %v, want a refusal because the Wolfgang would write one file", err)
 	}
 }
+
+func TestAPlaylistsLatinNameIsSetByHandAndOnlyTheWolfgangFileFollowsIt(t *testing.T) {
+	a, _ := syncedPlaylistLib(t)
+	if err := a.RenamePlaylist("Study", "دراسة"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SetPlaylistLatin("دراسة", "  Daraseh "); err != nil {
+		t.Fatal(err)
+	}
+	m, _ := a.Manifest()
+	if p := m.Playlists[0]; p.Name != "دراسة" || p.NameLatin != "Daraseh" {
+		t.Fatalf("playlist = %+v", p)
+	}
+
+	target := filepath.Join(t.TempDir(), "player")
+	mustSync(t, a, app.SyncOptions{Target: target, Device: device.Wolfgang})
+	if got := readFile(t, target, "Playlists/Daraseh.m3u"); len(got) == 0 {
+		t.Error("the Wolfgang's playlist is not named by its Latin form")
+	}
+
+	mustSync(t, a, app.SyncOptions{})
+	if _, err := os.Stat(filepath.Join(a.Root(), "Playlists", "دراسة.m3u8")); err != nil {
+		t.Errorf("the library folder keeps the true name: %v", err)
+	}
+	if err := a.SetPlaylistLatin("دراسة", "Study"); err != nil {
+		t.Fatal(err)
+	}
+	if ops := mustSync(t, a, app.SyncOptions{}); len(ops) != 0 {
+		t.Errorf("a Latin name is nothing to write to the library folder: %v", ops)
+	}
+
+	if err := a.SetPlaylistLatin("دراسة", ""); err != nil {
+		t.Fatal(err)
+	}
+	m, _ = a.Manifest()
+	if m.Playlists[0].NameLatin != "" {
+		t.Errorf("an empty form should be forgotten: %q", m.Playlists[0].NameLatin)
+	}
+}
+
+func TestTwoPlaylistsMayNotHaveTheSameFileOnTheWolfgang(t *testing.T) {
+	a := libWithTracks(t, 10)
+	for _, name := range []string{"دراسة", "عمل"} {
+		if err := a.CreatePlaylist(name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := a.SetPlaylistLatin("دراسة", "Work"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SetPlaylistLatin("عمل", "work"); err == nil || !strings.Contains(err.Error(), "same file") {
+		t.Errorf("err = %v, want a refusal: both would be Work.m3u", err)
+	}
+	if err := a.CreatePlaylist("Work"); err == nil {
+		t.Error("a new playlist may not take the file of another's Latin name")
+	}
+	if err := a.SetPlaylistLatin("دراسة", "one\ntwo"); err == nil {
+		t.Error("a name on two lines should be refused")
+	}
+	if err := a.SetPlaylistLatin("nothing", "x"); err == nil {
+		t.Error("a playlist that does not exist has no Latin name")
+	}
+}
+
+func TestReplacingThePlaylistsKeepsTheirLatinNames(t *testing.T) {
+	a := libWithTracks(t, 10)
+	if err := a.CreatePlaylist("دراسة"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SetPlaylistLatin("دراسة", "Study"); err != nil {
+		t.Fatal(err)
+	}
+	m, _ := a.Manifest()
+	snapshot := slices.Clone(m.Playlists)
+	if err := a.DeletePlaylist("دراسة"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.ReplacePlaylists(snapshot); err != nil {
+		t.Fatal(err)
+	}
+	m, _ = a.Manifest()
+	if len(m.Playlists) != 1 || m.Playlists[0].NameLatin != "Study" {
+		t.Errorf("playlists = %+v", m.Playlists)
+	}
+}

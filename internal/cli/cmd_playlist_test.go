@@ -202,3 +202,38 @@ func TestImportingAPlaylistFileOfThePlayer(t *testing.T) {
 		t.Errorf("importing a file that is not a playlist: code %d, err %q", code, errs)
 	}
 }
+
+func TestAPlaylistHasALatinNameForTheTargetsThatCannotShowTheTrueOne(t *testing.T) {
+	lib, id := libWithSongs(t, "Dream")
+	run(t, lib, "playlist", "new", "دراسة", id["Dream"])
+
+	code, out, errs := run(t, lib, "playlist", "latin", "دراسة", "Study")
+	if code != 0 || !strings.Contains(out, "Study") {
+		t.Fatalf("latin: code %d, out %q, err %q", code, out, errs)
+	}
+	if _, out, _ = run(t, lib, "playlist", "show", "دراسة"); !strings.Contains(out, "Latin name: Study") {
+		t.Errorf("show:\n%s", out)
+	}
+	if _, out, _ = run(t, lib, "playlist", "ls"); !strings.Contains(out, "LATIN") || !strings.Contains(out, "Study") {
+		t.Errorf("ls:\n%s", out)
+	}
+
+	player := filepath.Join(t.TempDir(), "player")
+	if code, _, errs := run(t, lib, "sync", "--wolfgang", "--target", player); code != 0 {
+		t.Fatalf("sync: %s", errs)
+	}
+	if _, err := os.Stat(filepath.Join(player, "Playlists", "Study.m3u")); err != nil {
+		t.Errorf("the Wolfgang's playlist is not named by its Latin name: %v", err)
+	}
+
+	code, out, errs = run(t, lib, "playlist", "latin", "دراسة") // none: the one worked out is used again
+	if code != 0 || !strings.Contains(out, "worked out") {
+		t.Errorf("clearing: code %d, out %q, err %q", code, out, errs)
+	}
+	if _, out, _ = run(t, lib, "playlist", "show", "دراسة"); strings.Contains(out, "Latin name") {
+		t.Errorf("show after clearing:\n%s", out)
+	}
+	if code, _, _ := run(t, lib, "playlist", "latin", "nothing", "x"); code == 0 {
+		t.Error("a playlist that does not exist has no Latin name")
+	}
+}

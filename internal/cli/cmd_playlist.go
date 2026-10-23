@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -24,7 +25,7 @@ from the card's root, with backslashes.`,
 	}
 	cmd.AddCommand(playlistNewCmd(open), playlistLsCmd(open), playlistShowCmd(open),
 		playlistAddCmd(open), playlistRmCmd(open), playlistMoveCmd(open),
-		playlistRenameCmd(open), playlistDeleteCmd(open), playlistImportCmd(open))
+		playlistRenameCmd(open), playlistLatinCmd(open), playlistDeleteCmd(open), playlistImportCmd(open))
 	return cmd
 }
 
@@ -65,10 +66,23 @@ func playlistLsCmd(open opener) *cobra.Command {
 				fmt.Fprintln(cmd.OutOrStdout(), "no playlists yet: mm playlist new <name> [id...]")
 				return nil
 			}
-			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "NAME\tTRACKS\tLENGTH")
+			// The column of Latin names is there when any was set by hand.
+			latin := false
 			for _, p := range m.Playlists {
-				fmt.Fprintf(w, "%s\t%d\t%s\n", p.Name, len(p.Tracks), clock(playlistLength(m, p)))
+				latin = latin || p.NameLatin != ""
+			}
+			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
+			if latin {
+				fmt.Fprintln(w, "NAME\tLATIN\tTRACKS\tLENGTH")
+			} else {
+				fmt.Fprintln(w, "NAME\tTRACKS\tLENGTH")
+			}
+			for _, p := range m.Playlists {
+				if latin {
+					fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", p.Name, p.NameLatin, len(p.Tracks), clock(playlistLength(m, p)))
+				} else {
+					fmt.Fprintf(w, "%s\t%d\t%s\n", p.Name, len(p.Tracks), clock(playlistLength(m, p)))
+				}
 			}
 			return w.Flush()
 		},
@@ -104,6 +118,9 @@ func playlistShowCmd(open opener) *cobra.Command {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "%s, %s\n", tracksText(len(p.Tracks)), clock(playlistLength(m, p)))
+			if p.NameLatin != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "Latin name: %s\n", p.NameLatin)
+			}
 			return nil
 		},
 	}
@@ -211,6 +228,37 @@ func playlistRenameCmd(open opener) *cobra.Command {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "renamed %s to %s\n", args[0], args[1])
+			return nil
+		},
+	}
+}
+
+func playlistLatinCmd(open opener) *cobra.Command {
+	return &cobra.Command{
+		Use:   "latin <name> [latin name]",
+		Short: "Set how a playlist is named in Latin letters",
+		Long: `A device that cannot show the true name of a playlist, like the Wolfgang WMP01
+with "mm sync --wolfgang", gets its file under the Latin name. Without one set by
+hand, the name is worked out from the true name. Leave the Latin name out to go
+back to that.`,
+		Args: cobra.RangeArgs(1, 2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a, err := open()
+			if err != nil {
+				return err
+			}
+			latin := ""
+			if len(args) == 2 {
+				latin = args[1]
+			}
+			if err := a.SetPlaylistLatin(args[0], latin); err != nil {
+				return err
+			}
+			if strings.TrimSpace(latin) == "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "the Latin name of %s is worked out again\n", args[0])
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), "the Latin name of %s is %s\n", args[0], strings.TrimSpace(latin))
+			}
 			return nil
 		},
 	}

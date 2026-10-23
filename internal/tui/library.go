@@ -75,6 +75,7 @@ type Library interface {
 	RemoveFromPlaylist(name string, ids []string) error
 	MoveInPlaylist(name, id string, to int) error
 	RenamePlaylist(name, to string) error
+	SetPlaylistLatin(name, latin string) error
 	DeletePlaylist(name string) error
 	ReplacePlaylists(ps []manifest.Playlist) error
 	// SetCover sets a track's cover image (JPEG or PNG), or removes it if

@@ -180,7 +180,8 @@ func (m Model) openBulk() (tea.Model, tea.Cmd) {
 	}
 	switch {
 	case r.Kind == kindPlaylist:
-		m.overlay = newPlaylistNamer(r.Label)
+		p, _ := m.playlistNamed(r.Label)
+		m.overlay = newPlaylistNamer(p)
 	case r.Key == playlistsKey:
 		m.say("Select a playlist to rename it", true)
 	case len(m.marks) > 0:

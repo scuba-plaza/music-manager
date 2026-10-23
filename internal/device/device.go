@@ -34,8 +34,9 @@ type Target interface {
 	CoverFile(storedMIME string) string
 	// SingleCovers says whether a single gets a cover file of its own.
 	SingleCovers() bool
-	// PlaylistFile is where the playlist of this name is written in the target.
-	PlaylistFile(name string) string
+	// PlaylistFile is where the playlist is written in the target: under its true
+	// name, or under the Latin form of it where the target cannot show the true one.
+	PlaylistFile(p manifest.Playlist) string
 	// Playlist is the file of a playlist, given the tracks by ID and where each
 	// is written: its path in the target and its content.
 	Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (name string, data []byte)
@@ -158,12 +159,12 @@ func (generic) CoverFile(storedMIME string) string {
 // SingleCovers: a single has its cover in its tag, and no file of its own.
 func (generic) SingleCovers() bool { return false }
 
-func (g generic) PlaylistFile(name string) string {
-	return layout.PlaylistPath(name, ".m3u8", g.Layout())
+func (g generic) PlaylistFile(p manifest.Playlist) string {
+	return layout.PlaylistPath(p.Name, ".m3u8", g.Layout())
 }
 
 func (g generic) Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (string, []byte) {
-	return g.PlaylistFile(p.Name), genericPlaylist(p, tracks, paths)
+	return g.PlaylistFile(p), genericPlaylist(p, tracks, paths)
 }
 
 type wolfgang struct{}
@@ -213,10 +214,10 @@ func (wolfgang) CoverFile(string) string { return "cover.jpg" }
 // one beside its file.
 func (wolfgang) SingleCovers() bool { return true }
 
-func (w wolfgang) PlaylistFile(name string) string {
-	return layout.PlaylistPath(name, ".m3u", w.Layout())
+func (w wolfgang) PlaylistFile(p manifest.Playlist) string {
+	return layout.PlaylistPath(p.LatinName(), ".m3u", w.Layout())
 }
 
 func (w wolfgang) Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (string, []byte) {
-	return w.PlaylistFile(p.Name), wolfgangPlaylist(p, paths)
+	return w.PlaylistFile(p), wolfgangPlaylist(p, paths)
 }
