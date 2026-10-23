@@ -75,6 +75,7 @@ changes the library while the interface is open, the change appears within a cou
 | `mm sync [--target DIR] [--dry-run] [--prune --yes]` | render the folder; `--prune` deletes files the records don't account for |
 | `mm rm <id>…` | remove records (audio is deleted by the next sync) |
 | `mm cover normalize [--dry-run]` | make every stored cover a JPEG the player opens (see Covers below) |
+| `mm review apply <file> [--dry-run] [--include-low]` | set a field for many tracks from a file of proposals you have corrected (see Review files below) |
 | `mm playlist <new, add, rm, move, rename, delete, import, ls, show>` | make and change playlists (see Playlists below) |
 | `mm doctor` | check the stores for missing or damaged files |
 | `mm tui` | the full-screen interface (also what plain `mm` opens in a terminal) |
@@ -87,6 +88,25 @@ The player's photo viewer opens baseline JPEG files of modest size. It fails on 
 
 A track may have a genre, free text such as `Folk`, `Anthem` or `Neoclassical`. `mm sync` writes it to the file as the genre tag, which the player shows. Set it with `mm edit <id> --genre Folk`, in the TUI (the Genre field and the bulk edit form, `e`) or `mm add --genre`; find tracks with `mm ls genre:folk` (any part of the genre, case ignored). The tags of an ingested file are kept as hints, the genre among them, and `mm adopt` takes them.
 
+## Review files
+
+When a field has to be filled in for many tracks at once, a review file lists a proposal for each artist, album or track, with how sure the proposal is, so that you can read and correct it before anything changes:
+
+```
+## ARTISTS -> genre
+
+Fairouz  (10 tracks)  [high ; the old tags]
+    Arabic
+
+## TRACKS -> genre
+
+k7f2qd  Fairouz · Songs (Live) · Wtni  [low ; a guess]
+    Anthem
+```
+
+The sections are `## ARTISTS`, `## ALBUMS` and `## TRACKS`, each followed by `-> field` (today `genre`). An entry is a heading and, indented under it, the value; the heading names the artist or album as the library does, or starts with the track's ID, and may end with `[high|medium|low ; note]` (an entry without one counts as high). A value of `-` or nothing skips the entry. A track's value wins over its album's, which wins over its artist's. Lines starting with `#` are comments.
+
+`mm review apply <file>` checks the whole file first, so that one invalid value changes nothing, then sets all the values in one save. Entries marked `low` are left out unless you pass `--include-low`, `--dry-run` only reports, and entries that match no track are listed. Applying a file twice changes nothing the second time.
 ## Dates and sorting
 
 Every track has three dates:
