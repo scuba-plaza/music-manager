@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/x/ansi"
 
@@ -135,6 +136,13 @@ func (m Model) headLines(t manifest.Track, w int, compact bool) []string {
 			lines = append(lines, m.barLines(t, w))
 		}
 	}
+	if tab == tabOf(fPlayerArtist) {
+		lines = append(lines, "")
+		text := fmt.Sprintf("The player keeps only %d characters of the artist and of the album, so a longer name is shortened here, at a word. Type a name to choose it yourself.", app.PlayerFieldWidth)
+		for _, l := range wrap(text, w-2) {
+			lines = append(lines, " "+styles.dim.Render(l))
+		}
+	}
 	return lines
 }
 
@@ -192,6 +200,9 @@ func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int, co
 
 	if f == fCover {
 		return []string{prefix + m.coverText(t)}
+	}
+	if f == fPlayerArtist || f == fPlayerAlbum {
+		return playerFieldLines(t, f, prefix, indent, vw)
 	}
 
 	value := displayValue(t, f)
@@ -335,6 +346,14 @@ func (m Model) editorLines(prefix, indent string, vw int) []string {
 	case m.dr.field == fGenre:
 		first.Width = max(vw-1, 1)
 		lines = append(lines, prefix+first.View(), indent+styles.dim.Render(fit("e.g. Folk or Neoclassical · empty for none", vw)))
+	case m.dr.field == fPlayerArtist || m.dr.field == fPlayerAlbum:
+		first.Width = max(vw-1, 1)
+		n := utf8.RuneCountInString(strings.TrimSpace(first.Value()))
+		count := styles.dim.Render(fit(fmt.Sprintf("%d of %d characters · empty for the automatic name", n, app.PlayerFieldWidth), vw))
+		if over := n - app.PlayerFieldWidth; over > 0 {
+			count = styles.warn.Render(fit(fmt.Sprintf("%d of %d characters · the player cuts the last %d", n, app.PlayerFieldWidth, over), vw))
+		}
+		lines = append(lines, prefix+first.View(), indent+count)
 	default:
 		first.Width = max(vw-24, 1)
 		lines = append(lines, prefix+first.View()+styles.dim.Render("  e.g. 0:12 or 1:30.5"))
@@ -396,4 +415,41 @@ func (m Model) tabStrip() (string, [][2]int) {
 		x += w + 1
 	}
 	return strip, spans
+}
+
+// playerFieldLines is the artist or album the player shows, with beneath it
+// where it comes from when that is worth saying.
+func playerFieldLines(t manifest.Track, f fieldKind, prefix, indent string, vw int) []string {
+	if t.Status != manifest.Identified {
+		return []string{prefix + styles.dim.Render("— (not identified yet)")}
+	}
+	shown, _ := playerShown(t, f)
+	own, real := t.PlayerArtist, t.Artist
+	if f == fPlayerAlbum {
+		own, real = t.PlayerAlbum, t.Album
+	}
+	lines := []string{prefix + fit(shown, vw)}
+
+	var note []string
+	switch {
+	case own != "":
+		note = append(note, "your own")
+	case f == fPlayerAlbum && real == "":
+		note = append(note, "a single, so the title stands in")
+	}
+	if real != "" && real != shown {
+		note = append(note, `from "`+real+`"`)
+	}
+	over := utf8.RuneCountInString(shown) - app.PlayerFieldWidth
+	if over > 0 {
+		note = append(note, fmt.Sprintf("the player cuts it at %d", app.PlayerFieldWidth))
+	}
+	if len(note) == 0 {
+		return lines
+	}
+	st := styles.dim
+	if over > 0 {
+		st = styles.warn
+	}
+	return append(lines, indent+st.Render(fit(strings.Join(note, " · "), vw)))
 }

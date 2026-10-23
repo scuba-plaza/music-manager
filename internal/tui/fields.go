@@ -29,6 +29,8 @@ const (
 	fCutStart
 	fCutEnd
 	fCover
+	fPlayerArtist
+	fPlayerAlbum
 )
 
 // An inspectorTab is a page of the inspector: some of the fields, under a name.
@@ -40,6 +42,7 @@ type inspectorTab struct {
 var inspectorTabs = []inspectorTab{
 	{"Details", []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fGenre, fCover}},
 	{"Audio", []fieldKind{fCutStart, fCutEnd}},
+	{"Player", []fieldKind{fPlayerArtist, fPlayerAlbum}},
 }
 
 // trackFields is every field, tab by tab, in the order the cursor goes through
@@ -76,7 +79,7 @@ func firstFieldOf(tab int) int {
 func (m Model) tab() int { return tabOf(trackFields[m.field]) }
 
 func (f fieldKind) label() string {
-	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover"}[f]
+	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Artist", "Album"}[f]
 }
 
 // isName reports whether the field is text that also has an ASCII form.
@@ -181,6 +184,12 @@ func displayValue(t manifest.Track, f fieldKind) string {
 		return releasedText(t)
 	case fGenre:
 		return genreText(t)
+	case fPlayerArtist, fPlayerAlbum:
+		if t.Status != manifest.Identified {
+			return ""
+		}
+		shown, _ := playerShown(t, f)
+		return shown
 	}
 	if s := cutText(f, t); s != "" {
 		return s
@@ -196,6 +205,9 @@ type draft struct {
 	second string
 	// touched: the user wrote the second input themselves.
 	touched bool
+	// auto: what the player shows when the field is left to itself, for the
+	// player names: text equal to it is not an override.
+	auto string
 	// follow: the ASCII form was the automatic one, so it keeps following
 	// the text until touched. A custom form stays put.
 	follow bool
@@ -216,6 +228,8 @@ func newDraft(t manifest.Track, f fieldKind) draft {
 		d.text = releasedText(t)
 	case f == fGenre:
 		d.text = genreText(t)
+	case f == fPlayerArtist || f == fPlayerAlbum:
+		d.text, d.auto = playerShown(t, f)
 	default:
 		d.text = cutText(f, t)
 	}
@@ -278,6 +292,16 @@ func (d draft) edit() (app.Edit, error) {
 	case fGenre:
 		genre := strings.TrimSpace(d.text)
 		e.Genre = &genre
+	case fPlayerArtist, fPlayerAlbum:
+		name := strings.TrimSpace(d.text)
+		if name == d.auto {
+			name = "" // the automatic one is not stored
+		}
+		if d.field == fPlayerArtist {
+			e.PlayerArtist = &name
+		} else {
+			e.PlayerAlbum = &name
+		}
 	case fCutStart, fCutEnd:
 		var cut time.Duration
 		if s := strings.TrimSpace(d.text); s != "" {
@@ -336,4 +360,16 @@ func previewTrack(t manifest.Track, d draft) manifest.Track {
 		t.Status = manifest.Identified
 	}
 	return t
+}
+
+// playerShown is what the player shows for the artist or album of t, and what
+// it would show if the track had no name of its own for it.
+func playerShown(t manifest.Track, f fieldKind) (shown, auto string) {
+	artist, album := app.PlayerTags(t)
+	t.PlayerArtist, t.PlayerAlbum = "", ""
+	autoArtist, autoAlbum := app.PlayerTags(t)
+	if f == fPlayerArtist {
+		return artist, autoArtist
+	}
+	return album, autoAlbum
 }

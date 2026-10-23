@@ -1,6 +1,8 @@
 package layout_test
 
 import (
+	"fmt"
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -33,7 +35,7 @@ func TestPathFor(t *testing.T) {
 		{"leading apostrophe from romanised ayn", identified("'Bd al-Hlim", "", "Song'", 0, 0), "Bd al-Hlim/Song.mp3"},
 		{"inner apostrophes stay", identified("Ma'a", "", "Don't", 0, 0), "Ma'a/Don't.mp3"},
 		{"empty after cleaning", identified("???", "", "...", 0, 0), "Unknown/Unknown.mp3"},
-		{"unidentified", manifest.Track{ID: "k7f2qd", Status: manifest.Unidentified, Hint: manifest.Hint{Filename: "01 - Bahlam Bek"}}, "_Inbox/k7f2qd - 01 - Bahlam Bek.mp3"},
+		{"unidentified", manifest.Track{ID: "k7f2qd", Status: manifest.Unidentified, Hint: manifest.Hint{Filename: "01 - Bahlam Bek"}}, "_Inbox/k7f2qd - 01 - Bahlam.mp3"},
 		{"unidentified with non-ascii hint", manifest.Track{ID: "k7f2qd", Status: manifest.Unidentified, Hint: manifest.Hint{Filename: "وطني"}}, "_Inbox/k7f2qd - Wtni.mp3"},
 		{"unidentified without hint", manifest.Track{ID: "k7f2qd", Status: manifest.Unidentified}, "_Inbox/k7f2qd.mp3"},
 	}
@@ -118,6 +120,80 @@ func TestPlaylistPath(t *testing.T) {
 	for name, want := range cases {
 		if got := layout.PlaylistPath(name); got != want {
 			t.Errorf("PlaylistPath(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
+// The player's index keeps 26 characters of a file name, the extension
+// included, and cuts the rest: so names are shortened here, where they are
+// whole words, instead of there.
+
+func TestFileNamesAreShortenedToWhatThePlayerKeeps(t *testing.T) {
+	cases := []struct {
+		name string
+		in   manifest.Track
+		want string
+	}{
+		{"fits exactly", identified("A", "", "Exactly Twenty Two Chr", 0, 0), "A/Exactly Twenty Two Chr.mp3"},
+		{"cut after a whole word", identified("A", "", "A Very Long Song Title Indeed Yes", 0, 0), "A/A Very Long Song Title.mp3"},
+		{"the number is kept and leaves less room", identified("A", "B", "The Long and Winding Road", 3, 8), "A/B/03 - The Long.mp3"},
+		{"a parenthesis goes before a word does", identified("A", "B", "Ya mashallah (Remix)", 8, 9), "A/B/08 - Ya mashallah.mp3"},
+		{"a word too long for the room is cut in it", identified("A", "B", "Supercalifragilistic", 1, 9), "A/B/01 - Supercalifragilis.mp3"},
+		{"no word boundary worth keeping", identified("A", "B", "Hi Supercalifragilistic", 1, 9), "A/B/01 - Hi Supercalifragi.mp3"},
+		{"a wide number takes more room", identified("A", "B", "The Long and Winding Road", 7, 120), "A/B/007 - The Long.mp3"},
+		{"no dangling punctuation", identified("A", "", "Twenty Characters Fit, Then More", 0, 0), "A/Twenty Characters Fit.mp3"},
+		{"only a parenthesis is better than nothing", identified("A", "", "(Instrumental Version Of It)", 0, 0), "A/(Instrumental Version.mp3"},
+		{"the folders keep their length", identified("An Artist With A Rather Long Name", "An Album With A Rather Long Name", "S", 0, 0), "An Artist With A Rather Long Name/An Album With A Rather Long Name/S.mp3"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := layout.PathFor(c.in); got != c.want {
+				t.Errorf("PathFor = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+func TestACollisionSuffixStaysWithinWhatThePlayerKeeps(t *testing.T) {
+	mk := func(id string, added int, title string) manifest.Track {
+		tr := identified("Artist", "", title, 0, 0)
+		tr.ID = id
+		tr.AddedAt = time.Unix(int64(added), 0)
+		return tr
+	}
+	got := layout.Assign([]manifest.Track{
+		mk("aaaaaa", 1, "A Very Long Song Title Indeed Yes"),
+		mk("bbbbbb", 2, "A Very Long Song Title Indeed No"),
+		mk("cccccc", 3, "A Very Long Song Title Indeed Maybe"),
+	})
+	want := map[string]string{
+		"aaaaaa": "Artist/A Very Long Song Title.mp3",
+		"bbbbbb": "Artist/A Very Long Song (2).mp3",
+		"cccccc": "Artist/A Very Long Song (3).mp3",
+	}
+	for id, w := range want {
+		if got[id] != w {
+			t.Errorf("Assign[%s] = %q, want %q", id, got[id], w)
+		}
+	}
+}
+
+func TestNoFileNameIsLongerThanThePlayerKeeps(t *testing.T) {
+	title := "Qasidat al-Hubb wa al-Hanin ila al-Watan al-Ghali (Live in Beirut)"
+	var tracks []manifest.Track
+	for i := 0; i < 12; i++ { // twelve that all shorten to the same name
+		tr := identified("Artist", "", fmt.Sprintf("%s %d", title, i), 0, 0)
+		tr.ID = fmt.Sprintf("id%04d", i)
+		tr.AddedAt = time.Unix(int64(i), 0)
+		tracks = append(tracks, tr)
+	}
+	tracks = append(tracks,
+		identified("Artist", "Album", title, 12, 120),
+		manifest.Track{ID: "k7f2qd", Status: manifest.Unidentified, Hint: manifest.Hint{Filename: title}},
+	)
+	for id, p := range layout.Assign(tracks) {
+		if name := path.Base(p); len(name) > 26 {
+			t.Errorf("%s: file name %q is %d characters, the player keeps 26", id, name, len(name))
 		}
 	}
 }

@@ -439,3 +439,40 @@ func TestAddTakesTheGenreFromAFlag(t *testing.T) {
 		t.Errorf("show:\n%s", out)
 	}
 }
+
+func TestTheNamesThePlayerShowsCanBeSetAndAreShownWhenTheyDiffer(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib)
+
+	if code, _, errs := run(t, lib, "edit", id, "--title", "Song", "--artist", "Abdel Halim Hafez", "--album", "Abd El Halim Hafez"); code != 0 {
+		t.Fatalf("edit: code %d, err %q", code, errs)
+	}
+	_, out, _ := run(t, lib, "show", id)
+	if !strings.Contains(squash(out), "On the player Abdel Halim · Abd El Halim") {
+		t.Errorf("show lacks what the player will show:\n%s", out)
+	}
+
+	if code, _, errs := run(t, lib, "edit", id, "--player-artist", "A. H. Hafez", "--player-album", "Hafez Hits"); code != 0 {
+		t.Fatalf("edit: code %d, err %q", code, errs)
+	}
+	_, out, _ = run(t, lib, "show", id)
+	if s := squash(out); !strings.Contains(s, "On the player A. H. Hafez · Hafez Hits") || !strings.Contains(s, "Player artist A. H. Hafez") {
+		t.Errorf("show after setting them:\n%s", out)
+	}
+
+	run(t, lib, "edit", id, "--player-artist", "", "--player-album", "")
+	if _, out, _ = run(t, lib, "show", id); strings.Contains(out, "Player artist") || strings.Contains(out, "Player album") {
+		t.Errorf("cleared names are still shown:\n%s", out)
+	}
+
+	// A track whose names fit has nothing to add.
+	run(t, lib, "edit", id, "--artist", "Band", "--album", "Hits")
+	if _, out, _ = run(t, lib, "show", id); strings.Contains(out, "On the player") {
+		t.Errorf("show repeats names that fit:\n%s", out)
+	}
+
+	// add takes no such flags
+	if code, _, _ := run(t, lib, "add", "u1", "--player-artist", "X"); code == 0 {
+		t.Error("add accepted --player-artist")
+	}
+}

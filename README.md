@@ -70,7 +70,7 @@ changes the library while the interface is open, the change appears within a cou
 | `mm identify [id…] [--yes]` | look tracks up on MusicBrainz; pick from a list, or `--yes` for confident matches |
 | `mm adopt [id…]` | identify tracks by what their old tags said, for what MusicBrainz does not know |
 | `mm add <url>` | download with yt-dlp and add |
-| `mm edit <id> --title … --artist … --album … --track N --of N --released DATE --genre TEXT --source-url LINK --trim-start T --trim-end T --cover FILE` | change a track; `--title-ascii` etc. override the derived ASCII |
+| `mm edit <id> --title … --artist … --album … --track N --of N --released DATE --genre TEXT --player-artist TEXT --player-album TEXT --source-url LINK --trim-start T --trim-end T --cover FILE` | change a track; `--title-ascii` etc. override the derived ASCII |
 | `mm ls [words] [status:identified\|unidentified] [--sort KEY] [--reverse]` / `mm show <id>` | look at records; `--sort` takes `artist`, `album`, `title`, `track`, `length`, `released`, `added` or `edited` |
 | `mm sync [--target DIR] [--dry-run] [--prune --yes]` | render the folder; `--prune` deletes files the records don't account for |
 | `mm rm <id>…` | remove records (audio is deleted by the next sync) |
@@ -104,9 +104,17 @@ k7f2qd  Fairouz · Songs (Live) · Wtni  [low ; a guess]
     Anthem
 ```
 
-The sections are `## ARTISTS`, `## ALBUMS` and `## TRACKS`, each followed by `-> field` (today `genre`). An entry is a heading and, indented under it, the value; the heading names the artist or album as the library does, or starts with the track's ID, and may end with `[high|medium|low ; note]` (an entry without one counts as high). A value of `-` or nothing skips the entry. A track's value wins over its album's, which wins over its artist's. Lines starting with `#` are comments.
+The sections are `## ARTISTS`, `## ALBUMS` and `## TRACKS`, each followed by `-> field` (`genre`, `player-artist` or `player-album`). An entry is a heading and, indented under it, the value; the heading names the artist or album as the library does, or starts with the track's ID, and may end with `[high|medium|low ; note]` (an entry without one counts as high). A value of `-` or nothing skips the entry. A track's value wins over its album's, which wins over its artist's. Lines starting with `#` are comments.
 
 `mm review apply <file>` checks the whole file first, so that one invalid value changes nothing, then sets all the values in one save. Entries marked `low` are left out unless you pass `--include-low`, `--dry-run` only reports, and entries that match no track are listed. Applying a file twice changes nothing the second time.
+## Names on the player
+
+The player keeps only 12 characters of an artist and of an album, and 26 of a file name (the `.mp3` included), and cuts the rest wherever that falls: "Abdel Halim Hafez" showed up as "Abdel Halim H". So `mm sync` shortens the names itself, in the file's tags and in the file names, at a whole word where it can: parentheses and a leading "The" go first, then the name is cut after the last word that leaves at least half of it, and never ends on a small word such as "of" or "and". The library keeps the full names. A single has no album, which the player shows as "Unknown Album", so its title is written there instead.
+
+To choose a name yourself, set `--player-artist` or `--player-album` (`mm edit <id> --player-artist "A. H. Hafez"`; `""` goes back to the automatic one), or use the Player tab of the TUI (`3`), which shows what the player will show, where it comes from and how many characters it counts. `mm show` has an "On the player" row when the names differ. For many tracks at once use a review file with `## ARTISTS -> player-artist` and `## ALBUMS -> player-album`, each entry with its own shortening.
+
+File names are `NN - Title.mp3` within 22 characters before the extension (a title is shortened the same way), so a track's file name is also whole on the player. This renames the files of long titles at the next sync; folders keep their full names.
+
 ## Dates and sorting
 
 Every track has three dates:

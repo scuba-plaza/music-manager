@@ -201,8 +201,9 @@ func tagSet(t manifest.Track) mp3.TagSet {
 			extra[k] = v
 		}
 	}
+	artist, album := PlayerTags(t)
 	return mp3.TagSet{
-		Title: t.Title, Artist: t.Artist, Album: t.Album,
+		Title: t.Title, Artist: artist, Album: album,
 		Genre: t.Genre,
 		Track: t.TrackNumber, Total: t.TrackTotal,
 		Date:   t.Released,

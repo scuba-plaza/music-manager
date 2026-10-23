@@ -70,7 +70,9 @@ func TestUpAndDownChooseTheField(t *testing.T) {
 	if m.field != 0 {
 		t.Errorf("up stops at the first field, on %d", m.field)
 	}
-	m = keys(t, m, "down", "down", "down", "down", "down", "down", "down", "down")
+	for range trackFields {
+		m = keys(t, m, "down")
+	}
 	if m.field != len(trackFields)-1 {
 		t.Errorf("down stops at the last field, on %d", m.field)
 	}

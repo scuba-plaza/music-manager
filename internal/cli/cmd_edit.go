@@ -21,6 +21,9 @@ automatically. Use --title-ascii (etc.) to set one by hand, or pass "" to go
 back to the derived form. Trims accept 90, 1:30 or 1:30.5. The release date
 takes a year, a month or a day (1999, 1999-05, 1999-05-17); pass "" to forget it.
 The source link (--source-url) is where the track came from; pass "" to forget it.
+The player keeps only 12 characters of the artist and of the album: mm shortens
+long ones itself, and --player-artist and --player-album say what to show
+instead; pass "" to go back to the shortened real name.
 A track with a title and an artist counts as identified.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -58,5 +61,7 @@ A track with a title and an artist counts as identified.`,
 	}
 	tf.register(cmd.Flags())
 	cmd.Flags().StringVar(&tf.sourceURL, "source-url", "", "the link the track came from; \"\" for none")
+	cmd.Flags().StringVar(&tf.playerArtist, "player-artist", "", "the artist as the player shows it (it keeps 12 characters); \"\" to shorten the real one")
+	cmd.Flags().StringVar(&tf.playerAlbum, "player-album", "", "the album as the player shows it (it keeps 12 characters); \"\" to shorten the real one")
 	return cmd
 }

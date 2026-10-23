@@ -19,6 +19,7 @@ type trackFlags struct {
 	trimStart, trimEnd                  string
 	released                            string
 	genre                               string
+	playerArtist, playerAlbum           string
 	sourceURL                           string
 	cover                               string
 }
@@ -69,6 +70,8 @@ func (tf *trackFlags) build(f *pflag.FlagSet) (p parsed, err error) {
 	str("released", &tf.released, &e.Released)
 	str("genre", &tf.genre, &e.Genre)
 	str("source-url", &tf.sourceURL, &e.SourceURL)
+	str("player-artist", &tf.playerArtist, &e.PlayerArtist)
+	str("player-album", &tf.playerAlbum, &e.PlayerAlbum)
 	if e.TrimStart, err = parseTrim(f, "trim-start", tf.trimStart); err != nil {
 		return p, err
 	}

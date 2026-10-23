@@ -42,7 +42,12 @@ type Track struct {
 	// 1999, 1999-05 or 1999-05-17.
 	Released string `json:"released,omitempty"`
 	// Genre is free text: Folk, Neoclassical, Anthem, whatever the library calls it.
-	Genre         string    `json:"genre,omitempty"`
+	Genre string `json:"genre,omitempty"`
+	// PlayerArtist and PlayerAlbum are what the player is to show instead of the
+	// artist and album, which it cuts at 12 characters; empty means a shortened
+	// form of the real name.
+	PlayerArtist  string    `json:"player_artist,omitempty"`
+	PlayerAlbum   string    `json:"player_album,omitempty"`
 	CoverSHA256   string    `json:"cover_sha256"`
 	MBRecordingID string    `json:"mb_recording_id"`
 	MBReleaseID   string    `json:"mb_release_id"`

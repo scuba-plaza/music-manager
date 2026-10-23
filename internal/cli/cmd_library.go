@@ -137,6 +137,13 @@ func showCmd(open opener) *cobra.Command {
 			}
 			row("Released", t.Released)
 			row("Genre", t.Genre)
+			row("Player artist", t.PlayerArtist)
+			row("Player album", t.PlayerAlbum)
+			if t.Status == manifest.Identified {
+				if artist, album := app.PlayerTags(t); artist != t.Artist || album != t.Album {
+					row("On the player", artist+" · "+album)
+				}
+			}
 			row("Length", clock(t.PlayingLength()))
 			if t.TrimStart > 0 || t.TrimEnd > 0 {
 				row("Trim", fmt.Sprintf("start %s, end %s (of %s)",
