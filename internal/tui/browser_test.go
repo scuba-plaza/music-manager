@@ -81,13 +81,13 @@ func TestRightOpensLeftClosesAndThenGoesToTheParent(t *testing.T) {
 		t.Errorf("left from a track: %q, want its album", got)
 	}
 	m = keys(t, m, "left") // close the album
-	lacks(t, m, "The Wanderer")
+	notInTree(t, m, "The Wanderer")
 	m = keys(t, m, "left") // album closed: go to the artist
 	if got := selectedLabel(t, m); got != "Shawn James" {
 		t.Errorf("left from a closed album: %q", got)
 	}
 	m = keys(t, m, "left") // close the artist
-	lacks(t, m, "Shadows")
+	notInTree(t, m, "Shadows")
 }
 
 func TestEnterOpensAndClosesGroups(t *testing.T) {

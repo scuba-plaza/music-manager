@@ -98,7 +98,8 @@ func plural(n int, word string) string {
 
 func (m Model) bodyView(l layoutInfo) string {
 	inspector := func() string {
-		return box("Details", m.inspectorLines(l.right-2, l.body-2), l.right, l.body, m.focus == paneInspector)
+		r, ok := m.selectedRow()
+		return box(peekTitle(r, ok), m.inspectorLines(l.right-2, l.body-2), l.right, l.body, m.focus == paneInspector)
 	}
 	if l.mode == modeOnePane && m.focus == paneInspector {
 		return inspector() // one pane at a time: the fields take the place of the tree

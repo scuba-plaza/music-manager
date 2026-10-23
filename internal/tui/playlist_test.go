@@ -27,7 +27,7 @@ func TestThePlaylistsOfTheLibraryAreInTheTree(t *testing.T) {
 	lib, _ := playlistLib(t)
 	m := newTestModel(t, lib, 120, 36)
 	contains(t, m, "Playlists")
-	lacks(t, m, "Study") // closed
+	notInTree(t, m, "Study") // closed
 
 	m = keys(t, m, "right", "down", "right") // open the group, then the playlist
 	contains(t, m, "Study", "Flow", "Dream")

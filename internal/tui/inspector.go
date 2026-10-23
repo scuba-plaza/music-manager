@@ -24,76 +24,13 @@ func (m Model) inspectorLines(w, h int) []string {
 		}
 		return []string{"", styles.dim.Render(" Nothing selected")}
 	}
-	switch r.Kind {
-	case kindTrack:
+	if r.Kind == kindTrack {
 		return m.trackLines(r.Track, w, h)
-	case kindPlaylist:
-		return m.playlistLines(r, w)
-	case kindGroup:
-		if r.Key == playlistsKey {
-			return playlistsGroupLines(r, w)
-		}
-		return groupLines(r, w)
 	}
-	return m.summaryLines(r, w)
+	return m.peekLines(r, w, h)
 }
 
 func rule(w int) string { return " " + styles.dim.Render(strings.Repeat("─", max(w-2, 0))) }
-
-func groupLines(r Row, w int) []string {
-	lines := []string{"", " " + styles.bold.Render(r.Label), rule(w), ""}
-	text := "These tracks have not been identified yet, so they have no proper title or artist and sit in the _Inbox folder."
-	for _, l := range wrap(text, w-2) {
-		lines = append(lines, " "+l)
-	}
-	return lines
-}
-
-// playlistsGroupLines explains the group of playlists.
-func playlistsGroupLines(r Row, w int) []string {
-	lines := []string{"", " " + styles.bold.Render(r.Label), rule(w), ""}
-	text := "Playlists are lists of tracks in an order of your own. Sync writes each one to the player as an .m3u file in the Playlists folder."
-	for _, l := range wrap(text, w-2) {
-		lines = append(lines, " "+l)
-	}
-	return lines
-}
-
-// playlistLines describes a playlist: how much is in it and where its file goes.
-func (m Model) playlistLines(r Row, w int) []string {
-	var length time.Duration
-	for _, t := range m.tracksFor(r.IDs) {
-		length += t.PlayingLength()
-	}
-	lines := []string{"", " " + styles.bold.Render(fit(r.Label, w-2)), rule(w), ""}
-	lines = append(lines, " "+plural(r.Count, "track")+" · "+clock(length)+" plays", "")
-	for i, l := range wrap(layout.PlaylistPath(r.Label), w-4) {
-		prefix := "   "
-		if i == 0 {
-			prefix = " → "
-		}
-		lines = append(lines, prefix+styles.accent.Render(l))
-	}
-	return lines
-}
-
-// summaryLines describes an artist or album: how much is in it.
-func (m Model) summaryLines(r Row, w int) []string {
-	lines := []string{"", " " + styles.bold.Render(r.Label), rule(w), ""}
-	lines = append(lines, " "+plural(r.Count, "track"))
-	if r.Kind == kindArtist {
-		albums := map[string]bool{}
-		for _, t := range m.tracks {
-			if t.Status == manifest.Identified && t.Artist == r.Label && t.Album != "" {
-				albums[t.Album] = true
-			}
-		}
-		if len(albums) > 0 {
-			lines[len(lines)-1] += " · " + plural(len(albums), "album")
-		}
-	}
-	return lines
-}
 
 // labelWidth is the width of the label column, including the focus marker.
 const labelWidth = 12
