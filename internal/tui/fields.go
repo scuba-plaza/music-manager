@@ -96,11 +96,11 @@ func (f fieldKind) isName() bool { return f == fTitle || f == fArtist || f == fA
 func names(t manifest.Track, f fieldKind) (original, ascii string) {
 	switch f {
 	case fTitle:
-		original, ascii = t.OriginalTitle, t.Title
+		original, ascii = t.OriginalTitle, t.AsciiTitle
 	case fArtist:
-		original, ascii = t.OriginalArtist, t.Artist
+		original, ascii = t.OriginalArtist, t.AsciiArtist
 	case fAlbum:
-		original, ascii = t.OriginalAlbum, t.Album
+		original, ascii = t.OriginalAlbum, t.AsciiAlbum
 	}
 	if original == "" && t.Status != manifest.Identified {
 		switch f {
@@ -384,17 +384,17 @@ func previewTrack(t manifest.Track, d draft) manifest.Track {
 		}
 		switch d.field {
 		case fTitle:
-			t.OriginalTitle, t.Title = text, ascii
+			t.OriginalTitle, t.AsciiTitle = text, ascii
 		case fArtist:
-			t.OriginalArtist, t.Artist = text, ascii
+			t.OriginalArtist, t.AsciiArtist = text, ascii
 		case fAlbum:
-			t.OriginalAlbum, t.Album = text, ascii
+			t.OriginalAlbum, t.AsciiAlbum = text, ascii
 		}
 	case fTrack:
 		t.TrackNumber, _ = count(d.text)
 		t.TrackTotal, _ = count(d.second)
 	}
-	if t.Title != "" && t.Artist != "" {
+	if t.AsciiTitle != "" && t.AsciiArtist != "" {
 		t.Status = manifest.Identified
 	}
 	return t

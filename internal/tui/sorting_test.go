@@ -216,7 +216,7 @@ func TestEditingATrackInASortedListMovesItAndKeepsItSelected(t *testing.T) {
 	if got := selectedLabel(t, m); got != "Zzz" {
 		t.Errorf("selected %q", got)
 	}
-	if trackNamed(t, hook.Library, "Zzz").Artist != "Shawn James" {
+	if trackNamed(t, hook.Library, "Zzz").AsciiArtist != "Shawn James" {
 		t.Error("not saved")
 	}
 }

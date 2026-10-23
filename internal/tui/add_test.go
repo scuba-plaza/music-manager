@@ -148,7 +148,7 @@ func TestSavingAddsTheTrackSelectsItAndCanBeUndone(t *testing.T) {
 		t.Fatalf("the dialog should close:\n%s", screen(m))
 	}
 	got := trackNamed(t, hook.Library, "My Title")
-	if got.Status != manifest.Identified || got.SourceURL != "https://youtu.be/abc123" || got.Artist != "Some Band" || got.Album != "Yt Album" || got.TrackNumber != 4 {
+	if got.Status != manifest.Identified || got.SourceURL != "https://youtu.be/abc123" || got.AsciiArtist != "Some Band" || got.AsciiAlbum != "Yt Album" || got.TrackNumber != 4 {
 		t.Errorf("track = %+v", got)
 	}
 	if r, ok := m.selectedRow(); !ok || r.Track.ID != got.ID {
@@ -182,7 +182,7 @@ func TestEverythingInTheFormIsUsed(t *testing.T) {
 	set(addCutEnd, "0:00.5")
 	m = keys(t, m, "enter")
 	got := trackNamed(t, hook.Library, "Fancy")
-	if got.OriginalArtist != "فيروز" || got.Artist != "Firuz" || got.Album != "" || got.TrackNumber != 3 || got.TrackTotal != 12 || got.Released != "1999-05" || got.Genre != "Folk" ||
+	if got.OriginalArtist != "فيروز" || got.AsciiArtist != "Firuz" || got.AsciiAlbum != "" || got.TrackNumber != 3 || got.TrackTotal != 12 || got.Released != "1999-05" || got.Genre != "Folk" ||
 		got.TrimStart != time.Second || got.TrimEnd != 500*time.Millisecond {
 		t.Errorf("track = %+v", got)
 	}

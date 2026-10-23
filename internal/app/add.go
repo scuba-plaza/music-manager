@@ -222,10 +222,10 @@ func infoFrom(c Candidate) Info {
 
 func missingFields(t manifest.Track) error {
 	var missing []string
-	if t.Title == "" {
+	if t.AsciiTitle == "" {
 		missing = append(missing, "title")
 	}
-	if t.Artist == "" {
+	if t.AsciiArtist == "" {
 		missing = append(missing, "artist")
 	}
 	return fmt.Errorf("missing %s (pass --%s, or run in a terminal to be asked)",

@@ -126,9 +126,9 @@ func showCmd(open opener) *cobra.Command {
 			}
 			row("ID", t.ID)
 			row("Status", string(t.Status))
-			row("Title", named(t.Title, t.OriginalTitle))
-			row("Artist", named(t.Artist, t.OriginalArtist))
-			row("Album", named(t.Album, t.OriginalAlbum))
+			row("Title", named(t.AsciiTitle, t.OriginalTitle))
+			row("Artist", named(t.AsciiArtist, t.OriginalArtist))
+			row("Album", named(t.AsciiAlbum, t.OriginalAlbum))
 			if t.TrackNumber > 0 {
 				n := fmt.Sprint(t.TrackNumber)
 				if t.TrackTotal > 0 {
@@ -141,7 +141,7 @@ func showCmd(open opener) *cobra.Command {
 			row("Player artist", t.PlayerArtist)
 			row("Player album", t.PlayerAlbum)
 			if t.Status == manifest.Identified {
-				if artist, album := device.PlayerTags(t); artist != t.Artist || album != t.Album {
+				if artist, album := device.PlayerTags(t); artist != t.AsciiArtist || album != t.AsciiAlbum {
 					row("On the player", artist+" · "+album)
 				}
 			}

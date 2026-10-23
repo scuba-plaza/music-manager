@@ -96,7 +96,7 @@ func TestAddWithEverythingGivenNeverAsksAndRecordsTheSource(t *testing.T) {
 		t.Errorf("asked %v although everything was given", p.asked)
 	}
 	if got.Status != manifest.Identified || got.SourceURL != "https://youtu.be/xyz" ||
-		got.Title != "Wtni" || got.OriginalTitle != "وطني" || got.Artist != "Firuz" || got.Album != "Hits" ||
+		got.AsciiTitle != "Wtni" || got.OriginalTitle != "وطني" || got.AsciiArtist != "Firuz" || got.AsciiAlbum != "Hits" ||
 		got.TrackNumber != 3 || got.TrackTotal != 12 || got.Released != "1999-05" || got.TrimStart != time.Second {
 		t.Errorf("track = %+v", got)
 	}
@@ -117,7 +117,7 @@ func TestAddWithoutPrompterFallsBackToTheDownloadMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Title != "Song Title" || got.Artist != "Some Band" || got.Album != "Yt Album" || got.TrackNumber != 4 || got.Status != manifest.Identified {
+	if got.AsciiTitle != "Song Title" || got.AsciiArtist != "Some Band" || got.AsciiAlbum != "Yt Album" || got.TrackNumber != 4 || got.Status != manifest.Identified {
 		t.Errorf("track = %+v", got)
 	}
 }
@@ -157,7 +157,7 @@ func TestAddAsksEachFieldWithDefaultsFromTheDownload(t *testing.T) {
 			t.Errorf("default for %s = %q, want %q", k, p.defaults[k], want)
 		}
 	}
-	if got.Title != "Watani" || got.OriginalTitle != "وطني" || got.Artist != "Firuz" || got.Album != "" ||
+	if got.AsciiTitle != "Watani" || got.OriginalTitle != "وطني" || got.AsciiArtist != "Firuz" || got.AsciiAlbum != "" ||
 		got.TrackNumber != 7 || got.TrackTotal != 9 || got.TrimStart != 1500*time.Millisecond || got.TrimEnd != 0 {
 		t.Errorf("track = %+v", got)
 	}
@@ -312,7 +312,7 @@ func TestAddUsesAConfidentMatchAsDefaultsAndRecordsItsIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Title != "Dream 3" || got.Artist != "Max Richter" || got.Album != "From Sleep" || got.TrackNumber != 1 || got.TrackTotal != 7 ||
+	if got.AsciiTitle != "Dream 3" || got.AsciiArtist != "Max Richter" || got.AsciiAlbum != "From Sleep" || got.TrackNumber != 1 || got.TrackTotal != 7 ||
 		got.MBRecordingID != "rec-1" || got.MBReleaseID != "rel-1" || got.CoverSHA256 == "" {
 		t.Errorf("track = %+v", got)
 	}
@@ -325,7 +325,7 @@ func TestAddIgnoresWeakMatchesAndMatchesTheUserOverrode(t *testing.T) {
 	src := &fakeSource{results: map[string][]app.Candidate{"Song Title|Some Band": {weak}}}
 	a, dl := openLib(t), newDownloader()
 	got, err := a.Add(ctx, app.AddRequest{URL: "u", Source: src}, dl, nil)
-	if err != nil || got.Title != "Song Title" || got.MBRecordingID != "" {
+	if err != nil || got.AsciiTitle != "Song Title" || got.MBRecordingID != "" {
 		t.Errorf("weak match used: %+v, %v", got, err)
 	}
 
@@ -334,7 +334,7 @@ func TestAddIgnoresWeakMatchesAndMatchesTheUserOverrode(t *testing.T) {
 	a2 := openLib(t)
 	p := &scriptedPrompter{answers: map[string]string{"title": "My Own Title"}}
 	got, err = a2.Add(ctx, app.AddRequest{URL: "u", Source: src}, dl, p)
-	if err != nil || got.Title != "My Own Title" || got.MBRecordingID != "" {
+	if err != nil || got.AsciiTitle != "My Own Title" || got.MBRecordingID != "" {
 		t.Errorf("overridden match kept its ids: %+v, %v", got, err)
 	}
 	if p.defaults["title"] != "Dream 3" {
@@ -347,7 +347,7 @@ func TestAddWarnsButCarriesOnWhenTheLookupFails(t *testing.T) {
 	src := &fakeSource{errs: map[string]error{"Song Title|Some Band": errors.New("offline")}}
 	var warned []error
 	got, err := a.Add(context.Background(), app.AddRequest{URL: "u", Source: src, OnWarning: func(e error) { warned = append(warned, e) }}, dl, nil)
-	if err != nil || got.Title != "Song Title" {
+	if err != nil || got.AsciiTitle != "Song Title" {
 		t.Fatalf("%+v, %v", got, err)
 	}
 	if len(warned) != 1 || !strings.Contains(warned[0].Error(), "offline") {
@@ -364,7 +364,7 @@ func TestAddCarriesTheLatinAliasOfAnArabicArtist(t *testing.T) {
 	for name, p := range map[string]app.Prompter{"non-interactive": nil, "interactive": &scriptedPrompter{}} {
 		lib := openLib(t)
 		got, err := lib.Add(context.Background(), app.AddRequest{URL: "u", Source: src}, dl, p)
-		if err != nil || got.Artist != "Fairuz" || got.OriginalArtist != "فيروز" {
+		if err != nil || got.AsciiArtist != "Fairuz" || got.OriginalArtist != "فيروز" {
 			t.Errorf("%s: %+v, %v", name, got, err)
 		}
 	}

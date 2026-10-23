@@ -374,9 +374,9 @@ func playerFieldLines(t manifest.Track, f fieldKind, prefix, indent string, vw i
 		return []string{prefix + styles.dim.Render("— (not identified yet)")}
 	}
 	shown, _ := playerShown(t, f)
-	own, real := t.PlayerArtist, t.Artist
+	own, real := t.PlayerArtist, t.AsciiArtist
 	if f == fPlayerAlbum {
-		own, real = t.PlayerAlbum, t.Album
+		own, real = t.PlayerAlbum, t.AsciiAlbum
 	}
 	lines := []string{prefix + fit(shown, vw)}
 

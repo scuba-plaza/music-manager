@@ -69,9 +69,9 @@ func (a *App) Edit(id string, e Edit) (manifest.Track, error) {
 // applyEdit returns t with e applied and its status recomputed. It changes
 // nothing if the result would be invalid.
 func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
-	t.Title, t.OriginalTitle = setName(t.Title, t.OriginalTitle, e.Title, e.TitleASCII)
-	t.Artist, t.OriginalArtist = setName(t.Artist, t.OriginalArtist, e.Artist, e.ArtistASCII)
-	t.Album, t.OriginalAlbum = setName(t.Album, t.OriginalAlbum, e.Album, e.AlbumASCII)
+	t.AsciiTitle, t.OriginalTitle = setName(t.AsciiTitle, t.OriginalTitle, e.Title, e.TitleASCII)
+	t.AsciiArtist, t.OriginalArtist = setName(t.AsciiArtist, t.OriginalArtist, e.Artist, e.ArtistASCII)
+	t.AsciiAlbum, t.OriginalAlbum = setName(t.AsciiAlbum, t.OriginalAlbum, e.Album, e.AlbumASCII)
 	if e.TrackNumber != nil {
 		t.TrackNumber = *e.TrackNumber
 	}
@@ -132,7 +132,7 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 		return t, err
 	}
 
-	if t.Title != "" && t.Artist != "" {
+	if t.AsciiTitle != "" && t.AsciiArtist != "" {
 		t.Status = manifest.Identified
 		t.Hint = manifest.Hint{}
 	} else {

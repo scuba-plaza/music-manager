@@ -21,10 +21,10 @@ func TestAddAssignsUniqueIDs(t *testing.T) {
 
 func TestGetAndRemove(t *testing.T) {
 	m := &manifest.Manifest{}
-	a := m.Add(manifest.Track{Title: "A"})
-	b := m.Add(manifest.Track{Title: "B"})
+	a := m.Add(manifest.Track{AsciiTitle: "A"})
+	b := m.Add(manifest.Track{AsciiTitle: "B"})
 
-	if got, ok := m.Get(b.ID); !ok || got.Title != "B" {
+	if got, ok := m.Get(b.ID); !ok || got.AsciiTitle != "B" {
 		t.Errorf("Get(%q) = %+v, %v", b.ID, got, ok)
 	}
 	if _, ok := m.Get("nope"); ok {
@@ -40,13 +40,13 @@ func TestGetAndRemove(t *testing.T) {
 
 func TestUpdateReplacesRecordByID(t *testing.T) {
 	m := &manifest.Manifest{}
-	a := m.Add(manifest.Track{Title: "Old"})
-	a.Title = "New"
+	a := m.Add(manifest.Track{AsciiTitle: "Old"})
+	a.AsciiTitle = "New"
 	if !m.Update(a) {
 		t.Fatal("Update reported unknown id")
 	}
-	if got, _ := m.Get(a.ID); got.Title != "New" {
-		t.Errorf("title = %q, want New", got.Title)
+	if got, _ := m.Get(a.ID); got.AsciiTitle != "New" {
+		t.Errorf("title = %q, want New", got.AsciiTitle)
 	}
 	if m.Update(manifest.Track{ID: "nope"}) {
 		t.Error("Update of unknown id succeeded")
@@ -55,8 +55,8 @@ func TestUpdateReplacesRecordByID(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 	m := &manifest.Manifest{}
-	m.Add(manifest.Track{Title: "Firuz", OriginalTitle: "فيروز", Artist: "Fairuz", OriginalArtist: "فيروز", Status: manifest.Identified})
-	m.Add(manifest.Track{Title: "Sleep", OriginalTitle: "Sleep", Artist: "Max Richter", OriginalArtist: "Max Richter", Status: manifest.Identified})
+	m.Add(manifest.Track{AsciiTitle: "Firuz", OriginalTitle: "فيروز", AsciiArtist: "Fairuz", OriginalArtist: "فيروز", Status: manifest.Identified})
+	m.Add(manifest.Track{AsciiTitle: "Sleep", OriginalTitle: "Sleep", AsciiArtist: "Max Richter", OriginalArtist: "Max Richter", Status: manifest.Identified})
 	m.Add(manifest.Track{Status: manifest.Unidentified, Hint: manifest.Hint{Title: "بحلم بيك", Artist: "Abdel Halim", Album: "Rawaeaa", Filename: "01 Bahlam Bek"}})
 
 	cases := []struct {
@@ -96,9 +96,9 @@ func TestPlayingLengthExcludesTrims(t *testing.T) {
 
 func TestSearchFindsAGenreAsAWordOrWithTheGenrePrefix(t *testing.T) {
 	m := &manifest.Manifest{}
-	m.Add(manifest.Track{Title: "Longing", Artist: "Gustavo", Genre: "Neoclassical", Status: manifest.Identified})
-	m.Add(manifest.Track{Title: "Folk Song", Artist: "Max", Genre: "Anthem", Status: manifest.Identified})
-	m.Add(manifest.Track{Title: "Plain", Artist: "Nobody", Status: manifest.Identified})
+	m.Add(manifest.Track{AsciiTitle: "Longing", AsciiArtist: "Gustavo", Genre: "Neoclassical", Status: manifest.Identified})
+	m.Add(manifest.Track{AsciiTitle: "Folk Song", AsciiArtist: "Max", Genre: "Anthem", Status: manifest.Identified})
+	m.Add(manifest.Track{AsciiTitle: "Plain", AsciiArtist: "Nobody", Status: manifest.Identified})
 
 	cases := []struct {
 		query string

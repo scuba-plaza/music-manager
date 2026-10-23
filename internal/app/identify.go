@@ -312,7 +312,7 @@ func (a *App) applyCandidate(ctx context.Context, t manifest.Track, c Candidate,
 // identified, what the ingested file said about itself otherwise.
 func Display(t manifest.Track) (artist, title, album string) {
 	if t.Status == manifest.Identified {
-		return t.Artist, t.Title, t.Album
+		return t.AsciiArtist, t.AsciiTitle, t.AsciiAlbum
 	}
 	title = t.Hint.Title
 	if title == "" {

@@ -12,7 +12,7 @@ func album(n int) []manifest.Track {
 	var ts []manifest.Track
 	for i := 1; i <= n; i++ {
 		t := trk(string(rune('a'+i)), "Song "+string(rune('A'+i)), "Shawn James", "Shadows", i)
-		t.OriginalArtist, t.OriginalTitle, t.OriginalAlbum = "Shawn James", t.Title, "Shadows"
+		t.OriginalArtist, t.OriginalTitle, t.OriginalAlbum = "Shawn James", t.AsciiTitle, "Shadows"
 		t.TrackTotal = n
 		ts = append(ts, t)
 	}
@@ -58,7 +58,7 @@ func TestBulkDashClears(t *testing.T) {
 
 func TestBulkSkipsTracksThatAlreadyHaveTheValue(t *testing.T) {
 	ts := album(3)
-	ts[1].OriginalArtist, ts[1].Artist = "Fairuz", "Fairuz"
+	ts[1].OriginalArtist, ts[1].AsciiArtist = "Fairuz", "Fairuz"
 	edits, changed, err := bulkPlan(ts, bulkValues{artist: "Fairuz"})
 	if err != nil || changed != 2 || len(edits) != 2 {
 		t.Errorf("changed %d, edits %v, err %v", changed, edits, err)

@@ -49,7 +49,7 @@ func playlistTitles(t *testing.T, lib Library, name string) []string {
 	}
 	byID := map[string]string{}
 	for _, tr := range libTracks(t, lib) {
-		byID[tr.ID] = tr.Title
+		byID[tr.ID] = tr.AsciiTitle
 	}
 	for _, p := range pls {
 		if p.Name == name {
@@ -276,7 +276,7 @@ func TestJAndKMoveATrackWithinAPlaylist(t *testing.T) {
 	if got := strings.Join(playlistTitles(t, lib, "Study"), ","); got != "Dream,Flow" {
 		t.Errorf("after K Study = %s", got)
 	}
-	if r, _ := m.selectedRow(); r.Track.Title != "Dream" || r.Num != "01" {
+	if r, _ := m.selectedRow(); r.Track.AsciiTitle != "Dream" || r.Num != "01" {
 		t.Errorf("the selection should follow Dream to the top: %+v", r)
 	}
 	m = keys(t, m, "K")
@@ -336,7 +336,7 @@ func TestEditingATrackInAPlaylistKeepsYouInThePlaylist(t *testing.T) {
 	m = keys(t, m, "enter")
 
 	r, ok := m.selectedRow()
-	if !ok || r.Track.Title != "Flowing" || r.Parent != playlistRowKey("Study") {
+	if !ok || r.Track.AsciiTitle != "Flowing" || r.Parent != playlistRowKey("Study") {
 		t.Errorf("the selection left the playlist: %+v", r)
 	}
 	if got := strings.Join(playlistTitles(t, lib, "Study"), ","); got != "Flowing,Dream" {

@@ -29,7 +29,7 @@ func renderInputs(tracks []manifest.Track, dev device.Target) (paths map[string]
 			continue
 		}
 		file := singleCoverPath(paths[t.ID])
-		if t.Album != "" {
+		if t.AsciiAlbum != "" {
 			file = path.Join(path.Dir(paths[t.ID]), "cover.jpg")
 		} else if !dev.SingleCovers() {
 			continue
@@ -62,7 +62,7 @@ func signatures(m *manifest.Manifest) map[string]string {
 	for _, t := range m.Tracks {
 		p := paths[t.ID]
 		folderCover := "" // the cover file this track's own belongs to, or comes from
-		if t.Status == manifest.Identified && t.Album != "" {
+		if t.Status == manifest.Identified && t.AsciiAlbum != "" {
 			folderCover = covers[path.Join(path.Dir(p), "cover.jpg")].CoverSHA256
 		} else if t.Status == manifest.Identified && t.CoverSHA256 != "" {
 			folderCover = "single" // it has a cover file beside it

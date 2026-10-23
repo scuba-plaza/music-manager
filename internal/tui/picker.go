@@ -345,7 +345,7 @@ func (m Model) identified(msg identifiedMsg) (tea.Model, tea.Cmd) {
 	m.overlay = nil
 	m.upsert(msg.after)
 	m.record(change{label: "identification of a track", before: []manifest.Track{msg.before}, after: []manifest.Track{msg.after}})
-	m.say("Identified as "+msg.after.Artist+" - "+msg.after.Title, false)
+	m.say("Identified as "+msg.after.AsciiArtist+" - "+msg.after.AsciiTitle, false)
 	m.revealTrack(msg.after)
 	return m, nil
 }

@@ -13,9 +13,9 @@ import (
 func identified() manifest.Track {
 	return manifest.Track{
 		ID: "k7f2qd", Status: manifest.Identified,
-		Title: "Wtni", OriginalTitle: "وطني",
-		Artist: "Firuz", OriginalArtist: "فيروز",
-		Album: "Hits", OriginalAlbum: "Hits",
+		AsciiTitle: "Wtni", OriginalTitle: "وطني",
+		AsciiArtist: "Firuz", OriginalArtist: "فيروز",
+		AsciiAlbum: "Hits", OriginalAlbum: "Hits",
 		TrackNumber: 3, TrackTotal: 12,
 		SourceLength: 3 * time.Minute, TrimStart: 2 * time.Second, TrimEnd: 1500 * time.Millisecond,
 	}
@@ -98,7 +98,7 @@ func TestTheASCIIFormFollowsTheTextUntilTheUserTouchesIt(t *testing.T) {
 
 func TestACustomASCIIFormStaysWhenTheTextChanges(t *testing.T) {
 	tr := identified()
-	tr.Artist = "Fairuz" // not what transliteration gives, so it is a custom form
+	tr.AsciiArtist = "Fairuz" // not what transliteration gives, so it is a custom form
 	d := newDraft(tr, fArtist)
 	d.setText("فيروز ")
 	if d.second != "Fairuz" {
@@ -239,7 +239,7 @@ func TestPreviewOfAnUnidentifiedTrackBecomesIdentifiedOnceItHasATitleAndArtist(t
 	if got := pathFor(previewTrack(tr, title)); got != "_Inbox/abc123 - x.mp3" {
 		t.Errorf("with only a title it is still in the inbox, got %q", got)
 	}
-	tr.Artist, tr.OriginalArtist = "Band", "Band"
+	tr.AsciiArtist, tr.OriginalArtist = "Band", "Band"
 	if got := pathFor(previewTrack(tr, title)); got != "Band/Song.mp3" {
 		t.Errorf("with both it gets a place, got %q", got)
 	}

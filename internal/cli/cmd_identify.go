@@ -43,7 +43,7 @@ match is taken if it is a confident one, and the track is left alone otherwise.`
 				case r.Applied != nil:
 					applied++
 					c := r.Applied
-					fmt.Fprintf(out, "%s  identified: %s - %s", r.TrackID, t.Artist, t.Title)
+					fmt.Fprintf(out, "%s  identified: %s - %s", r.TrackID, t.AsciiArtist, t.AsciiTitle)
 					if c.Album != "" {
 						fmt.Fprintf(out, " (%s)", c.Album)
 					}

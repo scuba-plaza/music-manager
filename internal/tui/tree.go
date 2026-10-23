@@ -91,7 +91,7 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 			needs = append(needs, t)
 			continue
 		}
-		byArtist[t.Artist] = append(byArtist[t.Artist], t)
+		byArtist[t.AsciiArtist] = append(byArtist[t.AsciiArtist], t)
 	}
 
 	rows := playlistRows(all, playlists, matched, open)
@@ -117,7 +117,7 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 
 		byAlbum := map[string][]manifest.Track{}
 		for _, t := range ts {
-			byAlbum[t.Album] = append(byAlbum[t.Album], t)
+			byAlbum[t.AsciiAlbum] = append(byAlbum[t.AsciiAlbum], t)
 		}
 		var ids []string
 		albums := albumOrder(byAlbum)
@@ -147,7 +147,7 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 				if album != "" && t.TrackNumber > 0 {
 					num = padNumber(t.TrackNumber, width)
 				}
-				rows = append(rows, Row{Kind: kindTrack, Depth: 2, Key: trackKey(t.ID), Parent: bkey, Label: t.Title, Num: num, Track: t})
+				rows = append(rows, Row{Kind: kindTrack, Depth: 2, Key: trackKey(t.ID), Parent: bkey, Label: t.AsciiTitle, Num: num, Track: t})
 			}
 		}
 	}
@@ -207,7 +207,7 @@ func sortTracks(ts []manifest.Track) {
 		if a.TrackNumber != b.TrackNumber {
 			return a.TrackNumber < b.TrackNumber
 		}
-		if la, lb := lower(a.Title), lower(b.Title); la != lb {
+		if la, lb := lower(a.AsciiTitle), lower(b.AsciiTitle); la != lb {
 			return la < lb
 		}
 		return a.ID < b.ID
@@ -233,10 +233,10 @@ func ancestorKeys(t manifest.Track) []string {
 	if t.Status != manifest.Identified {
 		return []string{keyNeedsWork}
 	}
-	if t.Album == "" {
-		return []string{artistKey(t.Artist), singlesKey(t.Artist)}
+	if t.AsciiAlbum == "" {
+		return []string{artistKey(t.AsciiArtist), singlesKey(t.AsciiArtist)}
 	}
-	return []string{artistKey(t.Artist), albumRowKey(t.Artist, t.Album)}
+	return []string{artistKey(t.AsciiArtist), albumRowKey(t.AsciiArtist, t.AsciiAlbum)}
 }
 
 // playlistRows is the group of playlists with those open shown in full. When
@@ -290,7 +290,7 @@ func playlistRows(tracks []manifest.Track, playlists []manifest.Playlist, matche
 			artist, _, _ := app.Display(t)
 			rows = append(rows, Row{
 				Kind: kindTrack, Depth: 2, Key: playlistTrackKey(p.name, t.ID), Parent: pkey,
-				Label: t.Title, Detail: artist, Num: padNumber(i+1, width), Track: t,
+				Label: t.AsciiTitle, Detail: artist, Num: padNumber(i+1, width), Track: t,
 			})
 		}
 	}

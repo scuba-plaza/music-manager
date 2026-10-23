@@ -56,8 +56,8 @@ func pathFor(t manifest.Track, suffix string, r Rules) string {
 		}
 		return path.Join(inbox, stem(name, room)+suffix+ext)
 	}
-	artist, title := clean(t.Artist, r), clean(t.Title, r)
-	if t.Album == "" {
+	artist, title := clean(t.AsciiArtist, r), clean(t.AsciiTitle, r)
+	if t.AsciiAlbum == "" {
 		return path.Join(artist, stem(title, room)+suffix+ext)
 	}
 	number := ""
@@ -65,7 +65,7 @@ func pathFor(t manifest.Track, suffix string, r Rules) string {
 		width := max(2, len(strconv.Itoa(t.TrackTotal)))
 		number = fmt.Sprintf("%0*d - ", width, t.TrackNumber)
 	}
-	return path.Join(artist, clean(t.Album, r), number+stem(title, room-len(number))+suffix+ext)
+	return path.Join(artist, clean(t.AsciiAlbum, r), number+stem(title, room-len(number))+suffix+ext)
 }
 
 // PlaylistPath is where the playlist with this name is rendered:

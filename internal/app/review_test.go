@@ -105,7 +105,7 @@ func genres(t *testing.T, a *app.App) map[string]string {
 	t.Helper()
 	out := map[string]string{}
 	for _, tr := range tracks(t, a) {
-		out[tr.Title] = tr.Genre
+		out[tr.AsciiTitle] = tr.Genre
 	}
 	return out
 }

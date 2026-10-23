@@ -79,7 +79,7 @@ func (m *Manifest) Search(query string) []Track {
 
 func matches(t Track, words []string) bool {
 	hay := strings.ToLower(strings.Join([]string{
-		t.Title, t.OriginalTitle, t.Artist, t.OriginalArtist, t.Album, t.OriginalAlbum,
+		t.AsciiTitle, t.OriginalTitle, t.AsciiArtist, t.OriginalArtist, t.AsciiAlbum, t.OriginalAlbum,
 		t.Genre, t.Hint.Title, t.Hint.Artist, t.Hint.Album, t.Hint.Filename,
 	}, "\n"))
 	for _, w := range words {

@@ -245,7 +245,7 @@ func (d *addDialog) path() string {
 	of, _ := count(d.in[addOf].Value())
 	return layout.PathFor(manifest.Track{
 		ID: "new", Status: manifest.Identified,
-		Title: d.ascii(addTitle, title), Artist: d.ascii(addArtist, artist), Album: d.ascii(addAlbum, album),
+		AsciiTitle: d.ascii(addTitle, title), AsciiArtist: d.ascii(addArtist, artist), AsciiAlbum: d.ascii(addAlbum, album),
 		TrackNumber: n, TrackTotal: of,
 	}, device.Generic.Layout())
 }
@@ -490,7 +490,7 @@ func (m Model) added(msg addedMsg) (tea.Model, tea.Cmd) {
 	m.overlay = nil
 	m.upsert(msg.track)
 	m.record(change{label: "addition of a track", after: []manifest.Track{msg.track}})
-	m.say(fmt.Sprintf("Added %q", msg.track.Title), false)
+	m.say(fmt.Sprintf("Added %q", msg.track.AsciiTitle), false)
 	m.revealTrack(msg.track)
 	return m, nil
 }

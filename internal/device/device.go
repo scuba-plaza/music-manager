@@ -69,7 +69,7 @@ func (today) Tags(t manifest.Track) mp3.TagSet {
 	}
 	artist, album := PlayerTags(t)
 	return mp3.TagSet{
-		Title: t.Title, Artist: artist, Album: album,
+		Title: t.AsciiTitle, Artist: artist, Album: album,
 		Genre: t.Genre,
 		Track: t.TrackNumber, Total: t.TrackTotal,
 		Date:   t.Released,

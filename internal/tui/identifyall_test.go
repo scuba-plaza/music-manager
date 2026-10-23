@@ -119,7 +119,7 @@ func TestOUsesTheOldTagsOfTheSelectedTrack(t *testing.T) {
 	m, hook := pickerModel(t, &fakeSource{})
 	m = keys(t, m, "o")
 	got := trackNamed(t, hook.Library, "Old Title")
-	if got.Status != manifest.Identified || got.Artist != "Old Artist" || got.Album != "Old Album" || got.TrackNumber != 1 || got.TrackTotal != 9 {
+	if got.Status != manifest.Identified || got.AsciiArtist != "Old Artist" || got.AsciiAlbum != "Old Album" || got.TrackNumber != 1 || got.TrackTotal != 9 {
 		t.Errorf("track = %+v", got)
 	}
 	contains(t, m, "old tags")

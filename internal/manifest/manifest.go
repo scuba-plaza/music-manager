@@ -26,11 +26,11 @@ type Track struct {
 	AudioSHA256    string        `json:"audio_sha256"`
 	SourceURL      string        `json:"source_url"`
 	Status         Status        `json:"status"`
-	Title          string        `json:"title"`
+	AsciiTitle     string        `json:"title"`
 	OriginalTitle  string        `json:"original_title"`
-	Artist         string        `json:"artist"`
+	AsciiArtist    string        `json:"artist"`
 	OriginalArtist string        `json:"original_artist"`
-	Album          string        `json:"album"`
+	AsciiAlbum     string        `json:"album"`
 	OriginalAlbum  string        `json:"original_album"`
 	TrackNumber    int           `json:"track_number"`
 	TrackTotal     int           `json:"track_total"`

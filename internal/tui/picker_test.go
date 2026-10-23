@@ -14,8 +14,8 @@ import (
 
 func TestCandidateDiffShowsWhatWouldChange(t *testing.T) {
 	tr := identified()
-	tr.Title, tr.OriginalTitle, tr.Artist, tr.OriginalArtist = "Flow", "Flow", "Shawn James", "Shawn James"
-	tr.Album, tr.OriginalAlbum, tr.TrackNumber, tr.TrackTotal = "Live", "Live", 2, 10
+	tr.AsciiTitle, tr.OriginalTitle, tr.AsciiArtist, tr.OriginalArtist = "Flow", "Flow", "Shawn James", "Shawn James"
+	tr.AsciiAlbum, tr.OriginalAlbum, tr.TrackNumber, tr.TrackTotal = "Live", "Live", 2, 10
 	c := app.Candidate{Title: "Flow", Artist: "Shawn James", Album: "Shadows", TrackNumber: 7, TrackTotal: 12}
 
 	got := candidateDiff(tr, c)
@@ -146,7 +146,7 @@ func TestChoosingACandidateIdentifiesTheTrack(t *testing.T) {
 	m = keys(t, m, "enter")
 
 	got := trackNamed(t, hook.Library, "Dream 3")
-	if got.Status != manifest.Identified || got.Album != "Voyager" || got.TrackNumber != 9 || got.MBReleaseID != "rel-2" {
+	if got.Status != manifest.Identified || got.AsciiAlbum != "Voyager" || got.TrackNumber != 9 || got.MBReleaseID != "rel-2" {
 		t.Errorf("track = %+v", got)
 	}
 	if m.overlay != nil {

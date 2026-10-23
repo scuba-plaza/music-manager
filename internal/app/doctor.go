@@ -75,8 +75,8 @@ func (a *App) Doctor() ([]Problem, error) {
 	}
 	at := map[position][]string{}
 	for _, t := range m.Tracks {
-		if t.Status == manifest.Identified && t.Album != "" && t.TrackNumber > 0 {
-			k := position{strings.ToLower(t.Artist), strings.ToLower(t.Album), t.TrackNumber}
+		if t.Status == manifest.Identified && t.AsciiAlbum != "" && t.TrackNumber > 0 {
+			k := position{strings.ToLower(t.AsciiArtist), strings.ToLower(t.AsciiAlbum), t.TrackNumber}
 			at[k] = append(at[k], t.ID)
 		}
 	}
