@@ -83,7 +83,8 @@ func (m *Manifest) Search(query string) []Track {
 func matches(t Track, words []string) bool {
 	names := []string{t.Title, t.Artist, t.Album}
 	fields := append([]string{t.Genre, t.Hint.Title, t.Hint.Artist, t.Hint.Album, t.Hint.Filename}, names...)
-	for _, n := range names { // in Latin letters too, so that "firuz" finds فيروز
+	fields = append(fields, t.TitleLatin, t.ArtistLatin, t.AlbumLatin, t.GenreLatin) // as set by hand
+	for _, n := range names {                                                        // in Latin letters too, so that "firuz" finds فيروز
 		fields = append(fields, translit.ToASCII(n))
 	}
 	hay := strings.ToLower(strings.Join(fields, "\n"))

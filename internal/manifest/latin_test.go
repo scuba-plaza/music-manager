@@ -62,3 +62,15 @@ func TestLatinFormsAreSavedAndOnlyWhenSet(t *testing.T) {
 		t.Errorf("not saved: %+v %+v", got.Tracks[0], got.Playlists[0])
 	}
 }
+
+func TestSearchFindsANameByItsLatinFormSetByHandAndByTheWorkedOutOne(t *testing.T) {
+	m := &manifest.Manifest{Tracks: []manifest.Track{
+		{ID: "a", Status: manifest.Identified, Title: "وطني", Artist: "فيروز", ArtistLatin: "Fairouz"},
+		{ID: "b", Status: manifest.Identified, Title: "Cold", Artist: "Nils Frahm"},
+	}}
+	for query, want := range map[string]int{"fairouz": 1, "firuz": 1, "frahm": 1, "wtni": 1, "nobody": 0} {
+		if got := len(m.Search(query)); got != want {
+			t.Errorf("Search(%q) found %d, want %d", query, got, want)
+		}
+	}
+}

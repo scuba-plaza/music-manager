@@ -156,7 +156,7 @@ func compareBy(a, b manifest.Track, k SortKey) (c int, missing bool) {
 	}
 	switch k {
 	case SortArtist, SortTitle, SortAlbum:
-		return strings.Compare(translit.SortKey(SortValue(a, k)), translit.SortKey(SortValue(b, k))), false
+		return strings.Compare(translit.SortKey(sortText(a, k)), translit.SortKey(sortText(b, k))), false
 	case SortTrack:
 		return trackNumber(a) - trackNumber(b), false
 	case SortLength:
@@ -169,6 +169,17 @@ func compareBy(a, b manifest.Track, k SortKey) (c int, missing bool) {
 		return a.UpdatedAt.Compare(b.UpdatedAt), false
 	}
 	return 0, false
+}
+
+// sortText is what a track is put in order by for a text key: the Latin form
+// set by hand where there is one, else the name as it is shown (which the
+// order then reads in Latin letters).
+func sortText(t manifest.Track, k SortKey) string {
+	set := map[SortKey]string{SortArtist: t.ArtistLatin, SortTitle: t.TitleLatin, SortAlbum: t.AlbumLatin}[k]
+	if set != "" {
+		return set
+	}
+	return SortValue(t, k)
 }
 
 func compareInt(a, b int64) int {

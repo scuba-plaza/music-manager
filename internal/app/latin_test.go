@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"strings"
 	"testing"
 
 	"music-manager/internal/app"
@@ -97,5 +98,27 @@ func TestChangingALatinFormIsNothingToSyncToTheLibraryFolder(t *testing.T) {
 	}
 	if n, _ := unsynced(t, a); n != 0 {
 		t.Errorf("a Latin form, which the library folder does not use, counts as %d to sync", n)
+	}
+}
+
+// Names are put in order by their Latin forms, the ones set by hand included,
+// so that a name in another script stands where it would be read.
+
+func TestTracksAreSortedByTheLatinFormSetByHand(t *testing.T) {
+	a := libWithTracks(t, 10, 20, 30)
+	ts := tracks(t, a)
+	identify(t, a, ts[0].ID, "Song", "فيروز", "", 0, 0) // worked out: "Firuz", after Beta
+	identify(t, a, ts[1].ID, "Song", "Beta", "", 0, 0)
+	identify(t, a, ts[2].ID, "Song", "Gamma", "", 0, 0)
+	if _, err := a.Edit(ts[0].ID, app.Edit{ArtistLatin: ptr("Alpha")}); err != nil {
+		t.Fatal(err)
+	}
+	got := app.SortTracks(tracks(t, a), app.SortArtist, false)
+	var artists []string
+	for _, tr := range got {
+		artists = append(artists, tr.Artist)
+	}
+	if want := []string{"فيروز", "Beta", "Gamma"}; strings.Join(artists, ",") != strings.Join(want, ",") {
+		t.Errorf("order = %v, want %v", artists, want)
 	}
 }
