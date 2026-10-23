@@ -480,7 +480,7 @@ func TestShowSaysWhatTheWolfgangWillShowOnlyWhenAsked(t *testing.T) {
 		t.Errorf("show talks about the Wolfgang unasked:\n%s", out)
 	}
 	_, out, _ = run(t, lib, "show", id, "--wolfgang")
-	if !strings.Contains(squash(out), "On the Wolfgang Abdel Halim · Abd El Halim") {
+	if !strings.Contains(squash(out), "On the Wolfgang A. H. Hafez · Abd El Halim") {
 		t.Errorf("show --wolfgang lacks what the player will show:\n%s", out)
 	}
 

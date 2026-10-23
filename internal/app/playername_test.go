@@ -20,7 +20,7 @@ func TestSyncWritesTagsTheWholePlayerCanShow(t *testing.T) {
 	mustSync(t, a, app.SyncOptions{Device: device.Wolfgang})
 
 	album := mp3.ReadTagSet(readFile(t, a.Root(), "Abdel Halim Hafez/Abd El Halim Hafez/01 - Bahlam Bek.mp3"))
-	if album.Artist != "Abdel Halim" || album.Album != "Abd El Halim" {
+	if album.Artist != "A. H. Hafez" || album.Album != "Abd El Halim" {
 		t.Errorf("album track: artist %q, album %q", album.Artist, album.Album)
 	}
 

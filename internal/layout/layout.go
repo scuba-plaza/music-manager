@@ -164,7 +164,7 @@ const dangling = " .,-&:;'"
 // does not end with them.
 var connectors = map[string]bool{
 	"a": true, "an": true, "the": true, "of": true, "and": true, "or": true, "to": true,
-	"in": true, "on": true, "at": true, "for": true, "with": true, "by": true, "wa": true,
+	"in": true, "on": true, "at": true, "for": true, "with": true, "by": true, "wa": true, "al": true, "el": true,
 }
 
 // withoutConnectors drops the connectors at the end of s, but never its only word.
