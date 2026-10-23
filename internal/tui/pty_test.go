@@ -329,7 +329,7 @@ func TestPTYCoverIsDrawnInColour(t *testing.T) {
 	s := startMM(t, 110, 34, a.Root(), "COLORTERM=truecolor")
 	s.MustSee("Shawn James")
 	s.Type("/flow\r\x1b[B\x1b[B\x1b[B") // the track
-	s.MustSee("40×40 JPEG", "▀")
+	s.MustSee("40×40 PNG", "▀")
 
 	raw := s.em.Render() // with the colour codes
 	var red, blue bool   // the cover is kept as a JPEG, so the colours are near red and blue

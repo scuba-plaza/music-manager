@@ -1,5 +1,3 @@
-Keaton Henson/Dream.jpg
-  657 bytes 935deb7cff
 Keaton Henson/Dream.mp3
   title="Dream" artist="Keaton Henson" album="" genre="Folk" track=0/0 date="" tlen=2.716s
   extra: MM_ID="<e>"
@@ -17,12 +15,10 @@ Max Richter/The Long Album Name Here (Deluxe)/05 - A Very Long Title Indeed That
   audio: 95965c26e4 2.664489696s
 Max Richter/The Long Album Name Here (Deluxe)/cover.jpg
   652 bytes cc1a610a49
-Nils Frahm/Cold.jpg
-  651 bytes b39c48bc6c
 Nils Frahm/Cold.mp3
   title="Cold" artist="Nils Frahm" album="" genre="" track=0/0 date="" tlen=2.742s
   extra: MM_ID="<f>"
-  cover: image/jpeg b39c48bc6c
+  cover: image/png 89af108ed4
   audio: 4923fc4466 2.74285704s
 Playlists/Resistance.m3u8
   "#EXTM3U\n#EXTINF:3,عبد الحليم حافظ - بحلم بيك\n../عبد الحليم حافظ/روائع/01 - بحلم بيك.mp3\n#EXTINF:3,Nils Frahm - Cold\n../Nils Frahm/Cold.mp3\n"
@@ -41,7 +37,7 @@ _Inbox/<g> - g.mp3
 فيروز/Hits/03 - وطني.mp3
   title="وطني" artist="فيروز" album="Hits" genre="Folk" track=3/12 date="1999" tlen=2.612s
   extra: MM_ID="<a>"
-  cover: image/jpeg b39c48bc6c
+  cover: image/png 89af108ed4
   audio: ece91d3408 2.6122448s
-فيروز/Hits/cover.jpg
-  651 bytes b39c48bc6c
+فيروز/Hits/cover.png
+  87 bytes 89af108ed4

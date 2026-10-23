@@ -2,11 +2,9 @@ package app
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 	"time"
 
 	"music-manager/internal/coverimg"
@@ -15,8 +13,8 @@ import (
 )
 
 // SetCover sets the cover image of a track, or removes it if image is empty.
-// Only JPEG and PNG images are accepted, and what is kept is a small baseline
-// JPEG, the kind the player opens (see coverimg).
+// Only JPEG and PNG images are accepted, and what is kept is the file just as
+// it came: what a device needs of it is made when it is written (see device).
 func (a *App) SetCover(id string, image []byte) error {
 	m, err := a.store.Load()
 	if err != nil {
@@ -36,17 +34,17 @@ func (a *App) SetCover(id string, image []byte) error {
 	return a.store.Save(m)
 }
 
-// storeCover files an image in the cover store, made into a cover the player
-// opens, and returns its SHA; empty input gives an empty SHA.
+// storeCover files an image in the cover store, as it is, and returns its SHA;
+// empty input gives an empty SHA, and an image that is not a JPEG or a PNG is
+// refused.
 func (a *App) storeCover(image []byte) (string, error) {
 	if len(image) == 0 {
 		return "", nil
 	}
-	cover, err := coverimg.Normalize(image)
-	if err != nil {
+	if _, err := coverimg.Validate(image); err != nil {
 		return "", err
 	}
-	return a.covers.Put(bytes.NewReader(cover))
+	return a.covers.Put(bytes.NewReader(image))
 }
 
 // older reports whether a was added before b, breaking ties by ID.
@@ -67,76 +65,15 @@ func (a *App) coverFile(sha string, dev device.Target) ([]byte, string, error) {
 	return dev.Cover(data)
 }
 
-// CoverReport says what NormalizeCovers did, or would do.
-type CoverReport struct {
-	Images    int   // the different covers the library uses
-	Converted int   // of those, the ones not yet in the form the player opens
-	Tracks    int   // tracks that use a different cover now
-	Before    int64 // the converted images' size in bytes, before and after
-	After     int64
-}
-
-// NormalizeCovers rewrites every cover of the library that the player may
-// not open (a PNG, a progressive or oversized JPEG) into one it does, and
-// points the tracks at the new image. The old images are deleted by the next
-// sync, as nothing uses them any more. With dryRun nothing is changed.
-func (a *App) NormalizeCovers(dryRun bool) (CoverReport, error) {
-	var rep CoverReport
-	m, err := a.store.Load()
+// coverKind says what kind of image the stored cover with this SHA is, from its
+// first bytes: "image/jpeg" or "image/png", or "" if it cannot be read.
+func (a *App) coverKind(sha string) string {
+	f, err := os.Open(a.covers.Path(sha))
 	if err != nil {
-		return rep, err
+		return ""
 	}
-	newSHA := map[string]string{} // each cover in use, and what it becomes
-	for _, t := range m.Tracks {
-		sha := t.CoverSHA256
-		if _, done := newSHA[sha]; done || sha == "" {
-			continue
-		}
-		rep.Images++
-		data, err := os.ReadFile(a.covers.Path(sha))
-		if err != nil {
-			return rep, fmt.Errorf("cover of track %s: %w", t.ID, err)
-		}
-		out, err := coverimg.Normalize(data)
-		if err != nil {
-			return rep, fmt.Errorf("cover of track %s: %w", t.ID, err)
-		}
-		if bytes.Equal(out, data) {
-			newSHA[sha] = sha
-			continue
-		}
-		rep.Converted++
-		rep.Before, rep.After = rep.Before+int64(len(data)), rep.After+int64(len(out))
-		if dryRun {
-			sum := sha256.Sum256(out)
-			newSHA[sha] = hex.EncodeToString(sum[:])
-		} else if newSHA[sha], err = a.covers.Put(bytes.NewReader(out)); err != nil {
-			return rep, err
-		}
-	}
-	for i, t := range m.Tracks {
-		if next, ok := newSHA[t.CoverSHA256]; ok && next != t.CoverSHA256 {
-			rep.Tracks++
-			m.Tracks[i].CoverSHA256 = next // not an edit: the dates stay
-		}
-	}
-	if dryRun || rep.Tracks == 0 {
-		return rep, nil
-	}
-	if err := a.backupLibrary("before-covers"); err != nil {
-		return rep, err
-	}
-	return rep, a.store.Save(m)
-}
-
-// backupLibrary copies library.json to .mm/library.json.<suffix>.
-func (a *App) backupLibrary(suffix string) error {
-	data, err := os.ReadFile(filepath.Join(a.root, "library.json"))
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Join(a.root, ".mm"), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(a.root, ".mm", "library.json."+suffix), data, 0o644)
+	defer f.Close()
+	head := make([]byte, 8)
+	n, _ := io.ReadFull(f, head)
+	return coverimg.Sniff(head[:n])
 }

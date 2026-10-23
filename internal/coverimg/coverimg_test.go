@@ -14,6 +14,12 @@ import (
 	"music-manager/internal/coverimg"
 )
 
+// The limits a device that is fussy about covers would give: the Wolfgang WMP01's.
+const (
+	maxEdge = 480
+	quality = 85
+)
+
 // jpegShape is what the player cares about in a JPEG file, read from the
 // markers themselves rather than through the decoder.
 type jpegShape struct {
@@ -88,7 +94,7 @@ func translucent(w, h int) *image.NRGBA {
 }
 
 func TestAPNGBecomesABaselineJPEGWithAJFIFHeader(t *testing.T) {
-	out, err := coverimg.Normalize(pngOf(t, translucent(100, 60)))
+	out, err := coverimg.Baseline(pngOf(t, translucent(100, 60)), maxEdge, quality)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +115,7 @@ func TestAPNGBecomesABaselineJPEGWithAJFIFHeader(t *testing.T) {
 }
 
 func TestSeeThroughAreasComeOutWhiteNotBlack(t *testing.T) {
-	out, err := coverimg.Normalize(pngOf(t, translucent(100, 60)))
+	out, err := coverimg.Baseline(pngOf(t, translucent(100, 60)), maxEdge, quality)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +141,7 @@ func TestABigPictureIsFittedInsideTheLimitKeepingItsShape(t *testing.T) {
 		{"thin", 2400, 100, 480, 20},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			out, err := coverimg.Normalize(pngOf(t, translucent(tc.w, tc.h)))
+			out, err := coverimg.Baseline(pngOf(t, translucent(tc.w, tc.h)), maxEdge, quality)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -147,11 +153,11 @@ func TestABigPictureIsFittedInsideTheLimitKeepingItsShape(t *testing.T) {
 }
 
 func TestAFileThatSuitsThePlayerAlreadyIsLeftAlone(t *testing.T) {
-	once, err := coverimg.Normalize(pngOf(t, translucent(300, 200)))
+	once, err := coverimg.Baseline(pngOf(t, translucent(300, 200)), maxEdge, quality)
 	if err != nil {
 		t.Fatal(err)
 	}
-	twice, err := coverimg.Normalize(once)
+	twice, err := coverimg.Baseline(once, maxEdge, quality)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +174,7 @@ func TestAJPEGWithoutAJFIFHeaderGetsOne(t *testing.T) {
 	if shapeOf(t, plain.Bytes()).jfif {
 		t.Fatal("test input already has a JFIF header")
 	}
-	out, err := coverimg.Normalize(plain.Bytes())
+	out, err := coverimg.Baseline(plain.Bytes(), maxEdge, quality)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +200,7 @@ func TestAwkwardJPEGsAreRewrittenTheWayThePlayerOpensThem(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			out, err := coverimg.Normalize(in)
+			out, err := coverimg.Baseline(in, maxEdge, quality)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -203,5 +209,52 @@ func TestAwkwardJPEGsAreRewrittenTheWayThePlayerOpensThem(t *testing.T) {
 				t.Errorf("%+v, want baseline JFIF without metadata, sampling %x, 96x64", s, tc.sampling)
 			}
 		})
+	}
+}
+
+func TestValidateSaysWhatKindOfPictureItIs(t *testing.T) {
+	var asJPEG bytes.Buffer
+	if err := jpeg.Encode(&asJPEG, translucent(8, 8), nil); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name string
+		data []byte
+		want string
+		ok   bool
+	}{
+		{"a JPEG", asJPEG.Bytes(), "image/jpeg", true},
+		{"a PNG", pngOf(t, translucent(8, 8)), "image/png", true},
+		{"text", []byte("just some text"), "", false},
+		{"a JPEG cut short", asJPEG.Bytes()[:len(asJPEG.Bytes())/2], "", false},
+		{"nothing", nil, "", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := coverimg.Validate(c.data)
+			if got != c.want || (err == nil) != c.ok {
+				t.Errorf("Validate = %q, %v; want %q, ok %v", got, err, c.want, c.ok)
+			}
+		})
+	}
+}
+
+func TestSniffReadsTheKindFromTheFirstBytes(t *testing.T) {
+	var asJPEG bytes.Buffer
+	if err := jpeg.Encode(&asJPEG, translucent(8, 8), nil); err != nil {
+		t.Fatal(err)
+	}
+	for name, c := range map[string]struct {
+		data []byte
+		want string
+	}{
+		"jpeg": {asJPEG.Bytes(), "image/jpeg"},
+		"png":  {pngOf(t, translucent(8, 8)), "image/png"},
+		"text": {[]byte("just some text"), ""},
+		"none": {nil, ""},
+	} {
+		if got := coverimg.Sniff(c.data); got != c.want {
+			t.Errorf("%s: Sniff = %q, want %q", name, got, c.want)
+		}
 	}
 }

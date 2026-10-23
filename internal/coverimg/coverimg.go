@@ -1,7 +1,8 @@
-// Package coverimg makes cover images into the one kind of file the mp3
-// player opens: a baseline JPEG with a JFIF header, 4:2:0, of a modest size.
-// The player's "Photos" menu refuses progressive and 4:4:4 files, and does
-// not list PNG files at all.
+// Package coverimg checks cover images and, for a device that is fussy about
+// them, makes them into a baseline JPEG with a JFIF header, 4:2:0, of a modest
+// size (the Wolfgang WMP01's "Photos" menu refuses progressive and 4:4:4
+// files, and does not list PNG files at all). It also scales pictures for the
+// terminal.
 package coverimg
 
 import (
@@ -16,13 +17,6 @@ import (
 	"math"
 )
 
-// MaxEdge is the most pixels a cover has along its longer side. The player's
-// screen is small, and a small file opens faster and fits its memory.
-const MaxEdge = 480
-
-// Quality is the JPEG quality (1 to 100) covers are written with.
-const Quality = 85
-
 // jfif is the header that follows the start of a JFIF file: version 1.01, no
 // units, a 1:1 pixel shape and no thumbnail. Go's encoder writes none, and
 // every file the player is known to open has one.
@@ -31,11 +25,40 @@ var jfif = []byte{
 	0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
 }
 
-// Normalize turns a JPEG or PNG image into a cover the player opens. A JPEG
-// that is one already comes back as it is, so that normalising twice costs no
-// quality.
-func Normalize(data []byte) ([]byte, error) {
-	if suits(data) {
+// Validate says what kind of picture data is, "image/jpeg" or "image/png", or
+// that it is neither or cannot be read.
+func Validate(data []byte) (string, error) {
+	_, format, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return "", fmt.Errorf("cover must be a JPEG or PNG image: %w", err)
+	}
+	switch format {
+	case "jpeg":
+		return "image/jpeg", nil
+	case "png":
+		return "image/png", nil
+	}
+	return "", fmt.Errorf("cover must be a JPEG or PNG image, not %s", format)
+}
+
+// Sniff says from its first bytes whether data is a "image/jpeg" or an
+// "image/png", or "" if it is neither.
+func Sniff(data []byte) string {
+	switch {
+	case bytes.HasPrefix(data, []byte{0xff, 0xd8, 0xff}):
+		return "image/jpeg"
+	case bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n")):
+		return "image/png"
+	}
+	return ""
+}
+
+// Baseline turns a JPEG or PNG image into a baseline JPEG with a JFIF header,
+// 4:2:0, at most maxEdge pixels along its longer side, written at the given
+// quality (1 to 100). A JPEG that is one already comes back as it is, so that
+// doing it twice costs no quality.
+func Baseline(data []byte, maxEdge, quality int) ([]byte, error) {
+	if suits(data, maxEdge) {
 		return data, nil
 	}
 	img, _, err := image.Decode(bytes.NewReader(data))
@@ -43,7 +66,7 @@ func Normalize(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("cover must be a JPEG or PNG image: %w", err)
 	}
 	var b bytes.Buffer
-	if err := jpeg.Encode(&b, fitted(onWhite(img)), &jpeg.Options{Quality: Quality}); err != nil {
+	if err := jpeg.Encode(&b, fitted(onWhite(img), maxEdge), &jpeg.Options{Quality: quality}); err != nil {
 		return nil, err
 	}
 	out := b.Bytes()
@@ -60,15 +83,15 @@ func onWhite(img image.Image) *image.RGBA {
 	return out
 }
 
-// fitted shrinks img to fit in MaxEdge pixels along its longer side, keeping
+// fitted shrinks img to fit in maxEdge pixels along its longer side, keeping
 // its shape. A picture that is small enough is not changed, or enlarged.
-func fitted(img *image.RGBA) image.Image {
+func fitted(img *image.RGBA, maxEdge int) image.Image {
 	b := img.Bounds()
 	long := max(b.Dx(), b.Dy())
-	if long <= MaxEdge {
+	if long <= maxEdge {
 		return img
 	}
-	scale := float64(MaxEdge) / float64(long)
+	scale := float64(maxEdge) / float64(long)
 	w := max(int(math.Round(float64(b.Dx())*scale)), 1)
 	h := max(int(math.Round(float64(b.Dy())*scale)), 1)
 	return Resize(img, w, h)
@@ -101,8 +124,8 @@ func Resize(img image.Image, w, h int) *image.RGBA {
 
 // suits reports whether data is a JPEG the player opens, and needs no change:
 // a JFIF file and nothing else in the way of metadata, a baseline frame of
-// grey or 4:2:0 colour, within MaxEdge.
-func suits(data []byte) bool {
+// grey or 4:2:0 colour, within maxEdge.
+func suits(data []byte, maxEdge int) bool {
 	if len(data) < 4 || data[0] != 0xff || data[1] != 0xd8 || !bytes.HasPrefix(data[2:], jfif) {
 		return false
 	}
@@ -124,7 +147,7 @@ func suits(data []byte) bool {
 		case marker >= 0xe1 && marker <= 0xef, marker == 0xfe:
 			return false // Exif, comments and the like
 		case marker == 0xc0:
-			return baselineAndSmall(body)
+			return baselineAndSmall(body, maxEdge)
 		case marker >= 0xc1 && marker <= 0xcf && marker != 0xc4 && marker != 0xc8 && marker != 0xcc:
 			return false // progressive, lossless, arithmetic coding
 		}
@@ -135,12 +158,12 @@ func suits(data []byte) bool {
 
 // baselineAndSmall judges the body of a frame header: height, width and the
 // sampling of each component.
-func baselineAndSmall(body []byte) bool {
+func baselineAndSmall(body []byte, maxEdge int) bool {
 	if len(body) < 6 {
 		return false
 	}
 	h, w := int(binary.BigEndian.Uint16(body[1:])), int(binary.BigEndian.Uint16(body[3:]))
-	if max(w, h) > MaxEdge {
+	if max(w, h) > maxEdge {
 		return false
 	}
 	n := int(body[5])

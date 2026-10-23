@@ -176,7 +176,7 @@ func TestTheInspectorShowsThePictureAndItsSize(t *testing.T) {
 	}
 
 	m, _ = coverModel(t)
-	contains(t, m, "60×60 JPEG", "▀")
+	contains(t, m, "60×60 PNG", "▀") // as it was given
 }
 
 func writeImage(t *testing.T, name string, data []byte) string {
@@ -200,7 +200,7 @@ func TestChoosingACoverFromAFile(t *testing.T) {
 	if got := trackNamed(t, hook.Library, "Flow"); got.CoverSHA256 == "" {
 		t.Fatal("the cover was not saved")
 	}
-	contains(t, m, "32×32 JPEG", "▀", "Saved")
+	contains(t, m, "32×32 PNG", "▀", "Saved") // the file as it was given
 
 	m = keys(t, m, "u")
 	if got := trackNamed(t, hook.Library, "Flow"); got.CoverSHA256 != "" {

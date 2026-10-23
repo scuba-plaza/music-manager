@@ -10,12 +10,10 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 
 	"music-manager/internal/app"
-	"music-manager/internal/coverimg"
-	"music-manager/internal/manifest"
+	"music-manager/internal/device"
 	"music-manager/internal/mp3"
 	"music-manager/internal/render"
 	"music-manager/internal/testmp3"
@@ -58,19 +56,19 @@ func TestAlbumFolderCoverComesFromTheOldestTrackThatHasOne(t *testing.T) {
 		t.Fatal(err)
 	}
 	mustSync(t, a, app.SyncOptions{})
-	want, err := coverimg.Normalize(testmp3.PNG) // the older track's picture, in the form covers are kept in
-	if err != nil {
-		t.Fatal(err)
+	// the older track's picture, as it is: a PNG, so a cover.png
+	if got := readFile(t, a.Root(), "Band/Album/cover.png"); !bytes.Equal(got, testmp3.PNG) {
+		t.Errorf("cover.png = %d bytes, want the older track's %d", len(got), len(testmp3.PNG))
 	}
-	if got := readFile(t, a.Root(), "Band/Album/cover.jpg"); !bytes.Equal(got, want) {
-		t.Errorf("cover.jpg = %d bytes, want the older track's %d", len(got), len(want))
+	if _, err := os.Stat(filepath.Join(a.Root(), "Band/Album/cover.jpg")); err == nil {
+		t.Error("a cover.jpg was written as well")
 	}
 	if ops := mustSync(t, a, app.SyncOptions{}); len(ops) != 0 {
 		t.Errorf("second sync wants %v", ops)
 	}
 }
 
-func TestASingleGetsItsCoverBesideItsFileButAnUnidentifiedTrackGetsNone(t *testing.T) {
+func TestASingleKeepsItsCoverInItsTagAndGetsNoFileOfItsOwn(t *testing.T) {
 	a := libWithTracks(t, 10, 20)
 	ts := tracks(t, a)
 	identify(t, a, ts[0].ID, "Single", "Band", "", 0, 0)
@@ -78,18 +76,36 @@ func TestASingleGetsItsCoverBesideItsFileButAnUnidentifiedTrackGetsNone(t *testi
 	a.SetCover(ts[1].ID, testmp3.JPEG) // not identified
 	ops := mustSync(t, a, app.SyncOptions{})
 	for _, op := range ops {
-		if op.Kind == render.Create && filepath.Ext(op.Path) != ".mp3" && op.Path != "Band/Single.jpg" {
-			t.Errorf("unexpected image file %s", op.Path)
+		if op.Kind == render.Create && filepath.Ext(op.Path) != ".mp3" {
+			t.Errorf("unexpected file %s", op.Path)
 		}
-	}
-	if got := readFile(t, a.Root(), "Band/Single.jpg"); !bytes.Equal(got, testmp3.JPEG) {
-		t.Errorf("Single.jpg = %d bytes, want the single's cover", len(got))
 	}
 	if got := mp3.ReadTagSet(readFile(t, a.Root(), "Band/Single.mp3")).Cover; !bytes.Equal(got, testmp3.JPEG) {
 		t.Error("a single should still embed its cover")
 	}
 	if ops := mustSync(t, a, app.SyncOptions{}); len(ops) != 0 {
 		t.Errorf("second sync wants %v", ops)
+	}
+}
+
+func TestTheWolfgangGetsAPhotoBesideASingleButNoneForAnUnidentifiedTrack(t *testing.T) {
+	a := libWithTracks(t, 10, 20)
+	ts := tracks(t, a)
+	identify(t, a, ts[0].ID, "Single", "Band", "", 0, 0)
+	a.SetCover(ts[0].ID, testmp3.JPEG)
+	a.SetCover(ts[1].ID, testmp3.JPEG) // not identified
+	target := filepath.Join(t.TempDir(), "player")
+	ops := mustSync(t, a, app.SyncOptions{Target: target, Device: device.Wolfgang})
+	for _, op := range ops {
+		if op.Kind == render.Create && filepath.Ext(op.Path) != ".mp3" && op.Path != "Band/Single.jpg" {
+			t.Errorf("unexpected image file %s", op.Path)
+		}
+	}
+	if got := readFile(t, target, "Band/Single.jpg"); !bytes.Equal(got, testmp3.JPEG) {
+		t.Errorf("Single.jpg = %d bytes, want the single's cover", len(got))
+	}
+	if got := mp3.ReadTagSet(readFile(t, target, "Band/Single.mp3")).Cover; !bytes.Equal(got, testmp3.JPEG) {
+		t.Error("a single should still embed its cover")
 	}
 }
 
@@ -135,7 +151,7 @@ func TestSetCoverRejectsNonImagesAndUnknownTracks(t *testing.T) {
 	}
 }
 
-// bigPNG is a 1200×800 picture, much larger than a cover needs to be.
+// bigPNG is a 1200×800 picture, much larger than a small screen needs.
 func bigPNG(t *testing.T) []byte {
 	t.Helper()
 	img := image.NewNRGBA(image.Rect(0, 0, 1200, 800))
@@ -151,122 +167,66 @@ func bigPNG(t *testing.T) []byte {
 	return b.Bytes()
 }
 
-func TestAnyCoverIsSyncedAsASmallJPEGThePlayerOpens(t *testing.T) {
+func TestACoverIsStoredExactlyAsGiven(t *testing.T) {
+	a := libWithTracks(t, 10)
+	tr := tracks(t, a)[0]
+	big := bigPNG(t)
+	if err := a.SetCover(tr.ID, big); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(big)
+	sha := hex.EncodeToString(sum[:])
+	if got := tracks(t, a)[0].CoverSHA256; got != sha {
+		t.Errorf("cover SHA = %s, want the SHA of the file given, %s", got, sha)
+	}
+	stored, err := os.ReadFile(filepath.Join(a.Root(), ".mm", "covers", sha+".img"))
+	if err != nil || !bytes.Equal(stored, big) {
+		t.Errorf("the stored cover is not the file given (%d bytes, %v; want %d)", len(stored), err, len(big))
+	}
+}
+
+func TestAPlainSyncWritesTheCoverAsItWasGiven(t *testing.T) {
+	a := libWithTracks(t, 10)
+	tr := tracks(t, a)[0]
+	identify(t, a, tr.ID, "Song", "Band", "Album", 1, 1)
+	big := bigPNG(t)
+	if err := a.SetCover(tr.ID, big); err != nil {
+		t.Fatal(err)
+	}
+	mustSync(t, a, app.SyncOptions{})
+
+	if got := readFile(t, a.Root(), "Band/Album/cover.png"); !bytes.Equal(got, big) {
+		t.Errorf("cover.png is %d bytes, want the %d of the picture given", len(got), len(big))
+	}
+	if _, err := os.Stat(filepath.Join(a.Root(), "Band/Album/cover.jpg")); err == nil {
+		t.Error("a cover.jpg was written")
+	}
+	tags := mp3.ReadTagSet(readFile(t, a.Root(), "Band/Album/01 - Song.mp3"))
+	if tags.CoverMIME != "image/png" || !bytes.Equal(tags.Cover, big) {
+		t.Errorf("embedded cover is %s, %d bytes; want the PNG given", tags.CoverMIME, len(tags.Cover))
+	}
+}
+
+func TestTheWolfgangGetsEveryCoverAsASmallJPEG(t *testing.T) {
 	a := libWithTracks(t, 10)
 	tr := tracks(t, a)[0]
 	identify(t, a, tr.ID, "Song", "Band", "Album", 1, 1)
 	if err := a.SetCover(tr.ID, bigPNG(t)); err != nil {
 		t.Fatal(err)
 	}
-	mustSync(t, a, app.SyncOptions{})
+	target := filepath.Join(t.TempDir(), "player")
+	mustSync(t, a, app.SyncOptions{Target: target, Device: device.Wolfgang})
 
-	file := readFile(t, a.Root(), "Band/Album/cover.jpg")
+	file := readFile(t, target, "Band/Album/cover.jpg")
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(file))
 	if err != nil || format != "jpeg" || cfg.Width != 480 || cfg.Height != 320 {
 		t.Errorf("cover.jpg is %s %dx%d (%v), want a 480x320 jpeg", format, cfg.Width, cfg.Height, err)
 	}
-	tags := mp3.ReadTagSet(readFile(t, a.Root(), "Band/Album/01 - Song.mp3"))
+	tags := mp3.ReadTagSet(readFile(t, target, "Band/Album/01 - Song.mp3"))
 	if tags.CoverMIME != "image/jpeg" || !bytes.Equal(tags.Cover, file) {
 		t.Errorf("embedded cover is %s, %d bytes; the file has %d", tags.CoverMIME, len(tags.Cover), len(file))
 	}
-	if _, err := os.Stat(filepath.Join(a.Root(), "Band/Album/cover.png")); err == nil {
+	if _, err := os.Stat(filepath.Join(target, "Band/Album/cover.png")); err == nil {
 		t.Error("a cover.png was written")
-	}
-}
-
-// plantLegacyCover gives a track a cover as an earlier version stored it:
-// the image just as it came, whatever its form.
-func plantLegacyCover(t *testing.T, a *app.App, id string, image []byte) string {
-	t.Helper()
-	sum := sha256.Sum256(image)
-	sha := hex.EncodeToString(sum[:])
-	dir := filepath.Join(a.Root(), ".mm", "covers")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeFile(t, filepath.Join(dir, sha+".img"), image)
-	store := manifest.NewStore(filepath.Join(a.Root(), "library.json"))
-	m, err := store.Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	tr, _ := m.Get(id)
-	tr.CoverSHA256 = sha
-	m.Update(tr)
-	if err := store.Save(m); err != nil {
-		t.Fatal(err)
-	}
-	return sha
-}
-
-func TestACoverStoredAsAPNGLongAgoIsStillSyncedAsAJPEG(t *testing.T) {
-	a := libWithTracks(t, 10)
-	tr := tracks(t, a)[0]
-	identify(t, a, tr.ID, "Song", "Band", "Album", 1, 1)
-	plantLegacyCover(t, a, tr.ID, bigPNG(t))
-	mustSync(t, a, app.SyncOptions{})
-
-	file := readFile(t, a.Root(), "Band/Album/cover.jpg")
-	if cfg, format, err := image.DecodeConfig(bytes.NewReader(file)); err != nil || format != "jpeg" || cfg.Width != 480 {
-		t.Errorf("cover.jpg is %s %dx%d (%v)", format, cfg.Width, cfg.Height, err)
-	}
-	if tags := mp3.ReadTagSet(readFile(t, a.Root(), "Band/Album/01 - Song.mp3")); tags.CoverMIME != "image/jpeg" || !bytes.Equal(tags.Cover, file) {
-		t.Errorf("embedded cover is %s, %d bytes", tags.CoverMIME, len(tags.Cover))
-	}
-}
-
-func coverShas(t *testing.T, a *app.App) []string {
-	t.Helper()
-	var out []string
-	for _, tr := range tracks(t, a) {
-		out = append(out, tr.CoverSHA256)
-	}
-	return out
-}
-
-func TestNormalizingTheCoversOfALibraryKeptByAnEarlierVersion(t *testing.T) {
-	a := libWithTracks(t, 10, 20, 30)
-	ts := tracks(t, a)
-	old := plantLegacyCover(t, a, ts[0].ID, bigPNG(t))
-	plantLegacyCover(t, a, ts[1].ID, bigPNG(t)) // the same image: one blob, two users
-	if err := a.SetCover(ts[2].ID, testmp3.JPEG); err != nil {
-		t.Fatal(err)
-	}
-	before := coverShas(t, a)
-
-	rep, err := a.NormalizeCovers(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rep.Images != 2 || rep.Converted != 1 || rep.Tracks != 2 || rep.Before == 0 || rep.After == 0 {
-		t.Errorf("dry run reports %+v", rep)
-	}
-	if !slices.Equal(coverShas(t, a), before) {
-		t.Error("a dry run changed the library")
-	}
-
-	if rep, err = a.NormalizeCovers(false); err != nil {
-		t.Fatal(err)
-	}
-	if rep.Converted != 1 || rep.Tracks != 2 {
-		t.Errorf("report %+v", rep)
-	}
-	after := coverShas(t, a)
-	if after[0] == old || after[0] != after[1] || after[2] != before[2] {
-		t.Errorf("cover shas %v became %v: the two PNG users should share one new image, the JPEG stay", before, after)
-	}
-	data, err := os.ReadFile(filepath.Join(a.Root(), ".mm", "covers", after[0]+".img"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg, format, err := image.DecodeConfig(bytes.NewReader(data)); err != nil || format != "jpeg" || cfg.Width != 480 {
-		t.Errorf("new image is %s %dx%d (%v)", format, cfg.Width, cfg.Height, err)
-	}
-	if _, err := os.Stat(filepath.Join(a.Root(), ".mm", "library.json.before-covers")); err != nil {
-		t.Errorf("no backup of the library: %v", err)
-	}
-
-	if rep, err = a.NormalizeCovers(false); err != nil || rep.Converted != 0 || rep.Tracks != 0 {
-		t.Errorf("a second run reports %+v, %v; want nothing to do", rep, err)
 	}
 }

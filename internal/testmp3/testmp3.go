@@ -114,7 +114,7 @@ func cover(col color.RGBA, asJPEG bool) []byte {
 	if !asJPEG {
 		return b.Bytes()
 	}
-	out, err := coverimg.Normalize(b.Bytes())
+	out, err := coverimg.Baseline(b.Bytes(), 480, 85)
 	if err != nil {
 		panic(err)
 	}

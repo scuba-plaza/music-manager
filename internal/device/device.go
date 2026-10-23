@@ -5,6 +5,7 @@
 package device
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"path"
@@ -28,6 +29,9 @@ type Target interface {
 	// Cover turns a stored cover into the picture that is embedded and written
 	// beside the tracks, and says what kind of image it is.
 	Cover(stored []byte) (data []byte, mime string, err error)
+	// CoverFile is the name of the cover file of an album folder, for a stored
+	// cover of this kind ("image/jpeg" or "image/png").
+	CoverFile(storedMIME string) string
 	// SingleCovers says whether a single gets a cover file of its own.
 	SingleCovers() bool
 	// PlaylistFile is where the playlist of this name is written in the target.
@@ -43,17 +47,6 @@ var Generic Target = generic{}
 
 // Wolfgang is the Wolfgang WMP01 player: Latin names of a width it can show.
 var Wolfgang Target = wolfgang{}
-
-// plain is what the targets still do alike: the cover and the playlist, which
-// come apart in their own slices.
-type plain struct{}
-
-func (plain) Cover(stored []byte) ([]byte, string, error) {
-	data, err := coverimg.Normalize(stored)
-	return data, "image/jpeg", err
-}
-
-func (plain) SingleCovers() bool { return true }
 
 // wolfgangPlaylist is the M3U file of a playlist for the Wolfgang WMP01. The
 // player was found to read paths from the root of its card with backslashes,
@@ -113,7 +106,7 @@ func extras(t manifest.Track) map[string]string {
 	return extra
 }
 
-type generic struct{ plain }
+type generic struct{}
 
 func (generic) Name() string { return "generic" }
 
@@ -134,6 +127,25 @@ func (generic) Tags(t manifest.Track) mp3.TagSet {
 	}
 }
 
+// Cover is kept as it was given, whatever it is; the file is named by its kind.
+func (generic) Cover(stored []byte) ([]byte, string, error) {
+	mime := coverimg.Sniff(stored)
+	if mime == "" {
+		return nil, "", errors.New("cover must be a JPEG or PNG image")
+	}
+	return stored, mime, nil
+}
+
+func (generic) CoverFile(storedMIME string) string {
+	if storedMIME == "image/png" {
+		return "cover.png"
+	}
+	return "cover.jpg"
+}
+
+// SingleCovers: a single has its cover in its tag, and no file of its own.
+func (generic) SingleCovers() bool { return false }
+
 func (g generic) PlaylistFile(name string) string {
 	return layout.PlaylistPath(name, ".m3u8", g.Layout())
 }
@@ -142,7 +154,7 @@ func (g generic) Playlist(p manifest.Playlist, tracks map[string]manifest.Track,
 	return g.PlaylistFile(p.Name), genericPlaylist(p, tracks, paths)
 }
 
-type wolfgang struct{ plain }
+type wolfgang struct{}
 
 func (wolfgang) Name() string { return "wolfgang-wmp01" }
 
@@ -166,6 +178,24 @@ func (wolfgang) Tags(t manifest.Track) mp3.TagSet {
 		Extra:  extras(t),
 	}
 }
+
+// The Wolfgang's Photos menu opens baseline JFIF files, 4:2:0, up to 480
+// pixels, and does not list PNG files: whatever was stored is turned into one.
+const (
+	coverMaxEdge = 480
+	coverQuality = 85
+)
+
+func (wolfgang) Cover(stored []byte) ([]byte, string, error) {
+	data, err := coverimg.Baseline(stored, coverMaxEdge, coverQuality)
+	return data, "image/jpeg", err
+}
+
+func (wolfgang) CoverFile(string) string { return "cover.jpg" }
+
+// SingleCovers: the player shows a photo named like the track, so a single gets
+// one beside its file.
+func (wolfgang) SingleCovers() bool { return true }
 
 func (w wolfgang) PlaylistFile(name string) string {
 	return layout.PlaylistPath(name, ".m3u", w.Layout())

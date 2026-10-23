@@ -19,26 +19,30 @@ import (
 
 // renderInputs works out, for tracks, where each one is rendered and which
 // track supplies each cover file: the cover of an album folder comes from the
-// oldest track that has a cover, and a single has a cover file of its own,
-// named like its track. Tracks not identified have no cover file.
-func renderInputs(tracks []manifest.Track, dev device.Target) (paths map[string]string, covers map[string]manifest.Track) {
+// oldest track that has a cover, and is named for the kind of picture it is;
+// where the target wants it, a single has a cover file of its own, named like
+// its track. Tracks not identified have no cover file. folders says, for each
+// album folder, whose cover it holds.
+func (a *App) renderInputs(tracks []manifest.Track, dev device.Target) (paths map[string]string, covers, folders map[string]manifest.Track) {
 	paths = layout.Assign(tracks, dev.Layout())
-	covers = map[string]manifest.Track{}
+	covers, folders = map[string]manifest.Track{}, map[string]manifest.Track{}
 	for _, t := range tracks {
 		if t.Status != manifest.Identified || t.CoverSHA256 == "" {
 			continue
 		}
-		file := singleCoverPath(paths[t.ID])
 		if t.Album != "" {
-			file = path.Join(path.Dir(paths[t.ID]), "cover.jpg")
-		} else if !dev.SingleCovers() {
-			continue
-		}
-		if cur, ok := covers[file]; !ok || older(t, cur) {
-			covers[file] = t
+			dir := path.Dir(paths[t.ID])
+			if cur, ok := folders[dir]; !ok || older(t, cur) {
+				folders[dir] = t
+			}
+		} else if dev.SingleCovers() {
+			covers[singleCoverPath(paths[t.ID])] = t
 		}
 	}
-	return paths, covers
+	for dir, t := range folders {
+		covers[path.Join(dir, dev.CoverFile(a.coverKind(t.CoverSHA256)))] = t
+	}
+	return paths, covers, folders
 }
 
 // singleCoverPath is where the cover of a single goes: beside its file, under
@@ -51,8 +55,8 @@ func singleCoverPath(trackPath string) string {
 // depends on: its record, where it goes and the cover of its album folder.
 // Each playlist has one too, under "playlist:" and its name: its name and
 // where each of its tracks goes.
-func signatures(m *manifest.Manifest) map[string]string {
-	paths, covers := renderInputs(m.Tracks, device.Generic)
+func (a *App) signatures(m *manifest.Manifest) map[string]string {
+	paths, _, folders := a.renderInputs(m.Tracks, device.Generic)
 	sigs := make(map[string]string, len(m.Tracks)+len(m.Playlists))
 	for _, p := range m.Playlists {
 		_, content := device.Generic.Playlist(p, byID(m.Tracks), paths)
@@ -63,8 +67,8 @@ func signatures(m *manifest.Manifest) map[string]string {
 		p := paths[t.ID]
 		folderCover := "" // the cover file this track's own belongs to, or comes from
 		if t.Status == manifest.Identified && t.Album != "" {
-			folderCover = covers[path.Join(path.Dir(p), "cover.jpg")].CoverSHA256
-		} else if t.Status == manifest.Identified && t.CoverSHA256 != "" {
+			folderCover = folders[path.Dir(p)].CoverSHA256
+		} else if t.Status == manifest.Identified && t.CoverSHA256 != "" && device.Generic.SingleCovers() {
 			folderCover = "single" // it has a cover file beside it
 		}
 		t.AddedAt, t.UpdatedAt = time.Time{}, time.Time{} // saving a record is not changing it
@@ -117,7 +121,7 @@ func (a *App) Unsynced() (n int, known bool, err error) {
 	if err != nil {
 		return 0, false, err
 	}
-	current := signatures(m)
+	current := a.signatures(m)
 	for id, sig := range current {
 		if saved.Tracks[id] != sig {
 			n++
@@ -139,7 +143,7 @@ func (a *App) RecordSynced() error {
 	if err != nil {
 		return err
 	}
-	return a.writeSynced(signatures(m))
+	return a.writeSynced(a.signatures(m))
 }
 
 func sameDir(a, b string) bool {

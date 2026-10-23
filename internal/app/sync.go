@@ -67,7 +67,7 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 		keepAudio[t.AudioSHA256] = true
 		keepCovers[t.CoverSHA256] = true
 	}
-	paths, covers := renderInputs(m.Tracks, dev)
+	paths, covers, _ := a.renderInputs(m.Tracks, dev)
 	desired := render.Tree{}
 	build := map[string]func() ([]byte, error){}
 	for i, t := range m.Tracks {
@@ -103,7 +103,7 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 	return &SyncPlan{
 		Ops: render.Plan(desired, existing, opts.Prune), a: a, target: target, build: build,
 		keepAudio: keepAudio, keepCovers: keepCovers,
-		desired: desired, existing: existing, sigs: signatures(m),
+		desired: desired, existing: existing, sigs: a.signatures(m),
 	}, nil
 }
 
