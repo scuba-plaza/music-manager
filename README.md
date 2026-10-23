@@ -14,7 +14,7 @@ _Inbox/<id> - old name.mp3      tracks not identified yet
 
 A record holds the truth and nothing for any one device: `title`, `artist` and
 `album` as they really are, in any script, one artist per track, and the cover
-exactly as it was given. A plain `mm sync` writes that truth in standard forms
+exactly as it was given, and optionally how a name reads in Latin letters (see Latin forms). A plain `mm sync` writes that truth in standard forms
 (true names in the tags and the file names, original covers, M3U8 playlists),
 which suits a phone, a computer or any player without odd limits. A player that
 does have limits gets what it needs worked out from the record while syncing:
@@ -51,11 +51,11 @@ matter right now. Without a terminal, plain `mm` prints help as before.
 | `S` | sort the list by artist, album, title, track number, length or any of the three dates (see below); the menu also reverses the order and goes back to the tree |
 | `+` `-` | open the tree one more level (artists, then albums) / close all of it |
 | `→` `enter` | from a track into its fields; `enter` edits a field, `enter` saves, `esc` cancels |
-| `→` `←` `1` `2` | in the fields: the other tab (Details, Audio); `←` on the first tab goes back to the tree. The tab you are on stays when you select another track. Under `mm --wolfgang` there is a third, `3`: a preview of what a sync for the Wolfgang writes for the track (see below) |
+| `→` `←` `1` `2` `3` | in the fields: the other tab (Details, Audio, Latin: the forms of the names in Latin letters, see below); `←` on the first tab goes back to the tree. The tab you are on stays when you select another track. Under `mm --wolfgang` there is a fourth, `4`: a preview of what a sync for the Wolfgang writes for the track (see below) |
 | `[` `]` `{` `}` `0` `p` | on a cut: nudge by 0.1 s / 1 s, clear, hear the 8 s around it (needs `ffplay` or `mpv`) |
-| `space` `ctrl+a` `e` | mark tracks (an album marks all of its tracks); edit the marked ones, or rename an artist or album |
+| `space` `ctrl+a` `e` | mark tracks (an album marks all of its tracks); edit the marked ones, or rename an artist or album; the form has the Latin forms of the artist, album and genre too |
 | `J` `K` `n` | move a track down or up in its album; number the album 1…N |
-| `p` | add the marked tracks (or the selected track, album or artist) to a playlist, or start a new one. The **Playlists** group at the top of the tree opens into each playlist and its tracks in play order; there `J` `K` reorder, `d` takes a track out of the playlist (never out of the library), `d` on the playlist itself deletes it after asking, and `e` renames it |
+| `p` | add the marked tracks (or the selected track, album or artist) to a playlist, or start a new one. The **Playlists** group at the top of the tree opens into each playlist and its tracks in play order; there `J` `K` reorder, `d` takes a track out of the playlist (never out of the library), `d` on the playlist itself deletes it after asking, and `e` renames it and sets its Latin name |
 | `i` `I` `o` | find a track on MusicBrainz and pick the match; do all unidentified tracks; use the file's old tags |
 | `a` | add from a YouTube link: one form, pre-filled from the match |
 | `s` | sync: choose the folder (or a mounted player), see what will change, apply. A drive has a Format row, Generic or Wolfgang WMP01, switched with `w` and never remembered (under `mm --wolfgang` a drive starts on the Wolfgang); the library folder is always written the standard way. The header says `N to sync · press s` when something is waiting; clicking it works too |
@@ -75,13 +75,14 @@ changes the library while the interface is open, the change appears within a cou
 | `mm identify [id…] [--yes]` | look tracks up on MusicBrainz; pick from a list, or `--yes` for confident matches |
 | `mm adopt [id…]` | identify tracks by what their old tags said, for what MusicBrainz does not know |
 | `mm add <url>` | download with yt-dlp and add |
-| `mm edit <id> --title … --artist … --album … --track N --of N --released DATE --genre TEXT --source-url LINK --trim-start T --trim-end T --gain DB --fade-in T --fade-out T --cover FILE` | change a track; title, artist and album are the true names, in any script |
+| `mm edit <id> --title … --artist … --album … --track N --of N --released DATE --genre TEXT --title-latin … --artist-latin … --album-latin … --genre-latin … --source-url LINK --trim-start T --trim-end T --gain DB --fade-in T --fade-out T --cover FILE` | change a track; title, artist and album are the true names, in any script; the `-latin` ones are the forms in Latin letters, `""` takes one away (see Latin forms) |
 | `mm ls [words] [status:identified\|unidentified] [--sort KEY] [--reverse]` / `mm show <id> [--wolfgang]` | look at records; `--sort` takes `artist`, `album`, `title`, `track`, `length`, `released`, `added` or `edited` |
 | `mm sync [--target DIR] [--wolfgang] [--dry-run] [--prune --yes]` | render the folder; `--prune` deletes files the records don't account for; `--wolfgang` (needs `--target`) writes for the Wolfgang WMP01 |
 | `mm rm <id>…` | remove records (audio is deleted by the next sync) |
 | `mm review apply <file> [--dry-run] [--include-low]` | set a field for many tracks from a file of proposals you have corrected (see Review files below) |
-| `mm playlist <new, add, rm, move, rename, delete, import, ls, show>` | make and change playlists (see Playlists below) |
+| `mm playlist <new, add, rm, move, rename, latin, delete, import, ls, show>` | make and change playlists (see Playlists below) |
 | `mm migrate [--dry-run]` | bring a library of version 1 up to date (see Upgrading below) |
+| `mm restore-latin [--dry-run]` | put back the Latin forms that an earlier migration dropped (see Upgrading below) |
 | `mm doctor` | check the stores for missing or damaged files, and point out artist names that look like several artists |
 | `mm tui [--wolfgang]` | the full-screen interface (also what plain `mm` opens in a terminal) |
 
@@ -115,15 +116,24 @@ The sections are `## ARTISTS`, `## ALBUMS` and `## TRACKS`, each followed by `->
 
 `mm review apply <file>` checks the whole file first, so that one invalid value changes nothing, then sets all the values in one save. Entries marked `low` are left out unless you pass `--include-low`, `--dry-run` only reports, and entries that match no track are listed. Applying a file twice changes nothing the second time.
 
+## Latin forms
+
+Names are kept as they really are, in any script. Some places can only show Latin letters: the Wolfgang WMP01 (below) and the order of the list, which puts فيروز among the F. For these, each name has a **Latin form**: how it reads in Latin letters. Unless you set one, it is worked out from the name, word by word. That is rough for Arabic, which is written without its short vowels: فيروز comes out as "Firuz" and جوليا بطرس as "Julya Btrs". So a form can be set by hand, for the title, the artist, the album and the genre of a track and for the name of a playlist, and it is used instead of the worked-out one:
+
+* **In the full-screen interface**, the **Latin** tab (`3`) of a track lists the four. The form shown is the one in use: dim when it is worked out, normal when it was set by hand, `—` when there is no name to write. `enter` edits it starting from what is shown; saving what was there changes nothing, and saving it empty goes back to the worked-out form. The change is one step for `u` to undo, like any other. For many tracks at once, `e` on an artist or an album, or on marked tracks, has rows for the Latin form of the artist, the album and the genre (`-` takes it away). `e` on a playlist has its Latin name under its name.
+* **On the command line**, `mm edit <id> --title-latin "Watani" --artist-latin "Fairouz" --album-latin … --genre-latin …`, with `""` to take one away, and `mm playlist latin <name> [latin name]`. `mm show <id>` lists the forms that were set.
+
+A form belongs to the name it was written for, and changing the name does not touch it, so a corrected spelling keeps its form; a name that becomes empty loses its form. Forms are searched (`mm ls`, `/` in the interface finds "watani" as well as وطني) and put the track in order (`S` and `--sort`). The library folder and a plain sync never use them: the tags and the file names there are the true names, and setting a form leaves nothing to sync. `mm sync --wolfgang` uses them for the folders, the file names, the artist, album and genre tags and the name of the playlist file; the title tag stays the true title.
+
 ## The Wolfgang WMP01
 
 `mm sync --wolfgang --target DIR` writes for the Wolfgang WMP01 player. Pass the flag every time (nothing remembers it); it needs `--target`, so that the library folder is always the standard tree. Everything below is worked out from the records while syncing and stored nowhere: the library holds no name, cover or setting for the player. The limits are the ones measured on the device.
 
-* **Names.** The player shows 24 characters of a file name (it keeps 26), the `.mp3` included, and scrolls a longer name along when it is hovered; it shows 12 of an artist, an album and a genre, cuts the rest wherever that falls, and does not join Arabic letters. So folders and files are named in Latin letters: Arabic is romanised word by word, which loses the short vowels the script does not write (فيروز becomes "Firuz", جوليا بطرس "Julya Btrs"), and accents are stripped. The title tag keeps the true title, since the player shows file names and not titles.
+* **Names.** The player shows 24 characters of a file name (it keeps 26), the `.mp3` included, and scrolls a longer name along when it is hovered; it shows 12 of an artist, an album and a genre, cuts the rest wherever that falls, and does not join Arabic letters. So folders and files are named in Latin letters, using the Latin forms (see above): the ones set by hand, else the ones worked out, which lose the short vowels of Arabic (فيروز becomes "Firuz"); accents are stripped. The title tag keeps the true title, since the player shows file names and not titles.
 * **File names** are `NN - Title.mp3` for the MP3 files only, hard-cut at 20 characters before the extension, so that the whole name, `.mp3` included, fits in the 24 the player shows and does not scroll; the track number and the ` (2)` of a collision count in the 20 (`01 - Munajat Amir al.mp3`). Names are not padded (a padded name scrolls). Folders, playlists and photos keep their full names, up to 100 bytes each. The first sync renames the files of long titles.
-* **Artist and album tags** are worked out from the Latin form by rules. An artist that fits in 12 characters is kept; otherwise "The" and what is in brackets go, "Various Artists" becomes "Various", and a name of several words becomes the initials of all but the last and the surname ("Mohamed Abdel Wahab" is "M. A. Wahab"), or the first initial and the surname, or the surname alone, or is cut at a word. An album that fits is kept; otherwise brackets, a trailing "EP" or "Single" and a leading artist name go, and then it is cut at a word. A single has no album, which the player shows as "Unknown Album", so its title (shortened the same way) is written there. `mm show <id> --wolfgang` and the third tab of `mm --wolfgang` show the result; only the real name can change it.
+* **Artist and album tags** are worked out from the Latin form by rules, and the genre tag is its Latin form. An artist that fits in 12 characters is kept; otherwise "The" and what is in brackets go, "Various Artists" becomes "Various", and a name of several words becomes the initials of all but the last and the surname ("Mohamed Abdel Wahab" is "M. A. Wahab"), or the first initial and the surname, or the surname alone, or is cut at a word. An album that fits is kept; otherwise brackets, a trailing "EP" or "Single" and a leading artist name go, and then it is cut at a word. A single has no album, which the player shows as "Unknown Album", so its title (shortened the same way) is written there. `mm show <id> --wolfgang` and the fourth tab of `mm --wolfgang` show the result; only the name and its Latin form can change it.
 * **Covers.** The photo viewer opens baseline JPEG files of modest size: it fails on PNG and progressive files, on 4:4:4 colour and on very large pictures, and does not list PNG files at all. So the cover is made into a baseline JFIF JPEG, 4:2:0, at most 480 pixels along its longer side (a transparent background becomes white), when syncing: in the MP3 tag, as `cover.jpg` in an album folder and as `Title.jpg` beside a single. The stored cover is not touched.
-* **Playlists** are `Playlists/<name>.m3u`: paths from the root of the card with backslashes (`\Artist\Album\01 - Title.mp3`), one per line, Windows line endings; the player lists every `.m3u` on the card as a playlist and ignores slashes and relative paths. (The player lists an `.m3u8` too, but shows its extension, which it hides for an `.m3u`; so it gets the `.m3u`. Entries with names longer than 26 characters play from a playlist.)
+* **Playlists** are `Playlists/<name>.m3u`, named by the Latin name of the playlist: paths from the root of the card with backslashes (`\Artist\Album\01 - Title.mp3`), one per line, Windows line endings; the player lists every `.m3u` on the card as a playlist and ignores slashes and relative paths. (The player lists an `.m3u8` too, but shows its extension, which it hides for an `.m3u`; so it gets the `.m3u`. Entries with names longer than 26 characters play from a playlist.)
 * **Warnings.** `mm sync --wolfgang` (also with `--dry-run`), the review screen of the sync dialog and `mm show --wolfgang` say what the player will not show well: a genre longer than 12 characters, a name with no Latin letters (it becomes "Unknown"), two file names that are the same only because they are cut, and an artist name that looks like several artists.
 
 The player's own playlist files can be read too: `mm playlist import` (see Playlists).
@@ -165,11 +175,12 @@ mm playlist move Study m2d8cz 1         # move a track to position 1
 mm playlist rm Study 9xw4ap             # take a track out (it stays in the library)
 mm playlist show Study
 mm playlist rename Study Exams
+mm playlist latin دراسة Study         # the name a device that needs Latin letters gets; leave it out to work it out again
 mm playlist delete Exams
 mm playlist import USERPL1.PL Resistance --dry-run   # bring in a playlist made on the player itself
 ```
 
-`mm sync` writes each playlist as `Playlists/<name>.m3u8`: `#EXTM3U`, then for each track a `#EXTINF` line with its length and "Artist - Title" and the path of the file relative to the playlist (`../Artist/Album/01 - Title.mp3`), in UTF-8 with Unix line endings, which players and phones list as a playlist. With `--wolfgang` it is the `.m3u` that player reads instead (see above). Removing a track from the library takes it out of its playlists. Playlist files count in the `N to sync` of the interface, and a deleted playlist's file is a stray that `mm sync --prune` removes.
+`mm sync` writes each playlist as `Playlists/<name>.m3u8`: `#EXTM3U`, then for each track a `#EXTINF` line with its length and "Artist - Title" and the path of the file relative to the playlist (`../Artist/Album/01 - Title.mp3`), in UTF-8 with Unix line endings, which players and phones list as a playlist. With `--wolfgang` it is the `.m3u` that player reads instead, named by the Latin name of the playlist (see above). Removing a track from the library takes it out of its playlists. Playlist files count in the `N to sync` of the interface, and a deleted playlist's file is a stray that `mm sync --prune` removes.
 
 The playlists made on the Wolfgang itself (`USERPL1.PL` to `USERPL3.PL` on the card) cannot be written by `mm`, but they can be read: `mm playlist import` takes the file names in one and finds the tracks they were by title, ignoring the track number, case and punctuation. It lists what it found (`~` matched on the start of a title only, `?` fits several tracks, `-` not found), and with `--dry-run` makes nothing. Fix the rest with `mm playlist add` and `mm playlist move`.
 
@@ -179,7 +190,7 @@ changed, so a trim can always be redone.
 
 ## Upgrading from version 1
 
-A library written by an earlier version kept every name twice (in Latin letters, maybe set by hand, and as it really is) and the 12-character names of the Wolfgang per track. `mm` will not open it until `mm migrate` has run: `mm migrate --dry-run` lists the Latin forms that were set by hand and are replaced by worked-out ones (and the player names that go) and writes nothing; `mm migrate` copies the old `library.json` byte for byte to `.mm/library.json.v1`, writes version 2 and refuses to run twice. Afterwards the first plain `mm sync` renames the library folder to the true names (read `mm sync --dry-run` first, then apply with `--prune --yes`), and the first `mm sync --wolfgang` rewrites the whole card once. An `mm` of version 1 cannot read a version 2 library.
+A library written by an earlier version kept every name twice (in Latin letters, maybe set by hand, and as it really is) and the 12-character names of the Wolfgang per track. `mm` will not open it until `mm migrate` has run: `mm migrate --dry-run` lists the Latin forms that were set by hand, which are kept as the Latin forms of the names (and the player names that go, which are worked out again) and writes nothing; `mm migrate` copies the old `library.json` byte for byte to `.mm/library.json.v1`, writes version 2 and refuses to run twice. Afterwards the first plain `mm sync` renames the library folder to the true names (read `mm sync --dry-run` first, then apply with `--prune --yes`), and the first `mm sync --wolfgang` rewrites the whole card once. An `mm` of version 1 cannot read a version 2 library. A library that was migrated by an earlier build of version 2, which dropped the Latin forms set by hand, gets them back with `mm restore-latin --dry-run` and then `mm restore-latin`: it reads them from `.mm/library.json.v1`, puts one back only where the track still has the name it was set for and has no form of its own, and lists what it left alone.
 
 ## Moving an existing folder over
 
