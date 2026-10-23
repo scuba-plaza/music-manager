@@ -127,9 +127,9 @@ func showCmd(open opener) *cobra.Command {
 			}
 			row("ID", t.ID)
 			row("Status", string(t.Status))
-			row("Title", t.OriginalTitle)
-			row("Artist", t.OriginalArtist)
-			row("Album", t.OriginalAlbum)
+			row("Title", t.Title)
+			row("Artist", t.Artist)
+			row("Album", t.Album)
 			if t.TrackNumber > 0 {
 				n := fmt.Sprint(t.TrackNumber)
 				if t.TrackTotal > 0 {

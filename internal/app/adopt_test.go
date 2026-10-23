@@ -32,8 +32,8 @@ func TestAdoptTakesWhatTheOldTagsSaid(t *testing.T) {
 		t.Fatalf("%+v, %v", res, err)
 	}
 	got := tracks(t, a)[0]
-	if got.Status != manifest.Identified || got.OriginalTitle != "بحلم بيك" ||
-		got.OriginalArtist != "Abdel Halim Hafez" || got.OriginalAlbum != "Rawaeaa" || got.TrackNumber != 1 || got.TrackTotal != 6 {
+	if got.Status != manifest.Identified || got.Title != "بحلم بيك" ||
+		got.Artist != "Abdel Halim Hafez" || got.Album != "Rawaeaa" || got.TrackNumber != 1 || got.TrackTotal != 6 {
 		t.Errorf("track = %+v", got)
 	}
 	if got.Hint != (manifest.Hint{}) || got.MBRecordingID != "" {
@@ -47,7 +47,7 @@ func TestAdoptFallsBackToTheNumberInTheFileName(t *testing.T) {
 	if _, err := a.Adopt(nil); err != nil {
 		t.Fatal(err)
 	}
-	if got := tracks(t, a)[0]; got.TrackNumber != 7 || got.OriginalAlbum != "" {
+	if got := tracks(t, a)[0]; got.TrackNumber != 7 || got.Album != "" {
 		t.Errorf("track = %+v", got)
 	}
 }
@@ -86,7 +86,7 @@ func TestAdoptOnlyTouchesUnidentifiedTracksAndNamedOnes(t *testing.T) {
 	if err != nil || len(res) != 1 || res[0].Adopted || res[0].Reason == "" {
 		t.Errorf("an identified track must be left alone: %+v, %v", res, err)
 	}
-	if got, _ := (func() (manifest.Track, bool) { m, _ := a.Manifest(); return m.Get(done.ID) })(); got.OriginalTitle != "My Title" {
+	if got, _ := (func() (manifest.Track, bool) { m, _ := a.Manifest(); return m.Get(done.ID) })(); got.Title != "My Title" {
 		t.Errorf("identified track changed: %+v", got)
 	}
 	if _, err := a.Adopt([]string{"nope"}); err == nil {

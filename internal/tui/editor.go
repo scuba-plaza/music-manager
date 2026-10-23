@@ -105,11 +105,11 @@ func prefilledFrom(t manifest.Track, f fieldKind) bool {
 	}
 	switch f {
 	case fTitle:
-		return t.OriginalTitle == ""
+		return t.Title == ""
 	case fArtist:
-		return t.OriginalArtist == ""
+		return t.Artist == ""
 	case fAlbum:
-		return t.OriginalAlbum == "" && t.Hint.Album != ""
+		return t.Album == "" && t.Hint.Album != ""
 	case fTrack:
 		return t.TrackNumber == 0 && t.Hint.Track > 0
 	case fReleased:

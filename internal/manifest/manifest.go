@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const schemaVersion = 1
+const schemaVersion = 2
 
 type Status string
 
@@ -22,22 +22,21 @@ const (
 )
 
 type Track struct {
-	ID             string        `json:"id"`
-	AudioSHA256    string        `json:"audio_sha256"`
-	SourceURL      string        `json:"source_url"`
-	Status         Status        `json:"status"`
-	AsciiTitle     string        `json:"title"`
-	OriginalTitle  string        `json:"original_title"`
-	AsciiArtist    string        `json:"artist"`
-	OriginalArtist string        `json:"original_artist"`
-	AsciiAlbum     string        `json:"album"`
-	OriginalAlbum  string        `json:"original_album"`
-	TrackNumber    int           `json:"track_number"`
-	TrackTotal     int           `json:"track_total"`
-	SourceLength   time.Duration `json:"source_length_ns"`
-	TrimStart      time.Duration `json:"trim_start_ns"`
-	TrimEnd        time.Duration `json:"trim_end_ns"`
-	Hint           Hint          `json:"hint,omitzero"`
+	ID          string `json:"id"`
+	AudioSHA256 string `json:"audio_sha256"`
+	SourceURL   string `json:"source_url"`
+	Status      Status `json:"status"`
+	// Title, Artist and Album are the true names, in whatever script they are
+	// written. Any other form of them is worked out when it is needed.
+	Title        string        `json:"title"`
+	Artist       string        `json:"artist"`
+	Album        string        `json:"album"`
+	TrackNumber  int           `json:"track_number"`
+	TrackTotal   int           `json:"track_total"`
+	SourceLength time.Duration `json:"source_length_ns"`
+	TrimStart    time.Duration `json:"trim_start_ns"`
+	TrimEnd      time.Duration `json:"trim_end_ns"`
+	Hint         Hint          `json:"hint,omitzero"`
 	// Released is when the track first came out, as precisely as is known:
 	// 1999, 1999-05 or 1999-05-17.
 	Released string `json:"released,omitempty"`
@@ -112,6 +111,9 @@ func (s *Store) Load() (*Manifest, error) {
 	var f file
 	if err := json.Unmarshal(data, &f); err != nil {
 		return nil, fmt.Errorf("%s: %w", s.path, err)
+	}
+	if f.Version == 1 {
+		return nil, fmt.Errorf("%s is a version 1 library: run mm migrate, which keeps a copy of the old file", s.path)
 	}
 	if f.Version != schemaVersion {
 		return nil, fmt.Errorf("%s: unsupported library version %d (want %d)", s.path, f.Version, schemaVersion)

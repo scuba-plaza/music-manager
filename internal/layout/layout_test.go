@@ -20,7 +20,7 @@ var rules = layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: 22}
 func identified(artist, album, title string, n, total int) manifest.Track {
 	return manifest.Track{
 		ID: "abc123", Status: manifest.Identified,
-		OriginalArtist: artist, OriginalAlbum: album, OriginalTitle: title, TrackNumber: n, TrackTotal: total,
+		Artist: artist, Album: album, Title: title, TrackNumber: n, TrackTotal: total,
 	}
 }
 

@@ -92,11 +92,11 @@ func name(t manifest.Track, f fieldKind) string {
 	var s string
 	switch f {
 	case fTitle:
-		s = t.OriginalTitle
+		s = t.Title
 	case fArtist:
-		s = t.OriginalArtist
+		s = t.Artist
 	case fAlbum:
-		s = t.OriginalAlbum
+		s = t.Album
 	}
 	if s == "" && t.Status != manifest.Identified {
 		switch f {
@@ -322,17 +322,17 @@ func previewTrack(t manifest.Track, d draft) manifest.Track {
 		text := strings.TrimSpace(d.text)
 		switch d.field {
 		case fTitle:
-			t.OriginalTitle = text
+			t.Title = text
 		case fArtist:
-			t.OriginalArtist = text
+			t.Artist = text
 		case fAlbum:
-			t.OriginalAlbum = text
+			t.Album = text
 		}
 	case fTrack:
 		t.TrackNumber, _ = count(d.text)
 		t.TrackTotal, _ = count(d.second)
 	}
-	if t.OriginalTitle != "" && t.OriginalArtist != "" {
+	if t.Title != "" && t.Artist != "" {
 		t.Status = manifest.Identified
 	}
 	return t

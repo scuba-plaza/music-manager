@@ -75,7 +75,7 @@ func TestIdentifyYesTakesAConfidentTopMatch(t *testing.T) {
 		t.Fatalf("results = %+v", res)
 	}
 	got := tracks(t, a)[0]
-	if got.Status != manifest.Identified || got.OriginalTitle != "Dream 3" || got.OriginalArtist != "Max Richter" || got.OriginalAlbum != "From Sleep" ||
+	if got.Status != manifest.Identified || got.Title != "Dream 3" || got.Artist != "Max Richter" || got.Album != "From Sleep" ||
 		got.TrackNumber != 1 || got.TrackTotal != 7 || got.MBRecordingID != "rec-1" || got.MBReleaseID != "rel-1" {
 		t.Errorf("track = %+v", got)
 	}
@@ -120,7 +120,7 @@ func TestIdentifyAsksWhichCandidateAndLetsYouSkip(t *testing.T) {
 			t.Errorf("option %q lacks %q", p.options[0], want)
 		}
 	}
-	if got := tracks(t, a)[0]; got.OriginalAlbum != "Voyager" || got.TrackNumber != 9 {
+	if got := tracks(t, a)[0]; got.Album != "Voyager" || got.TrackNumber != 9 {
 		t.Errorf("track = %+v", got)
 	}
 
@@ -212,7 +212,7 @@ func TestIdentifyKeepsTheNamesInTheirOwnScript(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := tracks(t, a)[0]
-	if got.OriginalArtist != "فيروز" || got.OriginalTitle != "سأرجع" || got.OriginalAlbum != "القدس في البال" {
+	if got.Artist != "فيروز" || got.Title != "سأرجع" || got.Album != "القدس في البال" {
 		t.Errorf("track = %+v", got)
 	}
 }
@@ -321,8 +321,8 @@ func TestIdentifyYesKeepsTheOldAlbumWhenNoReleaseMatchesIt(t *testing.T) {
 			t.Fatalf("%+v, %v", res, err)
 		}
 		got := tracks(t, a)[0]
-		if got.OriginalAlbum != "Rawaeaa Abd El Halim 5" || got.TrackNumber != 1 || got.TrackTotal != 7 {
-			t.Errorf("album %q %d/%d, want the old one", got.OriginalAlbum, got.TrackNumber, got.TrackTotal)
+		if got.Album != "Rawaeaa Abd El Halim 5" || got.TrackNumber != 1 || got.TrackTotal != 7 {
+			t.Errorf("album %q %d/%d, want the old one", got.Album, got.TrackNumber, got.TrackTotal)
 		}
 		if got.MBRecordingID != "rec-9" || got.MBReleaseID != "" {
 			t.Errorf("recording %q release %q: the recording is known, the release is not", got.MBRecordingID, got.MBReleaseID)
@@ -333,7 +333,7 @@ func TestIdentifyYesKeepsTheOldAlbumWhenNoReleaseMatchesIt(t *testing.T) {
 		a := openLib(t)
 		ingestTagged(t, a, "01 Ahwak", "Ahwak", "Abdel Halim Hafez", "", "")
 		a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
-		if got := tracks(t, a)[0]; got.OriginalAlbum != "Anthology 1955-1959" || got.MBReleaseID != "rel-9" {
+		if got := tracks(t, a)[0]; got.Album != "Anthology 1955-1959" || got.MBReleaseID != "rel-9" {
 			t.Errorf("track = %+v", got)
 		}
 	})
@@ -342,8 +342,8 @@ func TestIdentifyYesKeepsTheOldAlbumWhenNoReleaseMatchesIt(t *testing.T) {
 		a := openLib(t)
 		ingestTagged(t, a, "01 Ahwak", "Ahwak", "Abdel Halim Hafez", "Rawaeaa Abd El Halim 5", "1/7")
 		a.Identify(context.Background(), nil, src, &scriptedPrompter{choice: 0}, app.IdentifyOptions{})
-		if got := tracks(t, a)[0]; got.OriginalAlbum != "Anthology 1955-1959" {
-			t.Errorf("album = %q, want the one the user picked", got.OriginalAlbum)
+		if got := tracks(t, a)[0]; got.Album != "Anthology 1955-1959" {
+			t.Errorf("album = %q, want the one the user picked", got.Album)
 		}
 	})
 }
@@ -410,10 +410,10 @@ func TestApplyCandidateIdentifiesTheTrackAsChosen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != manifest.Identified || got.OriginalAlbum != "Voyager" || got.TrackNumber != 9 || got.MBReleaseID != "rel-2" || got.CoverSHA256 == "" {
+	if got.Status != manifest.Identified || got.Album != "Voyager" || got.TrackNumber != 9 || got.MBReleaseID != "rel-2" || got.CoverSHA256 == "" {
 		t.Errorf("track = %+v", got)
 	}
-	if saved := tracks(t, a)[0]; saved.OriginalAlbum != "Voyager" {
+	if saved := tracks(t, a)[0]; saved.Album != "Voyager" {
 		t.Errorf("not saved: %+v", saved)
 	}
 	if _, err := a.ApplyCandidate(context.Background(), "nope", dream3, src); err == nil {
@@ -462,8 +462,8 @@ func TestAMatchWithoutAUsableDateKeepsTheOneWeHave(t *testing.T) {
 		if _, err := a.ApplyCandidate(context.Background(), tr.ID, c, &fakeSource{}); err != nil {
 			t.Fatalf("date %q: %v", date, err)
 		}
-		if got := tracks(t, a)[0]; got.Released != "2014" || got.OriginalTitle != "Dream 3" {
-			t.Errorf("date %q: released = %q, title %q", date, got.Released, got.OriginalTitle)
+		if got := tracks(t, a)[0]; got.Released != "2014" || got.Title != "Dream 3" {
+			t.Errorf("date %q: released = %q, title %q", date, got.Released, got.Title)
 		}
 	}
 }

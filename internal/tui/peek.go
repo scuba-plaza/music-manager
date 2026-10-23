@@ -114,14 +114,14 @@ func (m Model) artistPeek(r Row, w int) (info, list []string) {
 	byName := map[string]*group{}
 	var singles []manifest.Track
 	for _, t := range ts {
-		if t.OriginalAlbum == "" {
+		if t.Album == "" {
 			singles = append(singles, t)
 			continue
 		}
-		g, ok := byName[t.OriginalAlbum]
+		g, ok := byName[t.Album]
 		if !ok {
-			g = &group{name: t.OriginalAlbum}
-			byName[t.OriginalAlbum] = g
+			g = &group{name: t.Album}
+			byName[t.Album] = g
 			albums = append(albums, g)
 		}
 		g.tracks = append(g.tracks, t)
@@ -205,10 +205,10 @@ func (m Model) needsList(r Row, w int) []string {
 	var list []string
 	for _, t := range m.tracksFor(r.IDs) {
 		var lacking []string
-		if t.OriginalTitle == "" {
+		if t.Title == "" {
 			lacking = append(lacking, "no title")
 		}
-		if t.OriginalArtist == "" {
+		if t.Artist == "" {
 			lacking = append(lacking, "no artist")
 		}
 		list = append(list, listRow(w, needsLabel(t), styles.dim.Render(strings.Join(lacking, ", ")), fmt.Sprintf("%5s", clock(t.PlayingLength()))))

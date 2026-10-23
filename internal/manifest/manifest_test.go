@@ -21,10 +21,10 @@ func TestAddAssignsUniqueIDs(t *testing.T) {
 
 func TestGetAndRemove(t *testing.T) {
 	m := &manifest.Manifest{}
-	a := m.Add(manifest.Track{AsciiTitle: "A"})
-	b := m.Add(manifest.Track{AsciiTitle: "B"})
+	a := m.Add(manifest.Track{Title: "A"})
+	b := m.Add(manifest.Track{Title: "B"})
 
-	if got, ok := m.Get(b.ID); !ok || got.AsciiTitle != "B" {
+	if got, ok := m.Get(b.ID); !ok || got.Title != "B" {
 		t.Errorf("Get(%q) = %+v, %v", b.ID, got, ok)
 	}
 	if _, ok := m.Get("nope"); ok {
@@ -40,13 +40,13 @@ func TestGetAndRemove(t *testing.T) {
 
 func TestUpdateReplacesRecordByID(t *testing.T) {
 	m := &manifest.Manifest{}
-	a := m.Add(manifest.Track{AsciiTitle: "Old"})
-	a.AsciiTitle = "New"
+	a := m.Add(manifest.Track{Title: "Old"})
+	a.Title = "New"
 	if !m.Update(a) {
 		t.Fatal("Update reported unknown id")
 	}
-	if got, _ := m.Get(a.ID); got.AsciiTitle != "New" {
-		t.Errorf("title = %q, want New", got.AsciiTitle)
+	if got, _ := m.Get(a.ID); got.Title != "New" {
+		t.Errorf("title = %q, want New", got.Title)
 	}
 	if m.Update(manifest.Track{ID: "nope"}) {
 		t.Error("Update of unknown id succeeded")
@@ -55,8 +55,8 @@ func TestUpdateReplacesRecordByID(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 	m := &manifest.Manifest{}
-	m.Add(manifest.Track{OriginalTitle: "فيروز", OriginalArtist: "فيروز", Status: manifest.Identified})
-	m.Add(manifest.Track{OriginalTitle: "Sleep", OriginalArtist: "Max Richter", Status: manifest.Identified})
+	m.Add(manifest.Track{Title: "فيروز", Artist: "فيروز", Status: manifest.Identified})
+	m.Add(manifest.Track{Title: "Sleep", Artist: "Max Richter", Status: manifest.Identified})
 	m.Add(manifest.Track{Status: manifest.Unidentified, Hint: manifest.Hint{Title: "بحلم بيك", Artist: "Abdel Halim", Album: "Rawaeaa", Filename: "01 Bahlam Bek"}})
 
 	cases := []struct {
@@ -97,9 +97,9 @@ func TestPlayingLengthExcludesTrims(t *testing.T) {
 
 func TestSearchFindsAGenreAsAWordOrWithTheGenrePrefix(t *testing.T) {
 	m := &manifest.Manifest{}
-	m.Add(manifest.Track{OriginalTitle: "Longing", OriginalArtist: "Gustavo", Genre: "Neoclassical", Status: manifest.Identified})
-	m.Add(manifest.Track{OriginalTitle: "Folk Song", OriginalArtist: "Max", Genre: "Anthem", Status: manifest.Identified})
-	m.Add(manifest.Track{OriginalTitle: "Plain", OriginalArtist: "Nobody", Status: manifest.Identified})
+	m.Add(manifest.Track{Title: "Longing", Artist: "Gustavo", Genre: "Neoclassical", Status: manifest.Identified})
+	m.Add(manifest.Track{Title: "Folk Song", Artist: "Max", Genre: "Anthem", Status: manifest.Identified})
+	m.Add(manifest.Track{Title: "Plain", Artist: "Nobody", Status: manifest.Identified})
 
 	cases := []struct {
 		query string

@@ -83,8 +83,8 @@ func (v bulkValues) edit() (app.Edit, error) {
 // changes reports whether e would alter t.
 func changes(t manifest.Track, e app.Edit) bool {
 	switch {
-	case e.Artist != nil && t.OriginalArtist != *e.Artist,
-		e.Album != nil && t.OriginalAlbum != *e.Album,
+	case e.Artist != nil && t.Artist != *e.Artist,
+		e.Album != nil && t.Album != *e.Album,
 		e.TrackTotal != nil && t.TrackTotal != *e.TrackTotal,
 		e.Released != nil && t.Released != *e.Released,
 		e.Genre != nil && t.Genre != *e.Genre,

@@ -157,7 +157,7 @@ func (a *App) Finish(ctx context.Context, d *Draft, e Edit) (manifest.Track, err
 	if t.Status != manifest.Identified {
 		return manifest.Track{}, missingFields(t)
 	}
-	if match := d.Match; match != nil && t.OriginalTitle == match.Title && t.OriginalArtist == match.Artist {
+	if match := d.Match; match != nil && t.Title == match.Title && t.Artist == match.Artist {
 		t.MBRecordingID, t.MBReleaseID = match.RecordingID, match.ReleaseID
 		if t.CoverSHA256 == "" && d.source != nil {
 			if img, err := d.source.CoverFront(ctx, match.ReleaseID); err == nil && len(img) > 0 {
@@ -220,10 +220,10 @@ func infoFrom(c Candidate) Info {
 
 func missingFields(t manifest.Track) error {
 	var missing []string
-	if t.OriginalTitle == "" {
+	if t.Title == "" {
 		missing = append(missing, "title")
 	}
-	if t.OriginalArtist == "" {
+	if t.Artist == "" {
 		missing = append(missing, "artist")
 	}
 	return fmt.Errorf("missing %s (pass --%s, or run in a terminal to be asked)",

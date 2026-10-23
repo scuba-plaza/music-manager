@@ -233,7 +233,7 @@ func libTracks(t *testing.T, lib Library) []manifest.Track {
 func trackNamed(t *testing.T, lib Library, title string) manifest.Track {
 	t.Helper()
 	for _, tr := range libTracks(t, lib) {
-		if tr.OriginalTitle == title || tr.Hint.Title == title {
+		if tr.Title == title || tr.Hint.Title == title {
 			return tr
 		}
 	}
@@ -245,7 +245,7 @@ func trackNamed(t *testing.T, lib Library, title string) manifest.Track {
 func selectTrack(t *testing.T, m Model, title string) Model {
 	t.Helper()
 	for _, tr := range m.tracks {
-		if tr.OriginalTitle == title || tr.Hint.Title == title {
+		if tr.Title == title || tr.Hint.Title == title {
 			m.revealTrack(tr)
 			return send(t, m, tea.WindowSizeMsg{Width: m.w, Height: m.h}) // a no-op that lets covers load
 		}

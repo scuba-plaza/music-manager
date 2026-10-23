@@ -13,7 +13,7 @@ import (
 func identified() manifest.Track {
 	return manifest.Track{
 		ID: "k7f2qd", Status: manifest.Identified,
-		OriginalTitle: "وطني", OriginalArtist: "فيروز", OriginalAlbum: "Hits",
+		Title: "وطني", Artist: "فيروز", Album: "Hits",
 		TrackNumber: 3, TrackTotal: 12,
 		SourceLength: 3 * time.Minute, TrimStart: 2 * time.Second, TrimEnd: 1500 * time.Millisecond,
 	}
@@ -198,7 +198,7 @@ func TestPreviewOfAnUnidentifiedTrackBecomesIdentifiedOnceItHasATitleAndArtist(t
 	if got := pathFor(previewTrack(tr, title)); got != "_Inbox/abc123 - x.mp3" {
 		t.Errorf("with only a title it is still in the inbox, got %q", got)
 	}
-	tr.OriginalArtist = "Band"
+	tr.Artist = "Band"
 	if got := pathFor(previewTrack(tr, title)); got != "Band/Song.mp3" {
 		t.Errorf("with both it gets a place, got %q", got)
 	}

@@ -87,18 +87,18 @@ func TestBulkEditOfMarkedTracks(t *testing.T) {
 	}
 	for _, title := range []string{"The Wanderer", "Flow"} {
 		tr := trackNamed(t, hook.Library, title)
-		if tr.OriginalArtist != "Shawn J." || tr.OriginalAlbum != "" {
+		if tr.Artist != "Shawn J." || tr.Album != "" {
 			t.Errorf("%s = %+v", title, tr)
 		}
 	}
-	if got := trackNamed(t, hook.Library, "Along Our Way"); got.OriginalArtist != "Shawn James" {
+	if got := trackNamed(t, hook.Library, "Along Our Way"); got.Artist != "Shawn James" {
 		t.Error("an unmarked track was changed")
 	}
 	contains(t, m, "Changed 2 tracks")
 
 	m = keys(t, m, "u") // one step undoes both
 	for _, title := range []string{"The Wanderer", "Flow"} {
-		if tr := trackNamed(t, hook.Library, title); tr.OriginalArtist != "Shawn James" || tr.OriginalAlbum != "Shadows" {
+		if tr := trackNamed(t, hook.Library, title); tr.Artist != "Shawn James" || tr.Album != "Shadows" {
 			t.Errorf("after undo %s = %+v", title, tr)
 		}
 	}
@@ -141,7 +141,7 @@ func TestRenameAnAlbumFromItsRow(t *testing.T) {
 	m = typed(t, m, "Shadows (Deluxe)")
 	m = keys(t, m, "enter")
 	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
-		if got := trackNamed(t, hook.Library, title).OriginalAlbum; got != "Shadows (Deluxe)" {
+		if got := trackNamed(t, hook.Library, title).Album; got != "Shadows (Deluxe)" {
 			t.Errorf("%s is on %q", title, got)
 		}
 	}
@@ -159,7 +159,7 @@ func TestRenameAnArtistMergesItWithAnother(t *testing.T) {
 	m = keys(t, m, "ctrl+u")
 	m = typed(t, m, "Shawn James")
 	m = keys(t, m, "enter")
-	if got := trackNamed(t, hook.Library, "Current").OriginalArtist; got != "Shawn James" {
+	if got := trackNamed(t, hook.Library, "Current").Artist; got != "Shawn James" {
 		t.Errorf("artist = %q", got)
 	}
 }

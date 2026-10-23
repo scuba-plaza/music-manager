@@ -57,7 +57,7 @@ func TestBulkDashClears(t *testing.T) {
 
 func TestBulkSkipsTracksThatAlreadyHaveTheValue(t *testing.T) {
 	ts := album(3)
-	ts[1].OriginalArtist = "Fairuz"
+	ts[1].Artist = "Fairuz"
 	edits, changed, err := bulkPlan(ts, bulkValues{artist: "Fairuz"})
 	if err != nil || changed != 2 || len(edits) != 2 {
 		t.Errorf("changed %d, edits %v, err %v", changed, edits, err)

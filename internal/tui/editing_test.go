@@ -87,7 +87,7 @@ func TestEditingATitleSavesItAtOnce(t *testing.T) {
 	m = typed(t, m, "Flow Again")
 	m = keys(t, m, "enter")
 
-	if got := trackNamed(t, lib, "Flow Again"); got.OriginalArtist != "Shawn James" {
+	if got := trackNamed(t, lib, "Flow Again"); got.Artist != "Shawn James" {
 		t.Errorf("saved %+v", got)
 	}
 	if m.editing {
@@ -107,7 +107,7 @@ func TestEscapeCancelsAnEdit(t *testing.T) {
 	if m.editing || hook.calls != 0 {
 		t.Errorf("editing %v, library calls %d", m.editing, hook.calls)
 	}
-	if trackNamed(t, hook.Library, "Flow").OriginalTitle != "Flow" {
+	if trackNamed(t, hook.Library, "Flow").Title != "Flow" {
 		t.Error("a cancelled edit was saved")
 	}
 	lacks(t, m, "nonsense")
@@ -141,7 +141,7 @@ func TestAnInvalidValueIsExplainedAndNothingIsSaved(t *testing.T) {
 	m = typed(t, m, "Fixed")
 	lacks(t, m, "cannot be empty") // the message goes away as soon as you type
 	m = keys(t, m, "enter")
-	if trackNamed(t, hook.Library, "Fixed").OriginalArtist != "Shawn James" {
+	if trackNamed(t, hook.Library, "Fixed").Artist != "Shawn James" {
 		t.Error("the corrected value was not saved")
 	}
 }
@@ -176,10 +176,10 @@ func TestClearingTheAlbumMakesItASingleAndTheSelectionFollows(t *testing.T) {
 	m = keys(t, m, "right", "down", "down", "enter")
 	m = clearField(t, m)
 	m = keys(t, m, "enter")
-	if got := trackNamed(t, hook.Library, "Flow"); got.OriginalAlbum != "" {
-		t.Fatalf("album = %q", got.OriginalAlbum)
+	if got := trackNamed(t, hook.Library, "Flow"); got.Album != "" {
+		t.Fatalf("album = %q", got.Album)
 	}
-	if r, _ := m.selectedRow(); r.Kind != kindTrack || r.Track.OriginalTitle != "Flow" {
+	if r, _ := m.selectedRow(); r.Kind != kindTrack || r.Track.Title != "Flow" {
 		t.Errorf("the selection lost the track: %+v", r)
 	}
 	contains(t, m, "Singles", "Shawn James/Flow.mp3")
@@ -282,12 +282,12 @@ func TestATrackNobodyIdentifiedStartsFromWhatTheFileSaid(t *testing.T) {
 		t.Fatalf("the field starts as %q", m.dr.text)
 	}
 	m = keys(t, m, "enter") // accept the old title as it is
-	if got := trackNamed(t, lib, "Old Title"); got.Status != manifest.Unidentified || got.OriginalTitle != "Old Title" {
+	if got := trackNamed(t, lib, "Old Title"); got.Status != manifest.Unidentified || got.Title != "Old Title" {
 		t.Errorf("after the title: %+v", got)
 	}
 	m = keys(t, m, "down", "enter", "enter") // and the old artist
 	got := trackNamed(t, lib, "Old Title")
-	if got.Status != manifest.Identified || got.OriginalArtist != "Old Artist" {
+	if got.Status != manifest.Identified || got.Artist != "Old Artist" {
 		t.Fatalf("after title and artist: %+v", got)
 	}
 	if r, _ := m.selectedRow(); r.Track.ID != got.ID {

@@ -61,7 +61,7 @@ The track is only recorded; run "mm sync" to write it into the library folder.`,
 				return err
 			}
 			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "added %s: %s - %s\n", t.ID, t.OriginalArtist, t.OriginalTitle)
+			fmt.Fprintf(out, "added %s: %s - %s\n", t.ID, t.Artist, t.Title)
 			fmt.Fprintf(out, "  will be written to %s\n", layout.PathFor(t, device.Generic.Layout()))
 			fmt.Fprintln(out, `  run "mm sync" to put it in the library folder`)
 			return nil

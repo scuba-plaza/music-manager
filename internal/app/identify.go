@@ -176,7 +176,7 @@ func (a *App) ApplyCandidate(ctx context.Context, id string, c Candidate, src Me
 // queryFor is what to search for to find t.
 func queryFor(t manifest.Track) Query {
 	if t.Status == manifest.Identified {
-		return Query{Title: t.OriginalTitle, Artist: t.OriginalArtist}
+		return Query{Title: t.Title, Artist: t.Artist}
 	}
 	title := t.Hint.Title
 	if title == "" {
@@ -307,7 +307,7 @@ func (a *App) applyCandidate(ctx context.Context, t manifest.Track, c Candidate,
 // identified, what the ingested file said about itself otherwise.
 func Display(t manifest.Track) (artist, title, album string) {
 	if t.Status == manifest.Identified {
-		return t.OriginalArtist, t.OriginalTitle, t.OriginalAlbum
+		return t.Artist, t.Title, t.Album
 	}
 	title = t.Hint.Title
 	if title == "" {

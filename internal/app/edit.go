@@ -65,7 +65,7 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 	for _, f := range []struct {
 		in  *string
 		out *string
-	}{{e.Title, &t.OriginalTitle}, {e.Artist, &t.OriginalArtist}, {e.Album, &t.OriginalAlbum}} {
+	}{{e.Title, &t.Title}, {e.Artist, &t.Artist}, {e.Album, &t.Album}} {
 		if f.in != nil {
 			*f.out = strings.TrimSpace(*f.in)
 		}
@@ -116,7 +116,7 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 		return t, err
 	}
 
-	if t.OriginalTitle != "" && t.OriginalArtist != "" {
+	if t.Title != "" && t.Artist != "" {
 		t.Status = manifest.Identified
 		t.Hint = manifest.Hint{}
 	} else {

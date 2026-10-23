@@ -36,11 +36,11 @@ func TestSyncWritesTagsTheWholePlayerCanShow(t *testing.T) {
 
 	// The library keeps the whole names.
 	for _, tr := range tracks(t, a) {
-		if tr.ID == ts[0].ID && (tr.OriginalArtist != "Abdel Halim Hafez" || tr.OriginalAlbum != "Abd El Halim Hafez") {
-			t.Errorf("the library's names were shortened: %q / %q", tr.OriginalArtist, tr.OriginalAlbum)
+		if tr.ID == ts[0].ID && (tr.Artist != "Abdel Halim Hafez" || tr.Album != "Abd El Halim Hafez") {
+			t.Errorf("the library's names were shortened: %q / %q", tr.Artist, tr.Album)
 		}
-		if tr.ID == ts[1].ID && tr.OriginalAlbum != "" {
-			t.Errorf("a single got the album %q in the library", tr.OriginalAlbum)
+		if tr.ID == ts[1].ID && tr.Album != "" {
+			t.Errorf("a single got the album %q in the library", tr.Album)
 		}
 	}
 }

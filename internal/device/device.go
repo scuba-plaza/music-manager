@@ -95,7 +95,7 @@ func (generic) Tags(t manifest.Track) mp3.TagSet {
 		return mp3.TagSet{Extra: extras(t)}
 	}
 	return mp3.TagSet{
-		Title: t.OriginalTitle, Artist: t.OriginalArtist, Album: t.OriginalAlbum,
+		Title: t.Title, Artist: t.Artist, Album: t.Album,
 		Genre: t.Genre,
 		Track: t.TrackNumber, Total: t.TrackTotal,
 		Date:   t.Released,
@@ -124,7 +124,7 @@ func (wolfgang) Tags(t manifest.Track) mp3.TagSet {
 	}
 	artist, album := PlayerTags(t)
 	return mp3.TagSet{
-		Title: t.OriginalTitle, Artist: artist, Album: album,
+		Title: t.Title, Artist: artist, Album: album,
 		Genre: t.Genre,
 		Track: t.TrackNumber, Total: t.TrackTotal,
 		Date:   t.Released,

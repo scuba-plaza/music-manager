@@ -29,9 +29,9 @@ func PlayerName(full string) string {
 // the player shows: a single has no album, so its title stands in for it
 // (otherwise the player says "Unknown Album").
 func PlayerTags(t manifest.Track) (artist, album string) {
-	album = t.OriginalAlbum
+	album = t.Album
 	if album == "" {
-		album = t.OriginalTitle
+		album = t.Title
 	}
-	return PlayerName(translit.ToASCII(t.OriginalArtist)), PlayerName(translit.ToASCII(album))
+	return PlayerName(translit.ToASCII(t.Artist)), PlayerName(translit.ToASCII(album))
 }

@@ -92,7 +92,7 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 			needs = append(needs, t)
 			continue
 		}
-		byArtist[t.OriginalArtist] = append(byArtist[t.OriginalArtist], t)
+		byArtist[t.Artist] = append(byArtist[t.Artist], t)
 	}
 
 	rows := playlistRows(all, playlists, matched, open)
@@ -120,7 +120,7 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 
 		byAlbum := map[string][]manifest.Track{}
 		for _, t := range ts {
-			byAlbum[t.OriginalAlbum] = append(byAlbum[t.OriginalAlbum], t)
+			byAlbum[t.Album] = append(byAlbum[t.Album], t)
 		}
 		var ids []string
 		albums := albumOrder(byAlbum)
@@ -150,7 +150,7 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 				if album != "" && t.TrackNumber > 0 {
 					num = padNumber(t.TrackNumber, width)
 				}
-				rows = append(rows, Row{Kind: kindTrack, Depth: 2, Key: trackKey(t.ID), Parent: bkey, Label: t.OriginalTitle, Num: num, Track: t})
+				rows = append(rows, Row{Kind: kindTrack, Depth: 2, Key: trackKey(t.ID), Parent: bkey, Label: t.Title, Num: num, Track: t})
 			}
 		}
 	}
@@ -208,7 +208,7 @@ func sortTracks(ts []manifest.Track) {
 		if a.TrackNumber != b.TrackNumber {
 			return a.TrackNumber < b.TrackNumber
 		}
-		if la, lb := translit.SortKey(a.OriginalTitle), translit.SortKey(b.OriginalTitle); la != lb {
+		if la, lb := translit.SortKey(a.Title), translit.SortKey(b.Title); la != lb {
 			return la < lb
 		}
 		return a.ID < b.ID
@@ -234,10 +234,10 @@ func ancestorKeys(t manifest.Track) []string {
 	if t.Status != manifest.Identified {
 		return []string{keyNeedsWork}
 	}
-	if t.OriginalAlbum == "" {
-		return []string{artistKey(t.OriginalArtist), singlesKey(t.OriginalArtist)}
+	if t.Album == "" {
+		return []string{artistKey(t.Artist), singlesKey(t.Artist)}
 	}
-	return []string{artistKey(t.OriginalArtist), albumRowKey(t.OriginalArtist, t.OriginalAlbum)}
+	return []string{artistKey(t.Artist), albumRowKey(t.Artist, t.Album)}
 }
 
 // playlistRows is the group of playlists with those open shown in full. When
@@ -291,7 +291,7 @@ func playlistRows(tracks []manifest.Track, playlists []manifest.Playlist, matche
 			artist, _, _ := app.Display(t)
 			rows = append(rows, Row{
 				Kind: kindTrack, Depth: 2, Key: playlistTrackKey(p.name, t.ID), Parent: pkey,
-				Label: t.OriginalTitle, Detail: artist, Num: padNumber(i+1, width), Track: t,
+				Label: t.Title, Detail: artist, Num: padNumber(i+1, width), Track: t,
 			})
 		}
 	}

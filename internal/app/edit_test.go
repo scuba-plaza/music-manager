@@ -32,14 +32,14 @@ func TestEditTitleAndArtistIdentifiesTheTrack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != manifest.Identified || got.OriginalTitle != "وطني" || got.OriginalArtist != "فيروز" || got.OriginalAlbum != "Hits" ||
+	if got.Status != manifest.Identified || got.Title != "وطني" || got.Artist != "فيروز" || got.Album != "Hits" ||
 		got.TrackNumber != 3 || got.TrackTotal != 12 {
 		t.Errorf("got %+v", got)
 	}
 	if got.Hint != (manifest.Hint{}) {
 		t.Errorf("hint not cleared: %+v", got.Hint)
 	}
-	if saved := tracks(t, a)[0]; saved.OriginalTitle != "وطني" {
+	if saved := tracks(t, a)[0]; saved.Title != "وطني" {
 		t.Errorf("edit was not saved: %+v", saved)
 	}
 }
@@ -67,12 +67,12 @@ func TestEditNeedsTitleAndArtistToIdentify(t *testing.T) {
 func TestEditKeepsTheNamesAsTyped(t *testing.T) {
 	a, tr := ingested(t)
 	got, _ := a.Edit(tr.ID, app.Edit{Artist: ptr("  عبد الحليم حافظ ")})
-	if got.OriginalArtist != "عبد الحليم حافظ" {
-		t.Errorf("Artist = %q, want the name without the spaces around it", got.OriginalArtist)
+	if got.Artist != "عبد الحليم حافظ" {
+		t.Errorf("Artist = %q, want the name without the spaces around it", got.Artist)
 	}
 	got, _ = a.Edit(tr.ID, app.Edit{Artist: ptr("فيروز")})
-	if got.OriginalArtist != "فيروز" {
-		t.Errorf("Artist = %q", got.OriginalArtist)
+	if got.Artist != "فيروز" {
+		t.Errorf("Artist = %q", got.Artist)
 	}
 }
 
@@ -80,8 +80,8 @@ func TestEditClearingAlbumClearsIt(t *testing.T) {
 	a, tr := ingested(t)
 	a.Edit(tr.ID, app.Edit{Album: ptr("Sleep")})
 	got, _ := a.Edit(tr.ID, app.Edit{Album: ptr("")})
-	if got.OriginalAlbum != "" {
-		t.Errorf("album = %q, want empty", got.OriginalAlbum)
+	if got.Album != "" {
+		t.Errorf("album = %q, want empty", got.Album)
 	}
 }
 

@@ -20,7 +20,7 @@ func TestRestoreBringsBackAnEditedTrack(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := tracks(t, a)[0]
-	if got.OriginalTitle != "Before" || got.OriginalArtist != "Band" || got.OriginalAlbum != "Album" || got.TrackNumber != 1 || !got.UpdatedAt.Equal(before.UpdatedAt) {
+	if got.Title != "Before" || got.Artist != "Band" || got.Album != "Album" || got.TrackNumber != 1 || !got.UpdatedAt.Equal(before.UpdatedAt) {
 		t.Errorf("restored = %+v, want %+v", got, before)
 	}
 }
@@ -60,10 +60,10 @@ func TestEditManyAppliesEverythingOrNothing(t *testing.T) {
 		ts[0].ID: {Title: strp("One"), Artist: strp("Band"), Album: strp("Album"), TrackNumber: ptr(1)},
 		ts[1].ID: {Title: strp("Two"), Artist: strp("Band"), Album: strp("Album"), TrackNumber: ptr(2)},
 	})
-	if err != nil || len(got) != 2 || got[ts[1].ID].OriginalTitle != "Two" {
+	if err != nil || len(got) != 2 || got[ts[1].ID].Title != "Two" {
 		t.Fatalf("%+v, %v", got, err)
 	}
-	if now := tracks(t, a); now[0].OriginalTitle != "One" || now[1].OriginalTitle != "Two" || now[2].Status != manifest.Unidentified {
+	if now := tracks(t, a); now[0].Title != "One" || now[1].Title != "Two" || now[2].Status != manifest.Unidentified {
 		t.Errorf("tracks = %+v", now)
 	}
 
@@ -76,7 +76,7 @@ func TestEditManyAppliesEverythingOrNothing(t *testing.T) {
 			t.Errorf("%s: accepted", name)
 		}
 		after := tracks(t, a)
-		if after[0].OriginalTitle != before[0].OriginalTitle || after[1].TrimStart != before[1].TrimStart {
+		if after[0].Title != before[0].Title || after[1].TrimStart != before[1].TrimStart {
 			t.Errorf("%s: a rejected batch changed the library", name)
 		}
 	}

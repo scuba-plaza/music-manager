@@ -13,7 +13,7 @@ func trk(id, title, artist, album string, n int) manifest.Track {
 	if title == "" || artist == "" {
 		status = manifest.Unidentified
 	}
-	return manifest.Track{ID: id, OriginalTitle: title, OriginalArtist: artist, OriginalAlbum: album, TrackNumber: n, Status: status, SourceLength: 3 * time.Minute}
+	return manifest.Track{ID: id, Title: title, Artist: artist, Album: album, TrackNumber: n, Status: status, SourceLength: 3 * time.Minute}
 }
 
 func labels(rows []Row) []string {
