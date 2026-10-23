@@ -31,7 +31,7 @@ each proposal is, so that you can read it, correct it and only then apply it:
   Fairouz  (10 tracks)  [high ; the old tags]
       Arabic
 
-The field after the arrow is genre, player-artist or player-album.
+The field after the arrow is genre.
 
 An artist's value goes to all its tracks, an album's (## ALBUMS) to all the
 tracks of the album and a track's (## TRACKS, by ID) to that track; the more

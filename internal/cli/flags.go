@@ -13,14 +13,13 @@ import (
 
 // trackFlags are the flags that describe a track, shared by add and edit.
 type trackFlags struct {
-	title, artist, album      string
-	track, of                 int
-	trimStart, trimEnd        string
-	released                  string
-	genre                     string
-	playerArtist, playerAlbum string
-	sourceURL                 string
-	cover                     string
+	title, artist, album string
+	track, of            int
+	trimStart, trimEnd   string
+	released             string
+	genre                string
+	sourceURL            string
+	cover                string
 }
 
 func (tf *trackFlags) register(f *pflag.FlagSet) {
@@ -63,8 +62,6 @@ func (tf *trackFlags) build(f *pflag.FlagSet) (p parsed, err error) {
 	str("released", &tf.released, &e.Released)
 	str("genre", &tf.genre, &e.Genre)
 	str("source-url", &tf.sourceURL, &e.SourceURL)
-	str("player-artist", &tf.playerArtist, &e.PlayerArtist)
-	str("player-album", &tf.playerAlbum, &e.PlayerAlbum)
 	if e.TrimStart, err = parseTrim(f, "trim-start", tf.trimStart); err != nil {
 		return p, err
 	}

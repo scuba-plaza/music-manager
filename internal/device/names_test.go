@@ -25,21 +25,9 @@ func TestPlayerNameKeepsAShortNameAndShortensALongOne(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := device.PlayerName(c.full, ""); got != c.want {
+			if got := device.PlayerName(c.full); got != c.want {
 				t.Errorf("PlayerName(%q) = %q, want %q", c.full, got, c.want)
 			}
 		})
-	}
-}
-
-func TestPlayerNameLetsAnOverrideWin(t *testing.T) {
-	if got := device.PlayerName("Abdel Halim Hafez", "A. H. Hafez"); got != "A. H. Hafez" {
-		t.Errorf("got %q", got)
-	}
-	if got := device.PlayerName("Fairouz", "Fairuz Official Channel"); got != "Fairuz Official Channel" {
-		t.Errorf("an override is the user's word, even when the player will cut it: got %q", got)
-	}
-	if got := device.PlayerName("Abdel Halim Hafez", "  "); got != "Abdel Halim" {
-		t.Errorf("a blank override is none: got %q", got)
 	}
 }

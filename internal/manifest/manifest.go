@@ -43,11 +43,6 @@ type Track struct {
 	Released string `json:"released,omitempty"`
 	// Genre is free text: Folk, Neoclassical, Anthem, whatever the library calls it.
 	Genre string `json:"genre,omitempty"`
-	// PlayerArtist and PlayerAlbum are what the player is to show instead of the
-	// artist and album, which it cuts at 12 characters; empty means a shortened
-	// form of the real name.
-	PlayerArtist string `json:"player_artist,omitempty"`
-	PlayerAlbum  string `json:"player_album,omitempty"`
 	// GainSteps makes the track louder (or, below zero, quieter) by this many
 	// steps of 1.505 dB. FadeIn and FadeOut are stretches of the original
 	// audio over which the sound rises from nothing or falls to nothing.

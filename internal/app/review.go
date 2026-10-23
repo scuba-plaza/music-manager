@@ -46,9 +46,7 @@ type reviewField struct {
 }
 
 var reviewFields = map[string]reviewField{
-	"genre":         {set: func(e *Edit, v string) { e.Genre = &v }},
-	"player-artist": {set: func(e *Edit, v string) { e.PlayerArtist = &v }},
-	"player-album":  {set: func(e *Edit, v string) { e.PlayerAlbum = &v }},
+	"genre": {set: func(e *Edit, v string) { e.Genre = &v }},
 }
 
 // reviewSections are the parts of a review file, from the least to the most

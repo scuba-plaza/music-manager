@@ -21,9 +21,6 @@ func editCmd(open opener) *cobra.Command {
 Title, artist and album are the true names, in any script. Trims accept 90, 1:30 or 1:30.5. The release date
 takes a year, a month or a day (1999, 1999-05, 1999-05-17); pass "" to forget it.
 The source link (--source-url) is where the track came from; pass "" to forget it.
-The player keeps only 12 characters of the artist and of the album: mm shortens
-long ones itself, and --player-artist and --player-album say what to show
-instead; pass "" to go back to the shortened real name.
 A track with a title and an artist counts as identified.
 
 --gain makes the track louder or quieter by about that many dB (3, -2.5,
@@ -109,8 +106,6 @@ original, so cutting the track again afterwards does not move them.`,
 	}
 	tf.register(cmd.Flags())
 	cmd.Flags().StringVar(&tf.sourceURL, "source-url", "", "the link the track came from; \"\" for none")
-	cmd.Flags().StringVar(&tf.playerArtist, "player-artist", "", "the artist as the player shows it (it keeps 12 characters); \"\" to shorten the real one")
-	cmd.Flags().StringVar(&tf.playerAlbum, "player-album", "", "the album as the player shows it (it keeps 12 characters); \"\" to shorten the real one")
 	cmd.Flags().StringVar(&gain, "gain", "", "make the track louder or quieter by about this many dB, e.g. 3 or -2.5; 0 for no change")
 	cmd.Flags().StringVar(&fadeIn, "fade-in", "", "fade in over this long from where the track starts, e.g. 3, or over a stretch, e.g. 0:02-0:05; \"\" for none")
 	cmd.Flags().StringVar(&fadeOut, "fade-out", "", "fade out over this long back from where the track ends, or over a stretch; \"\" for none")

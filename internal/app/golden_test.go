@@ -41,10 +41,9 @@ func fixture(t *testing.T) (*app.App, map[string]string) {
 	}
 	set("a", "وطني", "فيروز", "Hits", 3, 12, app.Edit{Genre: ptr("Folk"), Released: ptr("1999")})
 	set("b", "بحلم بيك", "عبد الحليم حافظ", "روائع", 1, 6, app.Edit{})
-	set("c", "A Very Long Title Indeed That Goes On", "Max Richter", "The Long Album Name Here (Deluxe)", 5, 5,
-		app.Edit{PlayerAlbum: ptr("Long Album")})
+	set("c", "A Very Long Title Indeed That Goes On", "Max Richter", "The Long Album Name Here (Deluxe)", 5, 5, app.Edit{})
 	set("d", "A Very Long Title Indeed That Goes On", "Max Richter", "The Long Album Name Here (Deluxe)", 5, 5, app.Edit{})
-	set("e", "Dream", "Keaton Henson", "", 0, 0, app.Edit{PlayerArtist: ptr("K. Henson"), Genre: ptr("Folk")})
+	set("e", "Dream", "Keaton Henson", "", 0, 0, app.Edit{Genre: ptr("Folk")})
 	set("f", "Cold", "Nils Frahm", "", 0, 0, app.Edit{})
 	// g stays unidentified
 	for letter, img := range map[string][]byte{"a": testmp3.PNG, "c": testmp3.JPEG, "e": testmp3.JPEG2, "f": testmp3.PNG} {

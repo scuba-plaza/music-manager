@@ -469,40 +469,26 @@ func TestAddTakesTheGenreFromAFlag(t *testing.T) {
 	}
 }
 
-func TestTheNamesThePlayerShowsCanBeSetAndAreShownWhenTheyDiffer(t *testing.T) {
+func TestShowSaysWhatTheWolfgangWillShowOnlyWhenAsked(t *testing.T) {
 	lib := filepath.Join(t.TempDir(), "lib")
 	id := ingestOne(t, lib)
-
 	if code, _, errs := run(t, lib, "edit", id, "--title", "Song", "--artist", "Abdel Halim Hafez", "--album", "Abd El Halim Hafez"); code != 0 {
 		t.Fatalf("edit: code %d, err %q", code, errs)
 	}
 	_, out, _ := run(t, lib, "show", id)
-	if !strings.Contains(squash(out), "On the player Abdel Halim · Abd El Halim") {
-		t.Errorf("show lacks what the player will show:\n%s", out)
+	if strings.Contains(out, "On the Wolfgang") {
+		t.Errorf("show talks about the Wolfgang unasked:\n%s", out)
+	}
+	_, out, _ = run(t, lib, "show", id, "--wolfgang")
+	if !strings.Contains(squash(out), "On the Wolfgang Abdel Halim · Abd El Halim") {
+		t.Errorf("show --wolfgang lacks what the player will show:\n%s", out)
 	}
 
-	if code, _, errs := run(t, lib, "edit", id, "--player-artist", "A. H. Hafez", "--player-album", "Hafez Hits"); code != 0 {
-		t.Fatalf("edit: code %d, err %q", code, errs)
-	}
-	_, out, _ = run(t, lib, "show", id)
-	if s := squash(out); !strings.Contains(s, "On the player A. H. Hafez · Hafez Hits") || !strings.Contains(s, "Player artist A. H. Hafez") {
-		t.Errorf("show after setting them:\n%s", out)
-	}
-
-	run(t, lib, "edit", id, "--player-artist", "", "--player-album", "")
-	if _, out, _ = run(t, lib, "show", id); strings.Contains(out, "Player artist") || strings.Contains(out, "Player album") {
-		t.Errorf("cleared names are still shown:\n%s", out)
-	}
-
-	// A track whose names fit has nothing to add.
-	run(t, lib, "edit", id, "--artist", "Band", "--album", "Hits")
-	if _, out, _ = run(t, lib, "show", id); strings.Contains(out, "On the player") {
-		t.Errorf("show repeats names that fit:\n%s", out)
-	}
-
-	// add takes no such flags
-	if code, _, _ := run(t, lib, "add", "u1", "--player-artist", "X"); code == 0 {
-		t.Error("add accepted --player-artist")
+	// The library keeps no names for the player: the flags are gone.
+	for _, args := range [][]string{{"edit", id, "--player-artist", "X"}, {"edit", id, "--player-album", "X"}} {
+		if code, _, errs := run(t, lib, args...); code == 0 || !strings.Contains(errs, "unknown flag") {
+			t.Errorf("%v: code %d, stderr %q; want an unknown flag", args, code, errs)
+		}
 	}
 }
 

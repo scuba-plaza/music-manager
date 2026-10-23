@@ -28,9 +28,6 @@ type Edit struct {
 	SourceURL *string
 	// Genre is free text, one line, or "" for none.
 	Genre *string
-	// PlayerArtist and PlayerAlbum are one line each, or "" to go back to the
-	// shortened real name.
-	PlayerArtist, PlayerAlbum *string
 	// GainDB makes the track louder or quieter by about this much, rounded to
 	// the nearest step the file allows (mp3.StepDB); 0 for no change.
 	GainDB *float64
@@ -105,20 +102,6 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 			return t, fmt.Errorf("genre %q must be on one line", g)
 		}
 		t.Genre = g
-	}
-	for _, f := range []struct {
-		name string
-		in   *string
-		out  *string
-	}{{"player artist", e.PlayerArtist, &t.PlayerArtist}, {"player album", e.PlayerAlbum, &t.PlayerAlbum}} {
-		if f.in == nil {
-			continue
-		}
-		v := strings.TrimSpace(*f.in)
-		if strings.ContainsAny(v, "\r\n") {
-			return t, fmt.Errorf("%s %q must be on one line", f.name, v)
-		}
-		*f.out = v
 	}
 	if e.GainDB != nil {
 		t.GainSteps = int(math.Round(*e.GainDB / mp3.StepDB))

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"music-manager/internal/app"
-	"music-manager/internal/manifest"
 )
 
 const sampleReview = `# Genres: proposals to review
@@ -211,42 +210,11 @@ func TestAReviewWithAnInvalidValueChangesNothing(t *testing.T) {
 	}
 }
 
-func TestAReviewCanSetSeveralFieldsOneSectionEach(t *testing.T) {
-	a, id := reviewLib(t)
-	entries, err := app.ParseReview(`## ARTISTS -> player-artist
-Fairouz  (3 tracks)  [high]
-    Fairuz
-## ALBUMS -> player-album
-Songs (Live)  (Fairouz, 2 tracks)  [medium]
-    Live
-## ARTISTS -> genre
-Max Richter  (1 track)  [high]
-    Neoclassical
-`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rep, err := a.ApplyReview(entries, app.ReviewOptions{})
-	if err != nil || rep.Changed != 4 || rep.Applied != 3 {
-		t.Fatalf("report %+v, %v; want 4 tracks changed by 3 entries", rep, err)
-	}
-	byID := map[string]manifest.Track{}
-	for _, tr := range tracks(t, a) {
-		byID[tr.ID] = tr
-	}
-	for title, want := range map[string][3]string{ // player artist, player album, genre
-		"Wtni":      {"Fairuz", "Live", ""},
-		"Habbaytak": {"Fairuz", "Live", ""},
-		"Kifak":     {"Fairuz", "", ""},
-		"Sleep":     {"", "", "Neoclassical"},
-		"Plain":     {"", "", ""},
-	} {
-		tr := byID[id[title]]
-		if got := [3]string{tr.PlayerArtist, tr.PlayerAlbum, tr.Genre}; got != want {
-			t.Errorf("%s: %v, want %v", title, got, want)
+func TestAReviewCannotSetWhatTheLibraryDoesNotKeep(t *testing.T) {
+	for _, field := range []string{"player-artist", "player-album"} {
+		_, err := app.ParseReview("## ARTISTS -> " + field + "\nFairouz  (3 tracks)  [high]\n    Fairuz\n")
+		if err == nil || !strings.Contains(err.Error(), "not a field a review can set") {
+			t.Errorf("%s: err = %v, want the field refused", field, err)
 		}
-	}
-	if rep, err = a.ApplyReview(entries, app.ReviewOptions{}); err != nil || rep.Changed != 0 {
-		t.Errorf("a second apply: %+v, %v", rep, err)
 	}
 }

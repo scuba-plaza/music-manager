@@ -13,14 +13,11 @@ import (
 // player's index keeps; it cuts the rest, wherever that falls.
 const PlayerFieldWidth = 12
 
-// PlayerName is the artist or album name as the player shows it: the override
-// if there is one, else full, shortened to fit PlayerFieldWidth. A name that
+// PlayerName is the artist or album name as the player shows it: full,
+// shortened to fit PlayerFieldWidth. A name that
 // fits is left alone; a longer one loses what is in parentheses and a leading
 // "The ", then is cut after a whole word if that keeps at least half of it.
-func PlayerName(full, override string) string {
-	if o := strings.TrimSpace(override); o != "" {
-		return o
-	}
+func PlayerName(full string) string {
 	full = strings.TrimSpace(full)
 	if utf8.RuneCountInString(full) > PlayerFieldWidth && len(full) > 4 && strings.EqualFold(full[:4], "the ") {
 		full = strings.TrimSpace(full[4:])
@@ -36,5 +33,5 @@ func PlayerTags(t manifest.Track) (artist, album string) {
 	if album == "" {
 		album = t.OriginalTitle
 	}
-	return PlayerName(translit.ToASCII(t.OriginalArtist), t.PlayerArtist), PlayerName(translit.ToASCII(album), t.PlayerAlbum)
+	return PlayerName(translit.ToASCII(t.OriginalArtist)), PlayerName(translit.ToASCII(album))
 }

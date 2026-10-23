@@ -101,7 +101,8 @@ dates sort newest first. Tracks with no value for the key always come last.
 }
 
 func showCmd(open opener) *cobra.Command {
-	return &cobra.Command{
+	var wolfgang bool
+	cmd := &cobra.Command{
 		Use:   "show <id>",
 		Short: "Show everything recorded about a track",
 		Args:  cobra.ExactArgs(1),
@@ -138,12 +139,9 @@ func showCmd(open opener) *cobra.Command {
 			}
 			row("Released", t.Released)
 			row("Genre", t.Genre)
-			row("Player artist", t.PlayerArtist)
-			row("Player album", t.PlayerAlbum)
-			if t.Status == manifest.Identified {
-				if artist, album := device.PlayerTags(t); artist != t.OriginalArtist || album != t.OriginalAlbum {
-					row("On the player", artist+" · "+album)
-				}
+			if wolfgang && t.Status == manifest.Identified {
+				artist, album := device.PlayerTags(t)
+				row("On the Wolfgang", artist+" · "+album)
 			}
 			row("Length", clock(t.PlayingLength()))
 			if t.GainSteps != 0 {
@@ -168,6 +166,8 @@ func showCmd(open opener) *cobra.Command {
 			return w.Flush()
 		},
 	}
+	cmd.Flags().BoolVar(&wolfgang, "wolfgang", false, "also show the artist and album the Wolfgang WMP01 will show")
+	return cmd
 }
 
 // stamp formats a moment in local time, or gives "" for an unknown one.
