@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"music-manager/internal/device"
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 )
@@ -34,10 +35,10 @@ func checkPlaylistName(m *manifest.Manifest, name string) error {
 	if name == "" {
 		return errors.New("a playlist needs a name")
 	}
-	file := strings.ToLower(layout.PlaylistPath(name))
+	file := strings.ToLower(playlistFileName(name))
 	for _, p := range m.Playlists {
-		if strings.ToLower(layout.PlaylistPath(p.Name)) == file {
-			return fmt.Errorf("there is already a playlist called %q, and %q would be the same file (%s)", p.Name, name, layout.PlaylistPath(name))
+		if strings.ToLower(playlistFileName(p.Name)) == file {
+			return fmt.Errorf("there is already a playlist called %q, and %q would be the same file (%s)", p.Name, name, playlistFileName(name))
 		}
 	}
 	return nil
@@ -175,21 +176,6 @@ func (a *App) DeletePlaylist(name string) error {
 	return a.store.Save(m)
 }
 
-// playlistFile is the M3U file of a playlist, given where each track is
-// rendered. The player (a Wolfang WMP01) was found to read paths from the
-// root of its card with backslashes, one per line, in plain UTF-8 with
-// Windows line endings; slashes, and paths relative to the playlist, give
-// an empty playlist.
-func playlistFile(p manifest.Playlist, paths map[string]string) []byte {
-	var b strings.Builder
-	for _, id := range p.Tracks {
-		if path, ok := paths[id]; ok {
-			b.WriteString(`\` + strings.ReplaceAll(path, "/", `\`) + "\r\n")
-		}
-	}
-	return []byte(b.String())
-}
-
 // ReplacePlaylists makes the playlists exactly ps, which is what undo
 // needs: a snapshot taken earlier. It refuses a snapshot that no playlist
 // could have: an unknown track, a track twice in a playlist, or names that
@@ -227,4 +213,10 @@ func (a *App) ReplacePlaylists(ps []manifest.Playlist) error {
 		}
 	}
 	return a.store.Save(m)
+}
+
+// playlistFileName is the file a playlist of this name is written to, which
+// decides whether two names are the same playlist.
+func playlistFileName(name string) string {
+	return layout.PlaylistPath(name, device.Generic.Layout())
 }

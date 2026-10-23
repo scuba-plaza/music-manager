@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/layout"
 )
 
@@ -61,7 +62,7 @@ The track is only recorded; run "mm sync" to write it into the library folder.`,
 			}
 			out := cmd.OutOrStdout()
 			fmt.Fprintf(out, "added %s: %s - %s\n", t.ID, t.Artist, t.Title)
-			fmt.Fprintf(out, "  will be written to %s\n", layout.PathFor(t))
+			fmt.Fprintf(out, "  will be written to %s\n", layout.PathFor(t, device.Generic.Layout()))
 			fmt.Fprintln(out, `  run "mm sync" to put it in the library folder`)
 			return nil
 		},

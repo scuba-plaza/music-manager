@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
@@ -79,7 +80,7 @@ func (m Model) headLines(t manifest.Track, w int, compact bool) []string {
 	}
 	if tab == tabOf(fPlayerArtist) {
 		lines = append(lines, "")
-		text := fmt.Sprintf("The player keeps only %d characters of the artist and of the album, so a longer name is shortened here, at a word. Type a name to choose it yourself.", app.PlayerFieldWidth)
+		text := fmt.Sprintf("The player keeps only %d characters of the artist and of the album, so a longer name is shortened here, at a word. Type a name to choose it yourself.", device.PlayerFieldWidth)
 		for _, l := range wrap(text, w-2) {
 			lines = append(lines, " "+styles.dim.Render(l))
 		}
@@ -106,7 +107,7 @@ func (m Model) trackLines(t manifest.Track, w, h int) []string {
 // shown is the track as it will be once what is being typed is saved.
 func (m Model) footLines(t, shown manifest.Track, w int) []string {
 	lines := []string{rule(w)}
-	for i, l := range wrap(layout.PathFor(shown), w-4) {
+	for i, l := range wrap(layout.PathFor(shown, device.Generic.Layout()), w-4) {
 		prefix := "   "
 		if i == 0 {
 			prefix = " → "
@@ -298,9 +299,9 @@ func (m Model) editorLines(prefix, indent string, vw int) []string {
 	case m.dr.field == fPlayerArtist || m.dr.field == fPlayerAlbum:
 		first.Width = max(vw-1, 1)
 		n := utf8.RuneCountInString(strings.TrimSpace(first.Value()))
-		count := styles.dim.Render(fit(fmt.Sprintf("%d of %d characters · empty for the automatic name", n, app.PlayerFieldWidth), vw))
-		if over := n - app.PlayerFieldWidth; over > 0 {
-			count = styles.warn.Render(fit(fmt.Sprintf("%d of %d characters · the player cuts the last %d", n, app.PlayerFieldWidth, over), vw))
+		count := styles.dim.Render(fit(fmt.Sprintf("%d of %d characters · empty for the automatic name", n, device.PlayerFieldWidth), vw))
+		if over := n - device.PlayerFieldWidth; over > 0 {
+			count = styles.warn.Render(fit(fmt.Sprintf("%d of %d characters · the player cuts the last %d", n, device.PlayerFieldWidth, over), vw))
 		}
 		lines = append(lines, prefix+first.View(), indent+count)
 	default:
@@ -389,9 +390,9 @@ func playerFieldLines(t manifest.Track, f fieldKind, prefix, indent string, vw i
 	if real != "" && real != shown {
 		note = append(note, `from "`+real+`"`)
 	}
-	over := utf8.RuneCountInString(shown) - app.PlayerFieldWidth
+	over := utf8.RuneCountInString(shown) - device.PlayerFieldWidth
 	if over > 0 {
-		note = append(note, fmt.Sprintf("the player cuts it at %d", app.PlayerFieldWidth))
+		note = append(note, fmt.Sprintf("the player cuts it at %d", device.PlayerFieldWidth))
 	}
 	if len(note) == 0 {
 		return lines

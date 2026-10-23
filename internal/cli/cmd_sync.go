@@ -1,18 +1,20 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/render"
 )
 
 func syncCmd(open opener) *cobra.Command {
 	var opts app.SyncOptions
-	var dryRun, yes bool
+	var dryRun, yes, wolfgang bool
 	cmd := &cobra.Command{
 		Use:   "sync",
 		Short: "Render the library folder from the records",
@@ -22,9 +24,20 @@ with a fresh tag, its album gets a cover file, and nothing else changes.
 Files the records do not account for are only listed. --prune deletes them
 (together with directories left empty); since that cannot be undone it
 also needs --yes. --target renders into another directory, such as the mounted
-player, instead of the library folder.`,
+player, instead of the library folder.
+
+The library folder and any ordinary target get the music as it is: names and
+tags in their own script, covers as they were given. --wolfgang writes for the
+Wolfgang WMP01 player instead, with everything its limits call for; it needs
+--target, as the library folder is always written the standard way.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if wolfgang {
+				if opts.Target == "" {
+					return errors.New("--wolfgang needs --target: the library folder is always written the standard way")
+				}
+				opts.Device = device.Wolfgang
+			}
 			a, err := open()
 			if err != nil {
 				return err
@@ -34,6 +47,9 @@ player, instead of the library folder.`,
 				return err
 			}
 			out := cmd.OutOrStdout()
+			if wolfgang {
+				fmt.Fprintln(out, "for the Wolfgang WMP01")
+			}
 			if len(plan.Ops) == 0 {
 				if !dryRun {
 					if err := plan.Apply(); err != nil { // still collects unused blobs
@@ -71,6 +87,9 @@ player, instead of the library folder.`,
 	f.BoolVar(&opts.Prune, "prune", false, "delete files the records do not account for")
 	f.BoolVar(&dryRun, "dry-run", false, "show what would change without changing anything")
 	f.BoolVar(&yes, "yes", false, "confirm deletions")
+	f.BoolVar(&wolfgang, "wolfgang", false, "write for the Wolfgang WMP01 player (needs --target)")
+	f.BoolVar(&wolfgang, "wolfang", false, "")
+	_ = f.MarkHidden("wolfang")
 	return cmd
 }
 

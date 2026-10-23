@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
 	"music-manager/internal/timecode"
@@ -402,9 +403,9 @@ func previewTrack(t manifest.Track, d draft) manifest.Track {
 // playerShown is what the player shows for the artist or album of t, and what
 // it would show if the track had no name of its own for it.
 func playerShown(t manifest.Track, f fieldKind) (shown, auto string) {
-	artist, album := app.PlayerTags(t)
+	artist, album := device.PlayerTags(t)
 	t.PlayerArtist, t.PlayerAlbum = "", ""
-	autoArtist, autoAlbum := app.PlayerTags(t)
+	autoArtist, autoAlbum := device.PlayerTags(t)
 	if f == fPlayerArtist {
 		return artist, autoArtist
 	}

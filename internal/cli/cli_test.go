@@ -181,6 +181,35 @@ func TestSyncToATarget(t *testing.T) {
 	}
 }
 
+func TestSyncWolfgangNeedsATarget(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib)
+	run(t, lib, "edit", id, "--title", "Song", "--artist", "Band")
+	code, _, errs := run(t, lib, "sync", "--wolfgang")
+	if code == 0 || !strings.Contains(errs, "--target") {
+		t.Errorf("code %d, err %q: --wolfgang without --target should be refused and say why", code, errs)
+	}
+	if exists(filepath.Join(lib, "Band", "Song.mp3")) {
+		t.Error("the library folder was written although the sync was refused")
+	}
+}
+
+func TestSyncWolfgangSaysWhatItWritesFor(t *testing.T) {
+	lib, target := filepath.Join(t.TempDir(), "lib"), filepath.Join(t.TempDir(), "player")
+	id := ingestOne(t, lib)
+	run(t, lib, "edit", id, "--title", "Song", "--artist", "Band")
+	code, out, errs := run(t, lib, "sync", "--wolfgang", "--target", target, "--dry-run")
+	if code != 0 || !strings.Contains(out, "Wolfgang WMP01") {
+		t.Errorf("code %d, out %q, err %q", code, out, errs)
+	}
+	if code, out, errs = run(t, lib, "sync", "--wolfgang", "--target", target); code != 0 || !exists(filepath.Join(target, "Band", "Song.mp3")) {
+		t.Errorf("code %d, out %q, err %q", code, out, errs)
+	}
+	if _, out, _ := run(t, lib, "sync", "--target", target, "--dry-run"); strings.Contains(out, "Wolfgang") {
+		t.Errorf("a plain sync talks about the Wolfgang: %q", out)
+	}
+}
+
 func TestEditCover(t *testing.T) {
 	lib := filepath.Join(t.TempDir(), "lib")
 	id := ingestOne(t, lib)

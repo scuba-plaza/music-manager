@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/render"
 )
 
@@ -339,4 +340,71 @@ func TestTheHeaderStaysQuietWhenNothingNeedsSyncing(t *testing.T) {
 	}
 	m = send(t, m, m.Init())
 	lacks(t, m, "press s")
+}
+
+// planSpy remembers the options of every plan the dialog asked for.
+type planSpy struct {
+	Library
+	opts []app.SyncOptions
+}
+
+func (s *planSpy) PlanSync(o app.SyncOptions) (Plan, error) {
+	s.opts = append(s.opts, o)
+	return s.Library.PlanSync(o)
+}
+
+func driveModel(t *testing.T) (Model, *planSpy) {
+	t.Helper()
+	m, _ := syncModel(t)
+	spy := &planSpy{Library: m.lib}
+	m.lib = spy
+	drive := filepath.Join(t.TempDir(), "PLAYER")
+	os.MkdirAll(drive, 0o755)
+	m.mounts = func() []string { return []string{drive} }
+	return m, spy
+}
+
+func TestTheChooserOffersAFormatForADriveButNotForTheLibraryFolder(t *testing.T) {
+	m, _ := driveModel(t)
+	m = keys(t, m, "s")
+	contains(t, m, "Format", "Generic")
+	lacks(t, m, "Wolfgang")
+	m = keys(t, m, "w") // on the library folder: nothing to choose
+	lacks(t, m, "Wolfgang WMP01")
+	m = keys(t, m, "down", "w")
+	contains(t, m, "Format", "Wolfgang WMP01")
+	m = keys(t, m, "w")
+	lacks(t, m, "Wolfgang WMP01")
+	contains(t, m, "Generic")
+}
+
+func TestAPlanForADriveAsksForTheFormatThatWasChosen(t *testing.T) {
+	m, spy := driveModel(t)
+	m = keys(t, m, "s", "down", "enter") // generic by default
+	contains(t, m, "to create")
+	lacks(t, m, "Wolfgang")
+	if got := spy.opts[len(spy.opts)-1].Device; got != nil && got != device.Generic {
+		t.Errorf("device = %v, want the generic one", got)
+	}
+	m = keys(t, m, "esc", "s", "down", "w", "enter")
+	contains(t, m, "to create", "Wolfgang WMP01")
+	if got := spy.opts[len(spy.opts)-1].Device; got != device.Wolfgang {
+		t.Errorf("device = %v, want the Wolfgang one", got)
+	}
+}
+
+func TestTheFormatIsNotRememberedBetweenSyncs(t *testing.T) {
+	m, _ := driveModel(t)
+	m = keys(t, m, "s", "down", "w", "esc", "s", "down")
+	contains(t, m, "Format", "Generic")
+	lacks(t, m, "Wolfgang WMP01")
+}
+
+func TestTheLibraryFolderIsAlwaysPlannedTheStandardWay(t *testing.T) {
+	m, spy := driveModel(t)
+	m = keys(t, m, "s", "down", "w", "up", "enter")
+	contains(t, m, "to create")
+	if got := spy.opts[len(spy.opts)-1].Device; got != nil && got != device.Generic {
+		t.Errorf("the library folder was planned for %v", got)
+	}
 }

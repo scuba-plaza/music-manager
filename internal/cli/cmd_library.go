@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -140,7 +141,7 @@ func showCmd(open opener) *cobra.Command {
 			row("Player artist", t.PlayerArtist)
 			row("Player album", t.PlayerAlbum)
 			if t.Status == manifest.Identified {
-				if artist, album := app.PlayerTags(t); artist != t.Artist || album != t.Album {
+				if artist, album := device.PlayerTags(t); artist != t.Artist || album != t.Album {
 					row("On the player", artist+" · "+album)
 				}
 			}

@@ -12,57 +12,72 @@ import (
 	"unicode/utf8"
 
 	"music-manager/internal/manifest"
-	"music-manager/internal/translit"
 )
 
 const (
-	ext          = ".mp3"
-	inbox        = "_Inbox"
-	playlistDir  = "Playlists"
-	playlistExt  = ".m3u"
-	maxComponent = 100 // bytes, well under the 255 most filesystems allow
-	maxName      = 22  // characters of a file name before ".mp3": the player keeps 26 with it
+	ext         = ".mp3"
+	inbox       = "_Inbox"
+	playlistDir = "Playlists"
+	playlistExt = ".m3u"
 )
+
+// Rules says how a target wants its paths made. The zero value keeps names
+// as they are, cuts a path component at 255 bytes and does not shorten file
+// names.
+type Rules struct {
+	// Fold turns a name into what the target keeps of it; nil keeps it as it is.
+	Fold func(string) string
+	// ComponentMax is the most bytes in one path component; 0 means 255.
+	ComponentMax int
+	// StemMax is the most characters in a file name before ".mp3"; 0 means no limit.
+	StemMax int
+}
 
 // PathFor returns the slash-separated path of t relative to the library
 // root: Artist/Album/NN - Title.mp3, Artist/Title.mp3 for tracks without an
 // album, or _Inbox/<id> - <old name>.mp3 for tracks not yet identified. The
-// file name is shortened to what the player keeps of it (see maxName).
-func PathFor(t manifest.Track) string { return pathFor(t, "") }
+// file name is shortened to r.StemMax characters.
+func PathFor(t manifest.Track, r Rules) string { return pathFor(t, "", r) }
 
 // pathFor is PathFor with suffix (" (2)") put after the name, which is
 // shortened to leave room for it.
-func pathFor(t manifest.Track, suffix string) string {
-	room := maxName - len(suffix)
+func pathFor(t manifest.Track, suffix string, r Rules) string {
+	room := r.StemMax - len(suffix)
+	stem := func(s string, room int) string {
+		if r.StemMax <= 0 {
+			return s
+		}
+		return Shorten(s, room)
+	}
 	if t.Status != manifest.Identified {
 		name := t.ID
-		if hint := clean(t.Hint.Filename); hint != "Unknown" {
+		if hint := clean(t.Hint.Filename, r); hint != "Unknown" {
 			name += " - " + hint
 		}
-		return path.Join(inbox, Shorten(name, room)+suffix+ext)
+		return path.Join(inbox, stem(name, room)+suffix+ext)
 	}
-	artist, title := clean(t.Artist), clean(t.Title)
+	artist, title := clean(t.Artist, r), clean(t.Title, r)
 	if t.Album == "" {
-		return path.Join(artist, Shorten(title, room)+suffix+ext)
+		return path.Join(artist, stem(title, room)+suffix+ext)
 	}
 	number := ""
 	if t.TrackNumber > 0 {
 		width := max(2, len(strconv.Itoa(t.TrackTotal)))
 		number = fmt.Sprintf("%0*d - ", width, t.TrackNumber)
 	}
-	return path.Join(artist, clean(t.Album), number+Shorten(title, room-len(number))+suffix+ext)
+	return path.Join(artist, clean(t.Album, r), number+stem(title, room-len(number))+suffix+ext)
 }
 
 // PlaylistPath is where the playlist with this name is rendered:
 // Playlists/<name>.m3u, with the name made safe for a file name.
-func PlaylistPath(name string) string {
-	return path.Join(playlistDir, clean(name)+playlistExt)
+func PlaylistPath(name string, r Rules) string {
+	return path.Join(playlistDir, clean(name, r)+playlistExt)
 }
 
 // Assign returns the path of every track by ID. Tracks that would share a
 // path (compared case-insensitively, as on FAT) get " (2)", " (3)", ...
 // before the extension; the oldest track keeps the plain name.
-func Assign(tracks []manifest.Track) map[string]string {
+func Assign(tracks []manifest.Track, r Rules) map[string]string {
 	ordered := append([]manifest.Track(nil), tracks...)
 	sort.Slice(ordered, func(i, j int) bool {
 		if !ordered[i].AddedAt.Equal(ordered[j].AddedAt) {
@@ -73,9 +88,9 @@ func Assign(tracks []manifest.Track) map[string]string {
 	taken := map[string]bool{}
 	out := make(map[string]string, len(ordered))
 	for _, t := range ordered {
-		p := PathFor(t)
+		p := PathFor(t, r)
 		for n := 2; taken[strings.ToLower(p)]; n++ {
-			p = pathFor(t, fmt.Sprintf(" (%d)", n))
+			p = pathFor(t, fmt.Sprintf(" (%d)", n), r)
 		}
 		taken[strings.ToLower(p)] = true
 		out[t.ID] = p
@@ -84,24 +99,29 @@ func Assign(tracks []manifest.Track) map[string]string {
 }
 
 // clean makes s usable as one path component on any filesystem.
-func clean(s string) string {
-	s = translit.ToASCII(s)
+func clean(s string, r Rules) string {
+	if r.Fold != nil {
+		s = r.Fold(s)
+	}
 	s = strings.Map(func(r rune) rune {
 		if strings.ContainsRune(`/\:*?"<>|`, r) || r < 0x20 || r == 0x7f {
 			return '-'
 		}
 		return r
 	}, s)
-	s = strings.Trim(truncate(s), " .'")
+	s = strings.Trim(truncate(s, r.ComponentMax), " .'")
 	if strings.Trim(s, "-") == "" {
 		return "Unknown"
 	}
 	return s
 }
 
-func truncate(s string) string {
-	if len(s) > maxComponent {
-		s = strings.TrimRight(s[:maxComponent], " .")
+func truncate(s string, max int) string {
+	if max <= 0 {
+		max = 255
+	}
+	if len(s) > max {
+		s = strings.TrimRight(s[:max], " .")
 	}
 	return s
 }

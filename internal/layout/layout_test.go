@@ -9,7 +9,12 @@ import (
 
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
+	"music-manager/internal/translit"
 )
+
+// rules are the ones of the one target that needs them today: ASCII names, a
+// component of at most 100 bytes, 22 characters before ".mp3".
+var rules = layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: 22}
 
 func identified(artist, album, title string, n, total int) manifest.Track {
 	return manifest.Track{
@@ -41,7 +46,7 @@ func TestPathFor(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := layout.PathFor(c.in); got != c.want {
+			if got := layout.PathFor(c.in, rules); got != c.want {
 				t.Errorf("PathFor = %q, want %q", got, c.want)
 			}
 		})
@@ -50,7 +55,7 @@ func TestPathFor(t *testing.T) {
 
 func TestPathForKeepsEveryComponentShort(t *testing.T) {
 	long := strings.Repeat("x", 400)
-	got := layout.PathFor(identified(long, long, long, 1, 1))
+	got := layout.PathFor(identified(long, long, long, 1, 1), rules)
 	for _, part := range strings.Split(got, "/") {
 		if len(part) > 120 {
 			t.Errorf("component of %d bytes in %q", len(part), got)
@@ -64,7 +69,7 @@ func TestPathForKeepsEveryComponentShort(t *testing.T) {
 func TestPathForOutputIsASCIIOnlyForASCIIFields(t *testing.T) {
 	// Non-ASCII in the ASCII fields is a bug upstream, but the layout must still
 	// never emit it, because the target player cannot show it.
-	got := layout.PathFor(identified("Bjørn", "", "Tïtle", 0, 0))
+	got := layout.PathFor(identified("Bjørn", "", "Tïtle", 0, 0), rules)
 	for _, r := range got {
 		if r > 127 {
 			t.Errorf("non-ASCII rune %q in %q", r, got)
@@ -90,7 +95,7 @@ func TestAssignGivesCollidingTracksDistinctStablePaths(t *testing.T) {
 		"qqqqqq": "A/B/02 - Different.mp3",
 	}
 	for _, order := range [][]manifest.Track{{older, newer, third, other}, {other, third, newer, older}} {
-		got := layout.Assign(order)
+		got := layout.Assign(order, rules)
 		for id, w := range want {
 			if got[id] != w {
 				t.Errorf("Assign[%s] = %q, want %q", id, got[id], w)
@@ -103,7 +108,7 @@ func TestAssignTreatsPathsAsCaseInsensitive(t *testing.T) {
 	a, b := identified("Artist", "", "SONG", 0, 0), identified("artist", "", "song", 0, 0)
 	a.ID, b.ID = "aaaaaa", "bbbbbb"
 	a.AddedAt, b.AddedAt = time.Unix(1, 0), time.Unix(2, 0)
-	got := layout.Assign([]manifest.Track{a, b})
+	got := layout.Assign([]manifest.Track{a, b}, rules)
 	if strings.EqualFold(got["aaaaaa"], got["bbbbbb"]) {
 		t.Errorf("paths collide on a case-insensitive filesystem: %v", got)
 	}
@@ -118,7 +123,7 @@ func TestPlaylistPath(t *testing.T) {
 		"???":              "Playlists/Unknown.m3u",
 	}
 	for name, want := range cases {
-		if got := layout.PlaylistPath(name); got != want {
+		if got := layout.PlaylistPath(name, rules); got != want {
 			t.Errorf("PlaylistPath(%q) = %q, want %q", name, got, want)
 		}
 	}
@@ -147,7 +152,7 @@ func TestFileNamesAreShortenedToWhatThePlayerKeeps(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := layout.PathFor(c.in); got != c.want {
+			if got := layout.PathFor(c.in, rules); got != c.want {
 				t.Errorf("PathFor = %q, want %q", got, c.want)
 			}
 		})
@@ -165,7 +170,7 @@ func TestACollisionSuffixStaysWithinWhatThePlayerKeeps(t *testing.T) {
 		mk("aaaaaa", 1, "A Very Long Song Title Indeed Yes"),
 		mk("bbbbbb", 2, "A Very Long Song Title Indeed No"),
 		mk("cccccc", 3, "A Very Long Song Title Indeed Maybe"),
-	})
+	}, rules)
 	want := map[string]string{
 		"aaaaaa": "Artist/A Very Long Song Title.mp3",
 		"bbbbbb": "Artist/A Very Long Song (2).mp3",
@@ -191,7 +196,7 @@ func TestNoFileNameIsLongerThanThePlayerKeeps(t *testing.T) {
 		identified("Artist", "Album", title, 12, 120),
 		manifest.Track{ID: "k7f2qd", Status: manifest.Unidentified, Hint: manifest.Hint{Filename: title}},
 	)
-	for id, p := range layout.Assign(tracks) {
+	for id, p := range layout.Assign(tracks, rules) {
 		if name := path.Base(p); len(name) > 26 {
 			t.Errorf("%s: file name %q is %d characters, the player keeps 26", id, name, len(name))
 		}

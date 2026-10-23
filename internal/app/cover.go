@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"music-manager/internal/coverimg"
+	"music-manager/internal/device"
 	"music-manager/internal/manifest"
 )
 
@@ -57,15 +58,13 @@ func older(a, b manifest.Track) bool {
 }
 
 // coverFile is the stored cover with the given SHA as it is written to the
-// card: a JPEG the player opens. Covers are kept in that form already; one
-// stored by an earlier version, as the PNG or large JPEG it came as, is made
-// into one here.
-func (a *App) coverFile(sha string) ([]byte, error) {
+// target, and the kind of image it is.
+func (a *App) coverFile(sha string, dev device.Target) ([]byte, string, error) {
 	data, err := os.ReadFile(a.covers.Path(sha))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return coverimg.Normalize(data)
+	return dev.Cover(data)
 }
 
 // CoverReport says what NormalizeCovers did, or would do.

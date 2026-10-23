@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 )
@@ -167,7 +168,7 @@ func (m Model) albumPeek(r Row, w int) (info, list []string) {
 func (m Model) playlistPeek(r Row, w int) (info, list []string) {
 	ts := m.tracksFor(r.IDs)
 	info = []string{" " + plural(r.Count, "track") + " · " + clock(lengthOf(ts)) + " plays", ""}
-	for i, l := range wrap(layout.PlaylistPath(r.Label), w-4) {
+	for i, l := range wrap(layout.PlaylistPath(r.Label, device.Generic.Layout()), w-4) {
 		prefix := "   "
 		if i == 0 {
 			prefix = " → "

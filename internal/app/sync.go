@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"music-manager/internal/layout"
+	"music-manager/internal/device"
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
 	"music-manager/internal/render"
@@ -22,6 +22,8 @@ import (
 type SyncOptions struct {
 	Target string // directory to render into; the library root if empty
 	Prune  bool   // delete stray files instead of only reporting them
+	// Device is the kind of place the tree is written to; nil means device.Generic.
+	Device device.Target
 	// OnProgress, if set, hears how many tracks have been prepared so far
 	// while the plan is made.
 	OnProgress func(done, total int)
@@ -52,6 +54,10 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 	if target == "" {
 		target = a.root
 	}
+	dev := opts.Device
+	if dev == nil {
+		dev = device.Generic
+	}
 	m, err := a.store.Load()
 	if err != nil {
 		return nil, err
@@ -61,13 +67,13 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 		keepAudio[t.AudioSHA256] = true
 		keepCovers[t.CoverSHA256] = true
 	}
-	paths, covers := renderInputs(m.Tracks)
+	paths, covers := renderInputs(m.Tracks, dev)
 	desired := render.Tree{}
 	build := map[string]func() ([]byte, error){}
 	for i, t := range m.Tracks {
 		t := t
 		p := paths[t.ID]
-		build[p] = func() ([]byte, error) { return a.renderTrack(t) }
+		build[p] = func() ([]byte, error) { return a.renderTrack(t, dev) }
 		data, err := build[p]()
 		if err != nil {
 			return nil, fmt.Errorf("track %s: %w", t.ID, err)
@@ -78,13 +84,12 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 		}
 	}
 	for _, p := range m.Playlists {
-		data := playlistFile(p, paths)
-		name := layout.PlaylistPath(p.Name)
+		name, data := dev.Playlist(p, paths)
 		build[name] = func() ([]byte, error) { return data, nil }
 		desired[name] = fingerprint(data)
 	}
 	for name, t := range covers {
-		data, err := a.coverFile(t.CoverSHA256)
+		data, _, err := a.coverFile(t.CoverSHA256, dev)
 		if err != nil {
 			return nil, fmt.Errorf("cover of track %s: %w", t.ID, err)
 		}
@@ -162,7 +167,7 @@ func (p *SyncPlan) ApplyWith(progress func(done, total int)) error {
 	return nil
 }
 
-func (a *App) renderTrack(t manifest.Track) ([]byte, error) {
+func (a *App) renderTrack(t manifest.Track, dev device.Target) ([]byte, error) {
 	audio, err := os.ReadFile(a.audio.Path(t.AudioSHA256))
 	if err != nil {
 		return nil, err
@@ -175,44 +180,13 @@ func (a *App) renderTrack(t manifest.Track) ([]byte, error) {
 			return nil, err
 		}
 	}
-	ts := tagSet(t)
+	ts := dev.Tags(t)
 	if t.Status == manifest.Identified && t.CoverSHA256 != "" {
-		if ts.Cover, err = a.coverFile(t.CoverSHA256); err != nil {
+		if ts.Cover, ts.CoverMIME, err = a.coverFile(t.CoverSHA256, dev); err != nil {
 			return nil, err
 		}
-		ts.CoverMIME = "image/jpeg"
 	}
 	return mp3.Render(audio, ts)
-}
-
-// tagSet is the complete tag of a track's file. Identified tracks carry the
-// ASCII fields in the standard frames and the originals in custom ones.
-func tagSet(t manifest.Track) mp3.TagSet {
-	extra := map[string]string{"MM_ID": t.ID}
-	if t.Status != manifest.Identified {
-		return mp3.TagSet{Extra: extra}
-	}
-	for k, v := range map[string]string{
-		"ORIGINAL_TITLE":      t.OriginalTitle,
-		"ORIGINAL_ARTIST":     t.OriginalArtist,
-		"ORIGINAL_ALBUM":      t.OriginalAlbum,
-		"SOURCE_URL":          t.SourceURL,
-		"MUSICBRAINZ_TRACKID": t.MBRecordingID,
-		"MUSICBRAINZ_ALBUMID": t.MBReleaseID,
-	} {
-		if v != "" {
-			extra[k] = v
-		}
-	}
-	artist, album := PlayerTags(t)
-	return mp3.TagSet{
-		Title: t.Title, Artist: artist, Album: album,
-		Genre: t.Genre,
-		Track: t.TrackNumber, Total: t.TrackTotal,
-		Date:   t.Released,
-		Length: t.PlayingLength(),
-		Extra:  extra,
-	}
 }
 
 func fingerprint(data []byte) render.File {

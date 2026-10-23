@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"music-manager/internal/device"
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 )
@@ -20,8 +21,8 @@ import (
 // track supplies each cover file: the cover of an album folder comes from the
 // oldest track that has a cover, and a single has a cover file of its own,
 // named like its track. Tracks not identified have no cover file.
-func renderInputs(tracks []manifest.Track) (paths map[string]string, covers map[string]manifest.Track) {
-	paths = layout.Assign(tracks)
+func renderInputs(tracks []manifest.Track, dev device.Target) (paths map[string]string, covers map[string]manifest.Track) {
+	paths = layout.Assign(tracks, dev.Layout())
 	covers = map[string]manifest.Track{}
 	for _, t := range tracks {
 		if t.Status != manifest.Identified || t.CoverSHA256 == "" {
@@ -30,6 +31,8 @@ func renderInputs(tracks []manifest.Track) (paths map[string]string, covers map[
 		file := singleCoverPath(paths[t.ID])
 		if t.Album != "" {
 			file = path.Join(path.Dir(paths[t.ID]), "cover.jpg")
+		} else if !dev.SingleCovers() {
+			continue
 		}
 		if cur, ok := covers[file]; !ok || older(t, cur) {
 			covers[file] = t
@@ -49,10 +52,11 @@ func singleCoverPath(trackPath string) string {
 // Each playlist has one too, under "playlist:" and its name: its name and
 // where each of its tracks goes.
 func signatures(m *manifest.Manifest) map[string]string {
-	paths, covers := renderInputs(m.Tracks)
+	paths, covers := renderInputs(m.Tracks, device.Generic)
 	sigs := make(map[string]string, len(m.Tracks)+len(m.Playlists))
 	for _, p := range m.Playlists {
-		sum := sha256.Sum256(append([]byte(p.Name+"\x00"), playlistFile(p, paths)...))
+		_, content := device.Generic.Playlist(p, paths)
+		sum := sha256.Sum256(append([]byte(p.Name+"\x00"), content...))
 		sigs[playlistKey+p.Name] = hex.EncodeToString(sum[:])
 	}
 	for _, t := range m.Tracks {

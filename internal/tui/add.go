@@ -14,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 	"music-manager/internal/translit"
@@ -246,7 +247,7 @@ func (d *addDialog) path() string {
 		ID: "new", Status: manifest.Identified,
 		Title: d.ascii(addTitle, title), Artist: d.ascii(addArtist, artist), Album: d.ascii(addAlbum, album),
 		TrackNumber: n, TrackTotal: of,
-	})
+	}, device.Generic.Layout())
 }
 
 // edit turns the form into the details of the track.

@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/render"
 )
 
@@ -118,6 +119,8 @@ type syncDialog struct {
 	folder  textinput.Model
 	confirm textinput.Model
 
+	wolfgang bool // write for the Wolfgang WMP01; never for the library folder, never remembered
+
 	target string // "" for the library folder
 	where  string // what to call the target
 	plan   Plan
@@ -213,6 +216,7 @@ func (d *syncDialog) lines(w int) []string {
 				lines = append(lines, "   "+fit(text, w-4))
 			}
 		}
+		lines = append(lines, "", d.formatLine())
 	case syncTyping:
 		in := d.folder
 		in.Width = max(w-14, 10)
@@ -318,9 +322,26 @@ func (d *syncDialog) stop() {
 	}
 }
 
+// formatLine is the row that says what kind of place the music goes to.
+func (d *syncDialog) formatLine() string {
+	label := styles.dim.Render("Format  ")
+	switch {
+	case d.cursor == 0:
+		return " " + label + "Generic " + styles.dim.Render("· the library folder is always written the standard way")
+	case d.wolfgang:
+		return " " + label + styles.accent.Render("Wolfgang WMP01") + " " + styles.dim.Render("· w for the standard way")
+	}
+	return " " + label + "Generic " + styles.dim.Render("· w for another format")
+}
+
 // plan starts working out what writing the target would change.
 func (d *syncDialog) planFor(m *Model, target, where string) tea.Cmd {
 	d.stop()
+	d.wolfgang = d.wolfgang && target != ""
+	var dev device.Target
+	if d.wolfgang {
+		dev, where = device.Wolfgang, where+" · Wolfgang WMP01"
+	}
 	d.target, d.where = target, where
 	d.state, d.err, d.done, d.total, d.prune = syncPlanning, "", 0, 0, false
 	d.gen++
@@ -336,7 +357,7 @@ func (d *syncDialog) planFor(m *Model, target, where string) tea.Cmd {
 			case <-ctx.Done():
 			}
 		}
-		plan, err := lib.PlanSync(app.SyncOptions{Target: target, OnProgress: func(done, total int) {
+		plan, err := lib.PlanSync(app.SyncOptions{Target: target, Device: dev, OnProgress: func(done, total int) {
 			send(syncEventMsg{gen: gen, done: done, total: total})
 		}})
 		send(syncEventMsg{gen: gen, plan: plan, err: err, finished: true})
@@ -377,6 +398,8 @@ func (d *syncDialog) key(m *Model, msg tea.KeyMsg) tea.Cmd {
 			d.cursor = max(d.cursor-1, 0)
 		case key.Matches(msg, k.Down):
 			d.cursor = min(d.cursor+1, len(d.targets)-1)
+		case msg.String() == "w":
+			d.wolfgang = d.cursor != 0 && !d.wolfgang // the library folder has no other format
 		case key.Matches(msg, k.Apply):
 			t := d.targets[d.cursor]
 			if t.custom {

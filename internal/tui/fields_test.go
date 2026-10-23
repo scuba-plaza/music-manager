@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"music-manager/internal/device"
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 )
@@ -195,39 +196,39 @@ func TestEditParsesNumbersAndTimecodes(t *testing.T) {
 
 func TestPreviewShowsWhereTheFileWillGo(t *testing.T) {
 	tr := identified()
-	base := layout.PathFor(tr)
+	base := pathFor(tr)
 	if base != "Firuz/Hits/03 - Wtni.mp3" {
 		t.Fatalf("setup: %q", base)
 	}
 
 	title := newDraft(tr, fTitle)
 	title.setText("Watani")
-	if got := layout.PathFor(previewTrack(tr, title)); got != "Firuz/Hits/03 - Watani.mp3" {
+	if got := pathFor(previewTrack(tr, title)); got != "Firuz/Hits/03 - Watani.mp3" {
 		t.Errorf("title preview = %q", got)
 	}
 
 	album := newDraft(tr, fAlbum)
 	album.setText("")
-	if got := layout.PathFor(previewTrack(tr, album)); got != "Firuz/Wtni.mp3" {
+	if got := pathFor(previewTrack(tr, album)); got != "Firuz/Wtni.mp3" {
 		t.Errorf("a single = %q", got)
 	}
 
 	num := newDraft(tr, fTrack)
 	num.text, num.second = "7", "120"
-	if got := layout.PathFor(previewTrack(tr, num)); got != "Firuz/Hits/007 - Wtni.mp3" {
+	if got := pathFor(previewTrack(tr, num)); got != "Firuz/Hits/007 - Wtni.mp3" {
 		t.Errorf("numbered = %q", got)
 	}
 
 	artist := newDraft(tr, fArtist)
 	artist.setText("فيروز")
 	artist.setSecond("Fairuz")
-	if got := layout.PathFor(previewTrack(tr, artist)); got != "Fairuz/Hits/03 - Wtni.mp3" {
+	if got := pathFor(previewTrack(tr, artist)); got != "Fairuz/Hits/03 - Wtni.mp3" {
 		t.Errorf("custom ascii = %q", got)
 	}
 
 	cut := newDraft(tr, fCutStart)
 	cut.text = "0:10"
-	if layout.PathFor(previewTrack(tr, cut)) != base {
+	if pathFor(previewTrack(tr, cut)) != base {
 		t.Error("a cut does not change the path")
 	}
 }
@@ -235,11 +236,11 @@ func TestPreviewShowsWhereTheFileWillGo(t *testing.T) {
 func TestPreviewOfAnUnidentifiedTrackBecomesIdentifiedOnceItHasATitleAndArtist(t *testing.T) {
 	tr := manifest.Track{ID: "abc123", Status: manifest.Unidentified, Hint: manifest.Hint{Title: "Song", Artist: "Band", Filename: "x"}}
 	title := newDraft(tr, fTitle)
-	if got := layout.PathFor(previewTrack(tr, title)); got != "_Inbox/abc123 - x.mp3" {
+	if got := pathFor(previewTrack(tr, title)); got != "_Inbox/abc123 - x.mp3" {
 		t.Errorf("with only a title it is still in the inbox, got %q", got)
 	}
 	tr.Artist, tr.OriginalArtist = "Band", "Band"
-	if got := layout.PathFor(previewTrack(tr, title)); got != "Band/Song.mp3" {
+	if got := pathFor(previewTrack(tr, title)); got != "Band/Song.mp3" {
 		t.Errorf("with both it gets a place, got %q", got)
 	}
 }
@@ -304,3 +305,6 @@ func TestATrackNobodyIdentifiedOffersTheDateOfItsOldTags(t *testing.T) {
 		t.Errorf("a date of its own wins: shown %q", got)
 	}
 }
+
+// pathFor is where the library folder puts a track.
+func pathFor(t manifest.Track) string { return layout.PathFor(t, device.Generic.Layout()) }

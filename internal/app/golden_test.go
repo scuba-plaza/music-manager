@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/mp3"
 	"music-manager/internal/testmp3"
 )
@@ -142,10 +143,10 @@ func describe(t *testing.T, root string, ids map[string]string) string {
 func TestSyncOutputGolden(t *testing.T) {
 	a, ids := fixture(t)
 	target := filepath.Join(t.TempDir(), "player")
-	mustSync(t, a, app.SyncOptions{Target: target})
+	mustSync(t, a, app.SyncOptions{Target: target, Device: device.Wolfgang})
 	got := describe(t, target, ids)
 
-	golden := filepath.Join("testdata", "sync-today.golden")
+	golden := filepath.Join("testdata", "sync-wolfgang.golden")
 	if *update {
 		if err := os.WriteFile(golden, []byte(got), 0o644); err != nil {
 			t.Fatal(err)
