@@ -5,6 +5,8 @@ import (
 	"encoding/base32"
 	"slices"
 	"strings"
+
+	"music-manager/internal/translit"
 )
 
 var idEncoding = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567").WithPadding(base32.NoPadding)
@@ -64,9 +66,10 @@ func (m *Manifest) Remove(id string) bool {
 }
 
 // Search returns the tracks matching every word of query. A word matches if
-// it appears (case-insensitively) in any ASCII, original, genre or hint text
-// field; a "status:<s>" word filters by status instead, and a "genre:<g>"
-// word by genre alone. An empty query matches all.
+// it appears (case-insensitively) in the title, artist or album, as they are
+// and in Latin letters, or in the genre or a hint text field; a "status:<s>"
+// word filters by status instead, and a "genre:<g>" word by genre alone. An
+// empty query matches all.
 func (m *Manifest) Search(query string) []Track {
 	var out []Track
 	for _, t := range m.Tracks {
@@ -78,10 +81,12 @@ func (m *Manifest) Search(query string) []Track {
 }
 
 func matches(t Track, words []string) bool {
-	hay := strings.ToLower(strings.Join([]string{
-		t.AsciiTitle, t.OriginalTitle, t.AsciiArtist, t.OriginalArtist, t.AsciiAlbum, t.OriginalAlbum,
-		t.Genre, t.Hint.Title, t.Hint.Artist, t.Hint.Album, t.Hint.Filename,
-	}, "\n"))
+	names := []string{t.OriginalTitle, t.OriginalArtist, t.OriginalAlbum}
+	fields := append([]string{t.Genre, t.Hint.Title, t.Hint.Artist, t.Hint.Album, t.Hint.Filename}, names...)
+	for _, n := range names { // in Latin letters too, so that "firuz" finds فيروز
+		fields = append(fields, translit.ToASCII(n))
+	}
+	hay := strings.ToLower(strings.Join(fields, "\n"))
 	for _, w := range words {
 		if s, ok := strings.CutPrefix(w, "status:"); ok {
 			if string(t.Status) != s {

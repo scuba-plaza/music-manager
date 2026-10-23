@@ -39,6 +39,11 @@ func ToASCII(s string) string {
 	return strings.Join(strings.Fields(printable), " ")
 }
 
+// SortKey is what names are put in order by: the Latin form in lower case,
+// so that a name in another script stands among the others where it would be
+// read.
+func SortKey(s string) string { return strings.ToLower(ToASCII(s)) }
+
 func latin(s string) string {
 	var b strings.Builder
 	for _, r := range norm.NFKD.String(s) {

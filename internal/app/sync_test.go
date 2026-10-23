@@ -75,12 +75,12 @@ func TestSyncRendersTheTreeFromTheManifest(t *testing.T) {
 		t.Fatalf("ops = %v, want 3 creates", ops)
 	}
 
-	file := readFile(t, a.Root(), "Firuz/Hits/03 - Wtni.mp3")
+	file := readFile(t, a.Root(), "فيروز/Hits/03 - وطني.mp3")
 	got := mp3.ReadTagSet(file)
-	if got.Title != "Wtni" || got.Artist != "Firuz" || got.Album != "Hits" || got.Track != 3 || got.Total != 12 {
+	if got.Title != "وطني" || got.Artist != "فيروز" || got.Album != "Hits" || got.Track != 3 || got.Total != 12 {
 		t.Errorf("tags = %+v", got)
 	}
-	if got.Extra["ORIGINAL_TITLE"] != "وطني" || got.Extra["ORIGINAL_ARTIST"] != "فيروز" || got.Extra["MM_ID"] != ts[0].ID {
+	if got.Extra["MM_ID"] != ts[0].ID {
 		t.Errorf("extra tags = %v", got.Extra)
 	}
 	audio, _, _ := mp3.Parse(file)

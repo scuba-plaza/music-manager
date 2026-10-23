@@ -260,9 +260,9 @@ func (a *App) ApplyReview(entries []ReviewEntry, opts ReviewOptions) (ReviewRepo
 func reviewMatches(e ReviewEntry, t manifest.Track) bool {
 	switch e.Section {
 	case "ARTISTS":
-		return t.AsciiArtist == e.Key || t.OriginalArtist == e.Key
+		return t.OriginalArtist == e.Key
 	case "ALBUMS":
-		return t.AsciiAlbum == e.Key || t.OriginalAlbum == e.Key
+		return t.OriginalAlbum == e.Key
 	case "TRACKS":
 		return t.ID == e.Key
 	}

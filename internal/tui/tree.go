@@ -7,6 +7,7 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/manifest"
+	"music-manager/internal/translit"
 )
 
 // The tree on the left of the screen is derived data: it is rebuilt from the
@@ -91,13 +92,15 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 			needs = append(needs, t)
 			continue
 		}
-		byArtist[t.AsciiArtist] = append(byArtist[t.AsciiArtist], t)
+		byArtist[t.OriginalArtist] = append(byArtist[t.OriginalArtist], t)
 	}
 
 	rows := playlistRows(all, playlists, matched, open)
 	if len(needs) > 0 {
 		isOpen := open(keyNeedsWork)
-		sort.SliceStable(needs, func(i, j int) bool { return lower(needsLabel(needs[i])) < lower(needsLabel(needs[j])) })
+		sort.SliceStable(needs, func(i, j int) bool {
+			return translit.SortKey(needsLabel(needs[i])) < translit.SortKey(needsLabel(needs[j]))
+		})
 		rows = append(rows, Row{Kind: kindGroup, Key: keyNeedsWork, Label: "Needs work", Count: len(needs), IDs: idsOf(needs), Expanded: isOpen})
 		if isOpen {
 			for _, t := range needs {
@@ -117,7 +120,7 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 
 		byAlbum := map[string][]manifest.Track{}
 		for _, t := range ts {
-			byAlbum[t.AsciiAlbum] = append(byAlbum[t.AsciiAlbum], t)
+			byAlbum[t.OriginalAlbum] = append(byAlbum[t.OriginalAlbum], t)
 		}
 		var ids []string
 		albums := albumOrder(byAlbum)
@@ -147,7 +150,7 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 				if album != "" && t.TrackNumber > 0 {
 					num = padNumber(t.TrackNumber, width)
 				}
-				rows = append(rows, Row{Kind: kindTrack, Depth: 2, Key: trackKey(t.ID), Parent: bkey, Label: t.AsciiTitle, Num: num, Track: t})
+				rows = append(rows, Row{Kind: kindTrack, Depth: 2, Key: trackKey(t.ID), Parent: bkey, Label: t.OriginalTitle, Num: num, Track: t})
 			}
 		}
 	}
@@ -163,8 +166,6 @@ func needsLabel(t manifest.Track) string {
 	return "?"
 }
 
-func lower(s string) string { return strings.ToLower(s) }
-
 func idsOf(ts []manifest.Track) []string {
 	ids := make([]string, len(ts))
 	for i, t := range ts {
@@ -173,14 +174,14 @@ func idsOf(ts []manifest.Track) []string {
 	return ids
 }
 
-// sortedNames returns the keys of m, ignoring case.
+// sortedNames returns the keys of m in the order of their Latin forms, ignoring case.
 func sortedNames[V any](m map[string]V) []string {
 	names := make([]string, 0, len(m))
 	for n := range m {
 		names = append(names, n)
 	}
 	sort.Slice(names, func(i, j int) bool {
-		if li, lj := lower(names[i]), lower(names[j]); li != lj {
+		if li, lj := translit.SortKey(names[i]), translit.SortKey(names[j]); li != lj {
 			return li < lj
 		}
 		return names[i] < names[j]
@@ -207,7 +208,7 @@ func sortTracks(ts []manifest.Track) {
 		if a.TrackNumber != b.TrackNumber {
 			return a.TrackNumber < b.TrackNumber
 		}
-		if la, lb := lower(a.AsciiTitle), lower(b.AsciiTitle); la != lb {
+		if la, lb := translit.SortKey(a.OriginalTitle), translit.SortKey(b.OriginalTitle); la != lb {
 			return la < lb
 		}
 		return a.ID < b.ID
@@ -233,10 +234,10 @@ func ancestorKeys(t manifest.Track) []string {
 	if t.Status != manifest.Identified {
 		return []string{keyNeedsWork}
 	}
-	if t.AsciiAlbum == "" {
-		return []string{artistKey(t.AsciiArtist), singlesKey(t.AsciiArtist)}
+	if t.OriginalAlbum == "" {
+		return []string{artistKey(t.OriginalArtist), singlesKey(t.OriginalArtist)}
 	}
-	return []string{artistKey(t.AsciiArtist), albumRowKey(t.AsciiArtist, t.AsciiAlbum)}
+	return []string{artistKey(t.OriginalArtist), albumRowKey(t.OriginalArtist, t.OriginalAlbum)}
 }
 
 // playlistRows is the group of playlists with those open shown in full. When
@@ -290,7 +291,7 @@ func playlistRows(tracks []manifest.Track, playlists []manifest.Playlist, matche
 			artist, _, _ := app.Display(t)
 			rows = append(rows, Row{
 				Kind: kindTrack, Depth: 2, Key: playlistTrackKey(p.name, t.ID), Parent: pkey,
-				Label: t.AsciiTitle, Detail: artist, Num: padNumber(i+1, width), Track: t,
+				Label: t.OriginalTitle, Detail: artist, Num: padNumber(i+1, width), Track: t,
 			})
 		}
 	}

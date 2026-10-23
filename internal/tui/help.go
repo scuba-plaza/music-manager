@@ -33,7 +33,7 @@ var helpLeft = []helpSection{
 		{"← →  1-3", "details, audio, player"},
 		{"enter", "edit it; enter saves"},
 		{"esc", "cancel, or back to tree"},
-		{"tab", "ascii form / other number"},
+		{"tab", "other number"},
 	}},
 	{"Cuts, volume, fades", []helpEntry{
 		{"[ ]", "nudge 0.1 s or 1.5 dB"},

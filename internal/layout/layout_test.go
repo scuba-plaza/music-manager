@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
@@ -19,7 +20,7 @@ var rules = layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: 22}
 func identified(artist, album, title string, n, total int) manifest.Track {
 	return manifest.Track{
 		ID: "abc123", Status: manifest.Identified,
-		AsciiArtist: artist, AsciiAlbum: album, AsciiTitle: title, TrackNumber: n, TrackTotal: total,
+		OriginalArtist: artist, OriginalAlbum: album, OriginalTitle: title, TrackNumber: n, TrackTotal: total,
 	}
 }
 
@@ -66,13 +67,40 @@ func TestPathForKeepsEveryComponentShort(t *testing.T) {
 	}
 }
 
-func TestPathForOutputIsASCIIOnlyForASCIIFields(t *testing.T) {
-	// Non-ASCII in the ASCII fields is a bug upstream, but the layout must still
-	// never emit it, because the target player cannot show it.
+func TestPathForFoldsTheNamesWhenTheRulesSay(t *testing.T) {
 	got := layout.PathFor(identified("Bjørn", "", "Tïtle", 0, 0), rules)
 	for _, r := range got {
 		if r > 127 {
 			t.Errorf("non-ASCII rune %q in %q", r, got)
+		}
+	}
+	if got := layout.PathFor(identified("فيروز", "Hits", "وطني", 3, 12), rules); got != "Firuz/Hits/03 - Wtni.mp3" {
+		t.Errorf("folded path = %q", got)
+	}
+}
+
+func TestPathForKeepsTheTrueNamesWithoutAFold(t *testing.T) {
+	got := layout.PathFor(identified("فيروز", "روائع", "وطني", 3, 12), layout.Rules{})
+	if want := "فيروز/روائع/03 - وطني.mp3"; got != want {
+		t.Errorf("PathFor = %q, want %q", got, want)
+	}
+}
+
+func TestPathForNeverCutsACharacterInHalf(t *testing.T) {
+	long := strings.Repeat("ع", 200) // 400 bytes
+	for _, r := range []layout.Rules{{}, {ComponentMax: 101}} {
+		got := layout.PathFor(identified(long, long, long, 1, 1), r)
+		limit := 255
+		if r.ComponentMax > 0 {
+			limit = r.ComponentMax
+		}
+		for _, part := range strings.Split(got, "/") {
+			if !utf8.ValidString(part) {
+				t.Errorf("%+v: %q is cut inside a character", r, part)
+			}
+			if len(part) > limit+len(".mp3")+len("01 - ") {
+				t.Errorf("%+v: component of %d bytes", r, len(part))
+			}
 		}
 	}
 }

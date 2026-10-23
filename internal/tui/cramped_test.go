@@ -10,20 +10,16 @@ import (
 )
 
 // The cover is drawn in whatever room the fields leave. A short terminal
-// (a large font does that) must still get one, and names with an ASCII form
-// of their own, which add a line each, must not be what takes it away.
+// (a large font does that) must still get one, and names in another script
+// must not take it away.
 
 func ptr[T any](v T) *T { return &v }
 
-// inArabic gives Flow original names that differ from their ASCII forms.
+// inArabic gives Flow a title in Arabic.
 func inArabic(t *testing.T, hook *editHook) {
 	t.Helper()
 	tr := trackNamed(t, hook.Library, "Flow")
-	_, err := appOf(t, hook.Library).Edit(tr.ID, app.Edit{
-		Title: ptr("فلو"), TitleASCII: ptr("Flow"),
-		Artist: ptr("شون جيمس"), ArtistASCII: ptr("Shawn James"),
-		Album: ptr("ظلال"), AlbumASCII: ptr("Shadows"),
-	})
+	_, err := appOf(t, hook.Library).Edit(tr.ID, app.Edit{Title: ptr("فلو")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,37 +40,12 @@ func TestTheCoverIsStillShownInAShortTerminal(t *testing.T) {
 	}
 }
 
-func TestTheAsciiFormsGiveWayToTheCoverWhenThereIsNoRoomForBoth(t *testing.T) {
-	m, hook := coverModel(t)
-	inArabic(t, hook)
-	m = send(t, m, m.load())
-
-	roomy := resized(t, m, 120, 40)
-	contains(t, roomy, "ascii  Flow", "ascii  Shawn James", "ascii  Shadows", "▀")
-
-	cramped := resized(t, m, 120, 26)
-	if got := strings.Count(screen(cramped), "▀"); got < 12 {
-		t.Errorf("the cover is only %d cells in 26 lines:\n%s", got, screen(cramped))
-	}
-	lacks(t, cramped, "ascii  Flow")
-	contains(t, cramped, "فلو") // the names themselves stay
-}
-
-func TestAFullResolutionCoverAlsoSurvivesTheAsciiForms(t *testing.T) {
-	m, _, hook := pictureModel(t, 120, 26)
-	inArabic(t, hook)
-	m = send(t, m, m.load())
-	if placeholderCount(m) == 0 {
-		t.Errorf("no picture in 26 lines:\n%s", screen(m))
-	}
-}
-
-func TestClickingAFieldStillFindsItWhenTheAsciiFormsAreHidden(t *testing.T) {
+func TestClickingAFieldFindsItInAShortTerminal(t *testing.T) {
 	m, hook := coverModel(t)
 	inArabic(t, hook)
 	m = send(t, m, m.load())
 	m = resized(t, m, 120, 26)
-	lacks(t, m, "ascii  Flow")
+	contains(t, m, "فلو")
 
 	l := computeLayout(m.w, m.h)
 	for _, c := range []struct {
@@ -95,42 +66,12 @@ func TestTypingInATightFitCutsThePictureInsteadOfDroppingIt(t *testing.T) {
 	if before == 0 {
 		t.Fatalf("no picture to begin with:\n%s", screen(m))
 	}
-	m = keys(t, m, "right", "enter") // edit the title: a line for its ASCII form opens under it
+	m = keys(t, m, "right", "enter") // edit the title
 	m = typed(t, m, "Ё")
 	if got := placeholderCount(m); got == 0 || got > before {
 		t.Errorf("%d placeholders while typing, %d before; the picture should lose its bottom rows and stay\n%s", got, before, screen(m))
 	}
 	if got := len(transmissions(t, log)); got != 1 {
 		t.Errorf("typing sent the picture again: %d pictures sent", got)
-	}
-}
-
-// coverRowsShown counts the lines of the screen that have a piece of the
-// cover (drawn in blocks) in them.
-func coverRowsShown(m Model) int {
-	n := 0
-	for _, l := range lines(m) {
-		if strings.Contains(l, "▀") {
-			n++
-		}
-	}
-	return n
-}
-
-func TestTheAsciiFormsAreOnlyShownWhileTheCoverKeepsAGoodSize(t *testing.T) {
-	for h := 24; h <= 44; h++ {
-		m, hook := coverModel(t)
-		inArabic(t, hook)
-		m = resized(t, send(t, m, m.load()), 120, h)
-		rows, ascii := coverRowsShown(m), strings.Contains(screen(m), "ascii  Flow")
-		if rows < minCoverRows {
-			t.Errorf("%d lines: no cover", h)
-		}
-		if ascii && rows < comfortCoverRows {
-			t.Errorf("%d lines: the ASCII forms are shown and the cover is down to %d lines; it should win", h, rows)
-		}
-		if !ascii && h >= 40 {
-			t.Errorf("%d lines: there is room for the ASCII forms, but they are gone", h)
-		}
 	}
 }

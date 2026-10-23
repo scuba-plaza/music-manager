@@ -55,8 +55,8 @@ func TestUpdateReplacesRecordByID(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 	m := &manifest.Manifest{}
-	m.Add(manifest.Track{AsciiTitle: "Firuz", OriginalTitle: "فيروز", AsciiArtist: "Fairuz", OriginalArtist: "فيروز", Status: manifest.Identified})
-	m.Add(manifest.Track{AsciiTitle: "Sleep", OriginalTitle: "Sleep", AsciiArtist: "Max Richter", OriginalArtist: "Max Richter", Status: manifest.Identified})
+	m.Add(manifest.Track{OriginalTitle: "فيروز", OriginalArtist: "فيروز", Status: manifest.Identified})
+	m.Add(manifest.Track{OriginalTitle: "Sleep", OriginalArtist: "Max Richter", Status: manifest.Identified})
 	m.Add(manifest.Track{Status: manifest.Unidentified, Hint: manifest.Hint{Title: "بحلم بيك", Artist: "Abdel Halim", Album: "Rawaeaa", Filename: "01 Bahlam Bek"}})
 
 	cases := []struct {
@@ -68,10 +68,11 @@ func TestSearch(t *testing.T) {
 		{"rawaeaa", 1}, // hint album
 		{"بحلم", 1},    // hint title
 		{"status:unidentified abdel", 1},
-		{"richter", 1},      // case-insensitive, ASCII field
-		{"فيروز", 1},        // original field
-		{"fairuz sleep", 0}, // every word must match the same track
-		{"max sleep", 1},    // words may match different fields
+		{"richter", 1},     // case-insensitive
+		{"فيروز", 1},       // the true name
+		{"firuz", 1},       // its Latin form
+		{"firuz sleep", 0}, // every word must match the same track
+		{"max sleep", 1},   // words may match different fields
 		{"status:unidentified", 1},
 		{"status:identified richter", 1},
 		{"zzz", 0},
@@ -96,9 +97,9 @@ func TestPlayingLengthExcludesTrims(t *testing.T) {
 
 func TestSearchFindsAGenreAsAWordOrWithTheGenrePrefix(t *testing.T) {
 	m := &manifest.Manifest{}
-	m.Add(manifest.Track{AsciiTitle: "Longing", AsciiArtist: "Gustavo", Genre: "Neoclassical", Status: manifest.Identified})
-	m.Add(manifest.Track{AsciiTitle: "Folk Song", AsciiArtist: "Max", Genre: "Anthem", Status: manifest.Identified})
-	m.Add(manifest.Track{AsciiTitle: "Plain", AsciiArtist: "Nobody", Status: manifest.Identified})
+	m.Add(manifest.Track{OriginalTitle: "Longing", OriginalArtist: "Gustavo", Genre: "Neoclassical", Status: manifest.Identified})
+	m.Add(manifest.Track{OriginalTitle: "Folk Song", OriginalArtist: "Max", Genre: "Anthem", Status: manifest.Identified})
+	m.Add(manifest.Track{OriginalTitle: "Plain", OriginalArtist: "Nobody", Status: manifest.Identified})
 
 	cases := []struct {
 		query string

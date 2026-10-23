@@ -32,33 +32,46 @@ type Target interface {
 	Playlist(p manifest.Playlist, paths map[string]string) (name string, data []byte)
 }
 
-// Generic is the default: any folder or device that is not known better.
-var Generic Target = today{"generic"}
+// Generic is the default: any folder or device that is not known better. It
+// gets the names as they are, in any script.
+var Generic Target = generic{}
 
-// Wolfgang is the Wolfgang WMP01 player.
-var Wolfgang Target = today{"wolfgang-wmp01"}
+// Wolfgang is the Wolfgang WMP01 player: Latin names of a width it can show.
+var Wolfgang Target = wolfgang{}
 
-// today is what both targets do for now: everything the program did before
-// there were targets. The two come apart one concern at a time.
-type today struct{ name string }
+// plain is what the targets still do alike: the cover and the playlist, which
+// come apart in their own slices.
+type plain struct{}
 
-func (t today) Name() string { return t.name }
-
-func (today) Layout() layout.Rules {
-	return layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: 22}
+func (plain) Cover(stored []byte) ([]byte, string, error) {
+	data, err := coverimg.Normalize(stored)
+	return data, "image/jpeg", err
 }
 
-// Tags carries the ASCII fields in the standard frames and the originals in
-// custom ones. A track not yet identified has only its ID.
-func (today) Tags(t manifest.Track) mp3.TagSet {
+func (plain) SingleCovers() bool { return true }
+
+// playlist is the M3U file of a playlist. The player (a Wolfgang WMP01) was
+// found to read paths from the root of its card with backslashes, one per
+// line, in plain UTF-8 with Windows line endings; slashes, and paths relative
+// to the playlist, give an empty playlist.
+func playlist(p manifest.Playlist, paths map[string]string, r layout.Rules) (string, []byte) {
+	var b strings.Builder
+	for _, id := range p.Tracks {
+		if path, ok := paths[id]; ok {
+			b.WriteString(`\` + strings.ReplaceAll(path, "/", `\`) + "\r\n")
+		}
+	}
+	return layout.PlaylistPath(p.Name, r), []byte(b.String())
+}
+
+// extras are the tag fields that belong to no standard frame. A track not yet
+// identified has only its ID.
+func extras(t manifest.Track) map[string]string {
 	extra := map[string]string{"MM_ID": t.ID}
 	if t.Status != manifest.Identified {
-		return mp3.TagSet{Extra: extra}
+		return extra
 	}
 	for k, v := range map[string]string{
-		"ORIGINAL_TITLE":      t.OriginalTitle,
-		"ORIGINAL_ARTIST":     t.OriginalArtist,
-		"ORIGINAL_ALBUM":      t.OriginalAlbum,
 		"SOURCE_URL":          t.SourceURL,
 		"MUSICBRAINZ_TRACKID": t.MBRecordingID,
 		"MUSICBRAINZ_ALBUMID": t.MBReleaseID,
@@ -67,34 +80,59 @@ func (today) Tags(t manifest.Track) mp3.TagSet {
 			extra[k] = v
 		}
 	}
-	artist, album := PlayerTags(t)
+	return extra
+}
+
+type generic struct{ plain }
+
+func (generic) Name() string { return "generic" }
+
+func (generic) Layout() layout.Rules { return layout.Rules{ComponentMax: 200} }
+
+// Tags are the true names; a single has no album.
+func (generic) Tags(t manifest.Track) mp3.TagSet {
+	if t.Status != manifest.Identified {
+		return mp3.TagSet{Extra: extras(t)}
+	}
 	return mp3.TagSet{
-		Title: t.AsciiTitle, Artist: artist, Album: album,
+		Title: t.OriginalTitle, Artist: t.OriginalArtist, Album: t.OriginalAlbum,
 		Genre: t.Genre,
 		Track: t.TrackNumber, Total: t.TrackTotal,
 		Date:   t.Released,
 		Length: t.PlayingLength(),
-		Extra:  extra,
+		Extra:  extras(t),
 	}
 }
 
-func (today) Cover(stored []byte) ([]byte, string, error) {
-	data, err := coverimg.Normalize(stored)
-	return data, "image/jpeg", err
+func (g generic) Playlist(p manifest.Playlist, paths map[string]string) (string, []byte) {
+	return playlist(p, paths, g.Layout())
 }
 
-func (today) SingleCovers() bool { return true }
+type wolfgang struct{ plain }
 
-// Playlist is the M3U file of a playlist. The player (a Wolfgang WMP01) was
-// found to read paths from the root of its card with backslashes, one per
-// line, in plain UTF-8 with Windows line endings; slashes, and paths relative
-// to the playlist, give an empty playlist.
-func (t today) Playlist(p manifest.Playlist, paths map[string]string) (string, []byte) {
-	var b strings.Builder
-	for _, id := range p.Tracks {
-		if path, ok := paths[id]; ok {
-			b.WriteString(`\` + strings.ReplaceAll(path, "/", `\`) + "\r\n")
-		}
+func (wolfgang) Name() string { return "wolfgang-wmp01" }
+
+func (wolfgang) Layout() layout.Rules {
+	return layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: 22}
+}
+
+// Tags keep the true title, which the player shows nowhere; the artist and
+// album are the ones it shows, in Latin letters of the width it keeps.
+func (wolfgang) Tags(t manifest.Track) mp3.TagSet {
+	if t.Status != manifest.Identified {
+		return mp3.TagSet{Extra: extras(t)}
 	}
-	return layout.PlaylistPath(p.Name, t.Layout()), []byte(b.String())
+	artist, album := PlayerTags(t)
+	return mp3.TagSet{
+		Title: t.OriginalTitle, Artist: artist, Album: album,
+		Genre: t.Genre,
+		Track: t.TrackNumber, Total: t.TrackTotal,
+		Date:   t.Released,
+		Length: t.PlayingLength(),
+		Extra:  extras(t),
+	}
+}
+
+func (w wolfgang) Playlist(p manifest.Playlist, paths map[string]string) (string, []byte) {
+	return playlist(p, paths, w.Layout())
 }

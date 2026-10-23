@@ -21,8 +21,7 @@ import (
 var update = flag.Bool("update", false, "rewrite the golden files in testdata")
 
 // fixture builds a small library that has a bit of everything the renderer
-// has an opinion about: names in Arabic with and without a hand-set Latin
-// form, titles and albums too long for the player, two tracks that collide,
+// has an opinion about: names in Arabic, titles and albums too long for the player, two tracks that collide,
 // singles with and without a cover, an unidentified track and two playlists.
 // It returns the library and the IDs of the tracks by letter.
 func fixture(t *testing.T) (*app.App, map[string]string) {
@@ -41,9 +40,7 @@ func fixture(t *testing.T) (*app.App, map[string]string) {
 		}
 	}
 	set("a", "وطني", "فيروز", "Hits", 3, 12, app.Edit{Genre: ptr("Folk"), Released: ptr("1999")})
-	set("b", "بحلم بيك", "عبد الحليم حافظ", "روائع", 1, 6, app.Edit{
-		TitleASCII: ptr("Bahlam Bek"), ArtistASCII: ptr("Abdel Halim Hafez"), AlbumASCII: ptr("Abd El Halim Hafez"),
-	})
+	set("b", "بحلم بيك", "عبد الحليم حافظ", "روائع", 1, 6, app.Edit{})
 	set("c", "A Very Long Title Indeed That Goes On", "Max Richter", "The Long Album Name Here (Deluxe)", 5, 5,
 		app.Edit{PlayerAlbum: ptr("Long Album")})
 	set("d", "A Very Long Title Indeed That Goes On", "Max Richter", "The Long Album Name Here (Deluxe)", 5, 5, app.Edit{})

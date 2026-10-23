@@ -62,7 +62,7 @@ func TestYRemovesTheTrackAndUndoBringsItBack(t *testing.T) {
 
 	m = keys(t, m, "u")
 	got := trackNamed(t, hook.Library, "Flow")
-	if got.ID != before.ID || got.AsciiArtist != before.AsciiArtist || got.TrackNumber != 7 {
+	if got.ID != before.ID || got.OriginalArtist != before.OriginalArtist || got.TrackNumber != 7 {
 		t.Errorf("restored %+v, want %+v", got, before)
 	}
 	contains(t, m, "Undid", "6 tracks", "07 Flow")

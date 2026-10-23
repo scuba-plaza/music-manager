@@ -13,7 +13,7 @@ func trk(id, title, artist, album string, n int) manifest.Track {
 	if title == "" || artist == "" {
 		status = manifest.Unidentified
 	}
-	return manifest.Track{ID: id, AsciiTitle: title, AsciiArtist: artist, AsciiAlbum: album, TrackNumber: n, Status: status, SourceLength: 3 * time.Minute}
+	return manifest.Track{ID: id, OriginalTitle: title, OriginalArtist: artist, OriginalAlbum: album, TrackNumber: n, Status: status, SourceLength: 3 * time.Minute}
 }
 
 func labels(rows []Row) []string {
@@ -237,5 +237,24 @@ func TestNonTrackRowsKnowWhichTracksTheyHold(t *testing.T) {
 	}
 	if got := byLabel["Shawn James"].IDs; len(got) != 3 {
 		t.Errorf("Shawn James holds %v", got)
+	}
+}
+
+func TestTheTreeShowsTheTrueNamesInTheOrderOfTheirLatinForms(t *testing.T) {
+	tracks := []manifest.Track{
+		trk("t1", "Song", "Zed", "", 0),
+		trk("t2", "وطني", "فيروز", "", 0), // Firuz
+		trk("t3", "Song", "Abba", "", 0),
+	}
+	got := labels(buildRows(tracks, "", expandAll(tracks)))
+	want := []string{"Abba", "Singles", "Song", "فيروز", "Singles", "وطني", "Zed", "Singles", "Song"}
+	for i := range got {
+		got[i] = strings.TrimSpace(got[i])
+	}
+	for i := range want {
+		want[i] = strings.TrimSpace(want[i])
+	}
+	if !equal(got, want) {
+		t.Errorf("rows = %q, want %q", got, want)
 	}
 }

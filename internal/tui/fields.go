@@ -14,7 +14,6 @@ import (
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
 	"music-manager/internal/timecode"
-	"music-manager/internal/translit"
 )
 
 // fieldKind is one editable field of a track, in the order the inspector
@@ -87,38 +86,36 @@ func (f fieldKind) label() string {
 	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Artist", "Album", "Volume", "Fade in", "Fade out"}[f]
 }
 
-// isName reports whether the field is text that also has an ASCII form.
+// isName reports whether the field is the title, the artist or the album.
 func (f fieldKind) isName() bool { return f == fTitle || f == fArtist || f == fAlbum }
 
-// names returns the original text of a name field and its ASCII form. A
-// track that is not identified yet has no title or artist of its own, so the
-// field starts from what the file said about itself.
-func names(t manifest.Track, f fieldKind) (original, ascii string) {
+// name returns the title, artist or album of a track. A track that is not
+// identified yet has no title or artist of its own, so the field starts from
+// what the file said about itself.
+func name(t manifest.Track, f fieldKind) string {
+	var s string
 	switch f {
 	case fTitle:
-		original, ascii = t.OriginalTitle, t.AsciiTitle
+		s = t.OriginalTitle
 	case fArtist:
-		original, ascii = t.OriginalArtist, t.AsciiArtist
+		s = t.OriginalArtist
 	case fAlbum:
-		original, ascii = t.OriginalAlbum, t.AsciiAlbum
+		s = t.OriginalAlbum
 	}
-	if original == "" && t.Status != manifest.Identified {
+	if s == "" && t.Status != manifest.Identified {
 		switch f {
 		case fTitle:
-			original = t.Hint.Title
-			if original == "" {
-				original = leadingNumber.ReplaceAllString(t.Hint.Filename, "")
+			s = t.Hint.Title
+			if s == "" {
+				s = leadingNumber.ReplaceAllString(t.Hint.Filename, "")
 			}
 		case fArtist:
-			original = t.Hint.Artist
+			s = t.Hint.Artist
 		case fAlbum:
-			original = t.Hint.Album
+			s = t.Hint.Album
 		}
 	}
-	if ascii == "" {
-		ascii = translit.ToASCII(original)
-	}
-	return original, ascii
+	return s
 }
 
 // leadingNumber matches the "04 " or "04 - " that file names start with.
@@ -174,8 +171,7 @@ func cutText(f fieldKind, t manifest.Track) string {
 func displayValue(t manifest.Track, f fieldKind) string {
 	switch f {
 	case fTitle, fArtist, fAlbum:
-		original, _ := names(t, f)
-		return original
+		return name(t, f)
 	case fTrack:
 		n, of := numbers(t)
 		switch {
@@ -208,31 +204,25 @@ func displayValue(t manifest.Track, f fieldKind) string {
 	return "0:00"
 }
 
-// draft is a field while it is being edited: its text, and for a name the
-// ASCII form beside it, for the track number the number of tracks.
+// draft is a field while it is being edited: its text, and for the track
+// number the number of tracks.
 type draft struct {
 	field  fieldKind
 	text   string
 	second string
-	// touched: the user wrote the second input themselves.
-	touched bool
 	// auto: what the player shows when the field is left to itself, for the
 	// player names: text equal to it is not an override.
 	auto string
 	// track is the track being edited, for the fades, which are typed as lengths
 	// from its cuts.
 	track manifest.Track
-	// follow: the ASCII form was the automatic one, so it keeps following
-	// the text until touched. A custom form stays put.
-	follow bool
 }
 
 func newDraft(t manifest.Track, f fieldKind) draft {
 	d := draft{field: f, track: t}
 	switch {
 	case f.isName():
-		d.text, d.second = names(t, f)
-		d.follow = d.second == translit.ToASCII(d.text)
+		d.text = name(t, f)
 	case f == fTrack:
 		n, of := numbers(t)
 		d.text, d.second = numberText(n), numberText(of)
@@ -258,18 +248,6 @@ func newDraft(t manifest.Track, f fieldKind) draft {
 	return d
 }
 
-func (d *draft) setText(s string) {
-	d.text = s
-	if d.field.isName() && d.follow && !d.touched {
-		d.second = translit.ToASCII(s)
-	}
-}
-
-func (d *draft) setSecond(s string) {
-	d.second = s
-	d.touched = true
-}
-
 // edit validates the draft and says what to change.
 func (d draft) edit() (app.Edit, error) {
 	var e app.Edit
@@ -279,21 +257,13 @@ func (d draft) edit() (app.Edit, error) {
 		if text == "" && d.field != fAlbum {
 			return e, fmt.Errorf("%s cannot be empty", d.field.label())
 		}
-		var ascii *string
-		if d.touched {
-			v := strings.TrimSpace(d.second)
-			if v == "" || v == translit.ToASCII(text) {
-				v = "" // the automatic form
-			}
-			ascii = &v
-		}
 		switch d.field {
 		case fTitle:
-			e.Title, e.TitleASCII = &text, ascii
+			e.Title = &text
 		case fArtist:
-			e.Artist, e.ArtistASCII = &text, ascii
+			e.Artist = &text
 		case fAlbum:
-			e.Album, e.AlbumASCII = &text, ascii
+			e.Album = &text
 		}
 	case fTrack:
 		n, err := count(d.text)
@@ -375,26 +345,19 @@ func previewTrack(t manifest.Track, d draft) manifest.Track {
 	switch d.field {
 	case fTitle, fArtist, fAlbum:
 		text := strings.TrimSpace(d.text)
-		ascii := d.second
-		if d.touched {
-			ascii = strings.TrimSpace(d.second)
-		}
-		if ascii == "" || (d.follow && !d.touched) {
-			ascii = translit.ToASCII(text)
-		}
 		switch d.field {
 		case fTitle:
-			t.OriginalTitle, t.AsciiTitle = text, ascii
+			t.OriginalTitle = text
 		case fArtist:
-			t.OriginalArtist, t.AsciiArtist = text, ascii
+			t.OriginalArtist = text
 		case fAlbum:
-			t.OriginalAlbum, t.AsciiAlbum = text, ascii
+			t.OriginalAlbum = text
 		}
 	case fTrack:
 		t.TrackNumber, _ = count(d.text)
 		t.TrackTotal, _ = count(d.second)
 	}
-	if t.AsciiTitle != "" && t.AsciiArtist != "" {
+	if t.OriginalTitle != "" && t.OriginalArtist != "" {
 		t.Status = manifest.Identified
 	}
 	return t

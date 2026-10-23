@@ -12,14 +12,12 @@ import (
 
 	"music-manager/internal/manifest"
 	"music-manager/internal/timecode"
-	"music-manager/internal/translit"
 )
 
 // Info is what the downloader learned about a download.
 type Info struct {
 	Title       string
 	Artist      string
-	ArtistASCII string // a Latin form of Artist, if one is known
 	Uploader    string
 	Album       string
 	TrackNumber int
@@ -215,17 +213,17 @@ func (a *App) lookup(ctx context.Context, req AddRequest, info Info) *Candidate 
 
 func infoFrom(c Candidate) Info {
 	return Info{
-		Title: c.Title, Artist: c.Artist, ArtistASCII: c.ArtistASCII, Album: c.Album,
+		Title: c.Title, Artist: c.Artist, Album: c.Album,
 		TrackNumber: c.TrackNumber, TrackTotal: c.TrackTotal, Released: leadingDate(c.Date),
 	}
 }
 
 func missingFields(t manifest.Track) error {
 	var missing []string
-	if t.AsciiTitle == "" {
+	if t.OriginalTitle == "" {
 		missing = append(missing, "title")
 	}
-	if t.AsciiArtist == "" {
+	if t.OriginalArtist == "" {
 		missing = append(missing, "artist")
 	}
 	return fmt.Errorf("missing %s (pass --%s, or run in a terminal to be asked)",
@@ -241,49 +239,30 @@ func collect(given Edit, info Info, p Prompter) (Edit, error) {
 		}
 		return p.Ask(q)
 	}
-	// name fills one of title/artist/album and, when the user typed
-	// non-ASCII text, offers its ASCII form.
-	name := func(key, label, def, knownASCII string, required bool, orig, ascii **string) error {
-		if *orig != nil {
+	// name fills one of title/artist/album.
+	name := func(key, label, def string, required bool, dst **string) error {
+		if *dst != nil {
 			return nil
 		}
-		var v string
-		var err error
-		if v, err = ask(Question{Key: key, Label: label, Default: def, Required: required, Validate: nonEmptyIf(required)}); err != nil {
+		v, err := ask(Question{Key: key, Label: label, Default: def, Required: required, Validate: nonEmptyIf(required)})
+		if err != nil {
 			return err
 		}
 		v = strings.TrimSpace(v)
-		*orig = &v
-		derived := translit.ToASCII(v)
-		if knownASCII != "" && v == def {
-			derived = knownASCII // the source knows a better Latin form
-		}
-		switch {
-		case *ascii != nil:
-		case p != nil && derived != v:
-			a, err := ask(Question{Key: key + "-ascii", Label: label + " (ASCII)", Default: derived, Validate: nonEmptyIf(false)})
-			if err != nil {
-				return err
-			}
-			if a = strings.TrimSpace(a); a != "" && a != translit.ToASCII(v) {
-				*ascii = &a
-			}
-		case p == nil && derived != translit.ToASCII(v):
-			*ascii = &derived
-		}
+		*dst = &v
 		return nil
 	}
 	artist := info.Artist
 	if artist == "" {
 		artist = strings.TrimSuffix(info.Uploader, " - Topic")
 	}
-	if err := name("title", "Title", info.Title, "", true, &e.Title, &e.TitleASCII); err != nil {
+	if err := name("title", "Title", info.Title, true, &e.Title); err != nil {
 		return e, err
 	}
-	if err := name("artist", "Artist", artist, info.ArtistASCII, true, &e.Artist, &e.ArtistASCII); err != nil {
+	if err := name("artist", "Artist", artist, true, &e.Artist); err != nil {
 		return e, err
 	}
-	if err := name("album", "Album (empty for a single)", info.Album, "", false, &e.Album, &e.AlbumASCII); err != nil {
+	if err := name("album", "Album (empty for a single)", info.Album, false, &e.Album); err != nil {
 		return e, err
 	}
 

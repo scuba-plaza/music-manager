@@ -49,3 +49,17 @@ func TestToASCIIOutputIsPrintableASCII(t *testing.T) {
 		}
 	}
 }
+
+func TestSortKeyPutsANameWhereItsLatinFormWouldBe(t *testing.T) {
+	cases := map[string]string{
+		"فيروز":       "firuz",
+		"Max Richter": "max richter",
+		"Bjørn":       "bjorn",
+		"":            "",
+	}
+	for in, want := range cases {
+		if got := translit.SortKey(in); got != want {
+			t.Errorf("SortKey(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

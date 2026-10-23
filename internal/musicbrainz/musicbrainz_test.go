@@ -103,7 +103,7 @@ func TestSearchJoinsArtistCreditsAndNumbersTracksWithinTheirDisc(t *testing.T) {
 	}
 }
 
-func TestSearchOffersALatinNameForANonLatinArtist(t *testing.T) {
+func TestSearchKeepsTheNamesAsTheDatabaseWritesThem(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"recordings":[{"id":"r1","score":100,"title":"سأرجع","length":200000,
 		  "artist-credit":[{"name":"فيروز","artist":{"name":"فيروز","aliases":[
@@ -117,7 +117,7 @@ func TestSearchOffersALatinNameForANonLatinArtist(t *testing.T) {
 	if err != nil || len(got) != 1 {
 		t.Fatalf("%v, %v", got, err)
 	}
-	if got[0].Artist != "فيروز" || got[0].ArtistASCII != "Fairuz" || got[0].Album != "القدس في البال" {
+	if got[0].Artist != "فيروز" || got[0].Title != "سأرجع" || got[0].Album != "القدس في البال" { // not the alias "Fairuz"
 		t.Errorf("candidate = %+v", got[0])
 	}
 }

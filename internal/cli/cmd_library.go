@@ -126,9 +126,9 @@ func showCmd(open opener) *cobra.Command {
 			}
 			row("ID", t.ID)
 			row("Status", string(t.Status))
-			row("Title", named(t.AsciiTitle, t.OriginalTitle))
-			row("Artist", named(t.AsciiArtist, t.OriginalArtist))
-			row("Album", named(t.AsciiAlbum, t.OriginalAlbum))
+			row("Title", t.OriginalTitle)
+			row("Artist", t.OriginalArtist)
+			row("Album", t.OriginalAlbum)
 			if t.TrackNumber > 0 {
 				n := fmt.Sprint(t.TrackNumber)
 				if t.TrackTotal > 0 {
@@ -141,7 +141,7 @@ func showCmd(open opener) *cobra.Command {
 			row("Player artist", t.PlayerArtist)
 			row("Player album", t.PlayerAlbum)
 			if t.Status == manifest.Identified {
-				if artist, album := device.PlayerTags(t); artist != t.AsciiArtist || album != t.AsciiAlbum {
+				if artist, album := device.PlayerTags(t); artist != t.OriginalArtist || album != t.OriginalAlbum {
 					row("On the player", artist+" · "+album)
 				}
 			}
@@ -176,14 +176,6 @@ func stamp(t time.Time) string {
 		return ""
 	}
 	return t.Local().Format("2006-01-02 15:04")
-}
-
-// named shows a name with its original when the two differ.
-func named(ascii, orig string) string {
-	if orig == "" || orig == ascii {
-		return ascii
-	}
-	return fmt.Sprintf("%s (original: %s)", ascii, orig)
 }
 
 // display is app.Display under a shorter name.

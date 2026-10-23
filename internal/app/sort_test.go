@@ -20,11 +20,11 @@ func day(s string) time.Time {
 // sortSample is four tracks that come in a different order for every key.
 func sortSample() []manifest.Track {
 	return []manifest.Track{
-		{ID: "a", Status: manifest.Identified, AsciiArtist: "Beta", AsciiTitle: "Zulu", AsciiAlbum: "Alpha", TrackNumber: 2,
+		{ID: "a", Status: manifest.Identified, OriginalArtist: "Beta", OriginalTitle: "Zulu", OriginalAlbum: "Alpha", TrackNumber: 2,
 			SourceLength: 200 * time.Second, Released: "2001", AddedAt: day("2026-01-03"), UpdatedAt: day("2026-03-01")},
-		{ID: "b", Status: manifest.Identified, AsciiArtist: "alpha", AsciiTitle: "yankee", AsciiAlbum: "Gamma", TrackNumber: 1,
+		{ID: "b", Status: manifest.Identified, OriginalArtist: "alpha", OriginalTitle: "yankee", OriginalAlbum: "Gamma", TrackNumber: 1,
 			SourceLength: 100 * time.Second, Released: "1999-05", AddedAt: day("2026-01-01"), UpdatedAt: day("2026-05-01")},
-		{ID: "c", Status: manifest.Identified, AsciiArtist: "Gamma", AsciiTitle: "Xray",
+		{ID: "c", Status: manifest.Identified, OriginalArtist: "Gamma", OriginalTitle: "Xray",
 			SourceLength: 300 * time.Second, AddedAt: day("2026-01-02")},
 		{ID: "d", Status: manifest.Unidentified, Hint: manifest.Hint{Title: "Whiskey", Artist: "Delta", Album: "Beta Album", Track: 3},
 			SourceLength: 150 * time.Second, AddedAt: day("2025-12-31"), UpdatedAt: day("2026-02-01")},
@@ -75,10 +75,10 @@ func TestSortingTracksByEachField(t *testing.T) {
 
 func TestTracksThatTieAreOrderedByArtistAlbumTrackAndTitle(t *testing.T) {
 	ts := []manifest.Track{
-		{ID: "1", Status: manifest.Identified, AsciiArtist: "B", AsciiAlbum: "X", TrackNumber: 2, AsciiTitle: "t", Released: "2000"},
-		{ID: "2", Status: manifest.Identified, AsciiArtist: "B", AsciiAlbum: "X", TrackNumber: 1, AsciiTitle: "t", Released: "2000"},
-		{ID: "3", Status: manifest.Identified, AsciiArtist: "A", AsciiAlbum: "Z", TrackNumber: 9, AsciiTitle: "t", Released: "2000"},
-		{ID: "4", Status: manifest.Identified, AsciiArtist: "A", AsciiAlbum: "Z", TrackNumber: 9, AsciiTitle: "s", Released: "2000"},
+		{ID: "1", Status: manifest.Identified, OriginalArtist: "B", OriginalAlbum: "X", TrackNumber: 2, OriginalTitle: "t", Released: "2000"},
+		{ID: "2", Status: manifest.Identified, OriginalArtist: "B", OriginalAlbum: "X", TrackNumber: 1, OriginalTitle: "t", Released: "2000"},
+		{ID: "3", Status: manifest.Identified, OriginalArtist: "A", OriginalAlbum: "Z", TrackNumber: 9, OriginalTitle: "t", Released: "2000"},
+		{ID: "4", Status: manifest.Identified, OriginalArtist: "A", OriginalAlbum: "Z", TrackNumber: 9, OriginalTitle: "s", Released: "2000"},
 	}
 	if got := ids(app.SortTracks(ts, app.SortReleased, false)); got != "4321" {
 		t.Errorf("ties came out as %s, want 4321", got)
@@ -141,3 +141,14 @@ func TestSortValueIsWhatTheListShowsBesideATrack(t *testing.T) {
 }
 
 func init() { time.Local = time.UTC } // dates are shown in local time; the tests do not depend on where they run
+
+func TestAnArtistInAnotherScriptSortsWhereItsLatinFormWouldBe(t *testing.T) {
+	ts := []manifest.Track{
+		{ID: "z", Status: manifest.Identified, OriginalArtist: "Zed", OriginalTitle: "t"},
+		{ID: "f", Status: manifest.Identified, OriginalArtist: "فيروز", OriginalTitle: "t"}, // Firuz
+		{ID: "a", Status: manifest.Identified, OriginalArtist: "Abba", OriginalTitle: "t"},
+	}
+	if got := ids(app.SortTracks(ts, app.SortArtist, false)); got != "afz" {
+		t.Errorf("by artist: %s, want afz", got)
+	}
+}

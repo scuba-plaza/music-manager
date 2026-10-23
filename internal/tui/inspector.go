@@ -13,7 +13,6 @@ import (
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
-	"music-manager/internal/translit"
 )
 
 // inspectorLines draws the right pane for whatever is selected.
@@ -38,26 +37,7 @@ const labelWidth = 12
 
 // trackHead is everything in the inspector above the cover: the title, and
 // the fields, with the one being edited open.
-func (m Model) trackHead(t manifest.Track, w, h int) []string {
-	return m.headLines(t, w, m.compact(t, w, h))
-}
-
-// compact says whether the inspector leaves out the ASCII forms under the
-// names, because the cover would be smaller than comfortCoverRows with them
-// and fits (at least minCoverRows) without. The answer depends only on the
-// size of the pane and the track, never on what is being typed, so the
-// layout does not jump about.
-func (m Model) compact(t manifest.Track, w, h int) bool {
-	if t.CoverSHA256 == "" {
-		return false // nothing to make room for
-	}
-	quiet := m.quiet()
-	room := func(compact bool) int { return quiet.coverRoom(t, w, h, len(quiet.headLines(t, w, compact))) }
-	return room(false) < comfortCoverRows && room(true) >= minCoverRows
-}
-
-// headLines is trackHead with the ASCII forms of the names left out if compact.
-func (m Model) headLines(t manifest.Track, w int, compact bool) []string {
+func (m Model) trackHead(t manifest.Track, w int) []string {
 	_, title, _ := app.Display(t)
 	tab := m.tab()
 	strip, _ := m.tabStrip()
@@ -70,7 +50,7 @@ func (m Model) headLines(t manifest.Track, w int, compact bool) []string {
 		if tabOf(f) != tab {
 			continue
 		}
-		lines = append(lines, m.fieldLines(t, f, m.focus == paneInspector && i == m.field, w, compact)...)
+		lines = append(lines, m.fieldLines(t, f, m.focus == paneInspector && i == m.field, w)...)
 		if f == fCutEnd {
 			lines = append(lines, m.barLines(t, w))
 		}
@@ -94,7 +74,7 @@ func (m Model) trackLines(t manifest.Track, w, h int) []string {
 	if m.editing {
 		shown = previewTrack(t, m.dr)
 	}
-	lines := m.trackHead(t, w, h)
+	lines := m.trackHead(t, w)
 	foot := m.footLines(t, shown, w)
 	if m.tab() == 0 { // the cover belongs to the details
 		lines = append(lines, m.thumbLines(t, w, h, h-len(lines)-len(foot)-coverSlack)...)
@@ -126,8 +106,8 @@ func (m Model) footLines(t, shown manifest.Track, w int) []string {
 }
 
 // fieldLines is one field: its label, its value or its open inputs, and
-// beneath them the ASCII form of a name and any error.
-func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int, compact bool) []string {
+// beneath them any error.
+func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int) []string {
 	marker, label := " ", styles.dim.Render(fit(f.label(), labelWidth-2))
 	if current {
 		marker, label = styles.accent.Render("▌"), styles.accent.Render(fit(f.label(), labelWidth-2))
@@ -159,16 +139,6 @@ func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int, co
 	default:
 		lines = append(lines, prefix+fit(value, vw))
 	}
-	if f.isName() && t.Status == manifest.Identified && !compact {
-		original, ascii := names(t, f)
-		if original != "" && original != ascii {
-			kind := "auto"
-			if ascii != translit.ToASCII(original) {
-				kind = "custom"
-			}
-			lines = append(lines, indent+styles.dim.Render(fit("ascii  "+ascii+" · "+kind, vw)))
-		}
-	}
 	return lines
 }
 
@@ -192,10 +162,6 @@ const (
 	minCoverRows = 3
 	minCoverCols = 6
 	coverSlack   = 1
-
-	// comfortCoverRows is the size the cover is worth keeping: below it the
-	// ASCII forms under the names give way to it.
-	comfortCoverRows = 8
 )
 
 // coverRoom is how many lines the cover may take in an inspector w wide and
@@ -274,8 +240,8 @@ func (m Model) editorLines(prefix, indent string, vw int) []string {
 	var lines []string
 	switch {
 	case m.dr.field.isName():
-		first.Width, second.Width = max(vw-1, 1), max(vw-8, 1)
-		lines = append(lines, prefix+first.View(), indent+styles.dim.Render("ascii  ")+second.View())
+		first.Width = max(vw-1, 1)
+		lines = append(lines, prefix+first.View())
 	case m.dr.field == fTrack:
 		first.Width, second.Width = 5, 5
 		lines = append(lines, prefix+first.View()+styles.dim.Render(" of ")+second.View())
@@ -374,9 +340,9 @@ func playerFieldLines(t manifest.Track, f fieldKind, prefix, indent string, vw i
 		return []string{prefix + styles.dim.Render("— (not identified yet)")}
 	}
 	shown, _ := playerShown(t, f)
-	own, real := t.PlayerArtist, t.AsciiArtist
+	own, real := t.PlayerArtist, t.OriginalArtist
 	if f == fPlayerAlbum {
-		own, real = t.PlayerAlbum, t.AsciiAlbum
+		own, real = t.PlayerAlbum, t.OriginalAlbum
 	}
 	lines := []string{prefix + fit(shown, vw)}
 

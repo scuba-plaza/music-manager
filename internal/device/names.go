@@ -6,6 +6,7 @@ import (
 
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
+	"music-manager/internal/translit"
 )
 
 // PlayerFieldWidth is how many characters of an artist or an album the
@@ -31,9 +32,9 @@ func PlayerName(full, override string) string {
 // the player shows: a single has no album, so its title stands in for it
 // (otherwise the player says "Unknown Album").
 func PlayerTags(t manifest.Track) (artist, album string) {
-	album = t.AsciiAlbum
+	album = t.OriginalAlbum
 	if album == "" {
-		album = t.AsciiTitle
+		album = t.OriginalTitle
 	}
-	return PlayerName(t.AsciiArtist, t.PlayerArtist), PlayerName(album, t.PlayerAlbum)
+	return PlayerName(translit.ToASCII(t.OriginalArtist), t.PlayerArtist), PlayerName(translit.ToASCII(album), t.PlayerAlbum)
 }

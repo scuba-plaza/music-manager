@@ -17,7 +17,6 @@ import (
 	"music-manager/internal/device"
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
-	"music-manager/internal/translit"
 )
 
 // addValues are the texts the add form starts with.
@@ -195,12 +194,6 @@ func (d *addDialog) formLines(w int) []string {
 		in := d.in[i]
 		in.Width = vw - 1
 		lines = append(lines, " "+label(i, name)+" "+in.View())
-		if i <= addAlbum {
-			text := strings.TrimSpace(d.in[i].Value())
-			if ascii := d.ascii(i, text); text != "" && ascii != text {
-				lines = append(lines, "  "+strings.Repeat(" ", 11)+styles.dim.Render(fit("ascii  "+ascii, vw)))
-			}
-		}
 	}
 	row(addTitle, "Title")
 	row(addArtist, "Artist")
@@ -226,14 +219,6 @@ func (d *addDialog) formLines(w int) []string {
 	return lines
 }
 
-// ascii is the ASCII form a name field would be saved with.
-func (d *addDialog) ascii(field int, text string) string {
-	if field == addArtist && d.useMatch && d.draft.Match != nil && text == d.draft.Info.Artist && d.draft.Info.ArtistASCII != "" {
-		return d.draft.Info.ArtistASCII
-	}
-	return translit.ToASCII(text)
-}
-
 // path is where the track would be written.
 func (d *addDialog) path() string {
 	title, artist := strings.TrimSpace(d.in[addTitle].Value()), strings.TrimSpace(d.in[addArtist].Value())
@@ -245,7 +230,7 @@ func (d *addDialog) path() string {
 	of, _ := count(d.in[addOf].Value())
 	return layout.PathFor(manifest.Track{
 		ID: "new", Status: manifest.Identified,
-		AsciiTitle: d.ascii(addTitle, title), AsciiArtist: d.ascii(addArtist, artist), AsciiAlbum: d.ascii(addAlbum, album),
+		OriginalTitle: title, OriginalArtist: artist, OriginalAlbum: album,
 		TrackNumber: n, TrackTotal: of,
 	}, device.Generic.Layout())
 }
@@ -270,10 +255,6 @@ func (d *addDialog) edit() (app.Edit, error) {
 		}
 		e = mergeEdits(e, part)
 	}
-	if text := strings.TrimSpace(d.in[addArtist].Value()); d.useMatch && d.draft.Match != nil && text == d.draft.Info.Artist && d.draft.Info.ArtistASCII != "" {
-		ascii := d.draft.Info.ArtistASCII // the form the database knows the artist by
-		e.ArtistASCII = &ascii
-	}
 	return e, nil
 }
 
@@ -287,15 +268,6 @@ func mergeEdits(a, b app.Edit) app.Edit {
 	}
 	if b.Album != nil {
 		a.Album = b.Album
-	}
-	if b.TitleASCII != nil {
-		a.TitleASCII = b.TitleASCII
-	}
-	if b.ArtistASCII != nil {
-		a.ArtistASCII = b.ArtistASCII
-	}
-	if b.AlbumASCII != nil {
-		a.AlbumASCII = b.AlbumASCII
 	}
 	if b.TrackNumber != nil {
 		a.TrackNumber = b.TrackNumber
@@ -490,7 +462,7 @@ func (m Model) added(msg addedMsg) (tea.Model, tea.Cmd) {
 	m.overlay = nil
 	m.upsert(msg.track)
 	m.record(change{label: "addition of a track", after: []manifest.Track{msg.track}})
-	m.say(fmt.Sprintf("Added %q", msg.track.AsciiTitle), false)
+	m.say(fmt.Sprintf("Added %q", msg.track.OriginalTitle), false)
 	m.revealTrack(msg.track)
 	return m, nil
 }

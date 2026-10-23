@@ -26,7 +26,6 @@ type fieldStart struct{ field, line int }
 // fieldStarts returns, for each field of the tab shown, the line of the
 // inspector at which it starts, so a click can be traced to a field.
 func (m Model) fieldStarts(t manifest.Track, w, h int) []fieldStart {
-	compact := m.compact(t, w, h)
 	tab := m.tab()
 	line := 3 // the strip of tabs, the title and a rule
 	if t.Status != manifest.Identified && tab == 0 {
@@ -38,7 +37,7 @@ func (m Model) fieldStarts(t manifest.Track, w, h int) []fieldStart {
 			continue
 		}
 		starts = append(starts, fieldStart{i, line})
-		line += len(m.fieldLines(t, f, false, w, compact))
+		line += len(m.fieldLines(t, f, false, w))
 		if f == fCutEnd {
 			line++ // the bar of what the cuts keep
 		}

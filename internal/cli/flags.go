@@ -13,24 +13,20 @@ import (
 
 // trackFlags are the flags that describe a track, shared by add and edit.
 type trackFlags struct {
-	title, artist, album                string
-	titleASCII, artistASCII, albumASCII string
-	track, of                           int
-	trimStart, trimEnd                  string
-	released                            string
-	genre                               string
-	playerArtist, playerAlbum           string
-	sourceURL                           string
-	cover                               string
+	title, artist, album      string
+	track, of                 int
+	trimStart, trimEnd        string
+	released                  string
+	genre                     string
+	playerArtist, playerAlbum string
+	sourceURL                 string
+	cover                     string
 }
 
 func (tf *trackFlags) register(f *pflag.FlagSet) {
 	f.StringVar(&tf.title, "title", "", "track title")
 	f.StringVar(&tf.artist, "artist", "", "artist")
 	f.StringVar(&tf.album, "album", "", "album (empty for a single)")
-	f.StringVar(&tf.titleASCII, "title-ascii", "", "ASCII title, overriding the derived one")
-	f.StringVar(&tf.artistASCII, "artist-ascii", "", "ASCII artist, overriding the derived one")
-	f.StringVar(&tf.albumASCII, "album-ascii", "", "ASCII album, overriding the derived one")
 	f.IntVar(&tf.track, "track", 0, "track number")
 	f.IntVar(&tf.of, "of", 0, "number of tracks on the album")
 	f.StringVar(&tf.released, "released", "", "when the track came out: 1999, 1999-05 or 1999-05-17; \"\" for unknown")
@@ -58,9 +54,6 @@ func (tf *trackFlags) build(f *pflag.FlagSet) (p parsed, err error) {
 	str("title", &tf.title, &e.Title)
 	str("artist", &tf.artist, &e.Artist)
 	str("album", &tf.album, &e.Album)
-	str("title-ascii", &tf.titleASCII, &e.TitleASCII)
-	str("artist-ascii", &tf.artistASCII, &e.ArtistASCII)
-	str("album-ascii", &tf.albumASCII, &e.AlbumASCII)
 	if f.Changed("track") {
 		e.TrackNumber = &tf.track
 	}

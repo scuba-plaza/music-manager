@@ -18,9 +18,7 @@ func editCmd(open opener) *cobra.Command {
 		Short: "Change the details of a track",
 		Long: `Change the details of a track. Only the flags you pass are changed.
 
-Title, artist and album take the original text; their ASCII forms are derived
-automatically. Use --title-ascii (etc.) to set one by hand, or pass "" to go
-back to the derived form. Trims accept 90, 1:30 or 1:30.5. The release date
+Title, artist and album are the true names, in any script. Trims accept 90, 1:30 or 1:30.5. The release date
 takes a year, a month or a day (1999, 1999-05, 1999-05-17); pass "" to forget it.
 The source link (--source-url) is where the track came from; pass "" to forget it.
 The player keeps only 12 characters of the artist and of the album: mm shortens

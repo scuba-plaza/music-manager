@@ -95,7 +95,7 @@ func newInput(value string) textinput.Model {
 }
 
 // hasSecond reports whether the field being edited has a second input.
-func (m Model) hasSecond() bool { return m.dr.field.isName() || m.dr.field == fTrack }
+func (m Model) hasSecond() bool { return m.dr.field == fTrack }
 
 // prefilledFrom reports whether the draft of f starts from the file's old tags
 // because the record has no value of its own yet.
@@ -150,12 +150,9 @@ func (m Model) updateEditing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.in[m.inFocus], cmd = m.in[m.inFocus].Update(msg)
 	if m.inFocus == 0 {
-		m.dr.setText(m.in[0].Value())
-		if m.dr.field.isName() && m.dr.follow && !m.dr.touched {
-			m.in[1].SetValue(m.dr.second)
-		}
+		m.dr.text = m.in[0].Value()
 	} else {
-		m.dr.setSecond(m.in[1].Value())
+		m.dr.second = m.in[1].Value()
 	}
 	return m, cmd
 }

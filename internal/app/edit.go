@@ -11,20 +11,16 @@ import (
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
 	"music-manager/internal/timecode"
-	"music-manager/internal/translit"
 )
 
 // Edit describes changes to a track. A nil field is left alone.
 //
-// Title, Artist and Album are the original (possibly non-ASCII) values; their
-// ASCII forms follow automatically. A *ASCII field overrides the derived
-// form and sticks across later changes of the original; setting it to ""
-// goes back to deriving.
+// Title, Artist and Album are the true names, in whatever script they are
+// written.
 type Edit struct {
-	Title, Artist, Album                *string
-	TitleASCII, ArtistASCII, AlbumASCII *string
-	TrackNumber, TrackTotal             *int
-	TrimStart, TrimEnd                  *time.Duration
+	Title, Artist, Album    *string
+	TrackNumber, TrackTotal *int
+	TrimStart, TrimEnd      *time.Duration
 	// Released is when the track first came out: 1999, 1999-05 or 1999-05-17,
 	// or "" for unknown.
 	Released *string
@@ -69,9 +65,14 @@ func (a *App) Edit(id string, e Edit) (manifest.Track, error) {
 // applyEdit returns t with e applied and its status recomputed. It changes
 // nothing if the result would be invalid.
 func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
-	t.AsciiTitle, t.OriginalTitle = setName(t.AsciiTitle, t.OriginalTitle, e.Title, e.TitleASCII)
-	t.AsciiArtist, t.OriginalArtist = setName(t.AsciiArtist, t.OriginalArtist, e.Artist, e.ArtistASCII)
-	t.AsciiAlbum, t.OriginalAlbum = setName(t.AsciiAlbum, t.OriginalAlbum, e.Album, e.AlbumASCII)
+	for _, f := range []struct {
+		in  *string
+		out *string
+	}{{e.Title, &t.OriginalTitle}, {e.Artist, &t.OriginalArtist}, {e.Album, &t.OriginalAlbum}} {
+		if f.in != nil {
+			*f.out = strings.TrimSpace(*f.in)
+		}
+	}
 	if e.TrackNumber != nil {
 		t.TrackNumber = *e.TrackNumber
 	}
@@ -132,7 +133,7 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 		return t, err
 	}
 
-	if t.AsciiTitle != "" && t.AsciiArtist != "" {
+	if t.OriginalTitle != "" && t.OriginalArtist != "" {
 		t.Status = manifest.Identified
 		t.Hint = manifest.Hint{}
 	} else {
@@ -140,25 +141,6 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 	}
 	t.UpdatedAt = time.Now().UTC()
 	return t, nil
-}
-
-// setName returns the new ASCII and original forms of a name field.
-func setName(ascii, orig string, newOrig, newASCII *string) (string, string) {
-	overridden := ascii != translit.ToASCII(orig)
-	if newOrig != nil {
-		orig = strings.TrimSpace(*newOrig)
-		if !overridden || orig == "" {
-			ascii = translit.ToASCII(orig)
-		}
-	}
-	if newASCII != nil {
-		if *newASCII == "" {
-			ascii = translit.ToASCII(orig)
-		} else {
-			ascii = strings.TrimSpace(*newASCII)
-		}
-	}
-	return ascii, orig
 }
 
 // NormalizeDate checks a release date and returns it trimmed. It may be as

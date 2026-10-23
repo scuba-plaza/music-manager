@@ -158,14 +158,6 @@ type searchResponse struct {
 		Credit []struct {
 			Name       string `json:"name"`
 			JoinPhrase string `json:"joinphrase"`
-			Artist     struct {
-				Aliases []struct {
-					Name    string `json:"name"`
-					Locale  string `json:"locale"`
-					Type    string `json:"type"`
-					Primary bool   `json:"primary"`
-				} `json:"aliases"`
-			} `json:"artist"`
 		} `json:"artist-credit"`
 		Releases []struct {
 			ID     string `json:"id"`
@@ -191,33 +183,14 @@ type ranked struct {
 func (r *searchResponse) candidates() []app.Candidate {
 	var all []ranked
 	for _, rec := range r.Recordings {
-		var artist, ascii strings.Builder
-		latin := true
+		var artist strings.Builder
 		for _, cr := range rec.Credit {
 			artist.WriteString(cr.Name + cr.JoinPhrase)
-			name := cr.Name
-			if !isASCII(cr.Name) {
-				name = ""
-				for _, al := range cr.Artist.Aliases { // prefer a primary English alias
-					if isASCII(al.Name) && al.Type == "Artist name" && (al.Primary || strings.HasPrefix(al.Locale, "en")) {
-						name = al.Name
-						break
-					}
-				}
-				if name == "" {
-					latin = false
-				}
-			}
-			ascii.WriteString(name + cr.JoinPhrase)
-		}
-		artistASCII := ""
-		if latin && ascii.String() != artist.String() {
-			artistASCII = ascii.String()
 		}
 		for _, rel := range rec.Releases {
 			c := app.Candidate{
 				RecordingID: rec.ID, ReleaseID: rel.ID,
-				Title: rec.Title, Artist: artist.String(), ArtistASCII: artistASCII, Album: rel.Title,
+				Title: rec.Title, Artist: artist.String(), Album: rel.Title,
 				TrackTotal: rel.Count, Length: time.Duration(rec.Length) * time.Millisecond,
 				Score: rec.Score, Date: rel.Date,
 			}
@@ -249,13 +222,4 @@ func (r *searchResponse) candidates() []app.Candidate {
 		out = append(out, r.Candidate)
 	}
 	return out
-}
-
-func isASCII(s string) bool {
-	for _, r := range s {
-		if r > 127 {
-			return false
-		}
-	}
-	return true
 }

@@ -91,7 +91,7 @@ func TestIngestKeepsOldTagsAndFilenameAsHintsOnly(t *testing.T) {
 	hints := map[string]manifest.Hint{}
 	for _, tr := range tracks(t, a) {
 		hints[tr.Hint.Filename] = tr.Hint
-		if tr.AsciiTitle != "" || tr.AsciiArtist != "" || tr.AsciiAlbum != "" || tr.OriginalTitle != "" {
+		if tr.OriginalTitle != "" || tr.OriginalArtist != "" || tr.OriginalAlbum != "" {
 			t.Errorf("old tags leaked into the record: %+v", tr)
 		}
 	}

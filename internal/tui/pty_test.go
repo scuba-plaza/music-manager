@@ -272,7 +272,7 @@ func TestPTYEditATitleAndItIsSaved(t *testing.T) {
 	}
 	found := false
 	for _, tr := range m.Tracks {
-		found = found || tr.AsciiTitle == "Flow Again"
+		found = found || tr.OriginalTitle == "Flow Again"
 	}
 	if !found {
 		t.Errorf("the edit never reached library.json: %+v", m.Tracks)
@@ -377,7 +377,7 @@ func TestPTYIdentifyThroughThePicker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := m.Tracks[0]; got.Status != "identified" || got.MBRecordingID == "" || got.AsciiAlbum != "From Sleep" {
+	if got := m.Tracks[0]; got.Status != "identified" || got.MBRecordingID == "" || got.OriginalAlbum != "From Sleep" {
 		t.Errorf("track = %+v", got)
 	}
 }
@@ -422,7 +422,7 @@ func TestPTYAddFromALinkWithAFakeYtDlp(t *testing.T) {
 	}
 	found := false
 	for _, tr := range m.Tracks {
-		found = found || (tr.AsciiTitle == "Pty Song" && tr.SourceURL == "https://youtu.be/abc" && tr.AsciiAlbum == "Pty Album")
+		found = found || (tr.OriginalTitle == "Pty Song" && tr.SourceURL == "https://youtu.be/abc" && tr.OriginalAlbum == "Pty Album")
 	}
 	if !found {
 		t.Errorf("the added track is not in library.json: %+v", m.Tracks)

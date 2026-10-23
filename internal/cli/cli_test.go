@@ -88,15 +88,15 @@ func TestEditThenShow(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("show: code %d, err %q", code, errs)
 	}
-	for _, want := range []string{id, "identified", "Wtni", "وطني", "Firuz", "فيروز", "Hits", "3/12", "0:01", "0:00.5"} {
+	for _, want := range []string{id, "identified", "وطني", "فيروز", "Hits", "3/12", "0:01", "0:00.5"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("show output lacks %q:\n%s", want, out)
 		}
 	}
 
 	_, out, _ = run(t, lib, "ls", "firuz")
-	if !strings.Contains(out, "Wtni") {
-		t.Errorf("ls firuz did not find the edited track:\n%s", out)
+	if !strings.Contains(out, "وطني") {
+		t.Errorf("ls firuz (the Latin form of the artist) did not find the edited track:\n%s", out)
 	}
 }
 
@@ -127,10 +127,10 @@ func TestSyncDryRunThenApply(t *testing.T) {
 	lib := filepath.Join(t.TempDir(), "lib")
 	id := ingestOne(t, lib)
 	run(t, lib, "edit", id, "--title", "وطني", "--artist", "فيروز", "--album", "Hits", "--track", "3", "--of", "12")
-	file := filepath.Join(lib, "Firuz", "Hits", "03 - Wtni.mp3")
+	file := filepath.Join(lib, "فيروز", "Hits", "03 - وطني.mp3")
 
 	code, out, errs := run(t, lib, "sync", "--dry-run")
-	if code != 0 || !strings.Contains(squash(out), "create Firuz/Hits/03 - Wtni.mp3") || !strings.Contains(out, "dry run") {
+	if code != 0 || !strings.Contains(squash(out), "create فيروز/Hits/03 - وطني.mp3") || !strings.Contains(out, "dry run") {
 		t.Errorf("dry run: code %d, out %q, err %q", code, out, errs)
 	}
 	if exists(file) {

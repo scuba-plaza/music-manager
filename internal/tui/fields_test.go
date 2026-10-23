@@ -13,9 +13,7 @@ import (
 func identified() manifest.Track {
 	return manifest.Track{
 		ID: "k7f2qd", Status: manifest.Identified,
-		AsciiTitle: "Wtni", OriginalTitle: "وطني",
-		AsciiArtist: "Firuz", OriginalArtist: "فيروز",
-		AsciiAlbum: "Hits", OriginalAlbum: "Hits",
+		OriginalTitle: "وطني", OriginalArtist: "فيروز", OriginalAlbum: "Hits",
 		TrackNumber: 3, TrackTotal: 12,
 		SourceLength: 3 * time.Minute, TrimStart: 2 * time.Second, TrimEnd: 1500 * time.Millisecond,
 	}
@@ -45,9 +43,9 @@ func TestANewDraftStartsFromTheTracksCurrentValues(t *testing.T) {
 		f            fieldKind
 		text, second string
 	}{
-		{fTitle, "وطني", "Wtni"},
-		{fArtist, "فيروز", "Firuz"},
-		{fAlbum, "Hits", "Hits"},
+		{fTitle, "وطني", ""},
+		{fArtist, "فيروز", ""},
+		{fAlbum, "Hits", ""},
 		{fTrack, "3", "12"},
 		{fCutStart, "0:02", ""},
 		{fCutEnd, "0:01.5", ""},
@@ -83,55 +81,17 @@ func TestADraftOfAnUnidentifiedTrackStartsFromWhatTheFileSaid(t *testing.T) {
 	}
 }
 
-func TestTheASCIIFormFollowsTheTextUntilTheUserTouchesIt(t *testing.T) {
-	d := newDraft(identified(), fTitle)
-	d.setText("ليته")
-	if d.second != "Lith" {
-		t.Errorf("ascii = %q, want it to follow the text (an auto form follows)", d.second)
-	}
-	d.setSecond("Layteh")
-	d.setText("ليته في")
-	if d.second != "Layteh" {
-		t.Errorf("ascii = %q: once the user wrote it, it must stay", d.second)
-	}
-}
-
-func TestACustomASCIIFormStaysWhenTheTextChanges(t *testing.T) {
-	tr := identified()
-	tr.AsciiArtist = "Fairuz" // not what transliteration gives, so it is a custom form
-	d := newDraft(tr, fArtist)
-	d.setText("فيروز ")
-	if d.second != "Fairuz" {
-		t.Errorf("ascii = %q: a custom form is kept, like the app does", d.second)
-	}
-}
-
 func TestEditBuildsWhatTheAppNeeds(t *testing.T) {
 	tr := identified()
 	d := newDraft(tr, fTitle)
-	d.setText("  Watani ")
+	d.text = "  Watani "
 	e, err := d.edit()
-	if err != nil || e.Title == nil || *e.Title != "Watani" || e.TitleASCII != nil {
-		t.Fatalf("untouched ascii: %+v, %v", e, err)
-	}
-
-	d.setSecond("Wtani")
-	e, _ = d.edit()
-	if e.TitleASCII == nil || *e.TitleASCII != "Wtani" {
-		t.Errorf("a written ascii form must be sent: %+v", e)
-	}
-	d.setSecond("")
-	if e, _ = d.edit(); e.TitleASCII == nil || *e.TitleASCII != "" {
-		t.Errorf("clearing the ascii form means back to automatic: %+v", e)
-	}
-	d.setText("Wtni")
-	d.setSecond("Wtni") // the same as the automatic form: no override
-	if e, _ = d.edit(); e.TitleASCII == nil || *e.TitleASCII != "" {
-		t.Errorf("an ascii form equal to the automatic one is no override: %+v", e)
+	if err != nil || e.Title == nil || *e.Title != "Watani" {
+		t.Fatalf("title: %+v, %v", e, err)
 	}
 
 	a := newDraft(tr, fAlbum)
-	a.setText("")
+	a.text = ""
 	if e, err := a.edit(); err != nil || e.Album == nil || *e.Album != "" {
 		t.Errorf("an empty album is a single: %+v, %v", e, err)
 	}
@@ -197,33 +157,32 @@ func TestEditParsesNumbersAndTimecodes(t *testing.T) {
 func TestPreviewShowsWhereTheFileWillGo(t *testing.T) {
 	tr := identified()
 	base := pathFor(tr)
-	if base != "Firuz/Hits/03 - Wtni.mp3" {
+	if base != "فيروز/Hits/03 - وطني.mp3" {
 		t.Fatalf("setup: %q", base)
 	}
 
 	title := newDraft(tr, fTitle)
-	title.setText("Watani")
-	if got := pathFor(previewTrack(tr, title)); got != "Firuz/Hits/03 - Watani.mp3" {
+	title.text = "Watani"
+	if got := pathFor(previewTrack(tr, title)); got != "فيروز/Hits/03 - Watani.mp3" {
 		t.Errorf("title preview = %q", got)
 	}
 
 	album := newDraft(tr, fAlbum)
-	album.setText("")
-	if got := pathFor(previewTrack(tr, album)); got != "Firuz/Wtni.mp3" {
+	album.text = ""
+	if got := pathFor(previewTrack(tr, album)); got != "فيروز/وطني.mp3" {
 		t.Errorf("a single = %q", got)
 	}
 
 	num := newDraft(tr, fTrack)
 	num.text, num.second = "7", "120"
-	if got := pathFor(previewTrack(tr, num)); got != "Firuz/Hits/007 - Wtni.mp3" {
+	if got := pathFor(previewTrack(tr, num)); got != "فيروز/Hits/007 - وطني.mp3" {
 		t.Errorf("numbered = %q", got)
 	}
 
 	artist := newDraft(tr, fArtist)
-	artist.setText("فيروز")
-	artist.setSecond("Fairuz")
-	if got := pathFor(previewTrack(tr, artist)); got != "Fairuz/Hits/03 - Wtni.mp3" {
-		t.Errorf("custom ascii = %q", got)
+	artist.text = "عبد الحليم"
+	if got := pathFor(previewTrack(tr, artist)); got != "عبد الحليم/Hits/03 - وطني.mp3" {
+		t.Errorf("artist preview = %q", got)
 	}
 
 	cut := newDraft(tr, fCutStart)
@@ -239,7 +198,7 @@ func TestPreviewOfAnUnidentifiedTrackBecomesIdentifiedOnceItHasATitleAndArtist(t
 	if got := pathFor(previewTrack(tr, title)); got != "_Inbox/abc123 - x.mp3" {
 		t.Errorf("with only a title it is still in the inbox, got %q", got)
 	}
-	tr.AsciiArtist, tr.OriginalArtist = "Band", "Band"
+	tr.OriginalArtist = "Band"
 	if got := pathFor(previewTrack(tr, title)); got != "Band/Song.mp3" {
 		t.Errorf("with both it gets a place, got %q", got)
 	}
@@ -277,16 +236,16 @@ func TestTheReleaseDateIsShownEditedAndChecked(t *testing.T) {
 		t.Errorf("draft = %q / %q", d.text, d.second)
 	}
 
-	d.setText(" 2001-02-03 ")
+	d.text = " 2001-02-03 "
 	e, err := d.edit()
 	if err != nil || e.Released == nil || *e.Released != "2001-02-03" || e.Title != nil || e.TrackNumber != nil {
 		t.Errorf("edit = %+v, %v", e, err)
 	}
-	d.setText("")
+	d.text = ""
 	if e, err := d.edit(); err != nil || e.Released == nil || *e.Released != "" {
 		t.Errorf("an empty date forgets the date: %+v, %v", e, err)
 	}
-	d.setText("soon")
+	d.text = "soon"
 	if _, err := d.edit(); err == nil || !strings.Contains(err.Error(), "1999-05-17") {
 		t.Errorf("a bad date: %v; want a message showing the format", err)
 	}

@@ -13,14 +13,11 @@ type Query struct{ Title, Artist, Album string }
 type Candidate struct {
 	RecordingID, ReleaseID string
 	Title, Artist, Album   string
-	// ArtistASCII is a Latin-script form of Artist known to the source, or ""
-	// if Artist needs no help or none is known.
-	ArtistASCII string
-	TrackNumber int
-	TrackTotal  int
-	Length      time.Duration
-	Score       int    // 0-100, how well the candidate matches the query
-	Date        string // when the release came out, as precise as known
+	TrackNumber            int
+	TrackTotal             int
+	Length                 time.Duration
+	Score                  int    // 0-100, how well the candidate matches the query
+	Date                   string // when the release came out, as precise as known
 }
 
 // MetadataSource looks tracks up in a music database.

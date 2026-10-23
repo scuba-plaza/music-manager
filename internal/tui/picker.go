@@ -33,9 +33,9 @@ func candidateDiff(t manifest.Track, c app.Candidate) []diffLine {
 	line := func(label, old, new string) diffLine {
 		return diffLine{label, orDash(old), orDash(new), orDash(old) == orDash(new)}
 	}
-	title, _ := names(t, fTitle)
-	artist, _ := names(t, fArtist)
-	album, _ := names(t, fAlbum)
+	title := name(t, fTitle)
+	artist := name(t, fArtist)
+	album := name(t, fAlbum)
 	newTrack := ""
 	switch {
 	case c.TrackNumber > 0 && c.TrackTotal > 0:
@@ -90,8 +90,8 @@ type picker struct {
 func newPicker(t manifest.Track) *picker {
 	p := &picker{track: t, spin: spinner.New(spinner.WithSpinner(spinner.MiniDot))}
 	p.spin.Style = styles.accent
-	title, _ := names(t, fTitle)
-	artist, _ := names(t, fArtist)
+	title := name(t, fTitle)
+	artist := name(t, fArtist)
 	for i, v := range []string{title, artist} {
 		in := textinput.New()
 		in.Prompt = ""
@@ -345,7 +345,7 @@ func (m Model) identified(msg identifiedMsg) (tea.Model, tea.Cmd) {
 	m.overlay = nil
 	m.upsert(msg.after)
 	m.record(change{label: "identification of a track", before: []manifest.Track{msg.before}, after: []manifest.Track{msg.after}})
-	m.say("Identified as "+msg.after.AsciiArtist+" - "+msg.after.AsciiTitle, false)
+	m.say("Identified as "+msg.after.OriginalArtist+" - "+msg.after.OriginalTitle, false)
 	m.revealTrack(msg.after)
 	return m, nil
 }

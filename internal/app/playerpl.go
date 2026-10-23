@@ -11,6 +11,7 @@ import (
 	"unicode/utf16"
 
 	"music-manager/internal/manifest"
+	"music-manager/internal/translit"
 )
 
 // The playlist files of the Wolfang WMP01 (USERPL1.PL to USERPL3.PL) were
@@ -141,12 +142,12 @@ func matchPlayerName(name string, tracks []manifest.Track) PlayerMatch {
 	return res
 }
 
-// titled lists the tracks whose title, or original title, is key once it is
+// titled lists the tracks whose title, or its Latin form, is key once it is
 // reduced the same way; or starts with it, if prefix is set.
 func titled(tracks []manifest.Track, key string, prefix bool) []manifest.Track {
 	var out []manifest.Track
 	for _, t := range tracks {
-		for _, title := range []string{t.AsciiTitle, t.OriginalTitle} {
+		for _, title := range []string{t.OriginalTitle, translit.ToASCII(t.OriginalTitle)} {
 			k := matchKey(title)
 			if k == key || prefix && strings.HasPrefix(k, key) {
 				out = append(out, t)

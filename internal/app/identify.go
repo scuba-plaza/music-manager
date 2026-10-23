@@ -280,14 +280,9 @@ func describe(c Candidate) string {
 
 // applyCandidate returns t described as c, with a cover from src if it had none.
 func (a *App) applyCandidate(ctx context.Context, t manifest.Track, c Candidate, src MetadataSource) (manifest.Track, error) {
-	derive := ""
 	e := Edit{
 		Title: &c.Title, Artist: &c.Artist, Album: &c.Album,
-		TitleASCII: &derive, ArtistASCII: &derive, AlbumASCII: &derive, // follow the new text
 		TrackNumber: &c.TrackNumber, TrackTotal: &c.TrackTotal,
-	}
-	if c.ArtistASCII != "" {
-		e.ArtistASCII = &c.ArtistASCII
 	}
 	if d := leadingDate(c.Date); d != "" { // a match that does not know the date keeps ours
 		e.Released = &d
@@ -312,7 +307,7 @@ func (a *App) applyCandidate(ctx context.Context, t manifest.Track, c Candidate,
 // identified, what the ingested file said about itself otherwise.
 func Display(t manifest.Track) (artist, title, album string) {
 	if t.Status == manifest.Identified {
-		return t.AsciiArtist, t.AsciiTitle, t.AsciiAlbum
+		return t.OriginalArtist, t.OriginalTitle, t.OriginalAlbum
 	}
 	title = t.Hint.Title
 	if title == "" {

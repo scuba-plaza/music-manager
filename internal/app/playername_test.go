@@ -36,11 +36,11 @@ func TestSyncWritesTagsTheWholePlayerCanShow(t *testing.T) {
 
 	// The library keeps the whole names.
 	for _, tr := range tracks(t, a) {
-		if tr.ID == ts[0].ID && (tr.AsciiArtist != "Abdel Halim Hafez" || tr.AsciiAlbum != "Abd El Halim Hafez") {
-			t.Errorf("the library's names were shortened: %q / %q", tr.AsciiArtist, tr.AsciiAlbum)
+		if tr.ID == ts[0].ID && (tr.OriginalArtist != "Abdel Halim Hafez" || tr.OriginalAlbum != "Abd El Halim Hafez") {
+			t.Errorf("the library's names were shortened: %q / %q", tr.OriginalArtist, tr.OriginalAlbum)
 		}
-		if tr.ID == ts[1].ID && tr.AsciiAlbum != "" {
-			t.Errorf("a single got the album %q in the library", tr.AsciiAlbum)
+		if tr.ID == ts[1].ID && tr.OriginalAlbum != "" {
+			t.Errorf("a single got the album %q in the library", tr.OriginalAlbum)
 		}
 	}
 }
@@ -68,8 +68,8 @@ func TestAPlayerNameSetOnATrackReachesTheTagsAndTheLibraryKeepsTheRest(t *testin
 		t.Errorf("single: artist %q, album %q", got.Artist, got.Album)
 	}
 	for _, tr := range tracks(t, a) {
-		if tr.ID == ts[0].ID && (tr.AsciiArtist != "Abdel Halim Hafez" || tr.AsciiAlbum != "Abd El Halim Hafez" || tr.PlayerArtist != "A. H. Hafez") {
-			t.Errorf("record: %q / %q / %q", tr.AsciiArtist, tr.AsciiAlbum, tr.PlayerArtist)
+		if tr.ID == ts[0].ID && (tr.OriginalArtist != "Abdel Halim Hafez" || tr.OriginalAlbum != "Abd El Halim Hafez" || tr.PlayerArtist != "A. H. Hafez") {
+			t.Errorf("record: %q / %q / %q", tr.OriginalArtist, tr.OriginalAlbum, tr.PlayerArtist)
 		}
 	}
 

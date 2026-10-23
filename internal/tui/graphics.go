@@ -68,7 +68,7 @@ type pictureMsg struct {
 // does not make the cover be sent again at another size.
 func (m Model) coverPlan(t manifest.Track, th thumb, w, h int) (cols, rows int) {
 	quiet := m.quiet()
-	room := quiet.coverRoom(t, w, h, len(quiet.trackHead(t, w, h)))
+	room := quiet.coverRoom(t, w, h, len(quiet.trackHead(t, w)))
 	cw, ch := m.gfx.cellSize()
 	return placementSize(th.kw, th.kh, w-labelWidth-4, min(room, maxCoverRows), cw, ch)
 }

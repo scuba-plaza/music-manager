@@ -48,7 +48,7 @@ func TestAddWithFlagsIsNonInteractive(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code %d, err %q", code, errs)
 	}
-	for _, want := range []string{"added", "Firuz - Wtni", "Firuz/Hits/03 - Wtni.mp3", "mm sync"} {
+	for _, want := range []string{"added", "فيروز - وطني", "فيروز/Hits/03 - وطني.mp3", "mm sync"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}

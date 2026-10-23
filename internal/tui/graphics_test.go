@@ -155,7 +155,7 @@ func TestAnotherSizeGetsItsOwnPictureAndTheOldOneIsFreed(t *testing.T) {
 func TestEditingAFieldDoesNotResendThePicture(t *testing.T) {
 	m, log, _ := pictureModel(t, 120, 36)
 	m = keys(t, m, "right", "enter") // edit the title
-	m = typed(t, m, "Ё")             // a name with an ASCII form of its own appears under the field
+	m = typed(t, m, "Ё")
 	if got := len(transmissions(t, log)); got != 1 {
 		t.Errorf("typing resized the cover: %d pictures sent", got)
 	}

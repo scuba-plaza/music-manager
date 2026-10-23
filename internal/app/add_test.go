@@ -96,7 +96,7 @@ func TestAddWithEverythingGivenNeverAsksAndRecordsTheSource(t *testing.T) {
 		t.Errorf("asked %v although everything was given", p.asked)
 	}
 	if got.Status != manifest.Identified || got.SourceURL != "https://youtu.be/xyz" ||
-		got.AsciiTitle != "Wtni" || got.OriginalTitle != "وطني" || got.AsciiArtist != "Firuz" || got.AsciiAlbum != "Hits" ||
+		got.OriginalTitle != "وطني" || got.OriginalArtist != "فيروز" || got.OriginalAlbum != "Hits" ||
 		got.TrackNumber != 3 || got.TrackTotal != 12 || got.Released != "1999-05" || got.TrimStart != time.Second {
 		t.Errorf("track = %+v", got)
 	}
@@ -117,7 +117,7 @@ func TestAddWithoutPrompterFallsBackToTheDownloadMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.AsciiTitle != "Song Title" || got.AsciiArtist != "Some Band" || got.AsciiAlbum != "Yt Album" || got.TrackNumber != 4 || got.Status != manifest.Identified {
+	if got.OriginalTitle != "Song Title" || got.OriginalArtist != "Some Band" || got.OriginalAlbum != "Yt Album" || got.TrackNumber != 4 || got.Status != manifest.Identified {
 		t.Errorf("track = %+v", got)
 	}
 }
@@ -142,22 +142,22 @@ func TestAddWithoutPrompterReportsWhatIsMissing(t *testing.T) {
 func TestAddAsksEachFieldWithDefaultsFromTheDownload(t *testing.T) {
 	a, dl := openLib(t), newDownloader()
 	p := &scriptedPrompter{answers: map[string]string{
-		"title": "وطني", "artist": "فيروز", "title-ascii": "Watani", "album": "", "track": "7", "of": "9", "trim-start": "0:01.5", "trim-end": "",
+		"title": "وطني", "artist": "فيروز", "album": "", "track": "7", "of": "9", "trim-start": "0:01.5", "trim-end": "",
 	}}
 	got, err := a.Add(context.Background(), app.AddRequest{URL: "u"}, dl, p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantAsked := []string{"title", "title-ascii", "artist", "artist-ascii", "album", "track", "of", "released", "genre", "trim-start", "trim-end"}
+	wantAsked := []string{"title", "artist", "album", "track", "of", "released", "genre", "trim-start", "trim-end"}
 	if strings.Join(p.asked, ",") != strings.Join(wantAsked, ",") {
 		t.Errorf("asked %v, want %v", p.asked, wantAsked)
 	}
-	for k, want := range map[string]string{"title": "Song Title", "artist": "Some Band", "album": "Yt Album", "track": "4", "title-ascii": "Wtni"} {
+	for k, want := range map[string]string{"title": "Song Title", "artist": "Some Band", "album": "Yt Album", "track": "4"} {
 		if p.defaults[k] != want {
 			t.Errorf("default for %s = %q, want %q", k, p.defaults[k], want)
 		}
 	}
-	if got.AsciiTitle != "Watani" || got.OriginalTitle != "وطني" || got.AsciiArtist != "Firuz" || got.AsciiAlbum != "" ||
+	if got.OriginalTitle != "وطني" || got.OriginalArtist != "فيروز" || got.OriginalAlbum != "" ||
 		got.TrackNumber != 7 || got.TrackTotal != 9 || got.TrimStart != 1500*time.Millisecond || got.TrimEnd != 0 {
 		t.Errorf("track = %+v", got)
 	}
@@ -175,8 +175,9 @@ func TestAddOnlyAsksForFieldsNotGivenAsFlags(t *testing.T) {
 	}
 }
 
-func TestAddDoesNotOfferAnASCIIFormWhenTheTextIsAlreadyASCII(t *testing.T) {
+func TestAddNeverAsksForALatinForm(t *testing.T) {
 	a, dl, p := openLib(t), newDownloader(), &scriptedPrompter{}
+	dl.info = app.Info{Title: "سأرجع", Artist: "فيروز"}
 	if _, err := a.Add(context.Background(), app.AddRequest{URL: "u"}, dl, p); err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +313,7 @@ func TestAddUsesAConfidentMatchAsDefaultsAndRecordsItsIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.AsciiTitle != "Dream 3" || got.AsciiArtist != "Max Richter" || got.AsciiAlbum != "From Sleep" || got.TrackNumber != 1 || got.TrackTotal != 7 ||
+	if got.OriginalTitle != "Dream 3" || got.OriginalArtist != "Max Richter" || got.OriginalAlbum != "From Sleep" || got.TrackNumber != 1 || got.TrackTotal != 7 ||
 		got.MBRecordingID != "rec-1" || got.MBReleaseID != "rel-1" || got.CoverSHA256 == "" {
 		t.Errorf("track = %+v", got)
 	}
@@ -325,7 +326,7 @@ func TestAddIgnoresWeakMatchesAndMatchesTheUserOverrode(t *testing.T) {
 	src := &fakeSource{results: map[string][]app.Candidate{"Song Title|Some Band": {weak}}}
 	a, dl := openLib(t), newDownloader()
 	got, err := a.Add(ctx, app.AddRequest{URL: "u", Source: src}, dl, nil)
-	if err != nil || got.AsciiTitle != "Song Title" || got.MBRecordingID != "" {
+	if err != nil || got.OriginalTitle != "Song Title" || got.MBRecordingID != "" {
 		t.Errorf("weak match used: %+v, %v", got, err)
 	}
 
@@ -334,7 +335,7 @@ func TestAddIgnoresWeakMatchesAndMatchesTheUserOverrode(t *testing.T) {
 	a2 := openLib(t)
 	p := &scriptedPrompter{answers: map[string]string{"title": "My Own Title"}}
 	got, err = a2.Add(ctx, app.AddRequest{URL: "u", Source: src}, dl, p)
-	if err != nil || got.AsciiTitle != "My Own Title" || got.MBRecordingID != "" {
+	if err != nil || got.OriginalTitle != "My Own Title" || got.MBRecordingID != "" {
 		t.Errorf("overridden match kept its ids: %+v, %v", got, err)
 	}
 	if p.defaults["title"] != "Dream 3" {
@@ -347,7 +348,7 @@ func TestAddWarnsButCarriesOnWhenTheLookupFails(t *testing.T) {
 	src := &fakeSource{errs: map[string]error{"Song Title|Some Band": errors.New("offline")}}
 	var warned []error
 	got, err := a.Add(context.Background(), app.AddRequest{URL: "u", Source: src, OnWarning: func(e error) { warned = append(warned, e) }}, dl, nil)
-	if err != nil || got.AsciiTitle != "Song Title" {
+	if err != nil || got.OriginalTitle != "Song Title" {
 		t.Fatalf("%+v, %v", got, err)
 	}
 	if len(warned) != 1 || !strings.Contains(warned[0].Error(), "offline") {
@@ -355,16 +356,16 @@ func TestAddWarnsButCarriesOnWhenTheLookupFails(t *testing.T) {
 	}
 }
 
-func TestAddCarriesTheLatinAliasOfAnArabicArtist(t *testing.T) {
+func TestAddKeepsTheArtistAsTheMatchWritesIt(t *testing.T) {
 	dl := newDownloader()
 	dl.info = app.Info{Title: "سأرجع", Uploader: "Fairuz"}
-	arabic := app.Candidate{RecordingID: "r", ReleaseID: "l", Title: "سأرجع", Artist: "فيروز", ArtistASCII: "Fairuz", Album: "Al Quds", Score: 100}
+	arabic := app.Candidate{RecordingID: "r", ReleaseID: "l", Title: "سأرجع", Artist: "فيروز", Album: "Al Quds", Score: 100}
 	src := &fakeSource{results: map[string][]app.Candidate{"سأرجع|Fairuz": {arabic}}}
 
 	for name, p := range map[string]app.Prompter{"non-interactive": nil, "interactive": &scriptedPrompter{}} {
 		lib := openLib(t)
 		got, err := lib.Add(context.Background(), app.AddRequest{URL: "u", Source: src}, dl, p)
-		if err != nil || got.AsciiArtist != "Fairuz" || got.OriginalArtist != "فيروز" {
+		if err != nil || got.OriginalArtist != "فيروز" {
 			t.Errorf("%s: %+v, %v", name, got, err)
 		}
 	}

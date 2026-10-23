@@ -202,6 +202,5 @@ func firstOriginal(ts []manifest.Track, f fieldKind) string {
 	if len(ts) == 0 {
 		return ""
 	}
-	original, _ := names(ts[0], f)
-	return original
+	return name(ts[0], f)
 }

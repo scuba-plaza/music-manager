@@ -8,6 +8,7 @@ import (
 
 	"music-manager/internal/manifest"
 	"music-manager/internal/timecode"
+	"music-manager/internal/translit"
 )
 
 // SortKey is a field tracks can be put in order by.
@@ -155,7 +156,7 @@ func compareBy(a, b manifest.Track, k SortKey) (c int, missing bool) {
 	}
 	switch k {
 	case SortArtist, SortTitle, SortAlbum:
-		return strings.Compare(strings.ToLower(SortValue(a, k)), strings.ToLower(SortValue(b, k))), false
+		return strings.Compare(translit.SortKey(SortValue(a, k)), translit.SortKey(SortValue(b, k))), false
 	case SortTrack:
 		return trackNumber(a) - trackNumber(b), false
 	case SortLength:

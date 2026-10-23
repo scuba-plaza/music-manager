@@ -32,23 +32,14 @@ func TestEditTitleAndArtistIdentifiesTheTrack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := manifest.Track{
-		Status:     manifest.Identified,
-		AsciiTitle: "Wtni", OriginalTitle: "وطني",
-		AsciiArtist: "Firuz", OriginalArtist: "فيروز",
-		AsciiAlbum: "Hits", OriginalAlbum: "Hits",
-		TrackNumber: 3, TrackTotal: 12,
-	}
-	if got.Status != want.Status || got.AsciiTitle != want.AsciiTitle || got.OriginalTitle != want.OriginalTitle ||
-		got.AsciiArtist != want.AsciiArtist || got.OriginalArtist != want.OriginalArtist ||
-		got.AsciiAlbum != want.AsciiAlbum || got.OriginalAlbum != want.OriginalAlbum ||
+	if got.Status != manifest.Identified || got.OriginalTitle != "وطني" || got.OriginalArtist != "فيروز" || got.OriginalAlbum != "Hits" ||
 		got.TrackNumber != 3 || got.TrackTotal != 12 {
 		t.Errorf("got %+v", got)
 	}
 	if got.Hint != (manifest.Hint{}) {
 		t.Errorf("hint not cleared: %+v", got.Hint)
 	}
-	if saved := tracks(t, a)[0]; saved.AsciiTitle != "Wtni" {
+	if saved := tracks(t, a)[0]; saved.OriginalTitle != "وطني" {
 		t.Errorf("edit was not saved: %+v", saved)
 	}
 }
@@ -73,35 +64,24 @@ func TestEditNeedsTitleAndArtistToIdentify(t *testing.T) {
 	}
 }
 
-func TestEditASCIIOverrideSurvivesChangesToTheOriginal(t *testing.T) {
+func TestEditKeepsTheNamesAsTyped(t *testing.T) {
 	a, tr := ingested(t)
-	got, _ := a.Edit(tr.ID, app.Edit{Artist: ptr("عبد الحليم حافظ"), ArtistASCII: ptr("Abdel Halim Hafez")})
-	if got.AsciiArtist != "Abdel Halim Hafez" || got.OriginalArtist != "عبد الحليم حافظ" {
-		t.Fatalf("override not applied: %+v", got)
+	got, _ := a.Edit(tr.ID, app.Edit{Artist: ptr("  عبد الحليم حافظ ")})
+	if got.OriginalArtist != "عبد الحليم حافظ" {
+		t.Errorf("Artist = %q, want the name without the spaces around it", got.OriginalArtist)
 	}
-	// Changing the original must not re-derive an overridden ASCII value.
-	got, _ = a.Edit(tr.ID, app.Edit{Artist: ptr("عبد الحليم حافظ ")})
-	if got.AsciiArtist != "Abdel Halim Hafez" {
-		t.Errorf("override lost: Artist = %q", got.AsciiArtist)
-	}
-	// An empty override goes back to deriving.
-	got, _ = a.Edit(tr.ID, app.Edit{ArtistASCII: ptr("")})
-	if got.AsciiArtist != "'Bd al-Hlim Hafz" {
-		t.Errorf("Artist = %q, want derived value", got.AsciiArtist)
-	}
-	// And derived values follow the original again.
 	got, _ = a.Edit(tr.ID, app.Edit{Artist: ptr("فيروز")})
-	if got.AsciiArtist != "Firuz" {
-		t.Errorf("Artist = %q, want Firuz", got.AsciiArtist)
+	if got.OriginalArtist != "فيروز" {
+		t.Errorf("Artist = %q", got.OriginalArtist)
 	}
 }
 
-func TestEditClearingAlbumClearsBothForms(t *testing.T) {
+func TestEditClearingAlbumClearsIt(t *testing.T) {
 	a, tr := ingested(t)
 	a.Edit(tr.ID, app.Edit{Album: ptr("Sleep")})
 	got, _ := a.Edit(tr.ID, app.Edit{Album: ptr("")})
-	if got.AsciiAlbum != "" || got.OriginalAlbum != "" {
-		t.Errorf("album = %q / %q, want both empty", got.AsciiAlbum, got.OriginalAlbum)
+	if got.OriginalAlbum != "" {
+		t.Errorf("album = %q, want empty", got.OriginalAlbum)
 	}
 }
 
