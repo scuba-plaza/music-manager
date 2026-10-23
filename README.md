@@ -33,7 +33,7 @@ asks and fails if the title or artist is unknown.
 ## The full-screen interface
 
 Run `mm` in a terminal (or `mm tui`) to browse and edit the library on one screen: artists, albums and
-tracks on the left, the selected track's details on the right. Every change is saved at once to
+tracks on the left, and on the right whatever the cursor is on: a track's details, or what is inside an album (its tracks), an artist (its albums and singles), a playlist (its tracks in play order) or the Needs work group (what each track lacks), as the preview column of a file manager does. Every change is saved at once to
 `library.json`; the music folder only changes when you sync (`s`), and the header says how many tracks
 are waiting (`3 to sync`). Press `?` for the list of keys; the bottom line always shows the ones that
 matter right now. Without a terminal, plain `mm` prints help as before.
@@ -45,7 +45,7 @@ matter right now. Without a terminal, plain `mm` prints help as before.
 | `S` | sort the list by artist, album, title, track number, length or any of the three dates (see below); the menu also reverses the order and goes back to the tree |
 | `+` `-` | open the tree one more level (artists, then albums) / close all of it |
 | `→` `enter` | from a track into its fields; `enter` edits a field, `enter` saves, `esc` cancels |
-| `→` `←` `1` `2` | in the fields: the other tab (Details, Audio); `←` on the first tab goes back to the tree. The tab you are on stays when you select another track |
+| `→` `←` `1` `2` `3` | in the fields: the other tab (Details, Audio, Player); `←` on the first tab goes back to the tree. The tab you are on stays when you select another track |
 | `tab` | while editing a name: switch between the text and its ASCII form |
 | `[` `]` `{` `}` `0` `p` | on a cut: nudge by 0.1 s / 1 s, clear, hear the 8 s around it (needs `ffplay` or `mpv`) |
 | `space` `ctrl+a` `e` | mark tracks (an album marks all of its tracks); edit the marked ones, or rename an artist or album |
