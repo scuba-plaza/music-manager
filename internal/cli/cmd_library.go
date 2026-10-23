@@ -171,7 +171,7 @@ func showCmd(open opener) *cobra.Command {
 			return w.Flush()
 		},
 	}
-	cmd.Flags().BoolVar(&wolfgang, "wolfgang", false, "also show the artist and album the Wolfgang WMP01 will show")
+	cmd.Flags().BoolVar(&wolfgang, "wolfgang", false, "also show the artist and album the Wolfgang WMP01 will show, and what it will not show well")
 	return cmd
 }
 

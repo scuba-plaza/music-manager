@@ -59,8 +59,8 @@ type Model struct {
 	sortReverse bool
 
 	// The inspector: which field the cursor is on and, while one is being
-	// edited, its draft and inputs (the text, and a second one for the ASCII
-	// form of a name or the size of an album).
+	// edited, its draft and inputs (the text, and a second one for the size of
+	// an album).
 	focus     pane
 	field     int
 	editing   bool
