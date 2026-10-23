@@ -42,6 +42,9 @@ func (m Model) fieldStarts(t manifest.Track, w, h int) []fieldStart {
 		if f == fCutEnd {
 			line++ // the bar of what the cuts keep
 		}
+		if f == fFadeOut {
+			line += len(m.levelLines(t, w)) // the level line, if there are fades
+		}
 	}
 	return starts
 }

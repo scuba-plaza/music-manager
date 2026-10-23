@@ -145,6 +145,11 @@ func showCmd(open opener) *cobra.Command {
 				}
 			}
 			row("Length", clock(t.PlayingLength()))
+			if t.GainSteps != 0 {
+				row("Volume", app.VolumeText(t.GainSteps)+" ("+plural(max(t.GainSteps, -t.GainSteps), "step", "steps")+")")
+			}
+			row("Fade in", app.FadeText(t.FadeIn, true, t))
+			row("Fade out", app.FadeText(t.FadeOut, false, t))
 			if t.TrimStart > 0 || t.TrimEnd > 0 {
 				row("Trim", fmt.Sprintf("start %s, end %s (of %s)",
 					timecode.Format(t.TrimStart), timecode.Format(t.TrimEnd), timecode.Format(t.SourceLength.Round(time.Millisecond))))

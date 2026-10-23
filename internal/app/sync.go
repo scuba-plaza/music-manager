@@ -167,6 +167,9 @@ func (a *App) renderTrack(t manifest.Track) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if audio, err = shaped(t, audio); err != nil {
+		return nil, err
+	}
 	if t.TrimStart > 0 || t.TrimEnd > 0 {
 		if audio, err = mp3.Trim(audio, t.TrimStart, t.TrimEnd); err != nil {
 			return nil, err

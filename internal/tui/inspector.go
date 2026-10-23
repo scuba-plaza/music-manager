@@ -11,6 +11,7 @@ import (
 	"music-manager/internal/app"
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
+	"music-manager/internal/mp3"
 	"music-manager/internal/translit"
 )
 
@@ -134,6 +135,9 @@ func (m Model) headLines(t manifest.Track, w int, compact bool) []string {
 		lines = append(lines, m.fieldLines(t, f, m.focus == paneInspector && i == m.field, w, compact)...)
 		if f == fCutEnd {
 			lines = append(lines, m.barLines(t, w))
+		}
+		if f == fFadeOut {
+			lines = append(lines, m.levelLines(t, w)...)
 		}
 	}
 	if tab == tabOf(fPlayerArtist) {
@@ -346,6 +350,14 @@ func (m Model) editorLines(prefix, indent string, vw int) []string {
 	case m.dr.field == fGenre:
 		first.Width = max(vw-1, 1)
 		lines = append(lines, prefix+first.View(), indent+styles.dim.Render(fit("e.g. Folk or Neoclassical · empty for none", vw)))
+	case m.dr.field == fVolume:
+		first.Width = max(vw-1, 1)
+		lines = append(lines, prefix+first.View())
+		lines = append(lines, hintLines(indent, "dB, like +3 or -4.5, in steps of 1.5 dB up to 24; empty for no change. Boosting can clip.", vw)...)
+	case m.dr.field == fFadeIn || m.dr.field == fFadeOut:
+		first.Width = max(vw-1, 1)
+		lines = append(lines, prefix+first.View())
+		lines = append(lines, hintLines(indent, "how long, like 3 or 0:02.5, or the stretch it covers, like 0:02-0:05; empty for none", vw)...)
 	case m.dr.field == fPlayerArtist || m.dr.field == fPlayerAlbum:
 		first.Width = max(vw-1, 1)
 		n := utf8.RuneCountInString(strings.TrimSpace(first.Value()))
@@ -452,4 +464,25 @@ func playerFieldLines(t manifest.Track, f fieldKind, prefix, indent string, vw i
 		st = styles.warn
 	}
 	return append(lines, indent+st.Render(fit(strings.Join(note, " · "), vw)))
+}
+
+// hintLines is a dim explanation under a field, wrapped to the width.
+func hintLines(indent, text string, vw int) []string {
+	var lines []string
+	for _, l := range wrap(text, vw) {
+		lines = append(lines, indent+styles.dim.Render(l))
+	}
+	return lines
+}
+
+// levelLines is the line that shows what the fades do to the volume across the
+// track, or nothing if there are none.
+func (m Model) levelLines(t manifest.Track, w int) []string {
+	if t.FadeIn == (manifest.Span{}) && t.FadeOut == (manifest.Span{}) {
+		return nil
+	}
+	start, end := m.cuts(t)
+	shape := mp3.Shape{FadeIn: mp3.Fade(t.FadeIn), FadeOut: mp3.Fade(t.FadeOut)}
+	prefix := " " + " " + styles.dim.Render(fit("Level", labelWidth-2)) + " "
+	return []string{prefix + levelBar(t.SourceLength, start, end, shape, max(w-labelWidth-2, 8))}
 }

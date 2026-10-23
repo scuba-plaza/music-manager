@@ -15,6 +15,7 @@ import (
 	"music-manager/internal/app"
 
 	"music-manager/internal/manifest"
+	"music-manager/internal/mp3"
 	"strings"
 )
 
@@ -225,7 +226,14 @@ const minKept = 100 * time.Millisecond
 func (m Model) nudge(step time.Duration) (tea.Model, tea.Cmd) {
 	f := trackFields[m.field]
 	r, ok := m.selectedRow()
-	if !ok || (f != fCutStart && f != fCutEnd) {
+	switch {
+	case !ok:
+		return m, nil
+	case f == fVolume:
+		return m.nudgeVolume(r.Track, step)
+	case f == fFadeIn || f == fFadeOut:
+		return m.nudgeFade(r.Track, f, step)
+	case f != fCutStart && f != fCutEnd:
 		return m, nil
 	}
 	t := r.Track
@@ -245,14 +253,23 @@ func (m Model) nudge(step time.Duration) (tea.Model, tea.Cmd) {
 func (m Model) setCut(d time.Duration, nudge string) (tea.Model, tea.Cmd) {
 	f := trackFields[m.field]
 	r, ok := m.selectedRow()
-	if !ok || (f != fCutStart && f != fCutEnd) {
+	if !ok {
 		return m, nil
 	}
 	var e app.Edit
-	if f == fCutStart {
+	switch f {
+	case fCutStart:
 		e.TrimStart = &d
-	} else {
+	case fCutEnd:
 		e.TrimEnd = &d
+	case fVolume:
+		e.GainDB = new(float64)
+	case fFadeIn:
+		e.FadeIn = &manifest.Span{}
+	case fFadeOut:
+		e.FadeOut = &manifest.Span{}
+	default:
+		return m, nil
 	}
 	m.busy = true
 	return m, m.save(r.Track, e, "change of "+strings.ToLower(f.label()), nudge)
@@ -284,6 +301,9 @@ func (m Model) edited(msg editedMsg) (tea.Model, tea.Cmd) {
 	m.busy = false
 	if msg.err != nil {
 		m.editErr = msg.err.Error()
+		if !m.editing { // a nudge: there is no editor to show it in
+			m.say(msg.err.Error(), true)
+		}
 		return m, nil
 	}
 	m.editing, m.editErr = false, ""
@@ -444,4 +464,60 @@ func (m Model) restored(msg restoredMsg) (tea.Model, tea.Cmd) {
 		m.revealTrack(tracks[0])
 	}
 	return m, nil
+}
+
+// nudgeVolume changes the volume by a step of 1.5 dB, or four with a big
+// nudge, up to the most a track may be changed.
+func (m Model) nudgeVolume(t manifest.Track, step time.Duration) (tea.Model, tea.Cmd) {
+	n := 1
+	if step >= time.Second || step <= -time.Second {
+		n = 4
+	}
+	if step < 0 {
+		n = -n
+	}
+	next := clamp(t.GainSteps+n, -app.MaxGainSteps, app.MaxGainSteps)
+	if next == t.GainSteps {
+		return m, nil
+	}
+	db := float64(next) * mp3.StepDB
+	m.busy = true
+	return m, m.save(t, app.Edit{GainDB: &db}, "change of volume", t.ID+"\x00"+fVolume.label())
+}
+
+// nudgeFade makes a fade longer or shorter by step, from where the track
+// starts for a fade-in and back from where it ends for a fade-out, or from
+// the fade's own edge if it has one. A fade that shrinks to nothing is gone.
+func (m Model) nudgeFade(t manifest.Track, f fieldKind, step time.Duration) (tea.Model, tea.Cmd) {
+	span := t.FadeIn
+	if f == fFadeOut {
+		span = t.FadeOut
+	}
+	length := span.End - span.Start
+	next := clamp(int(length+step), 0, int(max(t.PlayingLength(), 0)))
+	d := time.Duration(next).Round(time.Millisecond)
+	if d == length {
+		return m, nil
+	}
+	var e app.Edit
+	switch {
+	case d == 0 && f == fFadeIn:
+		e.FadeIn = &manifest.Span{}
+	case d == 0:
+		e.FadeOut = &manifest.Span{}
+	case f == fFadeIn:
+		start := t.TrimStart
+		if length > 0 {
+			start = span.Start
+		}
+		e.FadeIn = &manifest.Span{Start: start, End: start + d}
+	default:
+		end := t.SourceLength - t.TrimEnd
+		if length > 0 {
+			end = span.End
+		}
+		e.FadeOut = &manifest.Span{Start: end - d, End: end}
+	}
+	m.busy = true
+	return m, m.save(t, e, "change of "+strings.ToLower(f.label()), t.ID+"\x00"+f.label())
 }

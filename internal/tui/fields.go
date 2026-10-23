@@ -11,6 +11,7 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/manifest"
+	"music-manager/internal/mp3"
 	"music-manager/internal/timecode"
 	"music-manager/internal/translit"
 )
@@ -31,6 +32,9 @@ const (
 	fCover
 	fPlayerArtist
 	fPlayerAlbum
+	fVolume
+	fFadeIn
+	fFadeOut
 )
 
 // An inspectorTab is a page of the inspector: some of the fields, under a name.
@@ -41,7 +45,7 @@ type inspectorTab struct {
 
 var inspectorTabs = []inspectorTab{
 	{"Details", []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fGenre, fCover}},
-	{"Audio", []fieldKind{fCutStart, fCutEnd}},
+	{"Audio", []fieldKind{fCutStart, fCutEnd, fVolume, fFadeIn, fFadeOut}},
 	{"Player", []fieldKind{fPlayerArtist, fPlayerAlbum}},
 }
 
@@ -79,7 +83,7 @@ func firstFieldOf(tab int) int {
 func (m Model) tab() int { return tabOf(trackFields[m.field]) }
 
 func (f fieldKind) label() string {
-	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Artist", "Album"}[f]
+	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Artist", "Album", "Volume", "Fade in", "Fade out"}[f]
 }
 
 // isName reports whether the field is text that also has an ASCII form.
@@ -190,6 +194,12 @@ func displayValue(t manifest.Track, f fieldKind) string {
 		}
 		shown, _ := playerShown(t, f)
 		return shown
+	case fVolume:
+		return app.VolumeText(t.GainSteps)
+	case fFadeIn:
+		return app.FadeText(t.FadeIn, true, t)
+	case fFadeOut:
+		return app.FadeText(t.FadeOut, false, t)
 	}
 	if s := cutText(f, t); s != "" {
 		return s
@@ -208,13 +218,16 @@ type draft struct {
 	// auto: what the player shows when the field is left to itself, for the
 	// player names: text equal to it is not an override.
 	auto string
+	// track is the track being edited, for the fades, which are typed as lengths
+	// from its cuts.
+	track manifest.Track
 	// follow: the ASCII form was the automatic one, so it keeps following
 	// the text until touched. A custom form stays put.
 	follow bool
 }
 
 func newDraft(t manifest.Track, f fieldKind) draft {
-	d := draft{field: f}
+	d := draft{field: f, track: t}
 	switch {
 	case f.isName():
 		d.text, d.second = names(t, f)
@@ -230,6 +243,14 @@ func newDraft(t manifest.Track, f fieldKind) draft {
 		d.text = genreText(t)
 	case f == fPlayerArtist || f == fPlayerAlbum:
 		d.text, d.auto = playerShown(t, f)
+	case f == fVolume:
+		if t.GainSteps != 0 {
+			d.text = fmt.Sprintf("%+.1f", float64(t.GainSteps)*mp3.StepDB)
+		}
+	case f == fFadeIn:
+		d.text = app.FadeText(t.FadeIn, true, t)
+	case f == fFadeOut:
+		d.text = app.FadeText(t.FadeOut, false, t)
 	default:
 		d.text = cutText(f, t)
 	}
@@ -292,6 +313,22 @@ func (d draft) edit() (app.Edit, error) {
 	case fGenre:
 		genre := strings.TrimSpace(d.text)
 		e.Genre = &genre
+	case fVolume:
+		db, err := app.ParseGain(d.text)
+		if err != nil {
+			return e, err
+		}
+		e.GainDB = &db
+	case fFadeIn, fFadeOut:
+		span, err := app.ParseFade(d.text, d.field == fFadeIn, d.track)
+		if err != nil {
+			return e, err
+		}
+		if d.field == fFadeIn {
+			e.FadeIn = &span
+		} else {
+			e.FadeOut = &span
+		}
 	case fPlayerArtist, fPlayerAlbum:
 		name := strings.TrimSpace(d.text)
 		if name == d.auto {

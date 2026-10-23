@@ -476,3 +476,61 @@ func TestTheNamesThePlayerShowsCanBeSetAndAreShownWhenTheyDiffer(t *testing.T) {
 		t.Error("add accepted --player-artist")
 	}
 }
+
+func TestSetTheVolumeAndTheFadesFromTheCommandLine(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib) // 2.6 s
+
+	if code, _, errs := run(t, lib, "edit", id, "--title", "Song", "--artist", "Band", "--gain", "+3dB", "--fade-in", "1", "--fade-out", "0:00.5"); code != 0 {
+		t.Fatalf("edit: code %d, err %q", code, errs)
+	}
+	_, out, _ := run(t, lib, "show", id)
+	s := squash(out)
+	for _, want := range []string{"Volume +3.0 dB (2 steps)", "Fade in 0:01", "Fade out 0:00.5"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("show lacks %q:\n%s", want, out)
+		}
+	}
+
+	// A fade counts from the cuts, including cuts given in the same command.
+	if code, _, errs := run(t, lib, "edit", id, "--trim-start", "0:01", "--fade-in", "1"); code != 0 {
+		t.Fatalf("edit: code %d, err %q", code, errs)
+	}
+	if _, out, _ = run(t, lib, "show", id); !strings.Contains(squash(out), "Fade in 0:01") {
+		t.Errorf("a fade-in from the new cut:\n%s", out)
+	}
+	if _, out, _ = run(t, lib, "show", id); !strings.Contains(squash(out), "Fade out 0:00.5") {
+		t.Errorf("the other fade was lost:\n%s", out)
+	}
+
+	// Each can be taken away again.
+	if code, _, errs := run(t, lib, "edit", id, "--gain", "0", "--fade-in", "", "--fade-out", "0"); code != 0 {
+		t.Fatalf("edit: code %d, err %q", code, errs)
+	}
+	if _, out, _ = run(t, lib, "show", id); strings.Contains(out, "Volume") || strings.Contains(out, "Fade") {
+		t.Errorf("loudness is still shown:\n%s", out)
+	}
+}
+
+func TestVolumeAndFadeFlagsSayWhatIsWrong(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib)
+	for name, c := range map[string]struct {
+		args []string
+		want string
+	}{
+		"not a number":     {[]string{"--gain", "loud"}, "loud"},
+		"too much":         {[]string{"--gain", "40"}, "24 dB"},
+		"not a time":       {[]string{"--fade-in", "soon"}, "soon"},
+		"past the track":   {[]string{"--fade-out", "1:00"}, "fade-out"},
+		"fades that cross": {[]string{"--fade-in", "2", "--fade-out", "2"}, "must not start before"},
+	} {
+		code, _, errs := run(t, lib, append([]string{"edit", id}, c.args...)...)
+		if code == 0 || !strings.Contains(errs, c.want) {
+			t.Errorf("%s: code %d, err %q; want one that says %q", name, code, errs, c.want)
+		}
+	}
+	if _, out, _ := run(t, lib, "show", id); strings.Contains(out, "Volume") || strings.Contains(out, "Fade") {
+		t.Errorf("a refused edit changed the track:\n%s", out)
+	}
+}

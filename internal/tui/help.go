@@ -30,16 +30,16 @@ var helpLeft = []helpSection{
 	{"Editing a track", []helpEntry{
 		{"→  enter", "from tree into fields"},
 		{"↑↓", "choose a field"},
-		{"← →  1 2", "details / audio tab"},
+		{"← →  1-3", "details, audio, player"},
 		{"enter", "edit it; enter saves"},
 		{"esc", "cancel, or back to tree"},
 		{"tab", "ascii form / other number"},
 	}},
-	{"Cuts", []helpEntry{
-		{"[ ]", "nudge by 0.1 s"},
-		{"{ }", "nudge by 1 s"},
-		{"0", "no cut"},
-		{"p", "hear 8 s beside the cut"},
+	{"Cuts, volume, fades", []helpEntry{
+		{"[ ]", "nudge 0.1 s or 1.5 dB"},
+		{"{ }", "nudge 1 s or 6 dB"},
+		{"0", "no cut, fade or change"},
+		{"p", "hear 8 s beside it"},
 	}},
 }
 

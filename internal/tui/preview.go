@@ -43,7 +43,7 @@ func (m *Model) stopPlayback() {
 // togglePreview plays the audio around the cut being looked at, or stops it.
 func (m Model) togglePreview() (tea.Model, tea.Cmd) {
 	f := trackFields[m.field]
-	if f != fCutStart && f != fCutEnd {
+	if !hearable(f) {
 		return m, nil
 	}
 	if m.playing != nil {
@@ -59,13 +59,20 @@ func (m Model) togglePreview() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	edge := app.EdgeStart
-	if f == fCutEnd {
+	if f == fCutEnd || f == fFadeOut {
 		edge = app.EdgeEnd
+	}
+	window := previewWindow
+	switch f { // a fade is heard whole, and a little beyond
+	case fFadeIn:
+		window = max(window, r.Track.FadeIn.End-r.Track.FadeIn.Start+2*time.Second)
+	case fFadeOut:
+		window = max(window, r.Track.FadeOut.End-r.Track.FadeOut.Start+2*time.Second)
 	}
 	m.previews++
 	id, lib, player, trackID := m.previews, m.lib, m.player, r.Track.ID
 	return m, func() tea.Msg {
-		path, cleanup, err := lib.PreviewTrim(trackID, edge, previewWindow)
+		path, cleanup, err := lib.PreviewTrim(trackID, edge, window)
 		if err != nil {
 			return playbackStartedMsg{err: err}
 		}
@@ -97,4 +104,14 @@ func (m Model) playbackDone(msg playbackDoneMsg) (tea.Model, tea.Cmd) {
 		m.playing = nil
 	}
 	return m, nil
+}
+
+// hearable reports whether the field has a preview: the cuts, the volume and
+// the fades are things to hear.
+func hearable(f fieldKind) bool {
+	switch f {
+	case fCutStart, fCutEnd, fVolume, fFadeIn, fFadeOut:
+		return true
+	}
+	return false
 }

@@ -70,7 +70,7 @@ changes the library while the interface is open, the change appears within a cou
 | `mm identify [id…] [--yes]` | look tracks up on MusicBrainz; pick from a list, or `--yes` for confident matches |
 | `mm adopt [id…]` | identify tracks by what their old tags said, for what MusicBrainz does not know |
 | `mm add <url>` | download with yt-dlp and add |
-| `mm edit <id> --title … --artist … --album … --track N --of N --released DATE --genre TEXT --player-artist TEXT --player-album TEXT --source-url LINK --trim-start T --trim-end T --cover FILE` | change a track; `--title-ascii` etc. override the derived ASCII |
+| `mm edit <id> --title … --artist … --album … --track N --of N --released DATE --genre TEXT --player-artist TEXT --player-album TEXT --source-url LINK --trim-start T --trim-end T --gain DB --fade-in T --fade-out T --cover FILE` | change a track; `--title-ascii` etc. override the derived ASCII |
 | `mm ls [words] [status:identified\|unidentified] [--sort KEY] [--reverse]` / `mm show <id>` | look at records; `--sort` takes `artist`, `album`, `title`, `track`, `length`, `released`, `added` or `edited` |
 | `mm sync [--target DIR] [--dry-run] [--prune --yes]` | render the folder; `--prune` deletes files the records don't account for |
 | `mm rm <id>…` | remove records (audio is deleted by the next sync) |
@@ -114,6 +114,18 @@ The player keeps only 12 characters of an artist and of an album, and 26 of a fi
 To choose a name yourself, set `--player-artist` or `--player-album` (`mm edit <id> --player-artist "A. H. Hafez"`; `""` goes back to the automatic one), or use the Player tab of the TUI (`3`), which shows what the player will show, where it comes from and how many characters it counts. `mm show` has an "On the player" row when the names differ. For many tracks at once use a review file with `## ARTISTS -> player-artist` and `## ALBUMS -> player-album`, each entry with its own shortening.
 
 File names are `NN - Title.mp3` within 22 characters before the extension (a title is shortened the same way), so a track's file name is also whole on the player. This renames the files of long titles at the next sync; folders keep their full names.
+
+## Volume and fades
+
+A track can be made louder or quieter and can fade in and out, without being decoded or encoded again: an MP3 stores a gain for every 13 ms granule of each channel, and `mm sync` changes it (one step is 1.5 dB, a fourth of an octave of amplitude), so the sound is not touched and the file does not grow. A volume is therefore rounded to the nearest 1.5 dB and limited to 24 dB either way; boosting a track whose peaks are near full scale can clip. A fade is a ramp of amplitude from silence to full or back, in steps of 1.5 dB down to 60 dB (so a very short fade may sound stepped), and the track is silent before a fade-in starts and after a fade-out ends.
+
+```
+mm edit <id> --gain 3 --fade-in 2 --fade-out 4      # +3 dB, 2 s in, 4 s out
+mm edit <id> --fade-out 3:50-3:58                    # a stretch of the original
+mm edit <id> --gain 0 --fade-in "" --fade-out ""     # all away
+```
+
+A length counts from where the track now starts (fade-in) or back from where it now ends (fade-out); a stretch is in the time of the original, as it is stored, so cutting the track again later does not move a fade. In the TUI the Audio tab (`2`) has Volume, Fade in and Fade out below the cuts, with the same `[ ]` and `{ }` nudge keys (1.5 dB and 6 dB for the volume, 0.1 s and 1 s for the length of a fade), `0` to clear, and `p` to hear the start or the end with the change applied. A line under the fields draws the ramps.
 
 ## Dates and sorting
 

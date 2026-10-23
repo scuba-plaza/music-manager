@@ -2,12 +2,15 @@ package app
 
 import (
 	"fmt"
+	"math"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
 	"music-manager/internal/manifest"
+	"music-manager/internal/mp3"
+	"music-manager/internal/timecode"
 	"music-manager/internal/translit"
 )
 
@@ -32,7 +35,16 @@ type Edit struct {
 	// PlayerArtist and PlayerAlbum are one line each, or "" to go back to the
 	// shortened real name.
 	PlayerArtist, PlayerAlbum *string
+	// GainDB makes the track louder or quieter by about this much, rounded to
+	// the nearest step the file allows (mp3.StepDB); 0 for no change.
+	GainDB *float64
+	// FadeIn and FadeOut are stretches of the original audio; an empty one
+	// takes the fade away.
+	FadeIn, FadeOut *manifest.Span
 }
+
+// MaxGainSteps is the most a track may be made louder or quieter, in steps.
+const MaxGainSteps = 16 // 24 dB
 
 // Edit applies e to the track with the given ID and returns the result. A
 // track with a title and an artist is identified.
@@ -107,6 +119,15 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 		}
 		*f.out = v
 	}
+	if e.GainDB != nil {
+		t.GainSteps = int(math.Round(*e.GainDB / mp3.StepDB))
+	}
+	if e.FadeIn != nil {
+		t.FadeIn = *e.FadeIn
+	}
+	if e.FadeOut != nil {
+		t.FadeOut = *e.FadeOut
+	}
 	if err := validate(t); err != nil {
 		return t, err
 	}
@@ -164,6 +185,24 @@ func validate(t manifest.Track) error {
 		return fmt.Errorf("trims (%v + %v) leave nothing of a %v track", t.TrimStart, t.TrimEnd, t.SourceLength.Round(time.Millisecond))
 	case t.TrackNumber < 0 || t.TrackTotal < 0:
 		return fmt.Errorf("track numbers cannot be negative")
+	case t.GainSteps > MaxGainSteps || t.GainSteps < -MaxGainSteps:
+		return fmt.Errorf("a volume change of %+.1f dB is more than the %.0f dB allowed", float64(t.GainSteps)*mp3.StepDB, MaxGainSteps*mp3.StepDB)
+	}
+	for _, f := range []struct {
+		name string
+		span manifest.Span
+	}{{"fade-in", t.FadeIn}, {"fade-out", t.FadeOut}} {
+		if f.span == (manifest.Span{}) {
+			continue
+		}
+		if f.span.Start < 0 || f.span.End <= f.span.Start || f.span.End > t.SourceLength {
+			return fmt.Errorf("the %s (%s to %s) must start inside the track and end after it starts, within its %s",
+				f.name, timecode.Format(f.span.Start), timecode.Format(f.span.End), timecode.Format(t.SourceLength.Round(time.Millisecond)))
+		}
+	}
+	if t.FadeIn != (manifest.Span{}) && t.FadeOut != (manifest.Span{}) && t.FadeOut.Start < t.FadeIn.End {
+		return fmt.Errorf("the fade-out (from %s) must not start before the fade-in ends (%s)",
+			timecode.Format(t.FadeOut.Start), timecode.Format(t.FadeIn.End))
 	}
 	return nil
 }

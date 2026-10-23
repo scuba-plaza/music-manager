@@ -38,6 +38,9 @@ func (a *App) PreviewTrim(id string, edge Edge, window time.Duration) (path stri
 	if err != nil {
 		return "", nil, err
 	}
+	if audio, err = shaped(t, audio); err != nil {
+		return "", nil, err
+	}
 
 	start, end := t.TrimStart, t.TrimEnd
 	switch edge {

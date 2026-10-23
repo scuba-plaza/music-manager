@@ -46,13 +46,25 @@ type Track struct {
 	// PlayerArtist and PlayerAlbum are what the player is to show instead of the
 	// artist and album, which it cuts at 12 characters; empty means a shortened
 	// form of the real name.
-	PlayerArtist  string    `json:"player_artist,omitempty"`
-	PlayerAlbum   string    `json:"player_album,omitempty"`
+	PlayerArtist string `json:"player_artist,omitempty"`
+	PlayerAlbum  string `json:"player_album,omitempty"`
+	// GainSteps makes the track louder (or, below zero, quieter) by this many
+	// steps of 1.505 dB. FadeIn and FadeOut are stretches of the original
+	// audio over which the sound rises from nothing or falls to nothing.
+	GainSteps     int       `json:"gain_steps,omitempty"`
+	FadeIn        Span      `json:"fade_in,omitzero"`
+	FadeOut       Span      `json:"fade_out,omitzero"`
 	CoverSHA256   string    `json:"cover_sha256"`
 	MBRecordingID string    `json:"mb_recording_id"`
 	MBReleaseID   string    `json:"mb_release_id"`
 	AddedAt       time.Time `json:"added_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// Span is a stretch of a track's original audio; the zero value is none.
+type Span struct {
+	Start time.Duration `json:"start_ns"`
+	End   time.Duration `json:"end_ns"`
 }
 
 // Hint carries what an ingested file said about itself. It only seeds the

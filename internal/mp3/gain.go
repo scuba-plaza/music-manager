@@ -31,7 +31,7 @@ const floorSteps = 40
 // at says what the granule in the middle of which time is t gets: the steps to
 // add to its gain, or that it is to be silent.
 func (s Shape) at(t float64) (steps int, silent bool) {
-	f := ramp(s.FadeIn, t, true) * ramp(s.FadeOut, t, false)
+	f := s.level(t)
 	if f < math.Exp2(-floorSteps/4.0) {
 		return 0, true
 	}
@@ -193,4 +193,12 @@ func crc16(crc uint16, b []byte) uint16 {
 		}
 	}
 	return crc
+}
+
+// Level is the share of the full amplitude that the fades leave at time at:
+// 1 outside them, 0 before a fade-in and after a fade-out.
+func (s Shape) Level(at time.Duration) float64 { return s.level(at.Seconds()) }
+
+func (s Shape) level(t float64) float64 {
+	return ramp(s.FadeIn, t, true) * ramp(s.FadeOut, t, false)
 }

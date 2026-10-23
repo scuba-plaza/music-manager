@@ -290,3 +290,31 @@ func TestFadesAreInSecondsWhateverTheLayoutOfTheFrames(t *testing.T) {
 		t.Errorf("granules 18, 19 and 40: %d, %d and %d; want -4, -4 and 0", d[18], d[19], d[40])
 	}
 }
+
+func TestLevelIsTheShareOfTheFullAmplitudeTheFadesLeave(t *testing.T) {
+	s := mp3.Shape{
+		Steps:   9, // does not count: it is not a fade
+		FadeIn:  mp3.Fade{Start: time.Second, End: 3 * time.Second},
+		FadeOut: mp3.Fade{Start: 5 * time.Second, End: 9 * time.Second},
+	}
+	for at, want := range map[time.Duration]float64{
+		0:                       0, // silent until the fade-in begins
+		time.Second:             0,
+		2 * time.Second:         0.5,
+		2500 * time.Millisecond: 0.75,
+		3 * time.Second:         1,
+		4 * time.Second:         1,
+		5 * time.Second:         1,
+		7 * time.Second:         0.5,
+		8 * time.Second:         0.25,
+		9 * time.Second:         0,
+		10 * time.Second:        0,
+	} {
+		if got := s.Level(at); got < want-1e-9 || got > want+1e-9 {
+			t.Errorf("Level(%v) = %v, want %v", at, got, want)
+		}
+	}
+	if got := (mp3.Shape{Steps: 4}).Level(time.Hour); got != 1 {
+		t.Errorf("without fades the level is %v, want 1", got)
+	}
+}
