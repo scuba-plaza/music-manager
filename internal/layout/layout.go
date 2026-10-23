@@ -11,6 +11,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"golang.org/x/text/unicode/norm"
+
 	"music-manager/internal/manifest"
 )
 
@@ -28,25 +30,27 @@ type Rules struct {
 	Fold func(string) string
 	// ComponentMax is the most bytes in one path component; 0 means 255.
 	ComponentMax int
-	// StemMax is the most characters in a file name before ".mp3"; 0 means no limit.
+	// StemMax is the most characters in a file name before ".mp3", the track
+	// number and the " (2)" of a collision included: a longer title is cut
+	// there, as the player shows no more. 0 means no limit.
 	StemMax int
 }
 
 // PathFor returns the slash-separated path of t relative to the library
 // root: Artist/Album/NN - Title.mp3, Artist/Title.mp3 for tracks without an
 // album, or _Inbox/<id> - <old name>.mp3 for tracks not yet identified. The
-// file name is shortened to r.StemMax characters.
+// file name is cut at r.StemMax characters.
 func PathFor(t manifest.Track, r Rules) string { return pathFor(t, "", r) }
 
-// pathFor is PathFor with suffix (" (2)") put after the name, which is
-// shortened to leave room for it.
+// pathFor is PathFor with suffix (" (2)") put after the name, which is cut to
+// leave room for it.
 func pathFor(t manifest.Track, suffix string, r Rules) string {
 	room := r.StemMax - len(suffix)
 	stem := func(s string, room int) string {
 		if r.StemMax <= 0 {
 			return s
 		}
-		return Shorten(s, room)
+		return cut(s, room)
 	}
 	if t.Status != manifest.Identified {
 		name := t.ID
@@ -97,8 +101,10 @@ func Assign(tracks []manifest.Track, r Rules) map[string]string {
 	return out
 }
 
-// clean makes s usable as one path component on any filesystem.
+// clean makes s usable as one path component on any filesystem, with its
+// accents composed so that one name has one spelling.
 func clean(s string, r Rules) string {
+	s = norm.NFC.String(s)
 	if r.Fold != nil {
 		s = r.Fold(s)
 	}
@@ -111,6 +117,15 @@ func clean(s string, r Rules) string {
 	s = strings.Trim(truncate(s, r.ComponentMax), " .'")
 	if strings.Trim(s, "-") == "" {
 		return "Unknown"
+	}
+	return s
+}
+
+// cut keeps the first n characters of s and no more, as the player does, and
+// leaves nothing at its end that a file name cannot end with.
+func cut(s string, n int) string {
+	if runes := []rune(s); len(runes) > max(n, 1) {
+		s = strings.TrimRight(string(runes[:max(n, 1)]), " .'")
 	}
 	return s
 }

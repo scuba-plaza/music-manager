@@ -158,8 +158,11 @@ type wolfgang struct{}
 
 func (wolfgang) Name() string { return "wolfgang-wmp01" }
 
+// Layout: the player shows the first 24 characters of a file name and stores
+// 26 with the extension, so a longer name is cut at 24, where what is shown is
+// the end of the name and not the start of ".mp3".
 func (wolfgang) Layout() layout.Rules {
-	return layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: 22}
+	return layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: 24}
 }
 
 // Tags keep the true title, which the player shows nowhere; the artist and

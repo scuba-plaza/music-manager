@@ -17,12 +17,12 @@ Keaton Henson/Dream.mp3
   extra: MM_ID="<e>"
   cover: image/jpeg 935deb7cff
   audio: e12563850e 2.716734592s
-Max Richter/The Long Album Name Here (Deluxe)/05 - A Very Long (2).mp3
+Max Richter/The Long Album Name Here (Deluxe)/05 - A Very Long Tit (2).mp3
   title="A Very Long Title Indeed That Goes On" artist="Max Richter" album="Long Album" genre="" track=5/5 date="" tlen=2.69s
   extra: MM_ID="<d>"
   cover: none
   audio: 1f2d424b0a 2.690612144s
-Max Richter/The Long Album Name Here (Deluxe)/05 - A Very Long Title.mp3
+Max Richter/The Long Album Name Here (Deluxe)/05 - A Very Long Title I.mp3
   title="A Very Long Title Indeed That Goes On" artist="Max Richter" album="Long Album" genre="" track=5/5 date="" tlen=2.664s
   extra: MM_ID="<c>"
   cover: image/jpeg cc1a610a49
@@ -39,7 +39,7 @@ Nils Frahm/Cold.mp3
 Playlists/Resistance.m3u
   "\\Bd al-Hlim Hafz\\Rwa\\01 - Bhlm Bik.mp3\r\n\\Nils Frahm\\Cold.mp3\r\n"
 Playlists/Study.m3u
-  "\\Firuz\\Hits\\03 - Wtni.mp3\r\n\\Bd al-Hlim Hafz\\Rwa\\01 - Bhlm Bik.mp3\r\n\\Max Richter\\The Long Album Name Here (Deluxe)\\05 - A Very Long Title.mp3\r\n\\Keaton Henson\\Dream.mp3\r\n"
+  "\\Firuz\\Hits\\03 - Wtni.mp3\r\n\\Bd al-Hlim Hafz\\Rwa\\01 - Bhlm Bik.mp3\r\n\\Max Richter\\The Long Album Name Here (Deluxe)\\05 - A Very Long Title I.mp3\r\n\\Keaton Henson\\Dream.mp3\r\n"
 _Inbox/<g> - g.mp3
   title="" artist="" album="" genre="" track=0/0 date="" tlen=0s
   extra: MM_ID="<g>"

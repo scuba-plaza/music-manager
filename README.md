@@ -115,7 +115,7 @@ The player keeps only 12 characters of an artist and of an album, and 26 of a fi
 
 To choose a name yourself, set `--player-artist` or `--player-album` (`mm edit <id> --player-artist "A. H. Hafez"`; `""` goes back to the automatic one), or use the Player tab of the TUI (`3`), which shows what the player will show, where it comes from and how many characters it counts. `mm show` has an "On the player" row when the names differ. For many tracks at once use a review file with `## ARTISTS -> player-artist` and `## ALBUMS -> player-album`, each entry with its own shortening.
 
-File names are `NN - Title.mp3` within 22 characters before the extension (a title is shortened the same way), so a track's file name is also whole on the player. This renames the files of long titles at the next sync; folders keep their full names.
+File names are `NN - Title.mp3` and the player shows the first 24 characters of one, so a longer name is cut there, the track number and the ` (2)` of a collision counted in the 24. This renames the files of long titles at the next sync; folders keep their full names.
 
 ## Volume and fades
 

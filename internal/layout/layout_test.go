@@ -14,8 +14,8 @@ import (
 )
 
 // rules are the ones of the one target that needs them today: ASCII names, a
-// component of at most 100 bytes, 22 characters before ".mp3".
-var rules = layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: 22}
+// component of at most 100 bytes, 24 characters before ".mp3".
+var rules = layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: 24}
 
 func identified(artist, album, title string, n, total int) manifest.Track {
 	return manifest.Track{
@@ -41,7 +41,7 @@ func TestPathFor(t *testing.T) {
 		{"leading apostrophe from romanised ayn", identified("'Bd al-Hlim", "", "Song'", 0, 0), "Bd al-Hlim/Song.mp3"},
 		{"inner apostrophes stay", identified("Ma'a", "", "Don't", 0, 0), "Ma'a/Don't.mp3"},
 		{"empty after cleaning", identified("???", "", "...", 0, 0), "Unknown/Unknown.mp3"},
-		{"unidentified", manifest.Track{ID: "k7f2qd", Status: manifest.Unidentified, Hint: manifest.Hint{Filename: "01 - Bahlam Bek"}}, "_Inbox/k7f2qd - 01 - Bahlam.mp3"},
+		{"unidentified", manifest.Track{ID: "k7f2qd", Status: manifest.Unidentified, Hint: manifest.Hint{Filename: "01 - Bahlam Bek"}}, "_Inbox/k7f2qd - 01 - Bahlam Bek.mp3"},
 		{"unidentified with non-ascii hint", manifest.Track{ID: "k7f2qd", Status: manifest.Unidentified, Hint: manifest.Hint{Filename: "وطني"}}, "_Inbox/k7f2qd - Wtni.mp3"},
 		{"unidentified without hint", manifest.Track{ID: "k7f2qd", Status: manifest.Unidentified}, "_Inbox/k7f2qd.mp3"},
 	}
@@ -157,25 +157,22 @@ func TestPlaylistPath(t *testing.T) {
 	}
 }
 
-// The player's index keeps 26 characters of a file name, the extension
-// included, and cuts the rest: so names are shortened here, where they are
-// whole words, instead of there.
+// The player shows the first 24 characters of a name: a file name is cut
+// there, so that what is shown is the end of the name and not the start of the
+// extension. The number of a track counts, as it is part of the name.
 
-func TestFileNamesAreShortenedToWhatThePlayerKeeps(t *testing.T) {
+func TestFileNamesAreCutToWhatThePlayerShows(t *testing.T) {
 	cases := []struct {
 		name string
 		in   manifest.Track
 		want string
 	}{
-		{"fits exactly", identified("A", "", "Exactly Twenty Two Chr", 0, 0), "A/Exactly Twenty Two Chr.mp3"},
-		{"cut after a whole word", identified("A", "", "A Very Long Song Title Indeed Yes", 0, 0), "A/A Very Long Song Title.mp3"},
-		{"the number is kept and leaves less room", identified("A", "B", "The Long and Winding Road", 3, 8), "A/B/03 - The Long.mp3"},
-		{"a parenthesis goes before a word does", identified("A", "B", "Ya mashallah (Remix)", 8, 9), "A/B/08 - Ya mashallah.mp3"},
-		{"a word too long for the room is cut in it", identified("A", "B", "Supercalifragilistic", 1, 9), "A/B/01 - Supercalifragilis.mp3"},
-		{"no word boundary worth keeping", identified("A", "B", "Hi Supercalifragilistic", 1, 9), "A/B/01 - Hi Supercalifragi.mp3"},
-		{"a wide number takes more room", identified("A", "B", "The Long and Winding Road", 7, 120), "A/B/007 - The Long.mp3"},
-		{"no dangling punctuation", identified("A", "", "Twenty Characters Fit, Then More", 0, 0), "A/Twenty Characters Fit.mp3"},
-		{"only a parenthesis is better than nothing", identified("A", "", "(Instrumental Version Of It)", 0, 0), "A/(Instrumental Version.mp3"},
+		{"fits exactly", identified("A", "", "Exactly Twenty Four Char", 0, 0), "A/Exactly Twenty Four Char.mp3"},
+		{"cut at 24, whatever is there", identified("A", "", "A Very Long Song Title Indeed Yes", 0, 0), "A/A Very Long Song Title I.mp3"},
+		{"the number is kept and leaves less room", identified("A", "B", "Munajat Amir al-Mumineen", 1, 12), "A/B/01 - Munajat Amir al-Mum.mp3"},
+		{"a wide number takes more room", identified("A", "B", "The Long and Winding Road", 7, 120), "A/B/007 - The Long and Windi.mp3"},
+		{"a space at the cut is not kept", identified("A", "", "Twenty Three Chars Okay More", 0, 0), "A/Twenty Three Chars Okay.mp3"},
+		{"a dot at the cut is not kept", identified("A", "", "Twenty Three Chars Okay. More", 0, 0), "A/Twenty Three Chars Okay.mp3"},
 		{"the folders keep their length", identified("An Artist With A Rather Long Name", "An Album With A Rather Long Name", "S", 0, 0), "An Artist With A Rather Long Name/An Album With A Rather Long Name/S.mp3"},
 	}
 	for _, c := range cases {
@@ -187,7 +184,7 @@ func TestFileNamesAreShortenedToWhatThePlayerKeeps(t *testing.T) {
 	}
 }
 
-func TestACollisionSuffixStaysWithinWhatThePlayerKeeps(t *testing.T) {
+func TestACollisionSuffixStaysWithinWhatThePlayerShows(t *testing.T) {
 	mk := func(id string, added int, title string) manifest.Track {
 		tr := identified("Artist", "", title, 0, 0)
 		tr.ID = id
@@ -200,9 +197,9 @@ func TestACollisionSuffixStaysWithinWhatThePlayerKeeps(t *testing.T) {
 		mk("cccccc", 3, "A Very Long Song Title Indeed Maybe"),
 	}, rules)
 	want := map[string]string{
-		"aaaaaa": "Artist/A Very Long Song Title.mp3",
-		"bbbbbb": "Artist/A Very Long Song (2).mp3",
-		"cccccc": "Artist/A Very Long Song (3).mp3",
+		"aaaaaa": "Artist/A Very Long Song Title I.mp3",
+		"bbbbbb": "Artist/A Very Long Song Tit (2).mp3",
+		"cccccc": "Artist/A Very Long Song Tit (3).mp3",
 	}
 	for id, w := range want {
 		if got[id] != w {
@@ -211,7 +208,7 @@ func TestACollisionSuffixStaysWithinWhatThePlayerKeeps(t *testing.T) {
 	}
 }
 
-func TestNoFileNameIsLongerThanThePlayerKeeps(t *testing.T) {
+func TestNoFileNameIsLongerThanThePlayerShows(t *testing.T) {
 	title := "Qasidat al-Hubb wa al-Hanin ila al-Watan al-Ghali (Live in Beirut)"
 	var tracks []manifest.Track
 	for i := 0; i < 12; i++ { // twelve that all shorten to the same name
@@ -225,8 +222,29 @@ func TestNoFileNameIsLongerThanThePlayerKeeps(t *testing.T) {
 		manifest.Track{ID: "k7f2qd", Status: manifest.Unidentified, Hint: manifest.Hint{Filename: title}},
 	)
 	for id, p := range layout.Assign(tracks, rules) {
-		if name := path.Base(p); len(name) > 26 {
-			t.Errorf("%s: file name %q is %d characters, the player keeps 26", id, name, len(name))
+		if name := path.Base(p); utf8.RuneCountInString(strings.TrimSuffix(name, ".mp3")) > 24 {
+			t.Errorf("%s: file name %q is longer than the 24 characters the player shows", id, name)
 		}
+	}
+}
+
+// A name is the same name whether its accent is typed as one character or as a
+// letter and a combining mark; a filesystem that treats them alike (macOS
+// does) must not find two files where there is one.
+
+func TestPathForComposesTheNames(t *testing.T) {
+	got := layout.PathFor(identified("Beyoncé", "", "Café", 0, 0), layout.Rules{})
+	if want := "Beyoncé/Café.mp3"; got != want {
+		t.Errorf("PathFor = %q, want %q", got, want)
+	}
+}
+
+func TestAssignFindsTwoSpellingsOfOneNameCollide(t *testing.T) {
+	a, b := identified("Artist", "", "Café", 0, 0), identified("Artist", "", "Café", 0, 0)
+	a.ID, b.ID = "aaaaaa", "bbbbbb"
+	a.AddedAt, b.AddedAt = time.Unix(1, 0), time.Unix(2, 0)
+	got := layout.Assign([]manifest.Track{a, b}, layout.Rules{})
+	if want := "Artist/Café (2).mp3"; got["bbbbbb"] != want {
+		t.Errorf("Assign[bbbbbb] = %q, want %q", got["bbbbbb"], want)
 	}
 }
