@@ -9,9 +9,9 @@ import (
 
 const oldLibrary = `{"version": 1, "tracks": [
   {"id": "aaaaaa", "status": "identified", "title": "Watani", "original_title": "وطني",
-   "artist": "Fairouz", "original_artist": "فيروز", "album": "Hits", "original_album": "Hits", "player_artist": "Fairuz"},
+   "artist": "Fairouz", "original_artist": "فيروز", "album": "Hits", "original_album": "Hits", "player_artist": "Fairuz", "source_length_ns": 93000000000},
   {"id": "bbbbbb", "status": "identified", "title": "Kifak", "original_title": "كيفك",
-   "artist": "Fairouz", "original_artist": "فيروز", "album": "", "original_album": ""}
+   "artist": "Fairouz", "original_artist": "فيروز", "album": "", "original_album": "", "source_length_ns": 93000000000}
 ]}`
 
 func oldLib(t *testing.T) string {

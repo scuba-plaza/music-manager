@@ -18,13 +18,14 @@ func migrateCmd(open opener) *cobra.Command {
 
 Version 1 kept every name twice, in Latin letters (maybe set by hand) and as it
 really is, and the names the Wolfgang WMP01 shows per track. Version 2 keeps the
-true names and nothing for any one device: a Latin form is worked out from the
-name when a device needs one, and the 12-character names of the Wolfgang from
-those.
+true names and nothing for any one device. A Latin form that was set by hand is
+kept as the Latin form of the name (see "mm edit --help"); any other is worked
+out from the name when a device needs one, and the 12-character names of the
+Wolfgang from those.
 
 The old library.json is kept, byte for byte, in .mm/library.json.v1, so no
-name or setting is lost. --dry-run lists the Latin forms that were set by hand
-and are no longer used, and the player names that go, and writes nothing.`,
+name or setting is lost. --dry-run lists the Latin forms that were set by hand,
+and the player names that go, and writes nothing.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := open()
@@ -64,7 +65,7 @@ func printMigration(out interface{ Write([]byte) (int, error) }, rep *manifest.M
 		count[k]++
 	}
 	if len(order) > 0 {
-		fmt.Fprintf(out, "\nThese Latin forms were set by hand and are not kept; the Wolfgang gets the worked-out form instead:\n")
+		fmt.Fprintf(out, "\nThese Latin forms were set by hand and are kept (after the arrow: what is worked out from the name, and used without a form set by hand):\n")
 		for _, k := range order {
 			line := fmt.Sprintf("  %s  %s  %s → %s", k.field, k.name, k.held, k.now)
 			if n := count[k]; n > 1 {

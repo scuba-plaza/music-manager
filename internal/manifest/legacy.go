@@ -14,8 +14,10 @@ import (
 // Version 1 of library.json kept every name twice, in Latin letters (maybe set
 // by hand) under title, artist and album, and as it really is under
 // original_*, and kept the 12-character names of the Wolfgang WMP01 per track.
-// Version 2 keeps the true names under title, artist and album and nothing for
-// any one device. This file is the only place that knows the old shape.
+// Version 2 keeps the true names under title, artist and album, the Latin forms
+// that were set by hand under title_latin, artist_latin and album_latin, and
+// nothing for any one device. This file is the only place that knows the old
+// shape.
 
 // legacyNames are the fields of a version 1 track that version 2 has not got,
 // and the old meaning of the keys it has.
@@ -52,69 +54,17 @@ type MigrationReport struct {
 }
 
 // Migrate turns the version 1 library at path into version 2. The old file is
-// first copied, byte for byte, to backup, which must not exist yet. With
+// first copied, byte for byte, to backup, which must not exist yet. The Latin
+// forms that were set by hand are kept as the Latin forms of version 2. With
 // dryRun it only reports. A library of another version is refused.
 func Migrate(path, backup string, dryRun bool) (*MigrationReport, error) {
-	data, err := os.ReadFile(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("%s: there is no library to migrate", path)
-	}
+	data, err := readLibraryFile(path)
 	if err != nil {
 		return nil, err
 	}
-	var old struct {
-		Version   int               `json:"version"`
-		Tracks    []json.RawMessage `json:"tracks"`
-		Playlists []Playlist        `json:"playlists"`
-	}
-	if err := json.Unmarshal(data, &old); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
-	}
-	if old.Version != 1 {
-		if old.Version == schemaVersion {
-			return nil, fmt.Errorf("%s is already version %d: there is nothing to migrate", path, old.Version)
-		}
-		return nil, fmt.Errorf("%s: unsupported library version %d", path, old.Version)
-	}
-
-	rep := &MigrationReport{Tracks: len(old.Tracks)}
-	m := &Manifest{Playlists: old.Playlists}
-	for _, raw := range old.Tracks {
-		var t Track
-		var legacy legacyNames
-		if err := json.Unmarshal(raw, &t); err != nil {
-			return nil, fmt.Errorf("%s: %w", path, err)
-		}
-		if err := json.Unmarshal(raw, &legacy.Latin); err != nil {
-			return nil, fmt.Errorf("%s: %w", path, err)
-		}
-		if err := json.Unmarshal(raw, &legacy); err != nil {
-			return nil, fmt.Errorf("%s: %w", path, err)
-		}
-		for _, n := range []struct {
-			field       string
-			latin, orig string
-			truth       *string
-		}{
-			{"title", legacy.Latin.Title, legacy.OriginalTitle, &t.Title},
-			{"artist", legacy.Latin.Artist, legacy.OriginalArtist, &t.Artist},
-			{"album", legacy.Latin.Album, legacy.OriginalAlbum, &t.Album},
-		} {
-			*n.truth = n.orig
-			if n.orig == "" { // recorded before the originals were kept: the name is all there is
-				*n.truth = n.latin
-			}
-			if now := translit.ToASCII(*n.truth); n.latin != "" && now != n.latin {
-				rep.HandSet = append(rep.HandSet, HandSetName{ID: t.ID, Field: n.field, Name: *n.truth, Held: n.latin, Now: now})
-			}
-		}
-		if legacy.PlayerArtist != "" {
-			rep.PlayerArtists++
-		}
-		if legacy.PlayerAlbum != "" {
-			rep.PlayerAlbums++
-		}
-		m.Tracks = append(m.Tracks, t)
+	m, rep, err := convertLegacy(path, data)
+	if err != nil {
+		return nil, err
 	}
 	if dryRun {
 		return rep, nil
@@ -134,4 +84,88 @@ func Migrate(path, backup string, dryRun bool) (*MigrationReport, error) {
 		return nil, err
 	}
 	return rep, nil
+}
+
+// HandSetNames lists the Latin forms that the version 1 library at path (the
+// backup that Migrate made, say) holds for a name and that are not what is
+// worked out from the name now. It reads the file and changes nothing.
+func HandSetNames(path string) ([]HandSetName, error) {
+	data, err := readLibraryFile(path)
+	if err != nil {
+		return nil, err
+	}
+	_, rep, err := convertLegacy(path, data)
+	if err != nil {
+		return nil, err
+	}
+	return rep.HandSet, nil
+}
+
+func readLibraryFile(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("%s: there is no library to migrate", path)
+	}
+	return data, err
+}
+
+// convertLegacy turns the version 1 library in data, read from path, into a
+// version 2 one and says what it changed.
+func convertLegacy(path string, data []byte) (*Manifest, *MigrationReport, error) {
+	var old struct {
+		Version   int               `json:"version"`
+		Tracks    []json.RawMessage `json:"tracks"`
+		Playlists []Playlist        `json:"playlists"`
+	}
+	if err := json.Unmarshal(data, &old); err != nil {
+		return nil, nil, fmt.Errorf("%s: %w", path, err)
+	}
+	if old.Version != 1 {
+		if old.Version == schemaVersion {
+			return nil, nil, fmt.Errorf("%s is already version %d: there is nothing to migrate", path, old.Version)
+		}
+		return nil, nil, fmt.Errorf("%s: unsupported library version %d", path, old.Version)
+	}
+
+	rep := &MigrationReport{Tracks: len(old.Tracks)}
+	m := &Manifest{Playlists: old.Playlists}
+	for _, raw := range old.Tracks {
+		var t Track
+		var legacy legacyNames
+		if err := json.Unmarshal(raw, &t); err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", path, err)
+		}
+		if err := json.Unmarshal(raw, &legacy.Latin); err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", path, err)
+		}
+		if err := json.Unmarshal(raw, &legacy); err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", path, err)
+		}
+		for _, n := range []struct {
+			field       string
+			latin, orig string
+			truth, form *string
+		}{
+			{"title", legacy.Latin.Title, legacy.OriginalTitle, &t.Title, &t.TitleLatin},
+			{"artist", legacy.Latin.Artist, legacy.OriginalArtist, &t.Artist, &t.ArtistLatin},
+			{"album", legacy.Latin.Album, legacy.OriginalAlbum, &t.Album, &t.AlbumLatin},
+		} {
+			*n.truth = n.orig
+			if n.orig == "" { // recorded before the originals were kept: the name is all there is
+				*n.truth = n.latin
+			}
+			if now := translit.ToASCII(*n.truth); n.latin != "" && now != n.latin {
+				rep.HandSet = append(rep.HandSet, HandSetName{ID: t.ID, Field: n.field, Name: *n.truth, Held: n.latin, Now: now})
+				*n.form = n.latin
+			}
+		}
+		if legacy.PlayerArtist != "" {
+			rep.PlayerArtists++
+		}
+		if legacy.PlayerAlbum != "" {
+			rep.PlayerAlbums++
+		}
+		m.Tracks = append(m.Tracks, t)
+	}
+	return m, rep, nil
 }

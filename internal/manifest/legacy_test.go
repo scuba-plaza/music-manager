@@ -101,7 +101,7 @@ func TestMigrateWritesNothingBackOfWhatItDrops(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, gone := range []string{"original_", "player_artist", "player_album", "Watani", "Fairouz"} {
+	for _, gone := range []string{"original_", "player_artist", "player_album"} {
 		if strings.Contains(string(data), gone) {
 			t.Errorf("the migrated library still says %q", gone)
 		}
@@ -177,5 +177,55 @@ func TestMigrateDryRunReportsWhatWouldGoAndWritesNothing(t *testing.T) {
 	}
 	if rep.PlayerArtists != 1 || rep.PlayerAlbums != 1 {
 		t.Errorf("player names dropped = %d artists, %d albums; want 1 and 1", rep.PlayerArtists, rep.PlayerAlbums)
+	}
+}
+
+func TestMigrateKeepsTheLatinFormsSetByHandAsTheirOwn(t *testing.T) {
+	path, backup := writeV1(t)
+	if _, err := manifest.Migrate(path, backup, false); err != nil {
+		t.Fatal(err)
+	}
+	m, err := manifest.NewStore(path).Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]manifest.Track{}
+	for _, tr := range m.Tracks {
+		byID[tr.ID] = tr
+	}
+	// "Watani" and "Fairouz" are not what is worked out from وطني and فيروز, so
+	// they are kept; "Hits" is, so there is nothing to keep.
+	a := byID["aaaaaa"]
+	if a.TitleLatin != "Watani" || a.ArtistLatin != "Fairouz" || a.AlbumLatin != "" {
+		t.Errorf("the forms = %q / %q / %q", a.TitleLatin, a.ArtistLatin, a.AlbumLatin)
+	}
+	if a.LatinTitle() != "Watani" || a.LatinAlbum() != "Hits" {
+		t.Errorf("the Latin forms read %q and %q", a.LatinTitle(), a.LatinAlbum())
+	}
+	for _, id := range []string{"bbbbbb", "cccccc", "dddddd"} {
+		if tr := byID[id]; tr.TitleLatin != "" || tr.ArtistLatin != "" || tr.AlbumLatin != "" {
+			t.Errorf("%s has forms it did not need: %+v", id, tr)
+		}
+	}
+}
+
+func TestTheLatinFormsOfAVersion1FileCanBeReadWithoutMigrating(t *testing.T) {
+	path, _ := writeV1(t)
+	got, err := manifest.HandSetNames(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []manifest.HandSetName{
+		{ID: "aaaaaa", Field: "title", Name: "وطني", Held: "Watani", Now: "Wtni"},
+		{ID: "aaaaaa", Field: "artist", Name: "فيروز", Held: "Fairouz", Now: "Firuz"},
+	}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("names = %+v, want %+v", got, want)
+	}
+	if after, _ := os.ReadFile(path); string(after) != libraryV1 {
+		t.Error("reading the names changed the file")
+	}
+	if _, err := manifest.HandSetNames(filepath.Join(t.TempDir(), "nothing")); err == nil {
+		t.Error("a missing file has no names")
 	}
 }
