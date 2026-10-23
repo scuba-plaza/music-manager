@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"music-manager/internal/device"
-	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 )
 
@@ -30,15 +29,20 @@ func (a *App) CreatePlaylist(name string, ids ...string) error {
 	return a.store.Save(m)
 }
 
+// targets are the kinds of place a library is written to; two playlists may
+// not come out as one file on any of them.
+var targets = []device.Target{device.Generic, device.Wolfgang}
+
 // checkPlaylistName says whether name can be given to a new playlist.
 func checkPlaylistName(m *manifest.Manifest, name string) error {
 	if name == "" {
 		return errors.New("a playlist needs a name")
 	}
-	file := strings.ToLower(playlistFileName(name))
 	for _, p := range m.Playlists {
-		if strings.ToLower(playlistFileName(p.Name)) == file {
-			return fmt.Errorf("there is already a playlist called %q, and %q would be the same file (%s)", p.Name, name, playlistFileName(name))
+		for _, dev := range targets {
+			if file := dev.PlaylistFile(name); strings.EqualFold(file, dev.PlaylistFile(p.Name)) {
+				return fmt.Errorf("there is already a playlist called %q, and %q would be the same file (%s)", p.Name, name, file)
+			}
 		}
 	}
 	return nil
@@ -213,10 +217,4 @@ func (a *App) ReplacePlaylists(ps []manifest.Playlist) error {
 		}
 	}
 	return a.store.Save(m)
-}
-
-// playlistFileName is the file a playlist of this name is written to, which
-// decides whether two names are the same playlist.
-func playlistFileName(name string) string {
-	return layout.PlaylistPath(name, device.Generic.Layout())
 }

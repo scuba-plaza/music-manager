@@ -137,12 +137,18 @@ func describe(t *testing.T, root string, ids map[string]string) string {
 // changes the output on purpose, the golden is regenerated with -update and the
 // diff is read.
 func TestSyncOutputGolden(t *testing.T) {
+	for name, dev := range map[string]device.Target{"generic": device.Generic, "wolfgang": device.Wolfgang} {
+		t.Run(name, func(t *testing.T) { checkGolden(t, dev, "sync-"+name+".golden") })
+	}
+}
+
+func checkGolden(t *testing.T, dev device.Target, file string) {
 	a, ids := fixture(t)
 	target := filepath.Join(t.TempDir(), "player")
-	mustSync(t, a, app.SyncOptions{Target: target, Device: device.Wolfgang})
+	mustSync(t, a, app.SyncOptions{Target: target, Device: dev})
 	got := describe(t, target, ids)
 
-	golden := filepath.Join("testdata", "sync-wolfgang.golden")
+	golden := filepath.Join("testdata", file)
 	if *update {
 		if err := os.WriteFile(golden, []byte(got), 0o644); err != nil {
 			t.Fatal(err)

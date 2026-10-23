@@ -55,7 +55,7 @@ func signatures(m *manifest.Manifest) map[string]string {
 	paths, covers := renderInputs(m.Tracks, device.Generic)
 	sigs := make(map[string]string, len(m.Tracks)+len(m.Playlists))
 	for _, p := range m.Playlists {
-		_, content := device.Generic.Playlist(p, paths)
+		_, content := device.Generic.Playlist(p, byID(m.Tracks), paths)
 		sum := sha256.Sum256(append([]byte(p.Name+"\x00"), content...))
 		sigs[playlistKey+p.Name] = hex.EncodeToString(sum[:])
 	}
@@ -146,4 +146,13 @@ func sameDir(a, b string) bool {
 	x, err1 := filepath.Abs(a)
 	y, err2 := filepath.Abs(b)
 	return err1 == nil && err2 == nil && filepath.Clean(x) == filepath.Clean(y)
+}
+
+// byID lists tracks by their ID.
+func byID(tracks []manifest.Track) map[string]manifest.Track {
+	out := make(map[string]manifest.Track, len(tracks))
+	for _, t := range tracks {
+		out[t.ID] = t
+	}
+	return out
 }

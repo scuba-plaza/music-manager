@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/manifest"
 	"music-manager/internal/render"
 )
@@ -277,10 +278,12 @@ func syncedPlaylistLib(t *testing.T) (*app.App, []manifest.Track) {
 	return a, ts
 }
 
-func TestSyncWritesAPlaylistTheWolfangPlayerCanRead(t *testing.T) {
+func TestSyncWritesAPlaylistTheWolfgangPlayerCanRead(t *testing.T) {
 	a, ts := syncedPlaylistLib(t)
+	target := filepath.Join(t.TempDir(), "player")
+	opts := app.SyncOptions{Target: target, Device: device.Wolfgang}
 
-	ops := mustSync(t, a, app.SyncOptions{})
+	ops := mustSync(t, a, opts)
 	if len(ops) != 4 { // three tracks and the playlist
 		t.Fatalf("ops = %v, want 4 creates", ops)
 	}
@@ -290,8 +293,27 @@ func TestSyncWritesAPlaylistTheWolfangPlayerCanRead(t *testing.T) {
 	want := "\\Max Richter\\Dream.mp3\r\n" +
 		"\\Ali Al Attar\\Atlek Neranak\\01 - Atlek Neranak.mp3\r\n" +
 		"\\_Inbox\\" + ts[2].ID + " - c.mp3\r\n"
-	if got := string(readFile(t, a.Root(), "Playlists/Study.m3u")); got != want {
+	if got := string(readFile(t, target, "Playlists/Study.m3u")); got != want {
 		t.Errorf("Study.m3u =\n%q\nwant\n%q", got, want)
+	}
+	if ops := mustSync(t, a, opts); len(ops) != 0 {
+		t.Errorf("a second sync wants %v, want nothing", ops)
+	}
+}
+
+func TestSyncWritesAnM3U8AnyPlayerCanRead(t *testing.T) {
+	a, ts := syncedPlaylistLib(t)
+
+	ops := mustSync(t, a, app.SyncOptions{})
+	if len(ops) != 4 {
+		t.Fatalf("ops = %v, want 4 creates", ops)
+	}
+	want := "#EXTM3U\n" +
+		"#EXTINF:1,Max Richter - Dream\n../Max Richter/Dream.mp3\n" +
+		"#EXTINF:-1,Ali Al Attar - Atlek Neranak\n../Ali Al Attar/Atlek Neranak/01 - Atlek Neranak.mp3\n" +
+		"#EXTINF:1," + ts[2].ID + " - c\n../_Inbox/" + ts[2].ID + " - c.mp3\n"
+	if got := string(readFile(t, a.Root(), "Playlists/Study.m3u8")); got != want {
+		t.Errorf("Study.m3u8 =\n%q\nwant\n%q", got, want)
 	}
 	if ops := mustSync(t, a, app.SyncOptions{}); len(ops) != 0 {
 		t.Errorf("a second sync wants %v, want nothing", ops)
@@ -314,18 +336,18 @@ func TestPlaylistFilesFollowTheLibrary(t *testing.T) {
 			updated = append(updated, op.Path)
 		}
 	}
-	if !reflect.DeepEqual(updated, []string{"Playlists/Study.m3u"}) {
+	if !reflect.DeepEqual(updated, []string{"Playlists/Study.m3u8"}) {
 		t.Errorf("ops = %v, want the playlist updated", ops)
 	}
-	if got := string(readFile(t, a.Root(), "Playlists/Study.m3u")); !strings.HasPrefix(got, "\\Max Richter\\Dreams.mp3\r\n") {
-		t.Errorf("Study.m3u = %q", got)
+	if got := string(readFile(t, a.Root(), "Playlists/Study.m3u8")); !strings.Contains(got, "\n../Max Richter/Dreams.mp3\n") {
+		t.Errorf("Study.m3u8 = %q", got)
 	}
 
 	// A deleted playlist leaves its file behind as a stray; --prune removes it.
 	if err := a.DeletePlaylist("Study"); err != nil {
 		t.Fatal(err)
 	}
-	if ops := mustSync(t, a, app.SyncOptions{}); !slices.Contains(ops, render.Op{Kind: render.Stray, Path: "Playlists/Study.m3u"}) {
+	if ops := mustSync(t, a, app.SyncOptions{}); !slices.Contains(ops, render.Op{Kind: render.Stray, Path: "Playlists/Study.m3u8"}) {
 		t.Errorf("ops = %v, want the playlist file reported as a stray", ops)
 	}
 	mustSync(t, a, app.SyncOptions{Prune: true})
@@ -390,5 +412,18 @@ func TestReplacingThePlaylistsPutsBackAnEarlierState(t *testing.T) {
 	}
 	if got := playlists(t, a); len(got) != 0 {
 		t.Errorf("playlists = %+v, want none", got)
+	}
+}
+
+func TestPlaylistNamesThatAreTheSameFileOnAnyTargetAreRefused(t *testing.T) {
+	a := openLib(t)
+	if err := a.CreatePlaylist("Bjørn"); err != nil {
+		t.Fatal(err)
+	}
+	// Bjørn and Bjorn are two files for a folder that keeps names as they are,
+	// but the Wolfgang writes Latin letters only and they would be one.
+	err := a.CreatePlaylist("Bjorn")
+	if err == nil || !strings.Contains(err.Error(), "same file") {
+		t.Errorf("err = %v, want a refusal because the Wolfgang would write one file", err)
 	}
 }

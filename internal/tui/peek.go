@@ -9,7 +9,6 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/device"
-	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 )
 
@@ -44,7 +43,7 @@ func (m Model) peekLines(r Row, w, h int) []string {
 	switch r.Kind {
 	case kindGroup:
 		if r.Key == playlistsKey {
-			info = wrapped("Playlists are lists of tracks in an order of your own. Sync writes each one to the player as an .m3u file in the Playlists folder.", w)
+			info = wrapped("Playlists are lists of tracks in an order of your own. Sync writes each one as an .m3u8 file in the Playlists folder (an .m3u for the Wolfgang).", w)
 			list = m.playlistsList(w)
 		} else {
 			info = wrapped("These tracks have not been identified yet, so they have no proper title or artist and sit in the _Inbox folder.", w)
@@ -168,7 +167,7 @@ func (m Model) albumPeek(r Row, w int) (info, list []string) {
 func (m Model) playlistPeek(r Row, w int) (info, list []string) {
 	ts := m.tracksFor(r.IDs)
 	info = []string{" " + plural(r.Count, "track") + " · " + clock(lengthOf(ts)) + " plays", ""}
-	for i, l := range wrap(layout.PlaylistPath(r.Label, device.Generic.Layout()), w-4) {
+	for i, l := range wrap(device.Generic.PlaylistFile(r.Label), w-4) {
 		prefix := "   "
 		if i == 0 {
 			prefix = " → "

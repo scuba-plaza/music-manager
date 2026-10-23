@@ -17,8 +17,10 @@ func playlistCmd(open opener) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "playlist",
 		Short: "Make and change playlists",
-		Long: `Playlists are ordered lists of tracks. "mm sync" writes each one as an .m3u
-file in the Playlists folder, which the player lists as a playlist.`,
+		Long: `Playlists are ordered lists of tracks. "mm sync" writes each one as an .m3u8
+file in the Playlists folder, with paths relative to it, which players and
+phones list as a playlist. With --wolfgang it writes the .m3u the Wolfgang
+WMP01 reads instead: paths from the card's root, with backslashes.`,
 	}
 	cmd.AddCommand(playlistNewCmd(open), playlistLsCmd(open), playlistShowCmd(open),
 		playlistAddCmd(open), playlistRmCmd(open), playlistMoveCmd(open),

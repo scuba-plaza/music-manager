@@ -160,15 +160,15 @@ func TestSyncWritesThePlaylistsMadeOnTheCommandLine(t *testing.T) {
 	run(t, lib, "playlist", "new", "Study", id["Atlek"], id["Dream"])
 
 	code, out, errs := run(t, lib, "sync")
-	if code != 0 || !strings.Contains(out, "Playlists/Study.m3u") {
+	if code != 0 || !strings.Contains(out, "Playlists/Study.m3u8") {
 		t.Fatalf("sync: code %d, out %q, err %q", code, out, errs)
 	}
-	got, err := os.ReadFile(filepath.Join(lib, "Playlists", "Study.m3u"))
+	got, err := os.ReadFile(filepath.Join(lib, "Playlists", "Study.m3u8"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "\\Band\\Atlek.mp3\r\n\\Band\\Dream.mp3\r\n"; string(got) != want {
-		t.Errorf("Study.m3u = %q, want %q", got, want)
+	if !strings.Contains(string(got), "\n../Band/Atlek.mp3\n") || !strings.Contains(string(got), "\n../Band/Dream.mp3\n") || !strings.HasPrefix(string(got), "#EXTM3U\n") {
+		t.Errorf("Study.m3u8 = %q, want an M3U8 with the two tracks, Atlek first", got)
 	}
 }
 

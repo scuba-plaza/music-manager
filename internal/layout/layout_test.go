@@ -151,7 +151,7 @@ func TestPlaylistPath(t *testing.T) {
 		"???":              "Playlists/Unknown.m3u",
 	}
 	for name, want := range cases {
-		if got := layout.PlaylistPath(name, rules); got != want {
+		if got := layout.PlaylistPath(name, ".m3u", rules); got != want {
 			t.Errorf("PlaylistPath(%q) = %q, want %q", name, got, want)
 		}
 	}

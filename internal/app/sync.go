@@ -84,7 +84,7 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 		}
 	}
 	for _, p := range m.Playlists {
-		name, data := dev.Playlist(p, paths)
+		name, data := dev.Playlist(p, byID(m.Tracks), paths)
 		build[name] = func() ([]byte, error) { return data, nil }
 		desired[name] = fingerprint(data)
 	}
@@ -194,7 +194,7 @@ func fingerprint(data []byte) render.File {
 	return render.File{Size: int64(len(data)), SHA: hex.EncodeToString(sum[:])}
 }
 
-var mediaExts = map[string]bool{".mp3": true, ".jpg": true, ".jpeg": true, ".png": true, ".m3u": true}
+var mediaExts = map[string]bool{".mp3": true, ".jpg": true, ".jpeg": true, ".png": true, ".m3u": true, ".m3u8": true}
 
 // scanTree fingerprints the media files under dir, ignoring the library's own
 // .mm directory. Only files that are also wanted and have the wanted size

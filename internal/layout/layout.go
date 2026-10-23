@@ -18,7 +18,6 @@ const (
 	ext         = ".mp3"
 	inbox       = "_Inbox"
 	playlistDir = "Playlists"
-	playlistExt = ".m3u"
 )
 
 // Rules says how a target wants its paths made. The zero value keeps names
@@ -69,9 +68,9 @@ func pathFor(t manifest.Track, suffix string, r Rules) string {
 }
 
 // PlaylistPath is where the playlist with this name is rendered:
-// Playlists/<name>.m3u, with the name made safe for a file name.
-func PlaylistPath(name string, r Rules) string {
-	return path.Join(playlistDir, clean(name, r)+playlistExt)
+// Playlists/<name><ext>, with the name made safe for a file name.
+func PlaylistPath(name, ext string, r Rules) string {
+	return path.Join(playlistDir, clean(name, r)+ext)
 }
 
 // Assign returns the path of every track by ID. Tracks that would share a

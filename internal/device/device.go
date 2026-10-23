@@ -5,6 +5,9 @@
 package device
 
 import (
+	"fmt"
+	"math"
+	"path"
 	"strings"
 
 	"music-manager/internal/coverimg"
@@ -27,9 +30,11 @@ type Target interface {
 	Cover(stored []byte) (data []byte, mime string, err error)
 	// SingleCovers says whether a single gets a cover file of its own.
 	SingleCovers() bool
-	// Playlist is the file of a playlist, given where each track is written:
-	// its path in the target and its content.
-	Playlist(p manifest.Playlist, paths map[string]string) (name string, data []byte)
+	// PlaylistFile is where the playlist of this name is written in the target.
+	PlaylistFile(name string) string
+	// Playlist is the file of a playlist, given the tracks by ID and where each
+	// is written: its path in the target and its content.
+	Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (name string, data []byte)
 }
 
 // Generic is the default: any folder or device that is not known better. It
@@ -50,18 +55,43 @@ func (plain) Cover(stored []byte) ([]byte, string, error) {
 
 func (plain) SingleCovers() bool { return true }
 
-// playlist is the M3U file of a playlist. The player (a Wolfgang WMP01) was
-// found to read paths from the root of its card with backslashes, one per
-// line, in plain UTF-8 with Windows line endings; slashes, and paths relative
-// to the playlist, give an empty playlist.
-func playlist(p manifest.Playlist, paths map[string]string, r layout.Rules) (string, []byte) {
+// wolfgangPlaylist is the M3U file of a playlist for the Wolfgang WMP01. The
+// player was found to read paths from the root of its card with backslashes,
+// one per line, in plain UTF-8 with Windows line endings; slashes, and paths
+// relative to the playlist, give an empty playlist.
+func wolfgangPlaylist(p manifest.Playlist, paths map[string]string) []byte {
 	var b strings.Builder
 	for _, id := range p.Tracks {
 		if path, ok := paths[id]; ok {
 			b.WriteString(`\` + strings.ReplaceAll(path, "/", `\`) + "\r\n")
 		}
 	}
-	return layout.PlaylistPath(p.Name, r), []byte(b.String())
+	return []byte(b.String())
+}
+
+// genericPlaylist is the M3U8 file of a playlist: UTF-8, one line per track
+// with its length and name, and the paths relative to the playlist, which is
+// what players and phones understand.
+func genericPlaylist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) []byte {
+	var b strings.Builder
+	b.WriteString("#EXTM3U\n")
+	for _, id := range p.Tracks {
+		file, ok := paths[id]
+		if !ok {
+			continue
+		}
+		t := tracks[id]
+		seconds := int(math.Round(t.PlayingLength().Seconds()))
+		if seconds <= 0 {
+			seconds = -1 // unknown
+		}
+		name := strings.TrimSuffix(path.Base(file), path.Ext(file))
+		if t.Status == manifest.Identified {
+			name = t.Artist + " - " + t.Title
+		}
+		fmt.Fprintf(&b, "#EXTINF:%d,%s\n../%s\n", seconds, name, file)
+	}
+	return []byte(b.String())
 }
 
 // extras are the tag fields that belong to no standard frame. A track not yet
@@ -104,8 +134,12 @@ func (generic) Tags(t manifest.Track) mp3.TagSet {
 	}
 }
 
-func (g generic) Playlist(p manifest.Playlist, paths map[string]string) (string, []byte) {
-	return playlist(p, paths, g.Layout())
+func (g generic) PlaylistFile(name string) string {
+	return layout.PlaylistPath(name, ".m3u8", g.Layout())
+}
+
+func (g generic) Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (string, []byte) {
+	return g.PlaylistFile(p.Name), genericPlaylist(p, tracks, paths)
 }
 
 type wolfgang struct{ plain }
@@ -133,6 +167,10 @@ func (wolfgang) Tags(t manifest.Track) mp3.TagSet {
 	}
 }
 
-func (w wolfgang) Playlist(p manifest.Playlist, paths map[string]string) (string, []byte) {
-	return playlist(p, paths, w.Layout())
+func (w wolfgang) PlaylistFile(name string) string {
+	return layout.PlaylistPath(name, ".m3u", w.Layout())
+}
+
+func (w wolfgang) Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (string, []byte) {
+	return w.PlaylistFile(p.Name), wolfgangPlaylist(p, paths)
 }
