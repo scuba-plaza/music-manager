@@ -1,22 +1,23 @@
-package app_test
+package device_test
 
 import (
 	"os"
 	"reflect"
 	"testing"
 
-	"music-manager/internal/app"
+	"music-manager/internal/device"
+	"music-manager/internal/manifest"
 )
 
 func TestReadingAPlaylistFileOfThePlayer(t *testing.T) {
-	// Real bytes from a Wolfang WMP01 (USERPL1.PL), with the song names
+	// Real bytes from a Wolfgang WMP01 (USERPL1.PL), with the song names
 	// replaced: three entries and then the record that ends the list. The
 	// player keeps only the first 26 characters of a name.
 	data, err := os.ReadFile("testdata/userpl-sample.pl")
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := app.ReadPlayerPlaylist(data)
+	got, err := device.ReadWolfgangPlaylist(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,33 +26,35 @@ func TestReadingAPlaylistFileOfThePlayer(t *testing.T) {
 		t.Errorf("names = %q, want %q", got, want)
 	}
 
-	if _, err := app.ReadPlayerPlaylist([]byte("not a playlist")); err == nil {
+	if _, err := device.ReadWolfgangPlaylist([]byte("not a playlist")); err == nil {
 		t.Error("garbage was read as a playlist")
 	}
 	wrong := append([]byte("MUSIC\x00\x00\x00"), data[8:]...) // another of the player's files
-	if _, err := app.ReadPlayerPlaylist(wrong); err == nil {
+	if _, err := device.ReadWolfgangPlaylist(wrong); err == nil {
 		t.Error("another kind of file was read as a playlist")
 	}
-	if names, err := app.ReadPlayerPlaylist(data[:512]); err != nil || len(names) != 0 {
+	if names, err := device.ReadWolfgangPlaylist(data[:512]); err != nil || len(names) != 0 {
 		t.Errorf("an empty playlist = %q, %v", names, err)
 	}
 }
 
 func TestMatchingTheOldFileNamesToTracks(t *testing.T) {
-	a := libWithTracks(t, 10, 20, 30, 40, 50, 60, 70, 80, 90)
-	ts := tracks(t, a)
-	identify(t, a, ts[0].ID, "Atlek Neranak", "Julia Boutros", "Yawman Ma", 6, 10)
-	identify(t, a, ts[1].ID, "Atlek Neranak", "Ali Al Attar", "Atlek Neranak", 1, 4)
-	identify(t, a, ts[2].ID, "Moqawem", "Julia Boutros", "Yawman Ma", 7, 10)
-	identify(t, a, ts[3].ID, "Moqawem", "Ali Al Attar", "Atlek Neranak", 4, 4)
-	identify(t, a, ts[4].ID, "Yakhluf Al Qaida Qada", "Kataib", "Speeches", 6, 6)
-	identify(t, a, ts[5].ID, "The Anthem of the Arab Socialist Party", "Various", "Anthems", 1, 1)
-	identify(t, a, ts[6].ID, "وين الملايين (Live)", "Julia Boutros", "", 0, 0)
-	identify(t, a, ts[7].ID, "Twin", "Band", "One", 1, 2)
-	identify(t, a, ts[8].ID, "Twin", "Band", "Two", 1, 2)
-	ts = tracks(t, a)
+	lib := func(id, title, artist, album string, n, total int) manifest.Track {
+		return manifest.Track{ID: id, Status: manifest.Identified, Title: title, Artist: artist, Album: album, TrackNumber: n, TrackTotal: total}
+	}
+	ts := []manifest.Track{
+		lib("t0", "Atlek Neranak", "Julia Boutros", "Yawman Ma", 6, 10),
+		lib("t1", "Atlek Neranak", "Ali Al Attar", "Atlek Neranak", 1, 4),
+		lib("t2", "Moqawem", "Julia Boutros", "Yawman Ma", 7, 10),
+		lib("t3", "Moqawem", "Ali Al Attar", "Atlek Neranak", 4, 4),
+		lib("t4", "Yakhluf Al Qaida Qada", "Kataib", "Speeches", 6, 6),
+		lib("t5", "The Anthem of the Arab Socialist Party", "Various", "Anthems", 1, 1),
+		lib("t6", "وين الملايين (Live)", "Julia Boutros", "", 0, 0),
+		lib("t7", "Twin", "Band", "One", 1, 2),
+		lib("t8", "Twin", "Band", "Two", 1, 2),
+	}
 
-	matches, err := a.MatchPlayerNames([]string{
+	matches := device.MatchWolfgangNames([]string{
 		"06 Atlek neranak.mp3", // the number tells the two Atlek Neranaks apart
 		"07 Moqawem.mp3",
 		"Yakhluf.mp3",                // the title has grown since
@@ -59,10 +62,7 @@ func TestMatchingTheOldFileNamesToTracks(t *testing.T) {
 		"01 وين الملايين (Live).mp3", // matches the original title
 		"Missing Song.mp3",
 		"Twin.mp3", // nothing tells the two apart
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	}, ts)
 
 	type outcome struct {
 		id      string // the track it is, or ""

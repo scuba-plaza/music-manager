@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/manifest"
 )
 
@@ -239,11 +239,12 @@ func playlistImportCmd(open opener) *cobra.Command {
 	var dryRun bool
 	cmd := &cobra.Command{
 		Use:   "import <USERPLn.PL> <name>",
-		Short: "Make a playlist from one of the player's own playlist files",
-		Long: `Read a playlist file from the player (USERPL1.PL to USERPL3.PL, in the player's
-root folder) and make a playlist of its songs. The player keeps only the old
-file names, cut to 26 characters, so each is matched to a track by its title;
-a leading track number tells apart songs of the same title.
+		Short: "Make a playlist from one of the Wolfgang WMP01's own playlist files",
+		Long: `Read a playlist file from the Wolfgang WMP01 (USERPL1.PL to USERPL3.PL, in the
+player's root folder; other players do not have them) and make a playlist of
+its songs. The player keeps only the old file names, cut to 26 characters, so
+each is matched to a track by its title; a leading track number tells apart
+songs of the same title.
 
 Every entry is listed. A "~" marks one matched by the start of the title only,
 a "?" one that fits several tracks (not added; the candidates are listed) and a
@@ -255,7 +256,7 @@ missing. --dry-run only lists.`,
 			if err != nil {
 				return err
 			}
-			names, err := app.ReadPlayerPlaylist(data)
+			names, err := device.ReadWolfgangPlaylist(data)
 			if err != nil {
 				return fmt.Errorf("%s: %w", args[0], err)
 			}
@@ -263,10 +264,11 @@ missing. --dry-run only lists.`,
 			if err != nil {
 				return err
 			}
-			matches, err := a.MatchPlayerNames(names)
+			library, err := a.Manifest()
 			if err != nil {
 				return err
 			}
+			matches := device.MatchWolfgangNames(names, library.Tracks)
 
 			out := cmd.OutOrStdout()
 			var ids []string

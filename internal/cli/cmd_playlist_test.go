@@ -174,7 +174,7 @@ func TestSyncWritesThePlaylistsMadeOnTheCommandLine(t *testing.T) {
 
 func TestImportingAPlaylistFileOfThePlayer(t *testing.T) {
 	// Three entries: two whole names, and one the player cut at 26 characters.
-	const file = "../app/testdata/userpl-sample.pl"
+	const file = "../device/testdata/userpl-sample.pl"
 	lib, id := libWithSongs(t, "Alpha Song", "Beta Song", "Gamma Song With A Very Long Title", "Unrelated")
 
 	code, out, errs := run(t, lib, "playlist", "import", file, "Old", "--dry-run")

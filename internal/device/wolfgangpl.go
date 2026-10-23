@@ -1,4 +1,4 @@
-package app
+package device
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ import (
 	"music-manager/internal/translit"
 )
 
-// The playlist files of the Wolfang WMP01 (USERPL1.PL to USERPL3.PL) were
+// The playlist files of the Wolfgang WMP01 (USERPL1.PL to USERPL3.PL) were
 // worked out from the player's own files; nothing about them is published.
 // A file is a header of 512 bytes ("USERPL" and a digit, and the 0x55 0xAA of
 // a sector at its end) and then one record of 256 bytes for each entry. A
@@ -31,10 +31,10 @@ const (
 	playerMaxEntry = 1000
 )
 
-// ReadPlayerPlaylist returns the file names in one of the player's playlist
+// ReadWolfgangPlaylist returns the file names in one of the player's playlist
 // files, in the order they are stored. A name is as the player keeps it: at
 // most 26 characters, so a long one is cut short and has lost its ".mp3".
-func ReadPlayerPlaylist(data []byte) ([]string, error) {
+func ReadWolfgangPlaylist(data []byte) ([]string, error) {
 	if len(data) < playerHeader || !bytes.HasPrefix(data, []byte(playerMagic)) || data[len(playerMagic)] < '0' || data[len(playerMagic)] > '9' {
 		return nil, errors.New("not a playlist file of the player (USERPL1.PL to USERPL3.PL)")
 	}
@@ -60,8 +60,8 @@ func ReadPlayerPlaylist(data []byte) ([]string, error) {
 	return names, nil
 }
 
-// PlayerMatch is what one entry of a playlist file of the player came to.
-type PlayerMatch struct {
+// WolfgangMatch is what one entry of a playlist file of the player came to.
+type WolfgangMatch struct {
 	Name string // as the player kept it
 	// Track is the track it is, if one could be told. Candidates are the
 	// tracks it could be when more than one fits and nothing tells them apart.
@@ -72,28 +72,24 @@ type PlayerMatch struct {
 	Partial bool
 }
 
-// MatchPlayerNames finds, for each file name that a playlist of the player
+// MatchWolfgangNames finds, for each file name that a playlist of the player
 // held, the track in the library that it was. The names are the old ones, from
 // before the library renamed its files, so they are compared with the titles:
 // without the track number and ".mp3" at the start and end, ignoring case and
 // everything that is not a letter or a digit. A number that is there tells
 // apart tracks of the same title.
-func (a *App) MatchPlayerNames(names []string) ([]PlayerMatch, error) {
-	m, err := a.store.Load()
-	if err != nil {
-		return nil, err
-	}
-	matches := make([]PlayerMatch, len(names))
+func MatchWolfgangNames(names []string, tracks []manifest.Track) []WolfgangMatch {
+	matches := make([]WolfgangMatch, len(names))
 	for i, name := range names {
-		matches[i] = matchPlayerName(name, m.Tracks)
+		matches[i] = matchPlayerName(name, tracks)
 	}
-	return matches, nil
+	return matches
 }
 
 var leadingNumber = regexp.MustCompile(`^(\d{1,3})(?:\s*[-.]\s*|\s+)(.+)$`)
 
-func matchPlayerName(name string, tracks []manifest.Track) PlayerMatch {
-	res := PlayerMatch{Name: name}
+func matchPlayerName(name string, tracks []manifest.Track) WolfgangMatch {
+	res := WolfgangMatch{Name: name}
 	stem := strings.TrimSpace(strings.TrimSuffix(name, ".mp3"))
 	number, keys := 0, []string{matchKey(stem)}
 	if g := leadingNumber.FindStringSubmatch(stem); g != nil {
