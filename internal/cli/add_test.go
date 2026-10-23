@@ -71,7 +71,7 @@ func TestAddWithoutFlagsAsksOnlyWhenAPrompterIsAvailable(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("code %d, err %q", code, errs)
 		}
-		if got := strings.Join(p.asked, ","); got != "title,artist,album,track,of,released,trim-start,trim-end" {
+		if got := strings.Join(p.asked, ","); got != "title,artist,album,track,of,released,genre,trim-start,trim-end" {
 			t.Errorf("asked %s", got)
 		}
 		if _, out, _ := run(t, lib, "ls"); !strings.Contains(out, "Asked Album") {
@@ -83,7 +83,7 @@ func TestAddWithoutFlagsAsksOnlyWhenAPrompterIsAvailable(t *testing.T) {
 		p := &scripted{}
 		lib := filepath.Join(t.TempDir(), "lib")
 		runWith(t, cli.Deps{Downloader: dl, Prompter: p}, lib, "add", "u1", "--artist", "Given", "--album", "", "--trim-start", "0")
-		if got := strings.Join(p.asked, ","); got != "title,track,of,released,trim-end" {
+		if got := strings.Join(p.asked, ","); got != "title,track,of,released,genre,trim-end" {
 			t.Errorf("asked %s", got)
 		}
 	})

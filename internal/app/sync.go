@@ -203,6 +203,7 @@ func tagSet(t manifest.Track) mp3.TagSet {
 	}
 	return mp3.TagSet{
 		Title: t.Title, Artist: t.Artist, Album: t.Album,
+		Genre: t.Genre,
 		Track: t.TrackNumber, Total: t.TrackTotal,
 		Date:   t.Released,
 		Length: t.PlayingLength(),

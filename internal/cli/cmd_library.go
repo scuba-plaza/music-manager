@@ -42,8 +42,9 @@ func lsCmd(open opener) *cobra.Command {
 	var reverse bool
 	cmd := &cobra.Command{
 		Use:   "ls [query]",
-		Short: "List tracks; words match any title, artist or album, status:<s> filters",
-		Long: `List tracks. Words match any title, artist or album; status:<s> filters by status.
+		Short: "List tracks; words match any title, artist, album or genre, status:<s> and genre:<g> filter",
+		Long: `List tracks. Words match any title, artist, album or genre; status:<s> filters by
+status and genre:<g> by genre (genre:folk finds Folk and Folk Rock).
 
 --sort puts the tracks in order by artist, album, title, track, length,
 released, added or edited. Text and numbers sort smallest first; the three
@@ -135,6 +136,7 @@ func showCmd(open opener) *cobra.Command {
 				row("Track", n)
 			}
 			row("Released", t.Released)
+			row("Genre", t.Genre)
 			row("Length", clock(t.PlayingLength()))
 			if t.TrimStart > 0 || t.TrimEnd > 0 {
 				row("Trim", fmt.Sprintf("start %s, end %s (of %s)",

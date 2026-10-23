@@ -40,7 +40,9 @@ type Track struct {
 	Hint           Hint          `json:"hint,omitzero"`
 	// Released is when the track first came out, as precisely as is known:
 	// 1999, 1999-05 or 1999-05-17.
-	Released      string    `json:"released,omitempty"`
+	Released string `json:"released,omitempty"`
+	// Genre is free text: Folk, Neoclassical, Anthem, whatever the library calls it.
+	Genre         string    `json:"genre,omitempty"`
 	CoverSHA256   string    `json:"cover_sha256"`
 	MBRecordingID string    `json:"mb_recording_id"`
 	MBReleaseID   string    `json:"mb_release_id"`
@@ -58,6 +60,7 @@ type Hint struct {
 	Total    int    `json:"of,omitempty"`
 	Date     string `json:"date,omitempty"`
 	Filename string `json:"filename,omitempty"`
+	Genre    string `json:"genre,omitempty"`
 }
 
 // PlayingLength is the length of the track once its trims are applied.

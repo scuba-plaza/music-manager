@@ -122,3 +122,23 @@ func TestAdoptTakesTheDateTheOldTagsSaid(t *testing.T) {
 		}
 	}
 }
+
+func TestAdoptTakesTheGenreTheOldTagsSaid(t *testing.T) {
+	a := openLib(t)
+	f := filepath.Join(t.TempDir(), "x.mp3")
+	writeFile(t, f, testmp3.WithTextFrames(testmp3.Silent(30),
+		[2]string{"TIT2", "Song"}, [2]string{"TPE1", "Band"}, [2]string{"TCON", "(17)Folk"}))
+	rep, err := a.Ingest([]string{f})
+	if err != nil || len(rep.Added) != 1 {
+		t.Fatalf("%+v, %v", rep, err)
+	}
+	if got := rep.Added[0].Hint.Genre; got != "Folk" {
+		t.Errorf("hint genre = %q, want Folk", got)
+	}
+	if _, err := a.Adopt(nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := tracks(t, a)[0]; got.Genre != "Folk" || got.Hint != (manifest.Hint{}) {
+		t.Errorf("genre = %q, hint %+v", got.Genre, got.Hint)
+	}
+}

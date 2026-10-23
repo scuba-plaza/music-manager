@@ -59,7 +59,7 @@ func (a *App) Adopt(ids []string) ([]AdoptResult, error) {
 			}
 			updated, err := applyEdit(t, Edit{
 				Title: &h.Title, Artist: &h.Artist, Album: &h.Album,
-				TrackNumber: &track, TrackTotal: &h.Total, Released: &h.Date,
+				TrackNumber: &track, TrackTotal: &h.Total, Released: &h.Date, Genre: &h.Genre,
 			})
 			if err != nil {
 				res.Reason = err.Error()

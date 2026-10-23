@@ -301,3 +301,30 @@ func TestChangingTheReleaseDateNeedsASyncButEditingTheClockDoesNot(t *testing.T)
 		t.Errorf("the date should rewrite the file: %v", ops)
 	}
 }
+
+func TestSyncWritesTheGenreIntoTheTagAndChangingItNeedsASync(t *testing.T) {
+	a := libWithTracks(t, 40, 41)
+	ts := tracks(t, a)
+	identify(t, a, ts[0].ID, "Sorted", "Band", "", 0, 0)
+	identify(t, a, ts[1].ID, "Unsorted", "Band", "", 0, 0)
+	if _, err := a.Edit(ts[0].ID, app.Edit{Genre: ptr("Neoclassical")}); err != nil {
+		t.Fatal(err)
+	}
+	mustSync(t, a, app.SyncOptions{})
+	if got := mp3.ReadTagSet(readFile(t, a.Root(), "Band/Sorted.mp3")).Genre; got != "Neoclassical" {
+		t.Errorf("genre in the tag = %q", got)
+	}
+	if got := mp3.ReadTagSet(readFile(t, a.Root(), "Band/Unsorted.mp3")).Genre; got != "" {
+		t.Errorf("a track with no genre got %q", got)
+	}
+
+	if _, err := a.Edit(ts[0].ID, app.Edit{Genre: ptr("Folk")}); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := unsynced(t, a); n != 1 {
+		t.Errorf("after changing a genre: %d to sync, want 1", n)
+	}
+	if ops := mustSync(t, a, app.SyncOptions{}); len(ops) != 1 {
+		t.Errorf("the genre should rewrite the file: %v", ops)
+	}
+}

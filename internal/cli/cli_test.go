@@ -402,3 +402,40 @@ func TestEditTheSourceLink(t *testing.T) {
 		t.Error("add accepted --source-url")
 	}
 }
+
+func TestEditTheGenreAndFindTracksByIt(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib)
+
+	if code, _, errs := run(t, lib, "edit", id, "--title", "Song", "--artist", "Band", "--genre", "Neoclassical"); code != 0 {
+		t.Fatalf("edit: code %d, err %q", code, errs)
+	}
+	if _, out, _ := run(t, lib, "show", id); !strings.Contains(squash(out), "Genre Neoclassical") {
+		t.Errorf("show lacks the genre:\n%s", out)
+	}
+	if _, out, _ := run(t, lib, "ls", "genre:neo"); !strings.Contains(out, id) {
+		t.Errorf("ls genre:neo lacks the track:\n%s", out)
+	}
+	if _, out, _ := run(t, lib, "ls", "genre:folk"); strings.Contains(out, id) {
+		t.Errorf("ls genre:folk lists the track:\n%s", out)
+	}
+
+	run(t, lib, "edit", id, "--genre", "")
+	if _, out, _ := run(t, lib, "show", id); strings.Contains(out, "Genre") {
+		t.Errorf("a cleared genre is still shown:\n%s", out)
+	}
+}
+
+func TestAddTakesTheGenreFromAFlag(t *testing.T) {
+	dl := &fakeDownloader{info: app.Info{Title: "Song", Uploader: "Band - Topic"}}
+	lib := filepath.Join(t.TempDir(), "lib")
+	code, _, errs := runWith(t, cli.Deps{Downloader: dl}, lib, "add", "u1", "--no-input", "--genre", "Folk")
+	if code != 0 {
+		t.Fatalf("code %d, err %q", code, errs)
+	}
+	_, out, _ := run(t, lib, "ls")
+	id := strings.Fields(strings.Split(strings.TrimSpace(out), "\n")[1])[0]
+	if _, out, _ := run(t, lib, "show", id); !strings.Contains(squash(out), "Genre Folk") {
+		t.Errorf("show:\n%s", out)
+	}
+}

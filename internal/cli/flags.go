@@ -18,6 +18,7 @@ type trackFlags struct {
 	track, of                           int
 	trimStart, trimEnd                  string
 	released                            string
+	genre                               string
 	sourceURL                           string
 	cover                               string
 }
@@ -32,6 +33,7 @@ func (tf *trackFlags) register(f *pflag.FlagSet) {
 	f.IntVar(&tf.track, "track", 0, "track number")
 	f.IntVar(&tf.of, "of", 0, "number of tracks on the album")
 	f.StringVar(&tf.released, "released", "", "when the track came out: 1999, 1999-05 or 1999-05-17; \"\" for unknown")
+	f.StringVar(&tf.genre, "genre", "", "genre, free text such as Folk or Neoclassical; \"\" for none")
 	f.StringVar(&tf.trimStart, "trim-start", "", "cut this much off the start, e.g. 0:12")
 	f.StringVar(&tf.trimEnd, "trim-end", "", "cut this much off the end, e.g. 0:05.5")
 	f.StringVar(&tf.cover, "cover", "", "cover image file (JPEG or PNG); \"\" means no cover")
@@ -65,6 +67,7 @@ func (tf *trackFlags) build(f *pflag.FlagSet) (p parsed, err error) {
 		e.TrackTotal = &tf.of
 	}
 	str("released", &tf.released, &e.Released)
+	str("genre", &tf.genre, &e.Genre)
 	str("source-url", &tf.sourceURL, &e.SourceURL)
 	if e.TrimStart, err = parseTrim(f, "trim-start", tf.trimStart); err != nil {
 		return p, err

@@ -64,8 +64,9 @@ func (m *Manifest) Remove(id string) bool {
 }
 
 // Search returns the tracks matching every word of query. A word matches if
-// it appears (case-insensitively) in any ASCII, original or hint text field; a
-// "status:<s>" word filters by status instead. An empty query matches all.
+// it appears (case-insensitively) in any ASCII, original, genre or hint text
+// field; a "status:<s>" word filters by status instead, and a "genre:<g>"
+// word by genre alone. An empty query matches all.
 func (m *Manifest) Search(query string) []Track {
 	var out []Track
 	for _, t := range m.Tracks {
@@ -79,11 +80,15 @@ func (m *Manifest) Search(query string) []Track {
 func matches(t Track, words []string) bool {
 	hay := strings.ToLower(strings.Join([]string{
 		t.Title, t.OriginalTitle, t.Artist, t.OriginalArtist, t.Album, t.OriginalAlbum,
-		t.Hint.Title, t.Hint.Artist, t.Hint.Album, t.Hint.Filename,
+		t.Genre, t.Hint.Title, t.Hint.Artist, t.Hint.Album, t.Hint.Filename,
 	}, "\n"))
 	for _, w := range words {
 		if s, ok := strings.CutPrefix(w, "status:"); ok {
 			if string(t.Status) != s {
+				return false
+			}
+		} else if g, ok := strings.CutPrefix(w, "genre:"); ok {
+			if !strings.Contains(strings.ToLower(t.Genre), g) {
 				return false
 			}
 		} else if !strings.Contains(hay, w) {

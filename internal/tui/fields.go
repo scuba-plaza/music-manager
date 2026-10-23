@@ -25,6 +25,7 @@ const (
 	fAlbum
 	fTrack
 	fReleased
+	fGenre
 	fCutStart
 	fCutEnd
 	fCover
@@ -37,7 +38,7 @@ type inspectorTab struct {
 }
 
 var inspectorTabs = []inspectorTab{
-	{"Details", []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fCover}},
+	{"Details", []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fGenre, fCover}},
 	{"Audio", []fieldKind{fCutStart, fCutEnd}},
 }
 
@@ -75,7 +76,7 @@ func firstFieldOf(tab int) int {
 func (m Model) tab() int { return tabOf(trackFields[m.field]) }
 
 func (f fieldKind) label() string {
-	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Cut start", "Cut end", "Cover"}[f]
+	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover"}[f]
 }
 
 // isName reports whether the field is text that also has an ASCII form.
@@ -141,6 +142,15 @@ func releasedText(t manifest.Track) string {
 	return t.Released
 }
 
+// genreText is a track's genre, falling back to the one in the old tags of a
+// track that is not identified.
+func genreText(t manifest.Track) string {
+	if t.Genre == "" && t.Status != manifest.Identified {
+		return t.Hint.Genre
+	}
+	return t.Genre
+}
+
 func cutText(f fieldKind, t manifest.Track) string {
 	d := t.TrimStart
 	if f == fCutEnd {
@@ -169,6 +179,8 @@ func displayValue(t manifest.Track, f fieldKind) string {
 		return ""
 	case fReleased:
 		return releasedText(t)
+	case fGenre:
+		return genreText(t)
 	}
 	if s := cutText(f, t); s != "" {
 		return s
@@ -202,6 +214,8 @@ func newDraft(t manifest.Track, f fieldKind) draft {
 		// the text is the path of a new image
 	case f == fReleased:
 		d.text = releasedText(t)
+	case f == fGenre:
+		d.text = genreText(t)
 	default:
 		d.text = cutText(f, t)
 	}
@@ -261,6 +275,9 @@ func (d draft) edit() (app.Edit, error) {
 			return e, err
 		}
 		e.Released = &date
+	case fGenre:
+		genre := strings.TrimSpace(d.text)
+		e.Genre = &genre
 	case fCutStart, fCutEnd:
 		var cut time.Duration
 		if s := strings.TrimSpace(d.text); s != "" {

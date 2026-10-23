@@ -13,7 +13,7 @@ import (
 // bulkValues is what was typed in the form that edits several tracks at once.
 // A blank field keeps what each track has; "-" clears it.
 type bulkValues struct {
-	artist, album, of, released, cutStart, cutEnd string
+	artist, album, of, released, genre, cutStart, cutEnd string
 }
 
 const clearMark = "-"
@@ -53,6 +53,12 @@ func (v bulkValues) edit() (app.Edit, error) {
 		}
 		e.Released = &date
 	}
+	if s := strings.TrimSpace(v.genre); s != "" {
+		if s == clearMark {
+			s = ""
+		}
+		e.Genre = &s
+	}
 	for _, c := range []struct {
 		text string
 		dst  **time.Duration
@@ -81,6 +87,7 @@ func changes(t manifest.Track, e app.Edit) bool {
 		e.Album != nil && t.OriginalAlbum != *e.Album,
 		e.TrackTotal != nil && t.TrackTotal != *e.TrackTotal,
 		e.Released != nil && t.Released != *e.Released,
+		e.Genre != nil && t.Genre != *e.Genre,
 		e.TrimStart != nil && t.TrimStart != *e.TrimStart,
 		e.TrimEnd != nil && t.TrimEnd != *e.TrimEnd:
 		return true
@@ -121,6 +128,7 @@ func bulkSummary(v bulkValues) string {
 	say("Album", v.album, "none (a single)")
 	say("Tracks on album", v.of, "none")
 	say("Released", v.released, "unknown")
+	say("Genre", v.genre, "none")
 	say("Cut start", v.cutStart, "none")
 	say("Cut end", v.cutEnd, "none")
 	return strings.Join(parts, " · ")

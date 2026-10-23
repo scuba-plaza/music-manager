@@ -57,6 +57,7 @@ const (
 	addTrack
 	addOf
 	addReleased
+	addGenre
 	addCutStart
 	addCutEnd
 	addFields
@@ -211,6 +212,7 @@ func (d *addDialog) formLines(w int) []string {
 	}
 	lines = append(lines, " "+trackLabel+" "+track.View()+styles.dim.Render(" of ")+of.View())
 	row(addReleased, "Released")
+	row(addGenre, "Genre")
 	row(addCutStart, "Cut start")
 	row(addCutEnd, "Cut end")
 
@@ -256,6 +258,7 @@ func (d *addDialog) edit() (app.Edit, error) {
 		{field: fAlbum, text: d.in[addAlbum].Value()},
 		{field: fTrack, text: d.in[addTrack].Value(), second: d.in[addOf].Value()},
 		{field: fReleased, text: d.in[addReleased].Value()},
+		{field: fGenre, text: d.in[addGenre].Value()},
 		{field: fCutStart, text: d.in[addCutStart].Value()},
 		{field: fCutEnd, text: d.in[addCutEnd].Value()},
 	}
@@ -301,6 +304,9 @@ func mergeEdits(a, b app.Edit) app.Edit {
 	}
 	if b.Released != nil {
 		a.Released = b.Released
+	}
+	if b.Genre != nil {
+		a.Genre = b.Genre
 	}
 	if b.TrimStart != nil {
 		a.TrimStart = b.TrimStart

@@ -113,6 +113,8 @@ func prefilledFrom(t manifest.Track, f fieldKind) bool {
 		return t.TrackNumber == 0 && t.Hint.Track > 0
 	case fReleased:
 		return t.Released == "" && t.Hint.Date != ""
+	case fGenre:
+		return t.Genre == "" && t.Hint.Genre != ""
 	}
 	return false
 }

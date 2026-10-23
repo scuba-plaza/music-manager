@@ -220,3 +220,38 @@ func TestEditRejectsSourcesThatAreNotLinks(t *testing.T) {
 		t.Errorf("a rejected edit changed the record: %+v", after)
 	}
 }
+
+func TestEditGenre(t *testing.T) {
+	a, tr := ingested(t)
+	for _, c := range []struct{ in, want string }{
+		{"Neoclassical", "Neoclassical"},
+		{"  Hip-Hop/Rap  ", "Hip-Hop/Rap"},
+		{"", ""},
+	} {
+		got, err := a.Edit(tr.ID, app.Edit{Genre: ptr(c.in)})
+		if err != nil || got.Genre != c.want {
+			t.Errorf("%q: genre = %q, %v; want %q", c.in, got.Genre, err, c.want)
+		}
+		if saved := tracks(t, a)[0]; saved.Genre != c.want {
+			t.Errorf("%q: saved as %q", c.in, saved.Genre)
+		}
+	}
+}
+
+func TestOtherEditsLeaveTheGenreAlone(t *testing.T) {
+	a, tr := ingested(t)
+	if _, err := a.Edit(tr.ID, app.Edit{Genre: ptr("Folk")}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := a.Edit(tr.ID, app.Edit{Title: ptr("Song"), Artist: ptr("Band")})
+	if err != nil || got.Genre != "Folk" {
+		t.Errorf("genre = %q, %v after editing the title", got.Genre, err)
+	}
+}
+
+func TestEditRejectsAGenreWithMoreThanOneLine(t *testing.T) {
+	a, tr := ingested(t)
+	if _, err := a.Edit(tr.ID, app.Edit{Genre: ptr("Folk\nRock")}); err == nil {
+		t.Error("accepted a genre with a line break")
+	}
+}

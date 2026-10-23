@@ -127,7 +127,7 @@ func TestTheFormStartsFromWhatTheDownloadSaid(t *testing.T) {
 	if len(dl.calls) != 1 || dl.calls[0] != "https://youtu.be/abc123" {
 		t.Fatalf("downloaded %v", dl.calls)
 	}
-	contains(t, m, "Title", "Artist", "Album", "Track", "Released", "Cut start", "Cut end")
+	contains(t, m, "Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end")
 	d := asAdd(t, m)
 	if d.in[addTitle].Value() != "Song Title" || d.in[addArtist].Value() != "Some Band" || d.in[addAlbum].Value() != "Yt Album" || d.in[addTrack].Value() != "4" {
 		t.Errorf("fields = %q %q %q %q", d.in[addTitle].Value(), d.in[addArtist].Value(), d.in[addAlbum].Value(), d.in[addTrack].Value())
@@ -177,11 +177,12 @@ func TestEverythingInTheFormIsUsed(t *testing.T) {
 	set(addTrack, "3")
 	set(addOf, "12")
 	set(addReleased, "1999-05")
+	set(addGenre, " Folk ")
 	set(addCutStart, "0:01")
 	set(addCutEnd, "0:00.5")
 	m = keys(t, m, "enter")
 	got := trackNamed(t, hook.Library, "Fancy")
-	if got.OriginalArtist != "فيروز" || got.Artist != "Firuz" || got.Album != "" || got.TrackNumber != 3 || got.TrackTotal != 12 || got.Released != "1999-05" ||
+	if got.OriginalArtist != "فيروز" || got.Artist != "Firuz" || got.Album != "" || got.TrackNumber != 3 || got.TrackTotal != 12 || got.Released != "1999-05" || got.Genre != "Folk" ||
 		got.TrimStart != time.Second || got.TrimEnd != 500*time.Millisecond {
 		t.Errorf("track = %+v", got)
 	}

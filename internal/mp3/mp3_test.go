@@ -297,3 +297,38 @@ func TestRenderWritesTheXingHeaderEvenWhenTheFirstFrameIsTiny(t *testing.T) {
 		t.Errorf("header leaked into the audio: %d bytes, %v, %v", len(back), dur, err)
 	}
 }
+
+func TestRenderWritesTheGenreAndReadTagSetReadsItBack(t *testing.T) {
+	audio := testmp3.Silent(5)
+	file, err := mp3.Render(audio, mp3.TagSet{Title: "T", Genre: "Neoclassical"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := mp3.ReadTagSet(file).Genre; got != "Neoclassical" {
+		t.Errorf("genre = %q", got)
+	}
+	plain, err := mp3.Render(audio, mp3.TagSet{Title: "T"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(plain, []byte("TCON")) {
+		t.Error("a track without a genre got an empty genre frame")
+	}
+}
+
+func TestReadTagSetTakesTheGenreOfForeignTags(t *testing.T) {
+	audio := testmp3.Silent(5)
+	for _, c := range []struct{ name, in, want string }{
+		{"plain text", "Folk", "Folk"},
+		{"with a number in front", "(17)Rock", "Rock"},
+		{"text with parentheses", "Pop (Arabic)", "Pop (Arabic)"},
+		{"spaces around", "  Anthem ", "Anthem"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got := mp3.ReadTagSet(testmp3.WithTextFrames(audio, [2]string{"TCON", c.in})).Genre
+			if got != c.want {
+				t.Errorf("genre of %q = %q, want %q", c.in, got, c.want)
+			}
+		})
+	}
+}

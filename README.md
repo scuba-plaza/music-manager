@@ -70,7 +70,7 @@ changes the library while the interface is open, the change appears within a cou
 | `mm identify [id…] [--yes]` | look tracks up on MusicBrainz; pick from a list, or `--yes` for confident matches |
 | `mm adopt [id…]` | identify tracks by what their old tags said, for what MusicBrainz does not know |
 | `mm add <url>` | download with yt-dlp and add |
-| `mm edit <id> --title … --artist … --album … --track N --of N --released DATE --source-url LINK --trim-start T --trim-end T --cover FILE` | change a track; `--title-ascii` etc. override the derived ASCII |
+| `mm edit <id> --title … --artist … --album … --track N --of N --released DATE --genre TEXT --source-url LINK --trim-start T --trim-end T --cover FILE` | change a track; `--title-ascii` etc. override the derived ASCII |
 | `mm ls [words] [status:identified\|unidentified] [--sort KEY] [--reverse]` / `mm show <id>` | look at records; `--sort` takes `artist`, `album`, `title`, `track`, `length`, `released`, `added` or `edited` |
 | `mm sync [--target DIR] [--dry-run] [--prune --yes]` | render the folder; `--prune` deletes files the records don't account for |
 | `mm rm <id>…` | remove records (audio is deleted by the next sync) |
@@ -82,6 +82,10 @@ changes the library while the interface is open, the change appears within a cou
 ## Covers
 
 The player's photo viewer opens baseline JPEG files of modest size. It fails on PNG and progressive files, on 4:4:4 colour and on very large pictures, and does not list PNG files at all. So every cover is stored as a baseline JPEG with a JFIF header, 4:2:0 colour, at most 480 pixels along its longer side (a transparent background becomes white), whatever file it was given; a cover that already is such a file is kept as it is. `mm sync` writes it as `cover.jpg` in an album folder and as `Title.jpg` beside a single. Covers stored by an earlier version are converted when they are synced, and `mm cover normalize` converts them in the library itself. The `cover.png` files they leave on the player are strays that `mm sync --prune` removes.
+
+## Genre
+
+A track may have a genre, free text such as `Folk`, `Anthem` or `Neoclassical`. `mm sync` writes it to the file as the genre tag, which the player shows. Set it with `mm edit <id> --genre Folk`, in the TUI (the Genre field and the bulk edit form, `e`) or `mm add --genre`; find tracks with `mm ls genre:folk` (any part of the genre, case ignored). The tags of an ingested file are kept as hints, the genre among them, and `mm adopt` takes them.
 
 ## Dates and sorting
 

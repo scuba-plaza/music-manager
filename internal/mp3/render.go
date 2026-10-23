@@ -3,6 +3,7 @@ package mp3
 import (
 	"bytes"
 	"errors"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 // TagSet is everything the manager writes into a rendered file's tag.
 type TagSet struct {
 	Title, Artist, Album string
+	Genre                string
 	Track, Total         int               // track n of total; zero if unknown
 	Date                 string            // release date: 1999, 1999-05 or 1999-05-17; empty if unknown
 	Length               time.Duration     // playing length, stored as TLEN
@@ -44,6 +46,7 @@ func Render(audio []byte, ts TagSet) ([]byte, error) {
 		text("TRCK", trck)
 	}
 	text("TDRC", ts.Date)
+	text("TCON", ts.Genre)
 	if ts.Length > 0 {
 		text("TLEN", strconv.FormatInt(ts.Length.Milliseconds(), 10))
 	}
@@ -98,7 +101,7 @@ func ReadTagSet(data []byte) TagSet {
 		return TagSet{}
 	}
 	defer tag.Close()
-	ts := TagSet{Title: tag.Title(), Artist: tag.Artist(), Album: tag.Album()}
+	ts := TagSet{Title: tag.Title(), Artist: tag.Artist(), Album: tag.Album(), Genre: plainGenre(tag.Genre())}
 	if f, ok := tag.GetLastFrame("TRCK").(id3v2.TextFrame); ok {
 		n, total, _ := strings.Cut(f.Text, "/")
 		ts.Track, _ = strconv.Atoi(n)
@@ -127,4 +130,16 @@ func ReadTagSet(data []byte) TagSet {
 		ts.Cover, ts.CoverMIME = f.Picture, f.MimeType
 	}
 	return ts
+}
+
+// genreNumber is the "(17)" that older tags put in front of a genre's name.
+var genreNumber = regexp.MustCompile(`^\(\d+\)\s*`)
+
+// plainGenre is the text of a genre frame without such a number.
+func plainGenre(s string) string {
+	s = strings.TrimSpace(s)
+	if rest := genreNumber.ReplaceAllString(s, ""); rest != "" {
+		return rest
+	}
+	return s
 }

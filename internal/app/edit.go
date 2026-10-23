@@ -27,6 +27,8 @@ type Edit struct {
 	Released *string
 	// SourceURL is the link the track came from, or "" for none.
 	SourceURL *string
+	// Genre is free text, one line, or "" for none.
+	Genre *string
 }
 
 // Edit applies e to the track with the given ID and returns the result. A
@@ -80,6 +82,13 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 			return t, err
 		}
 		t.SourceURL = u
+	}
+	if e.Genre != nil {
+		g := strings.TrimSpace(*e.Genre)
+		if strings.ContainsAny(g, "\r\n") {
+			return t, fmt.Errorf("genre %q must be on one line", g)
+		}
+		t.Genre = g
 	}
 	if err := validate(t); err != nil {
 		return t, err

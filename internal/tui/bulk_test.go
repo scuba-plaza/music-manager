@@ -123,3 +123,34 @@ func TestBulkSetsAndClearsTheReleaseDate(t *testing.T) {
 		t.Errorf("summary %q", got)
 	}
 }
+
+func TestBulkSetsAndClearsTheGenre(t *testing.T) {
+	ts := album(3)
+	ts[1].Genre = "Folk"
+	edits, changed, err := bulkPlan(ts, bulkValues{genre: " Neoclassical "})
+	if err != nil || changed != 3 {
+		t.Fatalf("changed %d, err %v", changed, err)
+	}
+	if e := edits[ts[0].ID]; e.Genre == nil || *e.Genre != "Neoclassical" {
+		t.Errorf("= %+v", e)
+	}
+
+	edits, changed, err = bulkPlan(ts, bulkValues{genre: "-"})
+	if err != nil || changed != 1 { // only the track that has a genre changes
+		t.Fatalf("clearing: changed %d, err %v", changed, err)
+	}
+	if e := edits[ts[1].ID]; e.Genre == nil || *e.Genre != "" {
+		t.Errorf("= %+v", e)
+	}
+
+	edits, changed, _ = bulkPlan(ts, bulkValues{genre: "Folk"})
+	if changed != 2 || edits[ts[1].ID].Genre != nil {
+		t.Errorf("a track that has the genre should be left alone: changed %d", changed)
+	}
+	if got := bulkSummary(bulkValues{genre: "Folk"}); !strings.Contains(got, "Genre → Folk") {
+		t.Errorf("summary %q", got)
+	}
+	if got := bulkSummary(bulkValues{genre: "-"}); !strings.Contains(got, "Genre → none") {
+		t.Errorf("summary %q", got)
+	}
+}

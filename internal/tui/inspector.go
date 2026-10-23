@@ -332,6 +332,9 @@ func (m Model) editorLines(prefix, indent string, vw int) []string {
 	case m.dr.field == fReleased:
 		first.Width = max(vw-1, 1)
 		lines = append(lines, prefix+first.View(), indent+styles.dim.Render(fit("e.g. 1999, 1999-05 or 1999-05-17 · empty if unknown", vw)))
+	case m.dr.field == fGenre:
+		first.Width = max(vw-1, 1)
+		lines = append(lines, prefix+first.View(), indent+styles.dim.Render(fit("e.g. Folk or Neoclassical · empty for none", vw)))
 	default:
 		first.Width = max(vw-24, 1)
 		lines = append(lines, prefix+first.View()+styles.dim.Render("  e.g. 0:12 or 1:30.5"))

@@ -367,3 +367,38 @@ func TestTheInspectorSaysWhenATrackWasAddedAndLastEdited(t *testing.T) {
 	tr := trackNamed(t, hook.Library, "Flow")
 	contains(t, m, "added "+app.SortValue(tr, app.SortAdded), "edited "+app.SortValue(tr, app.SortEdited))
 }
+
+func TestEditingTheGenre(t *testing.T) {
+	m, hook := editingModel(t, "Flow")
+	m = focusField(t, m, fGenre)
+	contains(t, m, "Genre")
+	m = keys(t, m, "enter")
+	contains(t, m, "Folk", "empty for none") // the kind of thing that goes here is shown
+	m = typed(t, m, "Neoclassical")
+	m = keys(t, m, "enter")
+
+	if got := trackNamed(t, hook.Library, "Flow"); got.Genre != "Neoclassical" {
+		t.Errorf("saved %+v", got)
+	}
+	contains(t, m, "Saved", "Neoclassical")
+
+	m = keys(t, m, "enter")
+	m = clearField(t, m)
+	m = keys(t, m, "enter")
+	if got := trackNamed(t, hook.Library, "Flow"); got.Genre != "" {
+		t.Errorf("an empty genre should forget it: %q", got.Genre)
+	}
+}
+
+func TestTheGenreSitsBetweenTheReleaseDateAndTheCover(t *testing.T) {
+	m, _ := editingModel(t, "Flow")
+	m = focusField(t, m, fReleased)
+	m = keys(t, m, "down")
+	if trackFields[m.field] != fGenre {
+		t.Errorf("below Released is %v, want Genre", trackFields[m.field])
+	}
+	m = keys(t, m, "down")
+	if trackFields[m.field] != fCover {
+		t.Errorf("below Genre is %v, want Cover", trackFields[m.field])
+	}
+}

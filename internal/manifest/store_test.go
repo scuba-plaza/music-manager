@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -120,5 +121,25 @@ func TestFailedSaveKeepsExistingFile(t *testing.T) {
 	}
 	if len(m.Tracks) != 1 || m.Tracks[0].ID != "keep" {
 		t.Errorf("after failed save: %+v, want the original", m.Tracks)
+	}
+}
+
+func TestAGenreIsWrittenOnlyWhenThereIsOne(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "library.json")
+	s := manifest.NewStore(path)
+	m := &manifest.Manifest{Tracks: []manifest.Track{{ID: "aaaaaa", Genre: "Neoclassical"}, {ID: "bbbbbb"}}}
+	if err := s.Save(m); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(data), `"genre"`); got != 1 {
+		t.Errorf("%d genre keys in the file, want 1 (a track without one writes none):\n%s", got, data)
+	}
+	back, err := s.Load()
+	if err != nil || back.Tracks[0].Genre != "Neoclassical" || back.Tracks[1].Genre != "" {
+		t.Errorf("loaded %+v, %v", back.Tracks, err)
 	}
 }

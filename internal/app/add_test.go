@@ -87,7 +87,7 @@ func TestAddWithEverythingGivenNeverAsksAndRecordsTheSource(t *testing.T) {
 	a, dl, p := openLib(t), newDownloader(), &scriptedPrompter{}
 	got, err := a.Add(context.Background(), app.AddRequest{
 		URL:  "https://youtu.be/xyz",
-		Edit: app.Edit{Title: strp("وطني"), Artist: strp("فيروز"), Album: strp("Hits"), TrackNumber: ptr(3), TrackTotal: ptr(12), Released: strp("1999-05"), TrimStart: ptr(time.Second), TrimEnd: ptr(0 * time.Second)},
+		Edit: app.Edit{Title: strp("وطني"), Artist: strp("فيروز"), Album: strp("Hits"), TrackNumber: ptr(3), TrackTotal: ptr(12), Released: strp("1999-05"), Genre: strp(""), TrimStart: ptr(time.Second), TrimEnd: ptr(0 * time.Second)},
 	}, dl, p)
 	if err != nil {
 		t.Fatal(err)
@@ -148,7 +148,7 @@ func TestAddAsksEachFieldWithDefaultsFromTheDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantAsked := []string{"title", "title-ascii", "artist", "artist-ascii", "album", "track", "of", "released", "trim-start", "trim-end"}
+	wantAsked := []string{"title", "title-ascii", "artist", "artist-ascii", "album", "track", "of", "released", "genre", "trim-start", "trim-end"}
 	if strings.Join(p.asked, ",") != strings.Join(wantAsked, ",") {
 		t.Errorf("asked %v, want %v", p.asked, wantAsked)
 	}
@@ -170,7 +170,7 @@ func TestAddOnlyAsksForFieldsNotGivenAsFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "artist,track,of,released,trim-start"; strings.Join(p.asked, ",") != want {
+	if want := "artist,track,of,released,genre,trim-start"; strings.Join(p.asked, ",") != want {
 		t.Errorf("asked %v, want %s", p.asked, want)
 	}
 }
@@ -527,5 +527,28 @@ func TestAddValidatesTheReleaseDateAnswer(t *testing.T) {
 		if err := released.Validate(in); (err == nil) != ok {
 			t.Errorf("validate(%q) = %v, want ok=%v", in, err, ok)
 		}
+	}
+}
+
+func TestAddAsksForAGenreUnlessOneIsGiven(t *testing.T) {
+	a, dl := openLib(t), newDownloader()
+	p := &scriptedPrompter{answers: map[string]string{"genre": "  Folk "}}
+	got, err := a.Add(context.Background(), app.AddRequest{URL: "u"}, dl, p)
+	if err != nil || got.Genre != "Folk" {
+		t.Errorf("answered: genre %q, %v", got.Genre, err)
+	}
+	if p.defaults["genre"] != "" {
+		t.Errorf("default genre = %q, want none", p.defaults["genre"])
+	}
+
+	p = &scriptedPrompter{}
+	got, err = openLib(t).Add(context.Background(), app.AddRequest{URL: "u", Edit: app.Edit{Genre: strp("Anthem")}}, dl, p)
+	if err != nil || got.Genre != "Anthem" || strings.Contains(strings.Join(p.asked, ","), "genre") {
+		t.Errorf("given: genre %q, asked %v, %v", got.Genre, p.asked, err)
+	}
+
+	got, err = openLib(t).Add(context.Background(), app.AddRequest{URL: "u"}, dl, nil)
+	if err != nil || got.Genre != "" {
+		t.Errorf("non-interactive: genre %q, %v", got.Genre, err)
 	}
 }

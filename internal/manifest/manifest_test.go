@@ -93,3 +93,29 @@ func TestPlayingLengthExcludesTrims(t *testing.T) {
 		t.Errorf("PlayingLength with overlapping trims = %v, want 0", got)
 	}
 }
+
+func TestSearchFindsAGenreAsAWordOrWithTheGenrePrefix(t *testing.T) {
+	m := &manifest.Manifest{}
+	m.Add(manifest.Track{Title: "Longing", Artist: "Gustavo", Genre: "Neoclassical", Status: manifest.Identified})
+	m.Add(manifest.Track{Title: "Folk Song", Artist: "Max", Genre: "Anthem", Status: manifest.Identified})
+	m.Add(manifest.Track{Title: "Plain", Artist: "Nobody", Status: manifest.Identified})
+
+	cases := []struct {
+		query string
+		want  int
+	}{
+		{"neoclassical", 1}, // a plain word looks at the genre too
+		{"genre:neo", 1},    // a start or any part, case-insensitive
+		{"genre:ANTHEM", 1},
+		{"genre:folk", 0}, // only the genre is looked at after the prefix: not the title
+		{"folk", 1},       // a plain word matches the title
+		{"genre:neo genre:anthem", 0},
+		{"genre:neo longing", 1},
+		{"genre:", 3}, // nothing asked: everything
+	}
+	for _, c := range cases {
+		if got := len(m.Search(c.query)); got != c.want {
+			t.Errorf("Search(%q) = %d tracks, want %d", c.query, got, c.want)
+		}
+	}
+}

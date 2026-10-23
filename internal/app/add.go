@@ -315,6 +315,14 @@ func collect(given Edit, info Info, p Prompter) (Edit, error) {
 		v = strings.TrimSpace(v)
 		e.Released = &v
 	}
+	if e.Genre == nil {
+		v, err := ask(Question{Key: "genre", Label: "Genre (empty for none)"})
+		if err != nil {
+			return e, err
+		}
+		v = strings.TrimSpace(v)
+		e.Genre = &v
+	}
 
 	trim := func(key, label string, dst **time.Duration) error {
 		if *dst != nil {
