@@ -16,19 +16,22 @@ import (
 type bulkForm struct {
 	head   string
 	tracks []manifest.Track
-	in     [7]textinput.Model
+	in     [10]textinput.Model
 	focus  int
 	err    string
 }
 
-var bulkLabels = [7]string{"Artist", "Album", "Tracks on album", "Released", "Genre", "Cut start", "Cut end"}
+var bulkLabels = [10]string{"Artist", "Artist (Latin)", "Album", "Album (Latin)", "Tracks on album", "Released", "Genre", "Genre (Latin)", "Cut start", "Cut end"}
 
 const (
 	bulkArtist = iota
+	bulkArtistLatin
 	bulkAlbum
+	bulkAlbumLatin
 	bulkOf
 	bulkReleased
 	bulkGenre
+	bulkGenreLatin
 	bulkCutStart
 	bulkCutEnd
 )
@@ -53,7 +56,10 @@ func newBulkForm(head string, tracks []manifest.Track, focus int, prefill string
 
 func (b *bulkForm) values() bulkValues {
 	v := func(i int) string { return b.in[i].Value() }
-	return bulkValues{v(bulkArtist), v(bulkAlbum), v(bulkOf), v(bulkReleased), v(bulkGenre), v(bulkCutStart), v(bulkCutEnd)}
+	return bulkValues{
+		artist: v(bulkArtist), album: v(bulkAlbum), of: v(bulkOf), released: v(bulkReleased), genre: v(bulkGenre), cutStart: v(bulkCutStart), cutEnd: v(bulkCutEnd),
+		artistLatin: v(bulkArtistLatin), albumLatin: v(bulkAlbumLatin), genreLatin: v(bulkGenreLatin),
+	}
 }
 
 func (b *bulkForm) title() string { return b.head }

@@ -77,7 +77,7 @@ func TestBulkEditOfMarkedTracks(t *testing.T) {
 	m = keys(t, m, "e")
 	contains(t, m, "Edit 2 marked tracks", "Artist", "Album", "Tracks on album", "Cut start", "Cut end", "(keep)")
 	m = typed(t, m, "Shawn J.")
-	m = keys(t, m, "tab")
+	m = keys(t, m, "tab", "tab") // past the Latin form of the artist, to the album
 	m = typed(t, m, "-")
 	contains(t, m, "Artist → Shawn J.", "Album → none")
 	m = keys(t, m, "enter")
@@ -107,7 +107,7 @@ func TestBulkEditOfMarkedTracks(t *testing.T) {
 func TestTheBulkFormExplainsMistakesAndSavesNothing(t *testing.T) {
 	m, hook := editingModel(t, "Flow")
 	m = keys(t, m, "space", "e")
-	m = keys(t, m, "tab", "tab")
+	m = keys(t, m, "tab", "tab", "tab", "tab") // tracks on album
 	m = typed(t, m, "many")
 	m = keys(t, m, "enter")
 	contains(t, m, "whole number")
@@ -239,7 +239,7 @@ func TestTheBulkFormSetsTheReleaseDateOfTheMarkedTracks(t *testing.T) {
 	m, hook := editingModel(t, "Flow")
 	m = keys(t, m, "space", "e")
 	contains(t, m, "Released")
-	m = keys(t, m, "tab", "tab", "tab") // artist, album, tracks on album, released
+	m = keys(t, m, "tab", "tab", "tab", "tab", "tab") // artist, its Latin form, album, its Latin form, tracks on album, released
 	m = typed(t, m, "never")
 	m = keys(t, m, "enter")
 	contains(t, m, "is not a date")
@@ -257,4 +257,20 @@ func TestTheBulkFormSetsTheReleaseDateOfTheMarkedTracks(t *testing.T) {
 	if got := trackNamed(t, hook.Library, "The Wanderer"); got.Released != "" {
 		t.Errorf("an unmarked track was changed: %+v", got)
 	}
+}
+
+func TestRenamingAnArtistCanSetItsLatinFormOnAllItsTracks(t *testing.T) {
+	m, hook := editingModel(t, "Flow")
+	m = keys(t, m, "left", "left", "left", "e") // album, close it, artist
+	contains(t, m, "Rename the artist", "Artist (Latin)", "Album (Latin)", "Genre (Latin)")
+	m = keys(t, m, "tab")
+	m = typed(t, m, "Shawn J")
+	contains(t, m, "Artist (Latin) → Shawn J")
+	m = keys(t, m, "enter")
+	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
+		if got := trackNamed(t, hook.Library, title); got.ArtistLatin != "Shawn J" || got.Artist != "Shawn James" {
+			t.Errorf("%s: artist %q, its Latin form %q", title, got.Artist, got.ArtistLatin)
+		}
+	}
+	contains(t, m, "Changed 3 tracks")
 }

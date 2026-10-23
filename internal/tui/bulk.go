@@ -14,6 +14,9 @@ import (
 // A blank field keeps what each track has; "-" clears it.
 type bulkValues struct {
 	artist, album, of, released, genre, cutStart, cutEnd string
+	// The forms of the artist, the album and the genre in Latin letters; "-"
+	// takes the one set by hand away.
+	artistLatin, albumLatin, genreLatin string
 }
 
 const clearMark = "-"
@@ -59,6 +62,22 @@ func (v bulkValues) edit() (app.Edit, error) {
 		}
 		e.Genre = &s
 	}
+	for _, f := range []struct {
+		text string
+		dst  **string
+		name string
+	}{{v.artistLatin, &e.ArtistLatin, "Artist (Latin)"}, {v.albumLatin, &e.AlbumLatin, "Album (Latin)"}, {v.genreLatin, &e.GenreLatin, "Genre (Latin)"}} {
+		s := strings.TrimSpace(f.text)
+		switch {
+		case s == "":
+			continue
+		case strings.ContainsAny(s, "\r\n"):
+			return e, errors.New(f.name + " must be on one line")
+		case s == clearMark:
+			s = ""
+		}
+		*f.dst = &s
+	}
 	for _, c := range []struct {
 		text string
 		dst  **time.Duration
@@ -88,6 +107,9 @@ func changes(t manifest.Track, e app.Edit) bool {
 		e.TrackTotal != nil && t.TrackTotal != *e.TrackTotal,
 		e.Released != nil && t.Released != *e.Released,
 		e.Genre != nil && t.Genre != *e.Genre,
+		e.ArtistLatin != nil && t.ArtistLatin != *e.ArtistLatin,
+		e.AlbumLatin != nil && t.AlbumLatin != *e.AlbumLatin,
+		e.GenreLatin != nil && t.GenreLatin != *e.GenreLatin,
 		e.TrimStart != nil && t.TrimStart != *e.TrimStart,
 		e.TrimEnd != nil && t.TrimEnd != *e.TrimEnd:
 		return true
@@ -125,10 +147,13 @@ func bulkSummary(v bulkValues) string {
 		}
 	}
 	say("Artist", v.artist, "")
+	say("Artist (Latin)", v.artistLatin, "worked out")
 	say("Album", v.album, "none (a single)")
+	say("Album (Latin)", v.albumLatin, "worked out")
 	say("Tracks on album", v.of, "none")
 	say("Released", v.released, "unknown")
 	say("Genre", v.genre, "none")
+	say("Genre (Latin)", v.genreLatin, "worked out")
 	say("Cut start", v.cutStart, "none")
 	say("Cut end", v.cutEnd, "none")
 	return strings.Join(parts, " · ")

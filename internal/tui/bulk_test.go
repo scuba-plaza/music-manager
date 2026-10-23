@@ -153,3 +153,40 @@ func TestBulkSetsAndClearsTheGenre(t *testing.T) {
 		t.Errorf("summary %q", got)
 	}
 }
+
+func TestBulkSetsAndClearsTheLatinForms(t *testing.T) {
+	ts := album(3)
+	ts[1].ArtistLatin = "Shawn J"
+	edits, changed, err := bulkPlan(ts, bulkValues{artistLatin: " Shawn J ", albumLatin: "Shadows", genreLatin: "Folk"})
+	if err != nil || changed != 3 {
+		t.Fatalf("changed %d, err %v", changed, err)
+	}
+	e := edits[ts[0].ID]
+	if e.ArtistLatin == nil || *e.ArtistLatin != "Shawn J" || e.AlbumLatin == nil || *e.AlbumLatin != "Shadows" || e.GenreLatin == nil || *e.GenreLatin != "Folk" {
+		t.Errorf("= %+v", e)
+	}
+	if e.TitleLatin != nil || e.Artist != nil || e.Album != nil || e.Genre != nil {
+		t.Errorf("only the forms are to change: %+v", e)
+	}
+
+	edits, changed, err = bulkPlan(ts, bulkValues{artistLatin: "-"})
+	if err != nil || changed != 1 { // only the track that has a form set by hand changes
+		t.Fatalf("clearing: changed %d, err %v", changed, err)
+	}
+	if e := edits[ts[1].ID]; e.ArtistLatin == nil || *e.ArtistLatin != "" {
+		t.Errorf("= %+v", e)
+	}
+
+	if _, _, err := bulkPlan(ts, bulkValues{albumLatin: "two\nlines"}); err == nil {
+		t.Error("a form on two lines should be refused before anything is saved")
+	}
+}
+
+func TestTheBulkSummaryNamesTheLatinForms(t *testing.T) {
+	got := bulkSummary(bulkValues{artistLatin: "Fairouz", albumLatin: "-"})
+	for _, want := range []string{"Artist (Latin) → Fairouz", "Album (Latin) → worked out"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("summary %q lacks %q", got, want)
+		}
+	}
+}
