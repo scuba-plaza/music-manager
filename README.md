@@ -86,7 +86,7 @@ The player's photo viewer opens baseline JPEG files of modest size. It fails on 
 
 ## Genre
 
-A track may have a genre, free text such as `Folk`, `Anthem` or `Neoclassical`. `mm sync` writes it to the file as the genre tag, which the player shows. Set it with `mm edit <id> --genre Folk`, in the TUI (the Genre field and the bulk edit form, `e`) or `mm add --genre`; find tracks with `mm ls genre:folk` (any part of the genre, case ignored). The tags of an ingested file are kept as hints, the genre among them, and `mm adopt` takes them.
+A track may have a genre, free text such as `Folk`, `Anthem` or `Neoclassical`. `mm sync` writes it to the file as the genre tag, which the player shows. Its index has room for 12 characters of a genre, as for an artist and an album (judging from the layout of `MUSIC.LIB`, not yet seen on the device), so short names such as `Tarab` or `Arabic Pop` are safer than long ones. Set it with `mm edit <id> --genre Folk`, in the TUI (the Genre field and the bulk edit form, `e`) or `mm add --genre`; find tracks with `mm ls genre:folk` (any part of the genre, case ignored). The tags of an ingested file are kept as hints, the genre among them, and `mm adopt` takes them.
 
 ## Review files
 
