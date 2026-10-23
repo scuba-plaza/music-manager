@@ -73,7 +73,7 @@ func TestUpAndDownChooseTheField(t *testing.T) {
 	for range trackFields {
 		m = keys(t, m, "down")
 	}
-	if trackFields[m.field] != fFadeOut { // the preview of the Wolfgang is not there unless asked for
+	if trackFields[m.field] != fLatinGenre { // the preview of the Wolfgang is not there unless asked for
 		t.Errorf("down stops at the last field, on %v", trackFields[m.field])
 	}
 }

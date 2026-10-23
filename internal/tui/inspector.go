@@ -41,9 +41,7 @@ func (m Model) trackHead(t manifest.Track, w int) []string {
 	tab := m.tab()
 	strip, _ := m.tabStrip()
 	lines := []string{strip, " " + styles.bold.Render(fit(title, w-2)), rule(w)}
-	if t.Status != manifest.Identified && tab == 0 {
-		lines = append(lines, " "+styles.warn.Render("Not identified yet. Dim values are from the file's old tags."))
-	}
+	lines = append(lines, m.tabNotes(t, tab, w)...)
 
 	for i, f := range trackFields {
 		if tabOf(f) != tab {
@@ -58,6 +56,21 @@ func (m Model) trackHead(t manifest.Track, w int) []string {
 		}
 	}
 	return lines
+}
+
+// tabNotes are the lines under the rule of a tab, before its fields.
+func (m Model) tabNotes(t manifest.Track, tab, w int) []string {
+	switch {
+	case t.Status != manifest.Identified && tab == 0:
+		return []string{" " + styles.warn.Render("Not identified yet. Dim values are from the file's old tags.")}
+	case tab == tabOf(fLatinTitle):
+		var lines []string
+		for _, l := range wrap("Dim forms are worked out from the names. Type one to set it by hand; sorting, search and devices that cannot show the true names use it.", w-2) {
+			lines = append(lines, " "+styles.dim.Render(l))
+		}
+		return lines
+	}
+	return nil
 }
 
 // trackLines shows a track's fields, with the one being edited open.
@@ -127,6 +140,8 @@ func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int) []
 	case value == "":
 		lines = append(lines, prefix+styles.dim.Render("—"))
 	case prefilledFrom(t, f):
+		lines = append(lines, prefix+styles.dim.Render(fit(value, vw)))
+	case f.isLatin() && !handSet(t, f):
 		lines = append(lines, prefix+styles.dim.Render(fit(value, vw)))
 	default:
 		lines = append(lines, prefix+fit(value, vw))
@@ -234,6 +249,10 @@ func (m Model) editorLines(prefix, indent string, vw int) []string {
 	case m.dr.field.isName():
 		first.Width = max(vw-1, 1)
 		lines = append(lines, prefix+first.View())
+	case m.dr.field.isLatin():
+		first.Width = max(vw-1, 1)
+		lines = append(lines, prefix+first.View())
+		lines = append(lines, hintLines(indent, "for "+trueName(m.dr.track, m.dr.field)+" · empty takes the form worked out back", vw)...)
 	case m.dr.field == fTrack:
 		first.Width, second.Width = 5, 5
 		lines = append(lines, prefix+first.View()+styles.dim.Render(" of ")+second.View())

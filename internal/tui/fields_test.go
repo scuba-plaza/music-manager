@@ -20,7 +20,7 @@ func identified() manifest.Track {
 }
 
 func TestFieldsAreInTheOrderOfTheInspector(t *testing.T) {
-	want := []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fGenre, fCover, fCutStart, fCutEnd, fVolume, fFadeIn, fFadeOut, fWolfgang}
+	want := []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fGenre, fCover, fCutStart, fCutEnd, fVolume, fFadeIn, fFadeOut, fLatinTitle, fLatinArtist, fLatinAlbum, fLatinGenre, fWolfgang}
 	if len(trackFields) != len(want) {
 		t.Fatalf("fields = %v", trackFields)
 	}

@@ -131,6 +131,10 @@ func (m *Model) startEdit() tea.Cmd {
 	if f == fWolfgang {
 		return nil // a preview
 	}
+	if f.isLatin() && trueName(r.Track, f) == "" {
+		m.say("There is no "+strings.ToLower(f.label())+" to write in Latin letters", false)
+		return nil
+	}
 	m.dr = newDraft(r.Track, f)
 	m.prefilled = prefilledFrom(r.Track, f)
 	m.in[0], m.in[1] = newInput(m.dr.text), newInput(m.dr.second)
@@ -296,7 +300,7 @@ func (m Model) commit() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.busy = true
-	return m, m.save(t, e, "change of "+strings.ToLower(m.dr.field.label()), "")
+	return m, m.save(t, e, "change of "+m.dr.field.what(), "")
 }
 
 func (m Model) edited(msg editedMsg) (tea.Model, tea.Cmd) {

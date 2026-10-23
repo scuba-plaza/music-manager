@@ -25,7 +25,14 @@ func TestRightAndLeftMoveBetweenTheTabsAndLeftOnTheFirstLeaves(t *testing.T) {
 		t.Fatal("moving to another tab left the inspector")
 	}
 
-	m = keys(t, m, "right") // there is no tab after the second
+	m = keys(t, m, "right") // the third is the Latin forms
+	contains(t, m, "Dim forms")
+	lacks(t, m, "Cut start")
+
+	m = keys(t, m, "right") // there is no tab after the third
+	contains(t, m, "Dim forms")
+
+	m = keys(t, m, "left")
 	contains(t, m, "Cut start")
 	lacks(t, m, "Released")
 
@@ -117,7 +124,7 @@ func TestClickingATabLabelChoosesIt(t *testing.T) {
 
 func TestTheFooterOffersTheTabsInTheInspector(t *testing.T) {
 	m, _ := editingModel(t, "Flow")
-	lacks(t, m, "1-2 tabs")
+	lacks(t, m, "1-3 tabs")
 	m = keys(t, m, "right")
-	contains(t, m, "1-2 tabs")
+	contains(t, m, "1-3 tabs")
 }

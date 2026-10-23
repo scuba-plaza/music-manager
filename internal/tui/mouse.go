@@ -27,10 +27,8 @@ type fieldStart struct{ field, line int }
 // inspector at which it starts, so a click can be traced to a field.
 func (m Model) fieldStarts(t manifest.Track, w, h int) []fieldStart {
 	tab := m.tab()
-	line := 3 // the strip of tabs, the title and a rule
-	if t.Status != manifest.Identified && tab == 0 {
-		line++ // the note that it is not identified
-	}
+	line := 3                          // the strip of tabs, the title and a rule
+	line += len(m.tabNotes(t, tab, w)) // what is said before the fields
 	var starts []fieldStart
 	for i, f := range trackFields {
 		if tabOf(f) != tab {

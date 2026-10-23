@@ -30,7 +30,7 @@ var helpLeft = []helpSection{
 	{"Editing a track", []helpEntry{
 		{"→  enter", "from tree into fields"},
 		{"↑↓", "choose a field"},
-		{"← →  1-3", "details, audio, player"},
+		{"← →  1-3", "details, audio, Latin forms"},
 		{"enter", "edit it; enter saves"},
 		{"esc", "cancel, or back to tree"},
 		{"tab", "other number"},

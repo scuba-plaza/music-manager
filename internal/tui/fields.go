@@ -32,6 +32,10 @@ const (
 	fVolume
 	fFadeIn
 	fFadeOut
+	fLatinTitle // the forms in Latin letters, of the title, artist, album and genre
+	fLatinArtist
+	fLatinAlbum
+	fLatinGenre
 	fWolfgang // the read-only preview under --wolfgang
 )
 
@@ -44,6 +48,7 @@ type inspectorTab struct {
 var inspectorTabs = []inspectorTab{
 	{"Details", []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fGenre, fCover}},
 	{"Audio", []fieldKind{fCutStart, fCutEnd, fVolume, fFadeIn, fFadeOut}},
+	{"Latin", []fieldKind{fLatinTitle, fLatinArtist, fLatinAlbum, fLatinGenre}},
 	{"Wolfgang", []fieldKind{fWolfgang}},
 }
 
@@ -81,11 +86,25 @@ func firstFieldOf(tab int) int {
 func (m Model) tab() int { return tabOf(trackFields[m.field]) }
 
 func (f fieldKind) label() string {
-	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Volume", "Fade in", "Fade out", "Wolfgang"}[f]
+	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Volume", "Fade in", "Fade out", "Title", "Artist", "Album", "Genre", "Wolfgang"}[f]
+}
+
+// what is the field as a change of it is named: "title", or "Latin title" for
+// the form of the title in Latin letters, which has the label of the title
+// under the tab that says so.
+func (f fieldKind) what() string {
+	if f.isLatin() {
+		return "Latin " + strings.ToLower(f.label())
+	}
+	return strings.ToLower(f.label())
 }
 
 // isName reports whether the field is the title, the artist or the album.
 func (f fieldKind) isName() bool { return f == fTitle || f == fArtist || f == fAlbum }
+
+// isLatin reports whether the field is the form of the title, the artist, the
+// album or the genre in Latin letters.
+func (f fieldKind) isLatin() bool { return f >= fLatinTitle && f <= fLatinGenre }
 
 // name returns the title, artist or album of a track. A track that is not
 // identified yet has no title or artist of its own, so the field starts from
@@ -114,6 +133,40 @@ func name(t manifest.Track, f fieldKind) string {
 		}
 	}
 	return s
+}
+
+// latinOf is the Latin form that the field f of t shows: the one set by hand, if
+// there is one, else the one worked out. It is empty if the name it is the form
+// of is.
+func latinOf(t manifest.Track, f fieldKind) (form string, byHand bool) {
+	switch f {
+	case fLatinTitle:
+		return t.LatinTitle(), t.TitleLatin != ""
+	case fLatinArtist:
+		return t.LatinArtist(), t.ArtistLatin != ""
+	case fLatinAlbum:
+		return t.LatinAlbum(), t.AlbumLatin != ""
+	}
+	return t.LatinGenre(), t.GenreLatin != ""
+}
+
+// handSet reports whether the Latin field f of t shows a form set by hand.
+func handSet(t manifest.Track, f fieldKind) bool {
+	_, byHand := latinOf(t, f)
+	return byHand
+}
+
+// trueName is the name that the Latin field f is the form of.
+func trueName(t manifest.Track, f fieldKind) string {
+	switch f {
+	case fLatinTitle:
+		return t.Title
+	case fLatinArtist:
+		return t.Artist
+	case fLatinAlbum:
+		return t.Album
+	}
+	return t.Genre
 }
 
 // leadingNumber matches the "04 " or "04 - " that file names start with.
@@ -168,6 +221,9 @@ func cutText(f fieldKind, t manifest.Track) string {
 // displayValue is how a field reads when it is not being edited.
 func displayValue(t manifest.Track, f fieldKind) string {
 	switch f {
+	case fLatinTitle, fLatinArtist, fLatinAlbum, fLatinGenre:
+		form, _ := latinOf(t, f)
+		return form
 	case fTitle, fArtist, fAlbum:
 		return name(t, f)
 	case fTrack:
@@ -215,6 +271,8 @@ func newDraft(t manifest.Track, f fieldKind) draft {
 	case f == fTrack:
 		n, of := numbers(t)
 		d.text, d.second = numberText(n), numberText(of)
+	case f.isLatin():
+		d.text, _ = latinOf(t, f)
 	case f == fCover:
 		// the text is the path of a new image
 	case f == fReleased:
@@ -251,6 +309,18 @@ func (d draft) edit() (app.Edit, error) {
 			e.Artist = &text
 		case fAlbum:
 			e.Album = &text
+		}
+	case fLatinTitle, fLatinArtist, fLatinAlbum, fLatinGenre:
+		text := strings.TrimSpace(d.text) // empty takes the form worked out back
+		switch d.field {
+		case fLatinTitle:
+			e.TitleLatin = &text
+		case fLatinArtist:
+			e.ArtistLatin = &text
+		case fLatinAlbum:
+			e.AlbumLatin = &text
+		default:
+			e.GenreLatin = &text
 		}
 	case fTrack:
 		n, err := count(d.text)
