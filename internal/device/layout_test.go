@@ -17,11 +17,14 @@ func longTrack() manifest.Track {
 	}
 }
 
-func TestTheWolfgangsFileNamesAreCutAtWhatItShows(t *testing.T) {
+// The player shows 24 characters of a name, the extension included, and moves
+// a longer one along when it is hovered: a file name is cut so that all of it
+// fits.
+func TestTheWolfgangsFileNamesFitWhatItShowsWholeWithTheExtension(t *testing.T) {
 	got := layout.PathFor(longTrack(), device.Wolfgang.Layout())
-	stem := strings.TrimSuffix(got[strings.LastIndex(got, "/")+1:], ".mp3")
-	if n := utf8.RuneCountInString(stem); n != 24 {
-		t.Errorf("%q: the file name is %d characters before .mp3, want 24", got, n)
+	name := got[strings.LastIndex(got, "/")+1:]
+	if n := utf8.RuneCountInString(name); n != 24 {
+		t.Errorf("%q: the file name is %d characters with .mp3, want 24", got, n)
 	}
 }
 

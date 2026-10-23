@@ -47,8 +47,15 @@ type Target interface {
 // gets the names as they are, in any script.
 var Generic Target = generic{}
 
-// stemWidth is how many characters of a file name the Wolfgang shows.
-const stemWidth = 24
+// The Wolfgang shows 24 characters of a name, the extension included, and moves
+// a longer one along when it is hovered. A file name is cut so that all of it
+// fits, which leaves this many characters before ".mp3".
+const (
+	nameShown = 24
+
+	// WolfgangStemWidth is how long the part of a file name before ".mp3" is.
+	WolfgangStemWidth = nameShown - len(".mp3")
+)
 
 // Wolfgang is the Wolfgang WMP01 player: Latin names of a width it can show.
 var Wolfgang Target = wolfgang{}
@@ -163,11 +170,11 @@ type wolfgang struct{}
 
 func (wolfgang) Name() string { return "wolfgang-wmp01" }
 
-// Layout: the player shows the first 24 characters of a file name and stores
-// 26 with the extension, so a longer name is cut at 24, where what is shown is
-// the end of the name and not the start of ".mp3".
+// Layout: the player stores 26 characters of a file name and shows 24; a name
+// that does not fit in them, ".mp3" included, scrolls when hovered. So the file
+// name is cut where all of it fits.
 func (wolfgang) Layout() layout.Rules {
-	return layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: stemWidth}
+	return layout.Rules{Fold: translit.ToASCII, ComponentMax: 100, StemMax: WolfgangStemWidth}
 }
 
 // Tags keep the true title, which the player shows nowhere; the artist and

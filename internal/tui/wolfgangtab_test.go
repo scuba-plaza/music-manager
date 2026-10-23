@@ -56,7 +56,7 @@ func TestTheWolfgangTabMarksWhereTheFileNameIsCut(t *testing.T) {
 	m = send(t, m, m.Init())
 	m = selectTrack(t, m, "A Rather Long Title That Goes On")
 	m = keys(t, m, "right", "3")
-	contains(t, m, "07 - A Rather Long Title.mp3", "24") // what is kept, and the number the player keeps
+	contains(t, m, "07 - A Rather Long T.mp3", "24", "20") // what is kept, and the numbers the player works with
 }
 
 func TestTheWolfgangTabListsTheWarnings(t *testing.T) {

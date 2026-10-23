@@ -60,7 +60,7 @@ func (w wolfgang) Diagnose(tracks []manifest.Track) []Warning {
 				}
 			}
 			if len(clashes) > 0 {
-				warn(t, "its file name is cut at %d characters and becomes the same as that of %s; one of them is renamed with (2)", stemWidth, strings.Join(clashes, ", "))
+				warn(t, "its file name is cut at %d characters and becomes the same as that of %s; one of them is renamed with (2)", WolfgangStemWidth, strings.Join(clashes, ", "))
 			}
 		}
 	}

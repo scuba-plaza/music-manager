@@ -59,10 +59,10 @@ func (m Model) wolfgangLines(t manifest.Track, w int) []string {
 	uncut := dev.Layout()
 	uncut.StemMax = 0
 	whole := strings.TrimSuffix(path.Base(layout.PathFor(t, uncut)), ".mp3")
-	if n := utf8.RuneCountInString(whole); n > stemShown {
-		kept := string([]rune(whole)[:stemShown])
-		row("Cut", kept, styles.dim.Render(string([]rune(whole)[stemShown:])))
-		lines = append(lines, hintLines(strings.Repeat(" ", labelWidth+1), "The player shows "+itoa(stemShown)+" characters of a file name; the dim part is cut off.", vw)...)
+	if n := utf8.RuneCountInString(whole); n > device.WolfgangStemWidth {
+		kept := string([]rune(whole)[:device.WolfgangStemWidth])
+		row("Cut", kept, styles.dim.Render(string([]rune(whole)[device.WolfgangStemWidth:])))
+		lines = append(lines, hintLines(strings.Repeat(" ", labelWidth+1), "The player shows 24 characters of a name, the .mp3 included, and scrolls a longer one: the name is cut at "+itoa(device.WolfgangStemWidth)+", the dim part is cut off.", vw)...)
 	}
 	if t.Status == manifest.Identified {
 		tags := dev.Tags(t)
@@ -79,9 +79,6 @@ func (m Model) wolfgangLines(t manifest.Track, w int) []string {
 	}
 	return append(lines, "", " "+styles.dim.Render("A preview: nothing of it is stored."))
 }
-
-// stemShown is how many characters of a file name the Wolfgang shows.
-const stemShown = 24
 
 // counted says how much of a width a name uses, dimly.
 func counted(s string, width int) string {
