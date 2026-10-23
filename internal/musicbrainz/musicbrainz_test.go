@@ -79,7 +79,7 @@ func TestSearchFlattensRecordingsIntoCandidatesPerRelease(t *testing.T) {
 	}
 }
 
-func TestSearchJoinsArtistCreditsAndNumbersTracksWithinTheirDisc(t *testing.T) {
+func TestSearchNumbersTracksWithinTheirDisc(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write(fixture(t, "search_dream3.json"))
 	}))
@@ -87,16 +87,13 @@ func TestSearchJoinsArtistCreditsAndNumbersTracksWithinTheirDisc(t *testing.T) {
 	got, _ := newClient(srv).Search(context.Background(), app.Query{Title: "Dream 3"})
 	var multi *app.Candidate
 	for i, c := range got {
-		if c.Title == "Dream 3" && strings.Contains(c.Artist, "Clarice Jensen") {
+		if c.Title == "Dream 3" && c.Artist == "Clarice Jensen" {
 			multi = &got[i]
 			break
 		}
 	}
 	if multi == nil {
 		t.Fatal("collaboration not found")
-	}
-	if multi.Artist != "Clarice Jensen, Max Richter, Ben Russell" {
-		t.Errorf("Artist = %q", multi.Artist)
 	}
 	if multi.TrackNumber != 12 || multi.TrackTotal != 15 { // track 12 on disc 2, which has 15 tracks
 		t.Errorf("track %d of %d, want 12 of 15", multi.TrackNumber, multi.TrackTotal)
@@ -225,5 +222,36 @@ func TestCoverFront(t *testing.T) {
 	got, err = c.CoverFront(context.Background(), "no-cover")
 	if err != nil || got != nil {
 		t.Errorf("a release without art should give nil, nil; got %q, %v", got, err)
+	}
+}
+
+// A track has one artist: where a recording is credited to several, the
+// first credit is the artist, not "A, B & C" with the join phrases.
+func TestARecordingCreditedToSeveralArtistsHasTheFirstOne(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(fixture(t, "search_dream3.json"))
+	}))
+	defer srv.Close()
+
+	got, err := newClient(srv).Search(context.Background(), app.Query{Title: "Dream 3", Artist: "Max Richter"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, c := range got {
+		seen[c.RecordingID] = true
+		switch c.RecordingID {
+		case "594d6fb1-0a13-4c98-9370-fd55aed1caef": // Clarice Jensen, Max Richter, Ben Russell
+			if c.Artist != "Clarice Jensen" {
+				t.Errorf("artist of the three-credit recording = %q, want %q", c.Artist, "Clarice Jensen")
+			}
+		case "50157a6d-2890-4525-93ab-2d1a6c34d423": // Max Richter, Ben Russell & Yuki Numata Resnick
+			if c.Artist != "Max Richter" {
+				t.Errorf("artist of the short edit = %q, want %q", c.Artist, "Max Richter")
+			}
+		}
+	}
+	if !seen["594d6fb1-0a13-4c98-9370-fd55aed1caef"] || !seen["50157a6d-2890-4525-93ab-2d1a6c34d423"] {
+		t.Errorf("the fixture's multi-credit recordings are not among the candidates: %v", seen)
 	}
 }

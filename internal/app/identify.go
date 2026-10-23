@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode"
 
+	"music-manager/internal/artist"
 	"music-manager/internal/manifest"
 )
 
@@ -186,7 +187,7 @@ func queryFor(t manifest.Track) Query {
 	if onlyDigits.MatchString(title) {
 		title = "" // a bare number says nothing about the track
 	}
-	return Query{Title: leadingTrackNumber.ReplaceAllString(title, ""), Artist: t.Hint.Artist}
+	return Query{Title: leadingTrackNumber.ReplaceAllString(title, ""), Artist: artist.First(t.Hint.Artist)}
 }
 
 var onlyDigits = regexp.MustCompile(`^\d+$`)

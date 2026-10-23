@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"music-manager/internal/app"
@@ -140,5 +141,32 @@ func TestAdoptTakesTheGenreTheOldTagsSaid(t *testing.T) {
 	}
 	if got := tracks(t, a)[0]; got.Genre != "Folk" || got.Hint != (manifest.Hint{}) {
 		t.Errorf("genre = %q, hint %+v", got.Genre, got.Hint)
+	}
+}
+
+// A track has one artist. Old tags that say "A feat. B" or "A; B" name the
+// first; a name that merely contains "&" or "," is a band and stays whole.
+func TestAdoptTakesTheFirstOfSeveralArtistsOnlyWhereTheTagsSaySo(t *testing.T) {
+	cases := []struct{ tag, want string }{
+		{"Fairuz; Ziad Rahbani", "Fairuz"},
+		{"Fairuz\x00Ziad Rahbani", "Fairuz"},
+		{"Nils Frahm feat. Anne Müller", "Nils Frahm"},
+		{"Nils Frahm Feat. Anne Müller", "Nils Frahm"},
+		{"Nils Frahm ft. Anne Müller", "Nils Frahm"},
+		{"Nils Frahm featuring Anne Müller", "Nils Frahm"},
+		{"Simon & Garfunkel", "Simon & Garfunkel"},
+		{"Earth, Wind & Fire", "Earth, Wind & Fire"},
+		{"AC/DC", "AC/DC"},
+		{"Craft Beer Anthem", "Craft Beer Anthem"}, // "ft" inside a word is no separator
+	}
+	for i, c := range cases {
+		a := openLib(t)
+		ingestTagged(t, a, strings.Repeat("x", i+1), "Song", c.tag, "", "")
+		if _, err := a.Adopt(nil); err != nil {
+			t.Fatal(err)
+		}
+		if got := tracks(t, a)[0].Artist; got != c.want {
+			t.Errorf("old tag %q: artist %q, want %q", c.tag, got, c.want)
+		}
 	}
 }

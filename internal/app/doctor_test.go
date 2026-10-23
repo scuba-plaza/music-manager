@@ -78,3 +78,25 @@ func TestDoctorWarnsAboutUnidentifiedTracksAndClashingPositions(t *testing.T) {
 		t.Errorf("unexpected errors: %+v", got)
 	}
 }
+
+// A track has one artist; names that look like several are hints, not
+// errors, as "Simon & Garfunkel" is one act.
+func TestDoctorHintsAtArtistNamesThatLookLikeSeveralArtists(t *testing.T) {
+	a := libWithTracks(t, 10, 20, 30, 40, 50)
+	ts := tracks(t, a)
+	identify(t, a, ts[0].ID, "One", "Fairuz & Ziad Rahbani", "", 0, 0)
+	identify(t, a, ts[1].ID, "Two", "Fairuz feat. Ziad Rahbani", "", 0, 0)
+	identify(t, a, ts[2].ID, "Three", "Nils Frahm", "", 0, 0)
+	identify(t, a, ts[3].ID, "Four", "فيروز و زياد الرحباني", "", 0, 0)
+	identify(t, a, ts[4].ID, "Five", "AC/DC", "", 0, 0)
+	ps, _ := a.Doctor()
+	got := map[string]bool{}
+	for _, p := range problemsWith(ps, app.Warning, "several artists") {
+		got[p.TrackID] = true
+	}
+	for i, want := range []bool{true, true, false, true, false} {
+		if got[ts[i].ID] != want {
+			t.Errorf("track %d (%q): flagged = %v, want %v", i, tracks(t, a)[i].Artist, got[ts[i].ID], want)
+		}
+	}
+}

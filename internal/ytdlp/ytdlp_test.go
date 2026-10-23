@@ -171,3 +171,27 @@ func TestDownloadReportsWhenTheTrackCameOutButNotWhenTheVideoWasUploaded(t *test
 		})
 	}
 }
+
+// A track has one artist: where yt-dlp lists several, the first is the artist,
+// not the "A, B" it also prints in the artist field.
+func TestDownloadTakesTheFirstOfSeveralArtists(t *testing.T) {
+	fakeBin(t, `{"id":"vid123","title":"T","track":"Song","artist":"Fairuz, Ziad Rahbani","artists":["Fairuz","Ziad Rahbani"]}`+"\n", 0)
+	got, err := ytdlp.New().Download(context.Background(), "u", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Info.Artist != "Fairuz" {
+		t.Errorf("Artist = %q, want Fairuz", got.Info.Artist)
+	}
+}
+
+func TestDownloadKeepsTheArtistFieldWhenThereIsNoList(t *testing.T) {
+	fakeBin(t, `{"id":"vid123","title":"T","track":"Song","artist":"Earth, Wind & Fire"}`+"\n", 0)
+	got, err := ytdlp.New().Download(context.Background(), "u", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Info.Artist != "Earth, Wind & Fire" {
+		t.Errorf("Artist = %q, want it untouched", got.Info.Artist)
+	}
+}

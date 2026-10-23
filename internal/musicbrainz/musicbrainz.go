@@ -156,8 +156,7 @@ type searchResponse struct {
 		Title  string `json:"title"`
 		Length int    `json:"length"`
 		Credit []struct {
-			Name       string `json:"name"`
-			JoinPhrase string `json:"joinphrase"`
+			Name string `json:"name"`
 		} `json:"artist-credit"`
 		Releases []struct {
 			ID     string `json:"id"`
@@ -183,14 +182,14 @@ type ranked struct {
 func (r *searchResponse) candidates() []app.Candidate {
 	var all []ranked
 	for _, rec := range r.Recordings {
-		var artist strings.Builder
-		for _, cr := range rec.Credit {
-			artist.WriteString(cr.Name + cr.JoinPhrase)
+		artist := "" // a track has one artist: the first one credited
+		if len(rec.Credit) > 0 {
+			artist = rec.Credit[0].Name
 		}
 		for _, rel := range rec.Releases {
 			c := app.Candidate{
 				RecordingID: rec.ID, ReleaseID: rel.ID,
-				Title: rec.Title, Artist: artist.String(), Album: rel.Title,
+				Title: rec.Title, Artist: artist, Album: rel.Title,
 				TrackTotal: rel.Count, Length: time.Duration(rec.Length) * time.Millisecond,
 				Score: rec.Score, Date: rel.Date,
 			}

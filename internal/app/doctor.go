@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"music-manager/internal/artist"
 	"music-manager/internal/manifest"
 )
 
@@ -66,6 +67,8 @@ func (a *App) Doctor() ([]Problem, error) {
 		}
 		if t.Status != manifest.Identified {
 			add(Warning, t.ID, "not identified yet, it is rendered into _Inbox")
+		} else if artist.LooksLikeSeveral(t.Artist) {
+			add(Warning, t.ID, "the artist %q looks like several artists; a track has one (ignore this if it is one act)", t.Artist)
 		}
 	}
 

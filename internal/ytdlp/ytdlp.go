@@ -69,15 +69,16 @@ type parsed struct {
 // lines around it.
 func parseInfo(out []byte) (parsed, error) {
 	var raw struct {
-		ID          string  `json:"id"`
-		Title       string  `json:"title"`
-		Track       string  `json:"track"`
-		Artist      string  `json:"artist"`
-		Uploader    string  `json:"uploader"`
-		Album       string  `json:"album"`
-		TrackNumber float64 `json:"track_number"`
-		ReleaseDate string  `json:"release_date"`
-		ReleaseYear float64 `json:"release_year"`
+		ID          string   `json:"id"`
+		Title       string   `json:"title"`
+		Track       string   `json:"track"`
+		Artist      string   `json:"artist"`
+		Artists     []string `json:"artists"`
+		Uploader    string   `json:"uploader"`
+		Album       string   `json:"album"`
+		TrackNumber float64  `json:"track_number"`
+		ReleaseDate string   `json:"release_date"`
+		ReleaseYear float64  `json:"release_year"`
 	}
 	var found bool
 	for _, line := range strings.Split(string(out), "\n") {
@@ -95,8 +96,12 @@ func parseInfo(out []byte) (parsed, error) {
 	if title == "" {
 		title = raw.Title
 	}
+	artist := raw.Artist // "A, B" when there are several: a track has one artist, the first
+	if len(raw.Artists) > 0 && strings.TrimSpace(raw.Artists[0]) != "" {
+		artist = strings.TrimSpace(raw.Artists[0])
+	}
 	return parsed{id: raw.ID, Info: app.Info{
-		Title: title, Artist: raw.Artist, Uploader: raw.Uploader, Album: raw.Album, TrackNumber: int(raw.TrackNumber),
+		Title: title, Artist: artist, Uploader: raw.Uploader, Album: raw.Album, TrackNumber: int(raw.TrackNumber),
 		Released: released(raw.ReleaseDate, raw.ReleaseYear),
 	}}, nil
 }

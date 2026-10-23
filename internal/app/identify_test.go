@@ -467,3 +467,16 @@ func TestAMatchWithoutAUsableDateKeepsTheOneWeHave(t *testing.T) {
 		}
 	}
 }
+
+// The database is asked for the first artist of an old tag that names several:
+// "Max Richter feat. Someone" finds nothing there.
+func TestIdentifyAsksForTheFirstArtistOfSeveral(t *testing.T) {
+	a, _ := hinted(t, "dream", "Dream 3", "Max Richter feat. Clarice Jensen")
+	src := &fakeSource{results: map[string][]app.Candidate{}}
+	if _, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true}); err != nil {
+		t.Fatal(err)
+	}
+	if len(src.queries) != 1 || src.queries[0] != (app.Query{Title: "Dream 3", Artist: "Max Richter"}) {
+		t.Errorf("queries = %+v", src.queries)
+	}
+}

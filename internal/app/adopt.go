@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"music-manager/internal/artist"
 	"music-manager/internal/manifest"
 )
 
@@ -51,6 +52,7 @@ func (a *App) Adopt(ids []string) ([]AdoptResult, error) {
 		case h.Title == "" || h.Artist == "":
 			res.Reason = "the old tags have no title and artist"
 		default:
+			first := artist.First(h.Artist)
 			track := h.Track
 			if track == 0 {
 				if n := fileNameNumber.FindStringSubmatch(h.Filename); n != nil {
@@ -58,7 +60,7 @@ func (a *App) Adopt(ids []string) ([]AdoptResult, error) {
 				}
 			}
 			updated, err := applyEdit(t, Edit{
-				Title: &h.Title, Artist: &h.Artist, Album: &h.Album,
+				Title: &h.Title, Artist: &first, Album: &h.Album,
 				TrackNumber: &track, TrackTotal: &h.Total, Released: &h.Date, Genre: &h.Genre,
 			})
 			if err != nil {
