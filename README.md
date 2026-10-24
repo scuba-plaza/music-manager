@@ -42,7 +42,7 @@ Run `mm` in a terminal (or `mm tui`) to browse and edit the library on one scree
 tracks on the left, and on the right whatever the cursor is on: a track's details, or what is inside an album (its tracks), an artist (its albums and singles), a playlist (its tracks in play order) or the Needs work group (what each track lacks), as the preview column of a file manager does. Every change is saved at once to
 `library.json`; the music folder only changes when you sync (`s`), and the header says how many tracks
 are waiting (`3 to sync`). Press `?` for the list of keys, one page for each kind (`←` `→` or `1`-`4` turn the pages); the bottom line always shows the ones that
-matter right now. Without a terminal, plain `mm` prints help as before.
+matter right now. Without a terminal, plain `mm` prints help.
 
 | | |
 |---|---|
@@ -76,7 +76,7 @@ changes the library while the interface is open, the change appears within a cou
 | `mm ingest <file\|dir>…` | add existing MP3s as unidentified tracks (the files are only read) |
 | `mm identify [id…] [--yes]` | look tracks up on MusicBrainz; pick from a list, or `--yes` for confident matches |
 | `mm adopt [id…]` | identify tracks by what their old tags said, for what MusicBrainz does not know |
-| `mm add <url>` | download with yt-dlp and add |
+| `mm add <url> [--no-input] [--no-lookup]` | download with yt-dlp and add; `--no-input` never asks, `--no-lookup` skips MusicBrainz |
 | `mm edit <id> --title … --artist … --album … --track N --of N --released DATE --genre TEXT --title-latin … --artist-latin … --album-latin … --genre-latin … --source-url LINK --trim-start T --trim-end T --gain DB --fade-in T --fade-out T --cover FILE` | change a track; title, artist and album are the true names, in any script; the `-latin` ones are the forms in Latin letters, `""` takes one away (see Latin forms) |
 | `mm ls [words] [status:identified\|unidentified] [--sort KEY] [--reverse]` / `mm show <id> [--wolfgang]` | look at records; `--sort` takes `artist`, `album`, `title`, `track`, `length`, `released`, `added` or `edited` |
 | `mm sync [--target DIR] [--wolfgang] [--dry-run] [--prune --yes]` | render the folder; `--prune` deletes files the records don't account for; `--wolfgang` (needs `--target`) writes for the Wolfgang WMP01 |
@@ -85,6 +85,7 @@ changes the library while the interface is open, the change appears within a cou
 | `mm playlist <new, add, rm, move, rename, latin, delete, import, ls, show>` | make and change playlists (see Playlists below) |
 | `mm doctor` | check the stores for missing or damaged files, and point out artist names that look like several artists |
 | `mm tui [--wolfgang]` | the full-screen interface (also what plain `mm` opens in a terminal) |
+| `mm completion bash\|zsh\|fish` | print the completions for a shell (the Nix package installs them) |
 
 ## Covers
 
@@ -153,7 +154,7 @@ A form belongs to the name it was written for, and changing the name does not to
 `mm sync --wolfgang --target DIR` writes for the Wolfgang WMP01 player. Pass the flag every time (nothing remembers it); it needs `--target`, so that the library folder is always the standard tree. Everything below is worked out from the records while syncing and stored nowhere: the library holds no name, cover or setting for the player. The limits are the ones measured on the device.
 
 * **Names.** The player shows 24 characters of a file name (it keeps 26), the `.mp3` included, and scrolls a longer name along when it is hovered; it shows 12 of an artist, an album and a genre, cuts the rest wherever that falls, and does not join Arabic letters. So folders and files are named in Latin letters, using the Latin forms (see above): the ones set by hand, else the ones worked out, which lose the short vowels of Arabic (فيروز becomes "Firuz"); accents are stripped. The title tag keeps the true title, since the player shows file names and not titles.
-* **File names** are `NN - Title.mp3` for the MP3 files only, hard-cut at 20 characters before the extension, so that the whole name, `.mp3` included, fits in the 24 the player shows and does not scroll; the track number and the ` (2)` of a collision count in the 20 (`01 - Munajat Amir al.mp3`). Names are not padded (a padded name scrolls). Folders, playlists and photos keep their full names, up to 100 bytes each. The first sync renames the files of long titles.
+* **File names** are `NN - Title.mp3` for the MP3 files only, hard-cut at 20 characters before the extension, so that the whole name, `.mp3` included, fits in the 24 the player shows and does not scroll; the track number and the ` (2)` of a collision count in the 20 (`01 - Munajat Amir al.mp3`). Names are not padded (a padded name scrolls). Folders, playlists and photos keep their full names, up to 100 bytes each.
 * **Artist and album tags** are worked out from the Latin form by rules, and the genre tag is its Latin form. An artist that fits in 12 characters is kept; otherwise "The" and what is in brackets go, "Various Artists" becomes "Various", and a name of several words becomes the initials of all but the last and the surname ("Mohamed Abdel Wahab" is "M. A. Wahab"), or the first initial and the surname, or the surname alone, or is cut at a word. An album that fits is kept; otherwise brackets, a trailing "EP" or "Single" and a leading artist name go, and then it is cut at a word. A single has no album, which the player shows as "Unknown Album", so its title (shortened the same way) is written there. `mm show <id> --wolfgang` and the fourth tab of `mm --wolfgang` show the result; only the name and its Latin form can change it.
 * **Covers.** The photo viewer opens baseline JPEG files of modest size: it fails on PNG and progressive files, on 4:4:4 colour and on very large pictures, and does not list PNG files at all. So the cover is made into a baseline JFIF JPEG, 4:2:0, at most 480 pixels along its longer side (a transparent background becomes white), when syncing: in the MP3 tag, as `cover.jpg` in an album folder and as `Title.jpg` beside a single. The stored cover is not touched.
 * **Playlists** are `Playlists/<name>.m3u`, named by the Latin name of the playlist: paths from the root of the card with backslashes (`\Artist\Album\01 - Title.mp3`), one per line, Windows line endings; the player lists every `.m3u` on the card as a playlist and ignores slashes and relative paths. (The player lists an `.m3u8` too, but shows its extension, which it hides for an `.m3u`; so it gets the `.m3u`. Entries with names longer than 26 characters play from a playlist.)
@@ -230,6 +231,7 @@ mm sync --prune --yes
 
 * `--library DIR` or `MM_LIBRARY`: the library folder (default `~/Music/mp3-player`).
 * `MM_CONTACT`: an email or URL added to the User-Agent sent to MusicBrainz, which they ask for.
+* `MM_COVERS=blocks` or `MM_COVERS=kitty`: how the interface draws covers (see above); by default it looks at the terminal.
 * `ACCESSIBLE=1` or `TERM=dumb`: plain line-based questions instead of the full-screen form.
 
 Needs `yt-dlp` (and `ffmpeg`, which yt-dlp uses) on `PATH` for `mm add`. Hearing a cut in the interface needs `ffplay` (part of ffmpeg) or `mpv`.

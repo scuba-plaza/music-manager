@@ -22,8 +22,8 @@ Title, artist and album are the true names, in any script. The --title-latin,
 --artist-latin, --album-latin and --genre-latin flags set how each reads in Latin
 letters, which a player that cannot show the script gets (mm sync --wolfgang);
 where none is set a form is worked out, and "" goes back to it.
-Title, artist and album are the true names, in any script. Trims accept 90, 1:30 or 1:30.5. The release date
-takes a year, a month or a day (1999, 1999-05, 1999-05-17); pass "" to forget it.
+Trims accept 90, 1:30 or 1:30.5. The release date takes a year, a month or a
+day (1999, 1999-05, 1999-05-17); pass "" to forget it.
 The source link (--source-url) is where the track came from; pass "" to forget it.
 A track with a title and an artist counts as identified.
 
