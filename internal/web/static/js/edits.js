@@ -18,7 +18,7 @@ const enc = encodeURIComponent;
 // change sends one change and shows its outcome: the library is read again,
 // the cursor goes to the track changed, and renamed rows keep their place.
 // It resolves to the answer, or throws the reason it was refused.
-async function change(call) {
+export async function change(call) {
   if (S.busy) throw new Error('');
   S.busy = true;
   try {
@@ -35,7 +35,7 @@ async function change(call) {
 
 // attempt is change for a key that has no form to show a refusal in: the
 // reason goes to the status line.
-async function attempt(call) {
+export async function attempt(call) {
   try {
     return await change(call);
   } catch (err) {

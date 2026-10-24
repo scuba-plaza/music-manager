@@ -33,6 +33,13 @@ type reply struct {
 // send makes a change the way the page does, and reads the answer.
 func send(t *testing.T, srv *httptest.Server, method, path string, body any) (int, reply) {
 	t.Helper()
+	var r reply
+	return sendInto(t, srv.URL, method, path, body, &r), r
+}
+
+// sendInto is send for an answer of another shape.
+func sendInto(t *testing.T, base, method, path string, body any, into any) int {
+	t.Helper()
 	var in io.Reader
 	switch b := body.(type) {
 	case nil:
@@ -45,16 +52,15 @@ func send(t *testing.T, srv *httptest.Server, method, path string, body any) (in
 		}
 		in = bytes.NewReader(raw)
 	}
-	req, _ := http.NewRequest(method, srv.URL+path, in)
+	req, _ := http.NewRequest(method, base+path, in)
 	req.Header.Set("X-MM", "1")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	var r reply
-	json.NewDecoder(res.Body).Decode(&r)
-	return res.StatusCode, r
+	json.NewDecoder(res.Body).Decode(into)
+	return res.StatusCode
 }
 
 func titleOf(t *testing.T, a *app.App, id string) string {

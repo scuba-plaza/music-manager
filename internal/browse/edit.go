@@ -1,6 +1,7 @@
 package browse
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -16,6 +17,12 @@ import (
 // Store is what the editor changes; *app.App is one.
 type Store interface {
 	Manifest() (*manifest.Manifest, error)
+	Candidates(ctx context.Context, id string, src app.MetadataSource, q *app.Query) ([]app.Candidate, error)
+	ApplyCandidate(ctx context.Context, id string, c app.Candidate, src app.MetadataSource) (manifest.Track, error)
+	Identify(ctx context.Context, ids []string, src app.MetadataSource, p app.Prompter, opts app.IdentifyOptions) ([]app.IdentifyResult, error)
+	Adopt(ids []string) ([]app.AdoptResult, error)
+	Fetch(ctx context.Context, req app.AddRequest, dl app.Downloader) (*app.Draft, error)
+	Finish(ctx context.Context, d *app.Draft, e app.Edit) (manifest.Track, error)
 	Edit(id string, e app.Edit) (manifest.Track, error)
 	EditMany(edits map[string]app.Edit) (map[string]manifest.Track, error)
 	Renumber(ids []string) (map[string]manifest.Track, error)
@@ -72,17 +79,39 @@ type History struct {
 // Editor changes the library and remembers what it did, so that it can be
 // undone. One editor serves the one person using the program.
 type Editor struct {
-	lib Store
+	lib        Store
+	source     app.MetadataSource // the music database to look tracks up in; nil if there is none
+	downloader app.Downloader     // what downloads a link; nil if there is none
 
 	mu       sync.Mutex
 	undoes   []change
 	redoes   []change
 	nudgeKey string
 	clip     *clipContents
+
+	searches    map[string]search // what the searches found, by name
+	searchOrder []string
+	drafts      map[string]*app.Draft // downloads waiting for their details, by name
+	draftOrder  []string
 }
 
+// EditorOption adds a capability to an editor.
+type EditorOption func(*Editor)
+
+// WithSource lets the editor look tracks up in a music database.
+func WithSource(s app.MetadataSource) EditorOption { return func(e *Editor) { e.source = s } }
+
+// WithDownloader lets the editor add tracks by downloading them.
+func WithDownloader(d app.Downloader) EditorOption { return func(e *Editor) { e.downloader = d } }
+
 // NewEditor returns the editor of a library.
-func NewEditor(lib Store) *Editor { return &Editor{lib: lib} }
+func NewEditor(lib Store, opts ...EditorOption) *Editor {
+	e := &Editor{lib: lib}
+	for _, o := range opts {
+		o(e)
+	}
+	return e
+}
 
 func (e *Editor) snapshot() (Snapshot, error) {
 	m, err := e.lib.Manifest()

@@ -1,6 +1,8 @@
 package browse
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -587,5 +589,166 @@ func TestThePathShownWhileTypingIsWhereTheFileWillGo(t *testing.T) {
 	}
 	if _, ok := PathPreview(snap(t, a), "nope", "title", "x", ""); ok {
 		t.Error("a track that is not there")
+	}
+}
+
+// database is a music database that knows two recordings.
+type database struct {
+	found []app.Candidate
+	asked []app.Query
+}
+
+func (d *database) Search(_ context.Context, q app.Query) ([]app.Candidate, error) {
+	d.asked = append(d.asked, q)
+	return d.found, nil
+}
+func (d *database) CoverFront(context.Context, string) ([]byte, error) { return nil, nil }
+
+func withDatabase(t *testing.T, found ...app.Candidate) (*Editor, *app.App, []manifest.Track, *database) {
+	t.Helper()
+	_, a, ts := seeded(t, shadows...)
+	db := &database{found: found}
+	return NewEditor(a, WithSource(db)), a, ts, db
+}
+
+func TestATrackIsLookedUpAndIdentifiedAsOneOfWhatWasFound(t *testing.T) {
+	ed, a, ts, db := withDatabase(t,
+		app.Candidate{Title: "Flow", Artist: "Shawn James", Album: "Through the Haze", TrackNumber: 2, TrackTotal: 9, Score: 100, Date: "2012"},
+		app.Candidate{Title: "Flow (live)", Artist: "Shawn James", Album: "Live", TrackNumber: 5, TrackTotal: 12, Score: 90})
+	u := ts[4] // nobody identified it
+	v, err := ed.Candidates(context.Background(), u.ID, nil)
+	if err != nil || len(v.Candidates) != 2 || v.Search == "" {
+		t.Fatalf("%+v %v", v, err)
+	}
+	if v.Candidates[0].Text != "100%  Through the Haze · 2012 · 2/9 · Shawn James" || !strings.HasSuffix(v.Candidates[1].Text, "· Flow (live)") {
+		t.Errorf("%q / %q", v.Candidates[0].Text, v.Candidates[1].Text)
+	}
+	d := v.Candidates[0].Diff
+	if len(d) != 4 || d[0].Label != "Title" || d[0].New != "Flow" || d[2].New != "Through the Haze" || d[3].New != "2 of 9" {
+		t.Errorf("%+v", d)
+	}
+	if len(db.asked) != 1 {
+		t.Errorf("asked %v", db.asked)
+	}
+	r, err := ed.ApplyCandidate(context.Background(), v.Search, 1)
+	if err != nil || r.Message != "Identified as Shawn James - Flow (live)" || r.Reveal != u.ID {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if got := get(t, a, u.ID); got.Status != manifest.Identified || got.Album != "Live" || got.TrackNumber != 5 {
+		t.Errorf("%+v", got)
+	}
+	if ed.History().Undo != "identification of a track" {
+		t.Errorf("%+v", ed.History())
+	}
+	ed.Undo()
+	if got := get(t, a, u.ID); got.Status == manifest.Identified {
+		t.Error("undo leaves it identified")
+	}
+}
+
+func TestOtherWordsAreSearchedForAsTheyWereTyped(t *testing.T) {
+	ed, _, ts, db := withDatabase(t, app.Candidate{Title: "Sanarjiou", Artist: "Fairuz", Score: 100})
+	v, err := ed.Candidates(context.Background(), ts[4].ID, &app.Query{Title: " Sanarjiou ", Artist: "Fairuz "})
+	if err != nil || v.Title != "Sanarjiou" || v.Artist != "Fairuz" {
+		t.Fatalf("%+v %v", v, err)
+	}
+	if len(db.asked) != 1 || db.asked[0].Title != "Sanarjiou" || db.asked[0].Artist != "Fairuz" {
+		t.Errorf("asked %+v", db.asked)
+	}
+}
+
+func TestNothingFoundSaysWhatWasSearchedFor(t *testing.T) {
+	ed, _, ts, _ := withDatabase(t)
+	if _, err := ed.Candidates(context.Background(), ts[0].ID, nil); err == nil || !strings.Contains(err.Error(), "No match found for “The Wanderer – Shawn James”") {
+		t.Errorf("%v", err)
+	}
+	if _, err := NewEditor(ed.lib).Candidates(context.Background(), ts[0].ID, nil); !errors.Is(err, ErrNoLookup) {
+		t.Errorf("no database: %v", err)
+	}
+	if _, err := ed.ApplyCandidate(context.Background(), "nope", 0); err == nil || !strings.Contains(err.Error(), "That search is gone") {
+		t.Errorf("%v", err)
+	}
+}
+
+func TestAnOldSearchIsForgottenAfterManyNewOnes(t *testing.T) {
+	ed, _, ts, _ := withDatabase(t, app.Candidate{Title: "x", Artist: "y", Score: 100})
+	first, _ := ed.Candidates(context.Background(), ts[0].ID, nil)
+	for i := 0; i < maxSearches; i++ {
+		ed.Candidates(context.Background(), ts[0].ID, nil)
+	}
+	if len(ed.searches) > maxSearches {
+		t.Errorf("%d searches kept", len(ed.searches))
+	}
+	if _, err := ed.ApplyCandidate(context.Background(), first.Search, 0); err == nil {
+		t.Error("the oldest search is still there")
+	}
+}
+
+func TestEveryTrackThatNeedsWorkIsIdentifiedInOneStepToUndo(t *testing.T) {
+	_, a, ts := seeded(t, spec{}, spec{}, spec{"Flow", "Shawn James", "Shadows", 2, 3})
+	db := &database{found: []app.Candidate{{Title: "Found", Artist: "Someone", Album: "Somewhere", TrackNumber: 1, TrackTotal: 1, Score: 99}}}
+	ed := NewEditor(a, WithSource(db))
+	var seen []IdentifyProgress
+	p, err := ed.IdentifyAll(context.Background(), func(p IdentifyProgress) { seen = append(seen, p) })
+	if err != nil || p.Total != 2 || p.Done != 2 || p.Identified != 2 || len(seen) != 2 || seen[0].Done != 1 {
+		t.Fatalf("%+v %v seen %d", p, err, len(seen))
+	}
+	if get(t, a, ts[0].ID).Status != manifest.Identified || get(t, a, ts[1].ID).Title != "Found" {
+		t.Error("not identified")
+	}
+	if ed.History().Undo != "identification of 2 tracks" {
+		t.Errorf("%+v", ed.History())
+	}
+	ed.Undo()
+	if get(t, a, ts[0].ID).Status == manifest.Identified || get(t, a, ts[1].ID).Status == manifest.Identified {
+		t.Error("one undo takes both back")
+	}
+}
+
+func TestWhatIsNotConfidentIsLeftAndACancelledRunKeepsWhatItDid(t *testing.T) {
+	_, a, ts := seeded(t, spec{}, spec{})
+	db := &database{found: []app.Candidate{{Title: "Maybe", Artist: "Someone", Score: 70}}}
+	ed := NewEditor(a, WithSource(db))
+	p, err := ed.IdentifyAll(context.Background(), func(IdentifyProgress) {})
+	if err != nil || p.Left != 2 || p.Identified != 0 || ed.History().Undo != "" {
+		t.Errorf("%+v %v %+v", p, err, ed.History())
+	}
+	db.found[0].Score = 99
+	ctx, cancel := context.WithCancel(context.Background())
+	p, _ = ed.IdentifyAll(ctx, func(p IdentifyProgress) {
+		if p.Done == 1 {
+			cancel()
+		}
+	})
+	if p.Identified < 1 || ed.History().Undo == "" {
+		t.Errorf("what it did before it was stopped is kept: %+v %+v", p, ed.History())
+	}
+	_ = ts
+}
+
+func TestOldTagsAreAdoptedForTracksThatHaveThem(t *testing.T) {
+	ed, a, ts := seeded(t, spec{}, spec{})
+	if _, err := ed.Adopt([]string{ts[0].ID}); err == nil || !strings.Contains(err.Error(), "no old tags") {
+		// the test files carry no tags: give one a hint, as ingesting a tagged file would
+		t.Logf("untagged: %v", err)
+	}
+	u := get(t, a, ts[0].ID)
+	u.Hint.Title, u.Hint.Artist, u.Hint.Album = "Old title", "Old artist", "Old album"
+	if err := a.Restore(u); err != nil {
+		t.Fatal(err)
+	}
+	r, err := ed.Adopt([]string{ts[0].ID, ts[1].ID})
+	if err != nil || r.Message != "Used the old tags of 1 track · 1 had none" || r.Reveal != ts[0].ID {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if got := get(t, a, ts[0].ID); got.Title != "Old title" || got.Status != manifest.Identified {
+		t.Errorf("%+v", got)
+	}
+	ed.Undo()
+	if get(t, a, ts[0].ID).Status == manifest.Identified {
+		t.Error("undo")
+	}
+	if _, err := ed.Adopt([]string{"nope"}); err == nil || !strings.Contains(err.Error(), "Select a track that needs work") {
+		t.Errorf("%v", err)
 	}
 }

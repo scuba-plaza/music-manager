@@ -138,3 +138,18 @@ func (s *Server) describeCover(sha string) string {
 	s.coverInfo[sha] = info
 	return info
 }
+
+// doctor checks that every stored file is there and unharmed.
+func (s *Server) doctor(w http.ResponseWriter, r *http.Request) {
+	found, err := s.app.Doctor()
+	if err != nil {
+		fail(w, http.StatusInternalServerError, err)
+		return
+	}
+	snap, err := s.snapshot()
+	if err != nil {
+		fail(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, browse.Doctor(snap, found))
+}

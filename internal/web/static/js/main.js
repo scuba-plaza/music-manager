@@ -4,6 +4,8 @@ import * as a from './actions.js';
 import * as tree from './tree.js';
 import { onKeydown } from './keys.js';
 import * as edits from './edits.js';
+import * as ops from './ops.js';
+import { jobEvent } from './jobs.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -98,9 +100,7 @@ function wirePictures() {
     ev.preventDefault();
     body.classList.remove('dropping');
     if (S.overlay) return;
-    const file = edits.pictureIn(ev.dataTransfer.files);
-    if (file) edits.dropPicture(file);
-    else a.setStatus('Only a JPEG or PNG picture can be dropped here: it becomes a cover', 'bad');
+    ops.dropFiles(ev.dataTransfer.files);
   });
 }
 
@@ -136,6 +136,9 @@ function listen() {
     let stamp = '';
     try { stamp = JSON.parse(e.data); } catch { /* ask anyway */ }
     if (stamp !== S.stamp && !S.busy) a.loadLibrary();
+  });
+  es.addEventListener('job', (e) => {
+    try { jobEvent(JSON.parse(e.data)); } catch { /* a job we cannot read is not one we follow */ }
   });
   es.addEventListener('open', () => {
     // after a reconnect the library may have changed meanwhile

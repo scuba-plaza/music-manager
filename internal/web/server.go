@@ -35,8 +35,9 @@ type Server struct {
 	downloader app.Downloader
 	wolfgang   bool
 
-	hub *hub
-	mux *http.ServeMux
+	hub  *hub
+	jobs *jobs
+	mux  *http.ServeMux
 
 	infoMu    sync.Mutex
 	coverInfo map[string]string
@@ -57,10 +58,12 @@ func WithWolfgang() Option { return func(v *Server) { v.wolfgang = true } }
 
 // New returns the server for a library.
 func New(a *app.App, opts ...Option) *Server {
-	s := &Server{app: a, hub: newHub(), mux: http.NewServeMux(), coverInfo: map[string]string{}, ed: browse.NewEditor(a)}
+	s := &Server{app: a, hub: newHub(), mux: http.NewServeMux(), coverInfo: map[string]string{}}
+	s.jobs = newJobs(s.hub)
 	for _, o := range opts {
 		o(s)
 	}
+	s.ed = browse.NewEditor(a, browse.WithSource(s.source), browse.WithDownloader(s.downloader))
 	s.routes()
 	return s
 }
@@ -77,18 +80,22 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /", noCache(files))
 
 	s.mux.HandleFunc("GET /api/info", s.info)
+	s.mux.HandleFunc("GET /api/doctor", s.doctor)
 	s.mux.HandleFunc("GET /api/library", s.library)
 	s.mux.HandleFunc("GET /api/tracks/{id}", s.track)
 	s.mux.HandleFunc("GET /api/tracks/{id}/cover", s.cover)
 	s.mux.HandleFunc("GET /api/peek", s.peek)
 	s.mux.HandleFunc("GET /api/events", s.hub.serve)
 	s.editRoutes()
+	s.identifyRoutes()
+	s.addRoutes()
 }
 
 // Serve answers requests on ln until ctx is done, and watches the library for
 // changes made by anything else.
 func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	s.jobs.useContext(ctx)
 	go s.watch(ctx)
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ln) }()
@@ -101,6 +108,7 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 		defer cancel()
 		_ = srv.Shutdown(shut)
 		<-done
+		s.jobs.wait(5 * time.Second)
 		return nil
 	}
 }

@@ -2,6 +2,7 @@ import { S } from './state.js';
 import * as a from './actions.js';
 import * as tree from './tree.js';
 import * as e from './edits.js';
+import * as ops from './ops.js';
 
 // The keys, as the terminal interface had them. A key means different things
 // in the tree and in the inspector; the footer hints follow the same rules.
@@ -38,8 +39,8 @@ const treeKeys = {
   'ctrl+a': a.markAll,
   e: e.bulkEdit, c: e.copyKey, v: e.paste, d: e.remove, Delete: e.remove,
   J: () => e.moveTrack(1), K: () => e.moveTrack(-1), n: e.renumber, p: e.playlistKey,
-  i: notYet('Identify'), I: notYet('Identify'), o: notYet('Adopting old tags'),
-  a: notYet('Adding'), s: notYet('Sync'), D: notYet('The library check'),
+  i: ops.identify, I: ops.identifyAll, o: ops.adopt,
+  a: ops.add, s: notYet('Sync'), D: ops.doctor,
   u: e.undo, 'ctrl+r': e.redo,
 };
 
@@ -56,8 +57,8 @@ const inspectorKeys = {
   1: tab(0), 2: tab(1), 3: tab(2), 4: tab(3),
   Enter: e.startEdit, c: e.copyKey, v: e.paste, p: e.play,
   '[': () => e.nudge(-1, false), ']': () => e.nudge(1, false), '{': () => e.nudge(-1, true), '}': () => e.nudge(1, true), 0: e.clearField,
-  x: e.removeCover, i: notYet('Identify'), o: notYet('Adopting old tags'),
-  a: notYet('Adding'), s: notYet('Sync'), D: notYet('The library check'), u: e.undo, 'ctrl+r': e.redo,
+  x: e.removeCover, i: ops.identify, o: ops.adopt,
+  a: ops.add, s: notYet('Sync'), D: ops.doctor, u: e.undo, 'ctrl+r': e.redo,
 };
 
 export function onKeydown(ev) {
