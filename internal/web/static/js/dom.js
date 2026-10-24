@@ -35,3 +35,11 @@ export function plural(n, word) {
   const es = /(ch|sh|s|x)$/.test(word) ? 'es' : 's';
   return `${n} ${word}${es}`;
 }
+
+// progress is the bar and the count of a piece of work that is done/total through.
+export function progress(done, total) {
+  const pct = total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
+  return h('div', { class: 'progress-row' },
+    h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(total), 'aria-valuenow': String(done) }, h('i', { style: `width:${pct}%` })),
+    h('span', { class: 'dim' }, `${done}/${total}`));
+}

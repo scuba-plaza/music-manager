@@ -316,6 +316,3 @@ export function sortMenu() {
 
 export const help = openHelp;
 
-export function notYet(what) {
-  setStatus(`${what} is not built into the web interface yet.`, 'bad');
-}

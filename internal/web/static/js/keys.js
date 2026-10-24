@@ -3,6 +3,7 @@ import * as a from './actions.js';
 import * as tree from './tree.js';
 import * as e from './edits.js';
 import * as ops from './ops.js';
+import * as sync from './sync.js';
 
 // The keys, as the terminal interface had them. A key means different things
 // in the tree and in the inspector; the footer hints follow the same rules.
@@ -19,8 +20,6 @@ const common = {
   Tab: a.toggleFocus,
   Escape: a.escape,
 };
-
-const notYet = (what) => () => a.notYet(what);
 
 const treeKeys = {
   ArrowUp: () => a.move(-1), k: () => a.move(-1),
@@ -40,7 +39,7 @@ const treeKeys = {
   e: e.bulkEdit, c: e.copyKey, v: e.paste, d: e.remove, Delete: e.remove,
   J: () => e.moveTrack(1), K: () => e.moveTrack(-1), n: e.renumber, p: e.playlistKey,
   i: ops.identify, I: ops.identifyAll, o: ops.adopt,
-  a: ops.add, s: notYet('Sync'), D: ops.doctor,
+  a: ops.add, s: sync.openSync, D: ops.doctor,
   u: e.undo, 'ctrl+r': e.redo,
 };
 
@@ -58,7 +57,7 @@ const inspectorKeys = {
   Enter: e.startEdit, c: e.copyKey, v: e.paste, p: e.play,
   '[': () => e.nudge(-1, false), ']': () => e.nudge(1, false), '{': () => e.nudge(-1, true), '}': () => e.nudge(1, true), 0: e.clearField,
   x: e.removeCover, i: ops.identify, o: ops.adopt,
-  a: ops.add, s: notYet('Sync'), D: ops.doctor, u: e.undo, 'ctrl+r': e.redo,
+  a: ops.add, s: sync.openSync, D: ops.doctor, u: e.undo, 'ctrl+r': e.redo,
 };
 
 export function onKeydown(ev) {

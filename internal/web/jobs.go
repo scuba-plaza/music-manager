@@ -104,6 +104,10 @@ func (j *jobs) start(kind string, work func(ctx context.Context, report func(dat
 		defer cancel()
 		report := func(data any) {
 			j.mu.Lock()
+			if jb.view.State != jobRunning { // work that goes on after its job ended
+				j.mu.Unlock()
+				return
+			}
 			jb.view.Data = data
 			if time.Since(jb.sent) < 100*time.Millisecond { // a fast job is not worth every step
 				j.mu.Unlock()

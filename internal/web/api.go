@@ -52,10 +52,7 @@ func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, err)
 		return
 	}
-	n, known, err := s.app.Unsynced()
-	if err != nil {
-		n, known = 0, false
-	}
+	n, known := s.unsynced()
 	writeJSON(w, map[string]any{
 		"stamp":    stamp,
 		"view":     browse.Library(snap, o),

@@ -1,6 +1,6 @@
 import { S } from './state.js';
 import { get, post } from './api.js';
-import { h, name, plural } from './dom.js';
+import { h, name, plural, progress } from './dom.js';
 import * as a from './actions.js';
 import * as tree from './tree.js';
 import { openOverlay, closeOverlay } from './overlay.js';
@@ -209,12 +209,6 @@ async function startIdentifyAll() {
   if (S.overlay === overlay) overlay.redraw();
 }
 
-function progress(done, total) {
-  const pct = total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
-  return h('div', { class: 'progress-row' },
-    h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(total), 'aria-valuenow': String(done) }, h('i', { style: `width:${pct}%` })),
-    h('span', { class: 'dim' }, `${done}/${total}`));
-}
 
 // ---- adopt the old tags
 

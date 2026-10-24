@@ -130,7 +130,7 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: 0.4em 0; }
 #overlay-root { position: fixed; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 70%, transparent); z-index: 10; padding: 1em; }
 .dialog:focus { outline: 0; }
 .dialog { position: relative; background: var(--panel); border: 1px solid var(--accent); width: min(72ch, 100%); max-height: 100%; padding: 0.8em 1.5ch 0.6em; box-shadow: 0 0.5em 2em rgba(0, 0, 0, 0.45); }
-.dialog > .body { overflow-x: hidden; overflow-y: auto; max-height: calc(100dvh - 6em); padding-top: 0.3em; }
+.dialog > .body { overflow-x: hidden; overflow-y: auto; max-height: calc(100dvh - 6em); padding-top: 0.3em; scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
 .dialog > h2 { position: absolute; top: -0.85em; left: 1.5ch; margin: 0; padding: 0 0.7ch; background: var(--bg); color: var(--accent); font-size: inherit; line-height: 1.5; }
 .dialog .keys { display: grid; grid-template-columns: 14ch minmax(0, 1fr); column-gap: 1.5ch; }
 .dialog .keys .k { color: var(--accent); white-space: nowrap; }
@@ -195,9 +195,23 @@ body.dropping #app { outline: 2px dashed var(--accent); outline-offset: -6px; }
 .menu.wide .n, .menu.wide .d { display: none; }
 .menu.wide .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .diff { display: grid; grid-template-columns: 8ch minmax(0, 1fr); gap: 0 1ch; margin: 0.2em 0 0.4em 1ch; }
-.problems { max-height: 50vh; overflow: auto; margin-top: 0.4em; }
+.problems { max-height: 50vh; overflow: auto; margin-top: 0.4em; scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
 .problem { padding: 0 0.5ch; cursor: pointer; overflow-wrap: anywhere; }
 .problem > :first-child { margin-right: 1ch; }
 .problem.on { background: var(--sel); }
 .form input.edit { border-color: var(--rule); }
 .form input.edit:focus, input.edit:focus { border-color: var(--accent); }
+
+/* the sync dialog */
+.ops { max-height: 14em; overflow-y: auto; margin: 0.5em 0; border: 1px solid var(--rule); padding: 0.2em 0.5ch; scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
+.ops:focus { outline: 0; }
+.op { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op .g { display: inline-block; width: 2ch; }
+.op.create .g { color: var(--good); }
+.op.update .g { color: var(--accent); }
+.op.remove .g { color: var(--bad); }
+.op.stray .g { color: var(--warn); }
+.warns { margin-top: 0.5em; }
+.format { margin-top: 0.8em; }
+.format.click { cursor: pointer; }
+.confirm { margin-top: 0.8em; display: flex; align-items: baseline; gap: 1ch; flex-wrap: wrap; }

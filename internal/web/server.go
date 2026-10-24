@@ -39,6 +39,10 @@ type Server struct {
 	jobs *jobs
 	mux  *http.ServeMux
 
+	plans   plans
+	scanned scan
+	mounts  func() []string // the drives to offer; browse.DetectMounts unless a test says otherwise
+
 	infoMu    sync.Mutex
 	coverInfo map[string]string
 	ed        *browse.Editor
@@ -58,7 +62,7 @@ func WithWolfgang() Option { return func(v *Server) { v.wolfgang = true } }
 
 // New returns the server for a library.
 func New(a *app.App, opts ...Option) *Server {
-	s := &Server{app: a, hub: newHub(), mux: http.NewServeMux(), coverInfo: map[string]string{}}
+	s := &Server{app: a, hub: newHub(), mux: http.NewServeMux(), coverInfo: map[string]string{}, mounts: browse.DetectMounts}
 	s.jobs = newJobs(s.hub)
 	for _, o := range opts {
 		o(s)
@@ -89,6 +93,7 @@ func (s *Server) routes() {
 	s.editRoutes()
 	s.identifyRoutes()
 	s.addRoutes()
+	s.syncRoutes()
 }
 
 // Serve answers requests on ln until ctx is done, and watches the library for
@@ -97,6 +102,7 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	s.jobs.useContext(ctx)
 	go s.watch(ctx)
+	go s.scanUnsynced()
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ln) }()
 	select {
@@ -149,7 +155,7 @@ func URL(ln net.Listener) string {
 
 // info is what does not change while the program runs.
 func (s *Server) info(w http.ResponseWriter, r *http.Request) {
-	root := s.app.Root()
+	root := s.root()
 	if home, err := os.UserHomeDir(); err == nil && home != "" {
 		if rel, err := filepath.Rel(home, root); err == nil && !strings.HasPrefix(rel, "..") {
 			root = filepath.Join("~", rel)
@@ -189,4 +195,13 @@ func noCache(h http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "no-cache")
 		h.ServeHTTP(w, r)
 	})
+}
+
+// root is the library folder as a full path, wherever mm was started from.
+func (s *Server) root() string {
+	root := s.app.Root()
+	if abs, err := filepath.Abs(root); err == nil {
+		return abs
+	}
+	return root
 }

@@ -6,6 +6,7 @@ import { onKeydown } from './keys.js';
 import * as edits from './edits.js';
 import * as ops from './ops.js';
 import { jobEvent } from './jobs.js';
+import { openSync } from './sync.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,7 +23,7 @@ async function boot() {
   $('filter').addEventListener('focus', a.renderHints);
   $('filter').addEventListener('blur', a.renderHints);
   wireTheme();
-  $('sync-chip').addEventListener('click', () => a.notYet('Sync'));
+  $('sync-chip').addEventListener('click', () => { if (!S.overlay && !S.busy) openSync(); });
   wireTree();
   wireSplit();
   wirePictures();
