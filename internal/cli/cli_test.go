@@ -650,7 +650,7 @@ func TestEditWithACoverThatIsNotAnImageChangesNothing(t *testing.T) {
 
 func TestOnlyTheRightSpellingOfWolfgangIsAFlag(t *testing.T) {
 	lib := filepath.Join(t.TempDir(), "lib")
-	for _, args := range [][]string{{"sync", "--wolfang"}, {"tui", "--wolfang"}, {"--wolfang"}, {"show", "x", "--wolfang"}} {
+	for _, args := range [][]string{{"sync", "--wolfang"}, {"web", "--wolfang"}, {"--wolfang"}, {"show", "x", "--wolfang"}} {
 		code, _, errs := run(t, lib, args...)
 		if code == 0 || !strings.Contains(errs, "unknown flag: --wolfang") {
 			t.Errorf("mm %s: code %d, err %q; the misspelling is not a flag", strings.Join(args, " "), code, errs)

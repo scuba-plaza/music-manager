@@ -91,18 +91,16 @@ func TestOnlyTheNamedPlacesMakeLatinForms(t *testing.T) {
 		"internal/translit/", "internal/device/",
 		"internal/manifest/",      // the search finds a name by its Latin form
 		"internal/app/sort.go",    // names sort by their Latin form
-		"internal/tui/tree.go",    // and so do the lists
-		"internal/browse/rows.go", // and so do the lists of the web interface
+		"internal/browse/rows.go", // and so do the lists
 	})
 }
 
 func TestTheWolfgangIsNamedOnlyWhereItIsChosenOrExplained(t *testing.T) {
 	sweep(t, `(?i)wolfgang|wmp01|wolfang`, false, []string{
 		"internal/device/",
-		"cmd/mm/main.go",                // wires the flag to the interface
+		"cmd/mm/main.go",                // wires the flag to the web interface
 		"internal/cli/",                 // the --wolfgang flag and its help
-		"internal/tui/",                 // the format row and the preview tab
-		"internal/browse/",              // the preview tab of the web interface
+		"internal/browse/",              // the preview tab and the format of a sync
 		"internal/web/",                 // and the option that turns it on
 		"internal/app/playlist.go",      // the names of every device's playlists must not clash
 		"internal/coverimg/coverimg.go", // says why baseline JPEGs exist

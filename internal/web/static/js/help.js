@@ -27,7 +27,7 @@ const pages = [
       ['↑ ↓', 'choose a field'],
       ['enter', 'edit it; enter again saves'],
       ['esc', 'cancel, or back to the tree'],
-      ['← →  1-3', "a track's tabs: details, audio, Latin forms"],
+      ['← →  1-3', "a track's tabs: details, audio, Latin forms (4: the Wolfgang, under --wolfgang)"],
       ['tab', "a track's other number"],
       ['-', 'clear a (mixed) field of an artist or album'],
     ]],

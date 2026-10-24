@@ -24,6 +24,7 @@ nothing of it is stored.
 ## Everyday use
 
 ```sh
+mm web                             # browse and edit everything in a browser (see below)
 mm add https://youtu.be/…          # download, look up on MusicBrainz, ask for each detail
 mm add URL --no-input --artist X --title Y --album Z --track 3 --of 12 --trim-start 0:12
 mm sync                            # write it into the library folder
@@ -36,15 +37,13 @@ release date and how much to cut off the start and end, with defaults filled in.
 as a flag is not asked. Without a terminal (or with `--no-input`) it never
 asks and fails if the title or artist is unknown.
 
-## The full-screen interface
+## The web interface
 
-Run `mm` in a terminal (or `mm tui`) to browse and edit the library on one screen: artists, albums and
-tracks on the left, and on the right whatever the cursor is on: a track's details, or what is inside an album (its tracks), an artist (its albums and singles), a playlist (its tracks in play order) or the Needs work group (what each track lacks), as the preview column of a file manager does. Every change is saved at once to
-`library.json`; the music folder only changes when you sync (`s`), and the header says how many tracks
-are waiting (`3 to sync`). Press `?` for the list of keys, one page for each kind (`←` `→` or `1`-`4` turn the pages); the bottom line always shows the ones that
-matter right now. Without a terminal, plain `mm` prints help.
+Run `mm web` to browse and edit the library in a browser: artists, albums and tracks on the left, and on the right whatever the cursor is on: a track's details and its cover, or what is inside an album (its tracks), an artist (its albums and singles), a playlist (its tracks in play order) or the Needs work group (what each track lacks), as the preview column of a file manager does. The page keeps a terminal's look and its keys. Every change is saved at once to `library.json`; the music folder only changes when you sync (`s`), and the header says how many tracks are waiting (`3 to sync`; click it to sync). Press `?` for the list of keys, one page for each kind (`←` `→` or `1`-`4` turn the pages); the bottom line always shows the ones that matter right now. Plain `mm` prints help.
 
-Several `mm` can work on one library at once, the interface in one terminal and a command in another. A change reads `library.json` as it is at that moment, changes it and writes it back while holding a lock on `library.json.lock`, so no change undoes another; the interface notices what the others did and shows it. A waiting `mm` carries on within a moment, or says that another `mm` has the library after 30 seconds. If an `mm` is killed, the system lets go of its lock by itself. `library.json.lock` is only a place to lock and can be deleted when no `mm` is running.
+`mm web` serves the page on this computer only (`127.0.0.1:7878`, the same port every time so that it can be bookmarked; if it is taken, a free one is used, unless you asked for one with `--addr`), opens it in your browser and stops with Ctrl+C. `--no-open` leaves the browser alone, and `--wolfgang` adds the preview of what a sync for the Wolfgang writes (see below). It needs no terminal of its own, and no service: it runs when you start it. Other web pages cannot make it change anything: it answers only requests for its own address, and a change must come from its own page.
+
+Several `mm` can work on one library at once, the web page and a command in a terminal. A change reads `library.json` as it is at that moment, changes it and writes it back while holding a lock on `library.json.lock`, so no change undoes another; the page notices what the others did within a second or two and shows it. A waiting `mm` carries on within a moment, or says that another `mm` has the library after 30 seconds. If an `mm` is killed, the system lets go of its lock by itself. `library.json.lock` is only a place to lock and can be deleted when no `mm` is running.
 
 | | |
 |---|---|
@@ -54,22 +53,20 @@ Several `mm` can work on one library at once, the interface in one terminal and 
 | `+` `-` | open the tree one more level (artists, then albums) / close all of it |
 | `enter` `←` | open and close the artist, album or playlist under the cursor (`←` closes it, or goes up to its parent) |
 | `→` `e` | into the fields in the right-hand pane of what the cursor is on: a track, an artist, an album or a playlist; `↑↓` choose a field, `enter` edits it, `enter` saves, `esc` cancels, `←` goes back to the tree (see below for artists, albums and playlists). On a track `enter` goes in too |
-| `→` `←` `1` `2` `3` | in the fields: the other tab (Details, Audio, Latin: the forms of the names in Latin letters, see below); `←` on the first tab goes back to the tree. The tab you are on stays when you select another track. Under `mm --wolfgang` there is a fourth, `4`: a preview of what a sync for the Wolfgang writes for the track (see below) |
-| `[` `]` `{` `}` `0` `p` | on a cut: nudge by 0.1 s / 1 s, clear, hear the 8 s around it (needs `ffplay` or `mpv`) |
+| `→` `←` `1` `2` `3` | in the fields: the other tab (Details, Audio, Latin: the forms of the names in Latin letters, see below); `←` on the first tab goes back to the tree. The tab you are on stays when you select another track. Under `mm web --wolfgang` there is a fourth, `4`: a preview of what a sync for the Wolfgang writes for the track (see below) |
+| `[` `]` `{` `}` `0` `p` | on a cut: nudge by 0.1 s / 1 s, clear, hear the 8 s around it (the browser plays it) |
 | `space` `ctrl+a` `e` | mark tracks (an album marks all of its tracks); `e` edits the marked ones in one form, which has the Latin forms of the artist, album and genre too (with nothing marked, `e` is `→`) |
 | `J` `K` `n` | move a track down or up in its album; number the album 1…N |
-| `c` `v` | copy attributes of a track and paste them on others (see below); `v` also pastes a picture copied outside, as the cover |
+| `c` `v` | copy attributes of a track and paste them on others (see below); `ctrl+v` with a picture on the clipboard sets it as the cover |
 | `p` | add the marked tracks (or the selected track, album or artist) to a playlist, or start a new one. The **Playlists** group at the top of the tree opens into each playlist and its tracks in play order; there `J` `K` reorder, `d` takes a track out of the playlist (never out of the library), `d` on the playlist itself deletes it after asking, and `→` edits its name and its Latin name |
 | `i` `I` `o` | find a track on MusicBrainz and pick the match; do all unidentified tracks; use the file's old tags |
-| `a` | add from a YouTube link: one form, pre-filled from the match |
-| `s` | sync: choose the folder (or a mounted player), see what will change, apply. A drive has a Format row, Generic or Wolfgang WMP01, switched with `w` and never remembered (under `mm --wolfgang` a drive starts on the Wolfgang); the library folder is always written the standard way. The header says `N to sync · press s` when something is waiting; clicking it works too |
+| `a` | add from a YouTube link: one form, pre-filled from the match. MP3 files dropped on the page are added as unidentified tracks |
+| `s` | sync: choose the folder (or a mounted player), see what will change, apply. A folder other than the library folder has a Format row, Generic or Wolfgang WMP01, switched with `w` and never remembered (under `mm web --wolfgang` it starts on the Wolfgang); the library folder is always written the standard way. Files are only deleted when you ask for the strays to go (`p`) and type `delete`. The header says `N to sync · press s` when something is waiting |
 | `d` `u` `ctrl+r` `D` | remove (asks first: `y` or `enter` agrees), undo, redo, check the library for damage |
 
-Covers are shown in full resolution in terminals that speak the kitty graphics protocol (kitty, Ghostty), and as coloured half-blocks everywhere else. `MM_COVERS=blocks` or `MM_COVERS=kitty` overrides the guess; inside tmux or screen, which do not pass pictures on, blocks are used. The cover takes the room the fields leave below them.
+The covers are shown as pictures. A picture file dropped on the page, or a picture pasted with `ctrl+v`, becomes the cover of the marked tracks, or of the track, album or artist under the cursor; the Cover field's `enter` chooses a file instead.
 
-The mouse works too: click to select, click the selected track, artist, album or playlist again to go into its fields (a click on a field chooses it, another edits it), double-click a folder row to open or close it, wheel
-to scroll. Colours follow your terminal's light or dark background and honour `NO_COLOR`. If another `mm`
-changes the library while the interface is open, the change appears within a couple of seconds.
+The mouse works too: click to select, double-click a row to open or close it (on a track, to go into its fields), click the arrow of a folder row to open or close it at once, click a field to choose it and click it again to edit it, and drag the line between the panes to give one more room. The page is dark, like the terminal it stands in for; the `◐` button switches to a light theme, which is remembered. On a window narrower than 800 pixels it shows one pane at a time. Names in Arabic or any other right-to-left script are laid out in their own direction, without reordering the text around them.
 
 ## Commands
 
@@ -86,7 +83,7 @@ changes the library while the interface is open, the change appears within a cou
 | `mm review apply <file> [--dry-run] [--include-low]` | set a field for many tracks from a file of proposals you have corrected (see Review files below) |
 | `mm playlist <new, add, rm, move, rename, latin, delete, import, ls, show>` | make and change playlists (see Playlists below) |
 | `mm doctor` | check the stores for missing or damaged files, and point out artist names that look like several artists |
-| `mm tui [--wolfgang]` | the full-screen interface (also what plain `mm` opens in a terminal) |
+| `mm web [--addr ADDR] [--no-open] [--wolfgang]` | the interface in a browser (see above); stops with Ctrl+C |
 | `mm completion bash\|zsh\|fish` | print the completions for a shell (the Nix package installs them) |
 
 ## Covers
@@ -97,7 +94,7 @@ Reusing a picture costs nothing in the library: covers are kept once each, under
 
 ## Genre
 
-A track may have a genre, free text such as `Folk`, `Anthem` or `Neoclassical`. `mm sync` writes it to the file as the genre tag. Set it with `mm edit <id> --genre Folk`, in the TUI (the Genre field and the bulk edit form, `e`) or `mm add --genre`; find tracks with `mm ls genre:folk` (any part of the genre, case ignored). The tags of an ingested file are kept as hints, the genre among them, and `mm adopt` takes them. (The Wolfgang shows 12 characters of a genre; `--wolfgang` warns about a longer one.)
+A track may have a genre, free text such as `Folk`, `Anthem` or `Neoclassical`. `mm sync` writes it to the file as the genre tag. Set it with `mm edit <id> --genre Folk`, in the web interface (the Genre field and the bulk edit form, `e`) or `mm add --genre`; find tracks with `mm ls genre:folk` (any part of the genre, case ignored). The tags of an ingested file are kept as hints, the genre among them, and `mm adopt` takes them. (The Wolfgang shows 12 characters of a genre; `--wolfgang` warns about a longer one.)
 
 ## Review files
 
@@ -140,13 +137,13 @@ To rename an artist or fix an album you do not go from track to track: press `�
 
 * **What is copied.** In the fields of a track, `c` copies the field the cursor is on: the cover, the artist, the album, the number of tracks on the album, the release date or the genre. In the tree, `c` on a track opens a checklist of what it has, all ticked: `space` ticks and unticks, `enter` copies what is ticked. An attribute the track has none of cannot be ticked, so a paste never wipes anything. A name takes the form in Latin letters that was set by hand along with it, since that form belongs to the name. The title, the track number and the audio settings belong to the track and are never copied.
 * **Where it is pasted.** `v` pastes on the marked tracks if any are marked, otherwise on the track under the cursor, or on all the tracks of the album or artist under the cursor (whatever the filter shows). It is one step for `u` to undo and says what it did; if the tracks have the same values already it changes nothing. What was copied stays until something else is copied or `mm` is left.
-* **A picture from outside.** Copy a PNG or JPEG file in a file manager, or a picture in a browser or an image viewer, then press `v` on a track, an album, an artist or marked tracks: the picture becomes their cover. A picture copied outside after the last `c` is the one `v` pastes; otherwise what `c` copied. The clipboard of the desktop is read with `wl-paste` (Wayland) or `xclip` (X11), which the Nix package brings along; other picture formats (WebP, GIF…) are refused with a message, since a cover is a JPEG or a PNG.
+* **A picture from outside.** Copy a PNG or JPEG file in a file manager, or a picture in a browser or an image viewer, then press `ctrl+v` on the page with a track, an album, an artist or marked tracks selected: the picture becomes their cover. Dropping a picture file on the page does the same. Other picture formats (WebP, GIF…) are refused with a message, since a cover is a JPEG or a PNG.
 
 ## Latin forms
 
 Names are kept as they really are, in any script. Some places can only show Latin letters: the Wolfgang WMP01 (below) and the order of the list, which puts فيروز among the F. For these, each name has a **Latin form**: how it reads in Latin letters. Unless you set one, it is worked out from the name, word by word. That is rough for Arabic, which is written without its short vowels: فيروز comes out as "Firuz" and جوليا بطرس as "Julya Btrs". So a form can be set by hand, for the title, the artist, the album and the genre of a track and for the name of a playlist, and it is used instead of the worked-out one:
 
-* **In the full-screen interface**, the **Latin** tab (`3`) of a track lists the four. The form shown is the one in use: dim when it is worked out, normal when it was set by hand, `—` when there is no name to write. `enter` edits it starting from what is shown; saving what was there changes nothing, and saving it empty goes back to the worked-out form. The change is one step for `u` to undo, like any other. An artist and an album have a Latin name and a Latin genre among their fields, a playlist a Latin name, and these are set on all their tracks at once (see above). For marked tracks, `e` has rows for the Latin form of the artist, the album and the genre (`-` takes it away).
+* **In the web interface**, the **Latin** tab (`3`) of a track lists the four. The form shown is the one in use: dim when it is worked out, normal when it was set by hand, `—` when there is no name to write. `enter` edits it starting from what is shown; saving what was there changes nothing, and saving it empty goes back to the worked-out form. The change is one step for `u` to undo, like any other. An artist and an album have a Latin name and a Latin genre among their fields, a playlist a Latin name, and these are set on all their tracks at once (see above). For marked tracks, `e` has rows for the Latin form of the artist, the album and the genre (`-` takes it away).
 * **On the command line**, `mm edit <id> --title-latin "Watani" --artist-latin "Fairouz" --album-latin … --genre-latin …`, with `""` to take one away, and `mm playlist latin <name> [latin name]`. `mm show <id>` lists the forms that were set.
 
 A form belongs to the name it was written for, and changing the name does not touch it, so a corrected spelling keeps its form; a name that becomes empty loses its form. Forms are searched (`mm ls`, `/` in the interface finds "watani" as well as وطني) and put the track in order (`S` and `--sort`). The library folder and a plain sync never use them: the tags and the file names there are the true names, and setting a form leaves nothing to sync. `mm sync --wolfgang` uses them for the folders, the file names, the artist, album and genre tags and the name of the playlist file; the title tag stays the true title.
@@ -157,7 +154,7 @@ A form belongs to the name it was written for, and changing the name does not to
 
 * **Names.** The player shows 24 characters of a file name (it keeps 26), the `.mp3` included, and scrolls a longer name along when it is hovered; it shows 12 of an artist, an album and a genre, cuts the rest wherever that falls, and does not join Arabic letters. So folders and files are named in Latin letters, using the Latin forms (see above): the ones set by hand, else the ones worked out, which lose the short vowels of Arabic (فيروز becomes "Firuz"); accents are stripped. The title tag keeps the true title, since the player shows file names and not titles.
 * **File names** are `NN - Title.mp3` for the MP3 files only, hard-cut at 20 characters before the extension, so that the whole name, `.mp3` included, fits in the 24 the player shows and does not scroll; the track number and the ` (2)` of a collision count in the 20 (`01 - Munajat Amir al.mp3`). Names are not padded (a padded name scrolls). Folders, playlists and photos keep their full names, up to 100 bytes each.
-* **Artist and album tags** are worked out from the Latin form by rules, and the genre tag is its Latin form. An artist that fits in 12 characters is kept; otherwise "The" and what is in brackets go, "Various Artists" becomes "Various", and a name of several words becomes the initials of all but the last and the surname ("Mohamed Abdel Wahab" is "M. A. Wahab"), or the first initial and the surname, or the surname alone, or is cut at a word. An album that fits is kept; otherwise brackets, a trailing "EP" or "Single" and a leading artist name go, and then it is cut at a word. A single has no album, which the player shows as "Unknown Album", so its title (shortened the same way) is written there. `mm show <id> --wolfgang` and the fourth tab of `mm --wolfgang` show the result; only the name and its Latin form can change it.
+* **Artist and album tags** are worked out from the Latin form by rules, and the genre tag is its Latin form. An artist that fits in 12 characters is kept; otherwise "The" and what is in brackets go, "Various Artists" becomes "Various", and a name of several words becomes the initials of all but the last and the surname ("Mohamed Abdel Wahab" is "M. A. Wahab"), or the first initial and the surname, or the surname alone, or is cut at a word. An album that fits is kept; otherwise brackets, a trailing "EP" or "Single" and a leading artist name go, and then it is cut at a word. A single has no album, which the player shows as "Unknown Album", so its title (shortened the same way) is written there. `mm show <id> --wolfgang` and the fourth tab of `mm web --wolfgang` show the result; only the name and its Latin form can change it.
 * **Covers.** The photo viewer opens baseline JPEG files of modest size: it fails on PNG and progressive files, on 4:4:4 colour and on very large pictures, and does not list PNG files at all. So the cover is made into a baseline JFIF JPEG, 4:2:0, at most 480 pixels along its longer side (a transparent background becomes white), when syncing: in the MP3 tag, as `cover.jpg` in an album folder and as `Title.jpg` beside a single. The stored cover is not touched.
 * **Playlists** are `Playlists/<name>.m3u`, named by the Latin name of the playlist: paths from the root of the card with backslashes (`\Artist\Album\01 - Title.mp3`), one per line, Windows line endings; the player lists every `.m3u` on the card as a playlist and ignores slashes and relative paths. (The player lists an `.m3u8` too, but shows its extension, which it hides for an `.m3u`; so it gets the `.m3u`. Entries with names longer than 26 characters play from a playlist.)
 * **Warnings.** `mm sync --wolfgang` (also with `--dry-run`), the review screen of the sync dialog and `mm show --wolfgang` say what the player will not show well: a genre longer than 12 characters, a name with no Latin letters (it becomes "Unknown"), two file names that are the same only because they are cut, and an artist name that looks like several artists.
@@ -174,7 +171,7 @@ mm edit <id> --fade-out 3:50-3:58                    # a stretch of the original
 mm edit <id> --gain 0 --fade-in "" --fade-out ""     # all away
 ```
 
-A length counts from where the track now starts (fade-in) or back from where it now ends (fade-out); a stretch is in the time of the original, as it is stored, so cutting the track again later does not move a fade. In the TUI the Audio tab (`2`) has Volume, Fade in and Fade out below the cuts, with the same `[ ]` and `{ }` nudge keys (1.5 dB and 6 dB for the volume, 0.1 s and 1 s for the length of a fade), `0` to clear, and `p` to hear the start or the end with the change applied. A line under the fields draws the ramps.
+A length counts from where the track now starts (fade-in) or back from where it now ends (fade-out); a stretch is in the time of the original, as it is stored, so cutting the track again later does not move a fade. In the web interface the Audio tab (`2`) has Volume, Fade in and Fade out below the cuts, with the same `[ ]` and `{ }` nudge keys (1.5 dB and 6 dB for the volume, 0.1 s and 1 s for the length of a fade), `0` to clear, and `p` to hear the start or the end with the change applied. A line under the fields draws the ramps.
 
 ## Dates and sorting
 
@@ -233,20 +230,19 @@ mm sync --prune --yes
 
 * `--library DIR` or `MM_LIBRARY`: the library folder (default `~/Music/mp3-player`).
 * `MM_CONTACT`: an email or URL added to the User-Agent sent to MusicBrainz, which they ask for.
-* `MM_COVERS=blocks` or `MM_COVERS=kitty`: how the interface draws covers (see above); by default it looks at the terminal.
-* `ACCESSIBLE=1` or `TERM=dumb`: plain line-based questions instead of the full-screen form.
+* `ACCESSIBLE=1` or `TERM=dumb`: plain line-based questions instead of the full-screen form of `mm add`.
 
-Needs `yt-dlp` (and `ffmpeg`, which yt-dlp uses) on `PATH` for `mm add`. Hearing a cut in the interface needs `ffplay` (part of ffmpeg) or `mpv`.
+Needs `yt-dlp` (and `ffmpeg`, which yt-dlp uses) on `PATH` for `mm add` and for adding from a link in the web interface. `mm web` opens the browser with `xdg-open`; hearing a cut needs nothing more than the browser.
 
 ## Installing with Nix
 
 The repository is a flake. It provides `packages.<system>.music-manager` (the
 program is `mm`) and an overlay that adds `pkgs.music-manager`. The Nix package
-puts `yt-dlp` and `ffmpeg` at the end of the program's `PATH`, so ones you
+puts `yt-dlp`, `ffmpeg` and `xdg-open` at the end of the program's `PATH`, so ones you
 already have take precedence.
 
 ```sh
-nix run github:scuba-plaza/music-manager -- --help        # try it
+nix run github:scuba-plaza/music-manager -- web          # try it
 nix profile install github:scuba-plaza/music-manager      # or install it
 ```
 
@@ -270,8 +266,7 @@ files git knows about, so `git add` new files before `nix build`.
 
 ```sh
 go test ./...
-go test -tags pty ./internal/tui                          # runs the real binary in a pseudo-terminal
-go test ./internal/tui -update                               # accept changed screens in internal/tui/testdata
+go run ./cmd/mm --library /tmp/lib web                       # the web interface on a scratch library; its page is internal/web/static
 nix build                                                    # builds the package and runs the tests in the sandbox
 go test -tags live ./internal/musicbrainz ./internal/ytdlp   # real MusicBrainz, real yt-dlp
 ```

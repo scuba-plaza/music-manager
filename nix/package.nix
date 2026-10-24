@@ -4,8 +4,7 @@
   makeWrapper,
   yt-dlp,
   ffmpeg,
-  wl-clipboard,
-  xclip,
+  xdg-utils,
   version,
   commit,
 }:
@@ -24,7 +23,7 @@ buildGoModule {
     ];
   };
 
-  vendorHash = "sha256-1aCeXBf8naKoRNaGTEBfkZlCdPRL6KuZY3WTptXZ3to=";
+  vendorHash = "sha256-rO9TGDpz2aPDK0mS/GwB9JOe/QppXwiOOEmdkdd8J+w=";
 
   env.CGO_ENABLED = "0";
 
@@ -37,11 +36,11 @@ buildGoModule {
 
   nativeBuildInputs = [ makeWrapper ];
 
-  # yt-dlp, ffmpeg and the programs that read the clipboard (for pasting a
-  # cover picture) are only fallbacks, appended to PATH: one the user already
-  # has, say a newer yt-dlp, is found first.
+  # yt-dlp, ffmpeg and xdg-open (which opens the web interface in a browser)
+  # are only fallbacks, appended to PATH: one the user already has, say a newer
+  # yt-dlp, is found first.
   postInstall = ''
-    wrapProgram $out/bin/mm --suffix PATH : ${lib.makeBinPath [ yt-dlp ffmpeg wl-clipboard xclip ]}
+    wrapProgram $out/bin/mm --suffix PATH : ${lib.makeBinPath [ yt-dlp ffmpeg xdg-utils ]}
 
     mkdir -p $out/share/bash-completion/completions $out/share/zsh/site-functions $out/share/fish/vendor_completions.d
     $out/bin/mm completion bash > $out/share/bash-completion/completions/mm

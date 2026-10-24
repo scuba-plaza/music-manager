@@ -12,10 +12,8 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/cli"
-	"music-manager/internal/clipboard"
 	"music-manager/internal/musicbrainz"
 	"music-manager/internal/prompt"
-	"music-manager/internal/tui"
 	"music-manager/internal/version"
 	"music-manager/internal/web"
 	"music-manager/internal/ytdlp"
@@ -53,13 +51,6 @@ func main() {
 	}
 	if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 		deps.Prompter = prompt.New(os.Stdin, os.Stderr)
-		deps.RunTUI = func(ctx context.Context, a *app.App, wolfgang bool) error {
-			opts := []tui.Option{tui.WithPlayer(tui.DetectPlayer()), tui.WithClipboard(clipboard.Detect())}
-			if wolfgang {
-				opts = append(opts, tui.WithWolfgang())
-			}
-			return tui.Run(ctx, tui.NewLibrary(a, tui.WithSource(lookup), tui.WithDownloader(deps.Downloader)), opts...)
-		}
 	}
 	os.Exit(cli.Run(ctx, os.Args[1:], cli.IO{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}, deps))
 }

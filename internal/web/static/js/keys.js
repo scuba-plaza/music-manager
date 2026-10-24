@@ -5,7 +5,7 @@ import * as e from './edits.js';
 import * as ops from './ops.js';
 import * as sync from './sync.js';
 
-// The keys, as the terminal interface had them. A key means different things
+// The keys. A key means different things
 // in the tree and in the inspector; the footer hints follow the same rules.
 
 function keyName(ev) {
