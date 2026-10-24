@@ -83,8 +83,6 @@ changes the library while the interface is open, the change appears within a cou
 | `mm rm <id>…` | remove records (audio is deleted by the next sync) |
 | `mm review apply <file> [--dry-run] [--include-low]` | set a field for many tracks from a file of proposals you have corrected (see Review files below) |
 | `mm playlist <new, add, rm, move, rename, latin, delete, import, ls, show>` | make and change playlists (see Playlists below) |
-| `mm migrate [--dry-run]` | bring a library of version 1 up to date (see Upgrading below) |
-| `mm restore-latin [--dry-run]` | put back the Latin forms that an earlier migration dropped (see Upgrading below) |
 | `mm doctor` | check the stores for missing or damaged files, and point out artist names that look like several artists |
 | `mm tui [--wolfgang]` | the full-screen interface (also what plain `mm` opens in a terminal) |
 
@@ -212,10 +210,6 @@ The playlists made on the Wolfgang itself (`USERPL1.PL` to `USERPL3.PL` on the c
 Trims are stored on the record and applied when rendering, on MP3 frame
 boundaries (about 26 ms), without re-encoding. The stored audio is never
 changed, so a trim can always be redone.
-
-## Upgrading from version 1
-
-A library written by an earlier version kept every name twice (in Latin letters, maybe set by hand, and as it really is) and the 12-character names of the Wolfgang per track. `mm` will not open it until `mm migrate` has run: `mm migrate --dry-run` lists the Latin forms that were set by hand, which are kept as the Latin forms of the names (and the player names that go, which are worked out again) and writes nothing; `mm migrate` copies the old `library.json` byte for byte to `.mm/library.json.v1`, writes version 2 and refuses to run twice. Afterwards the first plain `mm sync` renames the library folder to the true names (read `mm sync --dry-run` first, then apply with `--prune --yes`), and the first `mm sync --wolfgang` rewrites the whole card once. An `mm` of version 1 cannot read a version 2 library. A library that was migrated by an earlier build of version 2, which dropped the Latin forms set by hand, gets them back with `mm restore-latin --dry-run` and then `mm restore-latin`: it reads them from `.mm/library.json.v1`, puts one back only where the track still has the name it was set for and has no form of its own, and lists what it left alone.
 
 ## Moving an existing folder over
 

@@ -80,11 +80,8 @@ func sweep(t *testing.T, pattern string, tests bool, allow []string) {
 
 func TestTheLibraryKnowsNoLatinFormsOrPlayerNames(t *testing.T) {
 	sweep(t, `OriginalTitle|OriginalArtist|OriginalAlbum|Ascii(Title|Artist|Album)|(Artist|Title|Album)ASCII\b|PlayerArtist|PlayerAlbum|player_artist|player_album|player-artist|player-album`, true, []string{
-		"internal/manifest/legacy.go", "internal/manifest/legacy_test.go", // the v1 shape, read by mm migrate
-		"internal/cli/migrate_test.go", // a v1 library as a fixture
-		"internal/cli/cmd_migrate.go",  // reports what the v1 library held
-		"internal/cli/cli_test.go",     // the flags of the old names are gone
-		"internal/app/review_test.go",  // review files must refuse the old keys
+		"internal/cli/cli_test.go",    // the flags of the old names are gone
+		"internal/app/review_test.go", // review files must refuse the old keys
 		"internal/device/boundary_test.go",
 	})
 }
@@ -92,7 +89,7 @@ func TestTheLibraryKnowsNoLatinFormsOrPlayerNames(t *testing.T) {
 func TestOnlyTheNamedPlacesMakeLatinForms(t *testing.T) {
 	sweep(t, `translit\.`, false, []string{
 		"internal/translit/", "internal/device/",
-		"internal/manifest/",   // the search finds a name by its Latin form; the old shape is migrated
+		"internal/manifest/",   // the search finds a name by its Latin form
 		"internal/app/sort.go", // names sort by their Latin form
 		"internal/tui/tree.go", // and so do the lists
 	})
@@ -106,7 +103,6 @@ func TestTheWolfgangIsNamedOnlyWhereItIsChosenOrExplained(t *testing.T) {
 		"internal/tui/",                 // the format row and the preview tab
 		"internal/app/playlist.go",      // the names of every device's playlists must not clash
 		"internal/coverimg/coverimg.go", // says why baseline JPEGs exist
-		"internal/manifest/legacy.go",   // says what the old shape held
 	})
 }
 
