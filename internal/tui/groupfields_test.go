@@ -378,3 +378,145 @@ func TestOneUndoPutsTheOldNameOfAnArtistBack(t *testing.T) {
 		t.Errorf("after redo Flow is by %q", got)
 	}
 }
+
+// withEdits changes tracks behind the model's back, as another run of mm would,
+// and loads them again.
+func withEdits(t *testing.T, m Model, hook *editHook, edits map[string]app.Edit) Model {
+	t.Helper()
+	a := appOf(t, hook.Library)
+	for title, e := range edits {
+		if _, err := a.Edit(trackNamed(t, hook.Library, title).ID, e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return send(t, m, m.Init())
+}
+
+// toArtistFields is the model on the fields of Shawn James, the cursor on the
+// field f.
+func toArtistFields(t *testing.T, m Model, f fieldKind) Model {
+	t.Helper()
+	if m.focus == paneInspector {
+		m = keys(t, m, "esc")
+	}
+	m = selectTrack(t, m, "Flow")
+	m = keys(t, m, "up", "up", "up", "right")
+	for i := 0; i < 10 && m.curField() != f; i++ {
+		m = keys(t, m, "down")
+	}
+	if m.curField() != f {
+		t.Fatalf("no field %v", f)
+	}
+	return m
+}
+
+func genreOf(t *testing.T, lib Library, title string) string {
+	t.Helper()
+	return trackNamed(t, lib, title).Genre
+}
+
+func TestAMixedFieldOpensEmptyAndEmptyKeepsAndDashClears(t *testing.T) {
+	m, hook := editingModel(t, "Flow")
+	m = withEdits(t, m, hook, map[string]app.Edit{"Flow": {Genre: ptr("Folk")}, "The Wanderer": {Genre: ptr("Folk")}, "Along Our Way": {Genre: ptr("Rock")}})
+	m = toArtistFields(t, m, fGenre)
+	contains(t, m, "(mixed)")
+
+	m = keys(t, m, "enter")
+	if got := m.in[0].Value(); got != "" {
+		t.Fatalf("a mixed field opens with %q, want it empty", got)
+	}
+	contains(t, m, "the tracks differ", "empty keeps them")
+	m = keys(t, m, "enter") // empty keeps
+	if m.editing || hook.manyCalls != 0 {
+		t.Errorf("editing %v, saves %d: empty should keep the tracks as they are", m.editing, hook.manyCalls)
+	}
+
+	m = typed(t, keys(t, m, "enter"), "-")
+	m = keys(t, m, "enter")
+	for _, title := range []string{"Flow", "The Wanderer", "Along Our Way"} {
+		if got := genreOf(t, hook.Library, title); got != "" {
+			t.Errorf("after -, %s has the genre %q", title, got)
+		}
+	}
+}
+
+func TestASharedFieldOpensWithItsValueAndEmptyClearsIt(t *testing.T) {
+	m, hook := editingModel(t, "Flow")
+	m = withEdits(t, m, hook, map[string]app.Edit{"Flow": {Genre: ptr("Folk")}, "The Wanderer": {Genre: ptr("Folk")}, "Along Our Way": {Genre: ptr("Folk")}})
+	m = toArtistFields(t, m, fGenre)
+	contains(t, m, "Folk")
+	lacks(t, m, "(mixed)")
+	m = keys(t, m, "enter")
+	if got := m.in[0].Value(); got != "Folk" {
+		t.Fatalf("opens with %q", got)
+	}
+	m = keys(t, clearField(t, m), "enter")
+	for _, title := range []string{"Flow", "The Wanderer", "Along Our Way"} {
+		if got := genreOf(t, hook.Library, title); got != "" {
+			t.Errorf("%s still has the genre %q", title, got)
+		}
+	}
+}
+
+func TestTheGenreOfAnArtistIsSetOnAllItsTracks(t *testing.T) {
+	m, hook := toArtist(t)
+	m = keys(t, m, "right", "down", "down", "enter")
+	m = typed(t, m, " Folk ")
+	m = keys(t, m, "enter")
+	for _, title := range []string{"Flow", "The Wanderer", "Along Our Way"} {
+		if got := genreOf(t, hook.Library, title); got != "Folk" {
+			t.Errorf("%s has the genre %q", title, got)
+		}
+	}
+	if got := genreOf(t, hook.Library, "Current"); got != "" {
+		t.Errorf("another artist's track has the genre %q", got)
+	}
+	contains(t, m, "Changed 3 tracks")
+}
+
+func TestTheLatinNameOfAnArtistIsSetOnAllItsTracksAndTheNameIsNotTouched(t *testing.T) {
+	m, hook := editingModel(t, "Flow")
+	arabic := app.Edit{Artist: ptr("فيروز")}
+	m = withEdits(t, m, hook, map[string]app.Edit{"Flow": arabic, "The Wanderer": arabic, "Along Our Way": arabic})
+	m = toArtistFields(t, m, fLatinArtist)
+	contains(t, m, "فيروز", "Firuz") // the name, and the form worked out from it
+	m = keys(t, m, "enter")
+	if got := m.in[0].Value(); got != "Firuz" {
+		t.Fatalf("opens with %q, want the form worked out", got)
+	}
+	contains(t, m, "for فيروز")
+	m = keys(t, m, "enter") // saving what was there changes nothing
+	if hook.manyCalls != 0 {
+		t.Fatal("the worked-out form was saved as if it were set by hand")
+	}
+
+	m = keys(t, m, "enter")
+	m = typed(t, clearField(t, m), "Fairouz")
+	m = keys(t, m, "enter")
+	for _, title := range []string{"Flow", "The Wanderer", "Along Our Way"} {
+		if got := trackNamed(t, hook.Library, title); got.ArtistLatin != "Fairouz" || got.Artist != "فيروز" {
+			t.Errorf("%s: artist %q, form %q", title, got.Artist, got.ArtistLatin)
+		}
+	}
+	contains(t, m, "Fairouz", "Changed 3 tracks")
+}
+
+func TestTheLatinGenreOnlyReachesTheTracksThatHaveAGenre(t *testing.T) {
+	m, hook := editingModel(t, "Flow")
+	m = toArtistFields(t, m, fLatinGenre)
+	m = keys(t, m, "enter")
+	if m.editing || hook.manyCalls != 0 {
+		t.Errorf("editing %v: no track has a genre to write in Latin letters", m.editing)
+	}
+	contains(t, m, "no genre")
+
+	m = withEdits(t, m, hook, map[string]app.Edit{"Flow": {Genre: ptr("طرب")}})
+	m = toArtistFields(t, m, fLatinGenre)
+	m = keys(t, m, "enter")
+	m = typed(t, clearField(t, m), "Tarab")
+	m = keys(t, m, "enter")
+	if got := trackNamed(t, hook.Library, "Flow").GenreLatin; got != "Tarab" {
+		t.Errorf("Flow has the form %q", got)
+	}
+	contains(t, m, "Changed 1 track")
+}

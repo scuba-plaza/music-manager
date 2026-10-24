@@ -225,6 +225,17 @@ func (m Model) updateGroupFields(msg tea.KeyMsg, r Row) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// anyHas reports whether any of the tracks has the name that the Latin field f
+// is the form of.
+func anyHas(ts []manifest.Track, f fieldKind) bool {
+	for _, t := range ts {
+		if trueName(t, f) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // isNameField reports whether the field is the name of the group, which may not
 // be empty.
 func isNameField(f fieldKind) bool { return f == fArtist || f == fAlbum || f == fPlaylistName }
@@ -242,7 +253,12 @@ func (m *Model) startGroupEdit(r Row) tea.Cmd {
 	if !ok || g.kind == kindPlaylist {
 		return nil
 	}
-	m.dr = newGroupDraft(g, m.curField())
+	f := m.curField()
+	if f.isLatin() && !anyHas(g.tracks, f) {
+		m.say("There is no "+strings.ToLower(f.label())+" to write in Latin letters", false)
+		return nil
+	}
+	m.dr = newGroupDraft(g, f)
 	m.prefilled = false
 	m.in[0], m.in[1] = newInput(m.dr.text), newInput("")
 	if m.dr.mixed {
@@ -295,6 +311,9 @@ func (m Model) commitGroup(r Row) (tea.Model, tea.Cmd) {
 	edits := map[string]app.Edit{}
 	var ids []string
 	for _, t := range g.tracks {
+		if f.isLatin() && trueName(t, f) == "" {
+			continue // a form of nothing
+		}
 		if changes(t, e) {
 			edits[t.ID] = e
 			ids = append(ids, t.ID)
