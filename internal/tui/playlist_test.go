@@ -29,7 +29,7 @@ func TestThePlaylistsOfTheLibraryAreInTheTree(t *testing.T) {
 	contains(t, m, "Playlists")
 	notInTree(t, m, "Study") // closed
 
-	m = keys(t, m, "right", "down", "right") // open the group, then the playlist
+	m = keys(t, m, "right", "down", "enter") // open the group, then the playlist
 	contains(t, m, "Study", "Flow", "Dream")
 	s := screen(m)
 	if strings.Index(s, "Flow") > strings.Index(s, "Dream") {
@@ -146,7 +146,7 @@ func TestPNeedsSomethingToAdd(t *testing.T) {
 // playlist.
 func openStudy(t *testing.T, m Model) Model {
 	t.Helper()
-	return keys(t, m, "right", "down", "right")
+	return keys(t, m, "right", "down", "enter") // open the group of playlists, then Study
 }
 
 func TestDTakesATrackOutOfAPlaylistButNotOutOfTheLibrary(t *testing.T) {
@@ -175,7 +175,7 @@ func TestDInAPlaylistActsOnTheMarkedTracksThatAreInIt(t *testing.T) {
 	m = selectTrack(t, m, "Flow")
 	m = keys(t, m, "space")
 
-	m = keys(t, m, "g", "right", "down", "right", "down", "d") // into Study, onto its first track
+	m = keys(t, m, "g", "right", "down", "enter", "down", "d") // into Study, onto its first track
 	if got := playlistTitles(t, lib, "Study"); len(got) != 0 {
 		t.Errorf("Study = %v, want it empty: both its tracks were marked", got)
 	}

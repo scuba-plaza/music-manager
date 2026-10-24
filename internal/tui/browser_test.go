@@ -59,19 +59,19 @@ func TestUpAndDownMoveAndStopAtTheEnds(t *testing.T) {
 	}
 }
 
-func TestRightOpensLeftClosesAndThenGoesToTheParent(t *testing.T) {
+func TestEnterOpensLeftClosesAndThenGoesToTheParent(t *testing.T) {
 	m, _ := browserModel(t, 120, 36)
 	m = keys(t, m, "down", "down", "down") // Shawn James
-	m = keys(t, m, "right")
+	m = keys(t, m, "enter")
 	contains(t, m, "Shadows")
 	lacks(t, m, "Flow")
-	m = keys(t, m, "right") // already open: step into the first child
+	m = keys(t, m, "down") // an open row is followed by its first child
 	if got := selectedLabel(t, m); got != "Shadows" {
 		t.Fatalf("selected %q, want the album", got)
 	}
-	m = keys(t, m, "right")
+	m = keys(t, m, "enter")
 	contains(t, m, "The Wanderer", "Flow", "Along Our Way")
-	m = keys(t, m, "right")
+	m = keys(t, m, "down")
 	if got := selectedLabel(t, m); got != "The Wanderer" {
 		t.Fatalf("selected %q, want the first track", got)
 	}
@@ -224,7 +224,7 @@ func TestTypingInTheFilterIsNotTakenForCommands(t *testing.T) {
 
 func TestTheSelectionSurvivesAReload(t *testing.T) {
 	m, lib := browserModel(t, 120, 36)
-	m = keys(t, m, "down", "down", "down", "right", "right", "right", "right") // The Wanderer
+	m = keys(t, m, "down", "down", "down", "enter", "down", "enter", "down") // open Shawn James and Shadows, then The Wanderer
 	if got := selectedLabel(t, m); got != "The Wanderer" {
 		t.Fatalf("setup: %q", got)
 	}
@@ -244,7 +244,7 @@ func TestHeaderCountsTracksAndWhatNeedsWork(t *testing.T) {
 
 func TestTheInspectorShowsTheSelectedTrack(t *testing.T) {
 	m, _ := browserModel(t, 120, 36)
-	m = keys(t, m, "down", "down", "down", "right", "right", "right", "right") // The Wanderer
+	m = keys(t, m, "down", "down", "down", "enter", "down", "enter", "down") // open Shawn James and Shadows, then The Wanderer
 	if got := selectedLabel(t, m); got != "The Wanderer" {
 		t.Fatalf("setup: %q", got)
 	}
@@ -256,7 +256,7 @@ func TestTheInspectorSummarisesArtistsAlbumsAndGroups(t *testing.T) {
 	contains(t, m, "not been identified")  // Needs work is selected
 	m = keys(t, m, "down", "down", "down") // Shawn James
 	contains(t, m, "Shawn James", "3 tracks", "1 album")
-	m = keys(t, m, "right", "right")
+	m = keys(t, m, "enter", "down")
 	contains(t, m, "Shadows", "3 tracks")
 }
 

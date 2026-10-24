@@ -55,7 +55,7 @@ func TestAnArtistRowShowsItsAlbumsAndSingles(t *testing.T) {
 
 func TestAnAlbumRowListsItsTracksInOrderWithTheirNumbers(t *testing.T) {
 	m, _ := browserModel(t, 120, 36)
-	m = keys(t, m, "down", "down", "down", "right", "right") // the album Shadows
+	m = keys(t, m, "down", "down", "down", "enter", "down") // open the artist, then the album Shadows
 	if got := selectedLabel(t, m); got != "Shadows" {
 		t.Fatalf("setup: %q", got)
 	}
@@ -96,7 +96,7 @@ func TestALongListEndsWithHowManyMoreThereAre(t *testing.T) {
 	}
 	seed(t, a, specs...)
 	m := newTestModel(t, NewLibrary(a), 120, 16)
-	m = keys(t, m, "right", "right") // the album
+	m = keys(t, m, "enter", "down") // open the artist, then the album
 	if got := selectedLabel(t, m); got != "Long" {
 		t.Fatalf("setup: %q", got)
 	}
@@ -120,11 +120,11 @@ func TestThePaneIsNamedForWhatItShows(t *testing.T) {
 	if !strings.Contains(title(), "Artist") {
 		t.Errorf("on an artist: %q", title())
 	}
-	m = keys(t, m, "right", "right")
+	m = keys(t, m, "enter", "down")
 	if !strings.Contains(title(), "Album") {
 		t.Errorf("on an album: %q", title())
 	}
-	m = keys(t, m, "right", "right")
+	m = keys(t, m, "enter", "down")
 	if !strings.Contains(title(), "Details") {
 		t.Errorf("on a track: %q", title())
 	}
