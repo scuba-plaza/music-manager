@@ -128,7 +128,9 @@ func (c *copyList) key(m *Model, msg tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 		m.overlay = nil
-		*m = m.copied(c.t, attrs)
+		var cmd tea.Cmd
+		*m, cmd = m.copied(c.t, attrs)
+		return cmd
 	}
 	return nil
 }

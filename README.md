@@ -56,6 +56,7 @@ matter right now. Without a terminal, plain `mm` prints help as before.
 | `[` `]` `{` `}` `0` `p` | on a cut: nudge by 0.1 s / 1 s, clear, hear the 8 s around it (needs `ffplay` or `mpv`) |
 | `space` `ctrl+a` `e` | mark tracks (an album marks all of its tracks); `e` edits the marked ones in one form, which has the Latin forms of the artist, album and genre too (with nothing marked, `e` is `→`) |
 | `J` `K` `n` | move a track down or up in its album; number the album 1…N |
+| `c` `v` | copy attributes of a track and paste them on others (see below); `v` also pastes a picture copied outside, as the cover |
 | `p` | add the marked tracks (or the selected track, album or artist) to a playlist, or start a new one. The **Playlists** group at the top of the tree opens into each playlist and its tracks in play order; there `J` `K` reorder, `d` takes a track out of the playlist (never out of the library), `d` on the playlist itself deletes it after asking, and `→` edits its name and its Latin name |
 | `i` `I` `o` | find a track on MusicBrainz and pick the match; do all unidentified tracks; use the file's old tags |
 | `a` | add from a YouTube link: one form, pre-filled from the match |
@@ -131,6 +132,14 @@ To rename an artist or fix an album you do not go from track to track: press `�
 * **What a field shows** is what all the tracks agree on. If they differ it says `(mixed)` and opens empty: leaving it empty keeps every track as it is, `-` clears the field on all of them, and any other text is set on all of them. A field that all the tracks agree on is cleared by emptying it. A Latin form is dim while it is worked out and normal once it was set by hand; it is only written on the tracks that have a name to write.
 * **Names cannot be empty**, and a name that is already another artist's (or the same artist's album) joins the two: the pane says `joins the artist Phoria (4 tracks)` while you type. To turn tracks into singles, mark them and use `e` with `-` in Album. The cursor and the open albums follow the new name.
 * **The cover of an album** is a JPEG or PNG file, set on every track of the album; an empty path or `x` takes the covers away. A playlist's name must not be another playlist's or give the same file name; the pane says so and nothing changes.
+
+## Copying and pasting
+
+`c` copies attributes of a track, `v` pastes them on another: a cover that one song of an album lacks is copied from its neighbour in two steps.
+
+* **What is copied.** In the fields of a track, `c` copies the field the cursor is on: the cover, the artist, the album, the number of tracks on the album, the release date or the genre. In the tree, `c` on a track opens a checklist of what it has, all ticked: `space` ticks and unticks, `enter` copies what is ticked. An attribute the track has none of cannot be ticked, so a paste never wipes anything. A name takes the form in Latin letters that was set by hand along with it, since that form belongs to the name. The title, the track number and the audio settings belong to the track and are never copied.
+* **Where it is pasted.** `v` pastes on the marked tracks if any are marked, otherwise on the track under the cursor, or on all the tracks of the album or artist under the cursor (whatever the filter shows). It is one step for `u` to undo and says what it did; if the tracks have the same values already it changes nothing. What was copied stays until something else is copied or `mm` is left.
+* **A picture from outside.** Copy a PNG or JPEG file in a file manager, or a picture in a browser or an image viewer, then press `v` on a track, an album, an artist or marked tracks: the picture becomes their cover. A picture copied outside after the last `c` is the one `v` pastes; otherwise what `c` copied. The clipboard of the desktop is read with `wl-paste` (Wayland) or `xclip` (X11), which the Nix package brings along; other picture formats (WebP, GIF…) are refused with a message, since a cover is a JPEG or a PNG.
 
 ## Latin forms
 

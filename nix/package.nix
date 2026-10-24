@@ -4,6 +4,8 @@
   makeWrapper,
   yt-dlp,
   ffmpeg,
+  wl-clipboard,
+  xclip,
   version,
   commit,
 }:
@@ -35,10 +37,11 @@ buildGoModule {
 
   nativeBuildInputs = [ makeWrapper ];
 
-  # yt-dlp and ffmpeg are only fallbacks, appended to PATH: one the user
-  # already has, say a newer yt-dlp, is found first.
+  # yt-dlp, ffmpeg and the programs that read the clipboard (for pasting a
+  # cover picture) are only fallbacks, appended to PATH: one the user already
+  # has, say a newer yt-dlp, is found first.
   postInstall = ''
-    wrapProgram $out/bin/mm --suffix PATH : ${lib.makeBinPath [ yt-dlp ffmpeg ]}
+    wrapProgram $out/bin/mm --suffix PATH : ${lib.makeBinPath [ yt-dlp ffmpeg wl-clipboard xclip ]}
 
     mkdir -p $out/share/bash-completion/completions $out/share/zsh/site-functions $out/share/fish/vendor_completions.d
     $out/bin/mm completion bash > $out/share/bash-completion/completions/mm

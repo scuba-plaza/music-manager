@@ -72,7 +72,9 @@ type Model struct {
 	editErr   string
 
 	// What c copied, for v to paste.
-	clip *clipboard
+	clip *clipContents
+	// The clipboard of the desktop, if it can be read: v pastes a picture from it.
+	sys SystemClipboard
 
 	// Everything that can be undone, and redone.
 	undoStack, redoStack []change
@@ -264,6 +266,11 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.restored(msg)
 	case changedMsg:
 		return m.changed(msg)
+	case desktopMsg:
+		return m.pasteDesktop(msg)
+	case seenMsg:
+		msg.clip.seen = msg.seen
+		return m, nil
 	case playlistsMsg:
 		return m.playlistsEdited(msg)
 	case removedMsg:

@@ -165,3 +165,9 @@ func TestTheHelpDialogStaysWhereItIsWhenThePagesTurn(t *testing.T) {
 		}
 	}
 }
+
+func TestTheHelpTeachesCopyAndPaste(t *testing.T) {
+	m, _ := editingModel(t, "Flow")
+	m = keys(t, m, "?", "3")
+	contains(t, m, "Copy and paste", "copy the cover, artist, album", "a picture copied outside")
+}

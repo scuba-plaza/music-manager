@@ -64,6 +64,10 @@ var helpPages = []helpPage{
 			{"ctrl+a", "mark everything shown"},
 			{"e", "edit the marked tracks together"},
 		}},
+		{"Copy and paste", []helpEntry{
+			{"c", "copy the cover, artist, album… of a track"},
+			{"v", "paste them, or a picture copied outside"},
+		}},
 		{"Order and playlists", []helpEntry{
 			{"J K", "move a track down / up"},
 			{"n", "number an album 1…N"},

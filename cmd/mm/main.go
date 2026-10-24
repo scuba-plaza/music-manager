@@ -10,6 +10,7 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/cli"
+	"music-manager/internal/clipboard"
 	"music-manager/internal/musicbrainz"
 	"music-manager/internal/prompt"
 	"music-manager/internal/tui"
@@ -32,7 +33,7 @@ func main() {
 	if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 		deps.Prompter = prompt.New(os.Stdin, os.Stderr)
 		deps.RunTUI = func(ctx context.Context, a *app.App, wolfgang bool) error {
-			opts := []tui.Option{tui.WithPlayer(tui.DetectPlayer())}
+			opts := []tui.Option{tui.WithPlayer(tui.DetectPlayer()), tui.WithClipboard(clipboard.Detect())}
 			if wolfgang {
 				opts = append(opts, tui.WithWolfgang())
 			}
