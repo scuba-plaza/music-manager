@@ -71,6 +71,9 @@ type Model struct {
 	inFocus   int
 	editErr   string
 
+	// What c copied, for v to paste.
+	clip *clipboard
+
 	// Everything that can be undone, and redone.
 	undoStack, redoStack []change
 
@@ -342,6 +345,10 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.markAll()
 	case key.Matches(msg, k.EditMany):
 		return m.openBulk()
+	case key.Matches(msg, k.Copy):
+		return m.openCopy()
+	case key.Matches(msg, k.Paste):
+		return m.paste()
 	case key.Matches(msg, k.Remove):
 		return m.openRemove()
 	case key.Matches(msg, k.Help):

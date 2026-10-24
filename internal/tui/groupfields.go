@@ -216,6 +216,8 @@ func (m Model) updateGroupFields(msg tea.KeyMsg, r Row) (tea.Model, tea.Cmd) {
 		m.gfield = max(m.gfield-1, 0)
 	case key.Matches(msg, k.Down):
 		m.gfield = min(m.gfield+1, len(groupFields(r.Kind))-1)
+	case key.Matches(msg, k.Paste):
+		return m.paste()
 	case key.Matches(msg, k.Edit):
 		return m, m.startEdit()
 	case key.Matches(msg, k.RemoveCover) && m.curField() == fCover:

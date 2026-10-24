@@ -59,6 +59,10 @@ func (m Model) updateInspector(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.field = max(m.field-1, 0)
 	case key.Matches(msg, k.Down):
 		m.field = min(m.field+1, m.lastField())
+	case key.Matches(msg, k.Copy):
+		return m.copyField()
+	case key.Matches(msg, k.Paste):
+		return m.paste()
 	case key.Matches(msg, k.Edit):
 		return m, m.startEdit()
 	case key.Matches(msg, k.Help):

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -226,6 +227,12 @@ func (m Model) footerKeys() []key.Binding {
 		if m.filter != "" {
 			bindings = append(bindings, k.ClearFilter)
 		}
+	}
+	if paste, ok := m.pasteKey(); ok { // near the front, so that it is the last to go
+		bindings = slices.Insert(bindings, min(2, len(bindings)), paste)
+	}
+	if r, ok := m.selectedRow(); ok && r.Kind == kindTrack {
+		bindings = append(bindings, k.Copy)
 	}
 	if len(m.undoStack) > 0 {
 		bindings = append(bindings, k.Undo)

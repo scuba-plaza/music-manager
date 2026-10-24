@@ -67,6 +67,9 @@ type keyMap struct {
 	Renumber                  key.Binding
 	Playlist                  key.Binding
 
+	// copying attributes of a track, and pasting them
+	Copy, Paste key.Binding
+
 	// inside the playlists, where d, e and J K mean something else
 	TakeOut, DeletePlaylist key.Binding
 
@@ -146,6 +149,8 @@ func newKeyMap() keyMap {
 		MoveUp:     key.NewBinding(key.WithKeys("K")),
 		Renumber:   key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "number")),
 		Playlist:   key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "playlist")),
+		Copy:       key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy")),
+		Paste:      key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "paste")),
 
 		TakeOut:        key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "take out")),
 		DeletePlaylist: key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "delete")),

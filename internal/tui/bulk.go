@@ -110,6 +110,7 @@ func changes(t manifest.Track, e app.Edit) bool {
 		e.ArtistLatin != nil && t.ArtistLatin != *e.ArtistLatin,
 		e.AlbumLatin != nil && t.AlbumLatin != *e.AlbumLatin,
 		e.GenreLatin != nil && t.GenreLatin != *e.GenreLatin,
+		e.Cover != nil && t.CoverSHA256 != *e.Cover,
 		e.TrimStart != nil && t.TrimStart != *e.TrimStart,
 		e.TrimEnd != nil && t.TrimEnd != *e.TrimEnd:
 		return true
