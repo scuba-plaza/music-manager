@@ -14,6 +14,9 @@ export const S = {
   field: 0,          // the field under the cursor in the inspector
   tab: Number(safeGet('mm.tab') || 0),
   detail: null,      // what the right pane shows for the cursor: {kind: 'track'|'peek', ...}
+  history: { undo: '', redo: '', clip: '' }, // what u and ctrl+r would do, and what v would paste
+  edit: null,        // the field being typed in: see edits.js
+  playing: null,     // the preview that is sounding: { id, field }
   status: { text: '', kind: '' },
   overlay: null,
   busy: false,

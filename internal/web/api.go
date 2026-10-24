@@ -60,6 +60,7 @@ func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 		"stamp":    stamp,
 		"view":     browse.Library(snap, o),
 		"unsynced": map[string]any{"n": n, "known": known},
+		"history":  s.ed.History(),
 	})
 }
 

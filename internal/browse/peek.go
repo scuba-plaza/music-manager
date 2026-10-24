@@ -23,13 +23,19 @@ type ListRow struct {
 // PeekView is what the inspector shows for a row that is not a track: a
 // summary and the list of what is inside.
 type PeekView struct {
-	Kind     string    `json:"kind"`
-	Title    string    `json:"title"`
-	Label    string    `json:"label"`
-	Editable bool      `json:"editable"`
-	Info     []string  `json:"info"`
-	Path     string    `json:"path,omitempty"` // where a playlist is written
-	List     []ListRow `json:"list"`
+	Kind     string   `json:"kind"`
+	Title    string   `json:"title"`
+	Label    string   `json:"label"`
+	Editable bool     `json:"editable"`
+	Info     []string `json:"info"`
+	// Fields and Note are the fields of an artist, album or playlist, and what an edit of them reaches.
+	Fields []FieldView `json:"fields,omitempty"`
+	Note   string      `json:"note,omitempty"`
+	Path   string      `json:"path,omitempty"` // where a playlist is written
+	// CoverTrack is a track of an artist or album whose cover stands for the group, with that cover's hash.
+	CoverTrack string    `json:"coverTrack,omitempty"`
+	CoverSha   string    `json:"coverSha,omitempty"`
+	List       []ListRow `json:"list"`
 }
 
 // Peek describes the row with the given key as the library view for the same
@@ -48,6 +54,15 @@ func Peek(s Snapshot, key, filter string) (PeekView, bool) {
 	}
 	v := PeekView{Kind: r.Kind.String(), Label: r.Label, Title: peekTitle(r), Info: []string{}, List: []ListRow{}}
 	v.Editable = r.Kind == kindPlaylist || r.Kind == kindArtist || (r.Kind == kindAlbum && r.Album != "")
+	if g, ok := groupOf(s, key); ok && v.Editable {
+		v.Fields, v.Note = groupFieldViews(g), groupNote(g)
+		for _, t := range g.tracks {
+			if t.CoverSHA256 != "" {
+				v.CoverTrack, v.CoverSha = t.ID, t.CoverSHA256
+				break
+			}
+		}
+	}
 	switch r.Kind {
 	case kindGroup:
 		if r.Key == playlistsKey {

@@ -44,10 +44,26 @@ function key(k, d) { return [k, d]; }
 export function currentHints() {
   if (S.overlay) return S.overlay.hints ? S.overlay.hints() : [];
   if (document.activeElement === $('filter')) return [key('enter', 'keep'), key('esc', 'clear')];
-  if (S.focus === 'inspector') {
-    return [key('↑↓', 'field'), key('1-4', 'tabs'), key('esc', 'back'), key('?', 'help')];
+  if (S.edit) {
+    const hints = [key('enter', 'save'), key('esc', 'cancel')];
+    if (S.edit.hasSecond) hints.splice(1, 0, key('tab', 'next'));
+    return hints;
   }
-  const hints = [key('↑↓', 'move'), key('→', 'open'), key('space', 'mark'), key('/', 'filter'), key('S', 'sort')];
+  const undo = S.history.undo ? [key('u', 'undo')] : [];
+  if (S.focus === 'inspector') {
+    const f = inspector.currentField();
+    const hints = [key('↑↓', 'field')];
+    if (S.detail && S.detail.kind === 'track') hints.push(key('1-4', 'tabs'));
+    if (f && f.key === 'cover') hints.push(key('enter', 'choose'), key('x', 'remove'));
+    else if (f && f.editable && f.key !== 'wolfgang') hints.push(key('enter', 'edit'));
+    if (f && ['cutStart', 'cutEnd', 'volume', 'fadeIn', 'fadeOut'].includes(f.key)) {
+      hints.push(key('[ ]', 'nudge'), key('0', 'clear'), key('p', S.playing ? 'stop' : 'hear'));
+    }
+    if (S.detail && S.detail.kind === 'track') hints.push(key('c', 'copy'));
+    return [...hints, key('v', 'paste'), ...undo, key('esc', 'back'), key('?', 'help')];
+  }
+  const hints = [key('↑↓', 'move'), key('→', 'fields'), key('space', 'mark'), key('e', 'edit'), key('d', 'remove'), key('p', 'playlist')];
+  hints.push(key('/', 'filter'), key('S', 'sort'), ...undo);
   if (S.filter) hints.push(key('esc', 'clear filter'));
   else if (S.marks.size) hints.push(key('esc', 'clear marks'));
   hints.push(key('?', 'help'));
@@ -68,7 +84,9 @@ export function renderFocus() {
 // ---- loading
 
 let librarySeq = 0;
-export async function loadLibrary() {
+// loadLibrary asks for the library again. After a change, moves says which rows
+// were renamed, and reveal which track to put the cursor on.
+export async function loadLibrary({ moves, reveal } = {}) {
   const seq = ++librarySeq;
   try {
     const res = await get('/api/library' + query({ q: S.filter.trim(), sort: S.sort.key, reverse: S.sort.key && S.sort.reverse }));
@@ -76,11 +94,14 @@ export async function loadLibrary() {
     S.lib = res.view;
     S.stamp = res.stamp;
     S.unsynced = res.unsynced;
+    S.history = res.history || S.history;
     S.sort = { key: res.view.sort.key, reverse: res.view.sort.reverse };
     if (!S.filter.trim() && !S.lib.sort.key) {
       const have = new Set(S.lib.rows.filter((r) => r.trackId).map((r) => r.trackId));
       for (const id of [...S.marks]) if (!have.has(id)) S.marks.delete(id);
     }
+    if (moves) tree.applyMoves(moves);
+    if (reveal) tree.showTrack(reveal);
     renderHeader();
     tree.renderTree();
     await loadDetail();
@@ -116,17 +137,28 @@ export async function loadDetail() {
     if (seq !== detailSeq) return;
     S.detail = { kind: 'error', message: err.message };
   }
-  const max = S.detail.kind === 'track' ? inspector.fieldsOfTab(S.detail.data).length - 1 : 0;
-  S.field = Math.min(S.field, Math.max(max, 0));
+  S.field = Math.min(S.field, Math.max(inspector.fieldList().length - 1, 0));
+  if (S.edit) return; // the person is typing in it: the new text waits for the end
   inspector.renderInspector();
   renderHints();
 }
 
-tree.hooks.cursorChanged = () => { scheduleDetail(); renderHints(); };
+// edits.js fills these in: what a second click on a field does.
+export const hooks = { editField() {}, stopPlaying: () => false };
+
+tree.hooks.cursorChanged = () => { S.edit = null; scheduleDetail(); renderHints(); };
 tree.hooks.structureChanged = () => renderHints();
 inspector.hooks.gotoKey = (k) => tree.reveal(k);
 inspector.hooks.tabChosen = () => { inspector.renderInspector(); renderHints(); };
-inspector.hooks.fieldChosen = (i) => { S.focus = 'inspector'; S.field = i; renderFocus(); inspector.renderInspector(); renderHints(); };
+inspector.hooks.fieldChosen = (i) => {
+  const again = S.focus === 'inspector' && S.field === i && !S.edit;
+  S.focus = 'inspector';
+  S.field = i;
+  renderFocus();
+  inspector.renderInspector();
+  renderHints();
+  if (again) hooks.editField();
+};
 
 // ---- moving
 
@@ -136,7 +168,7 @@ export const page = (dir) => tree.moveBy(dir * tree.pageSize());
 export function open() {
   const row = tree.cursorRow();
   if (!row) return;
-  if (row.kind === 'track') return focusInspector();
+  if (focusInspector()) return; // a track, an artist, an album or a playlist: its fields
   if (!tree.isOpen(row)) tree.toggle(row, true);
   else {
     const child = tree.firstChild(row);
@@ -162,13 +194,21 @@ export function enter() {
   else tree.toggle(row);
 }
 
+// focusInspector gives the keyboard to the right pane if what the cursor is on
+// has fields: a track, or an artist, an album or a playlist. The fields of a
+// group start at the first one.
 export function focusInspector() {
   const row = tree.cursorRow();
-  if (!row || row.kind !== 'track' || !S.detail || S.detail.kind !== 'track') return;
+  if (!row || !S.detail) return false;
+  const track = row.kind === 'track' && S.detail.kind === 'track';
+  const group = row.kind !== 'track' && S.detail.kind === 'peek' && S.detail.data.editable;
+  if (!track && !group) return false;
+  if (group && S.focus !== 'inspector') S.field = 0;
   S.focus = 'inspector';
   renderFocus();
   inspector.renderInspector();
   renderHints();
+  return true;
 }
 
 export function focusTree() {
@@ -186,8 +226,8 @@ export function toggleFocus() {
 // ---- the inspector
 
 export function moveField(n) {
-  if (!S.detail || S.detail.kind !== 'track') return;
-  const count = inspector.fieldsOfTab(S.detail.data).length;
+  const count = inspector.fieldList().length;
+  if (count === 0) return;
   S.field = Math.min(Math.max(S.field + n, 0), count - 1);
   inspector.renderInspector();
 }
@@ -226,6 +266,7 @@ export function markAll() {
 }
 
 export function escape() {
+  if (hooks.stopPlaying()) return;
   if (S.focus === 'inspector') return focusTree();
   if (S.filter) return setFilter('');
   if (S.marks.size) {

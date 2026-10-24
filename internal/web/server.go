@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"music-manager/internal/app"
+	"music-manager/internal/browse"
 	"music-manager/internal/version"
 )
 
@@ -39,6 +40,7 @@ type Server struct {
 
 	infoMu    sync.Mutex
 	coverInfo map[string]string
+	ed        *browse.Editor
 }
 
 // Option adds a capability to the server.
@@ -55,7 +57,7 @@ func WithWolfgang() Option { return func(v *Server) { v.wolfgang = true } }
 
 // New returns the server for a library.
 func New(a *app.App, opts ...Option) *Server {
-	s := &Server{app: a, hub: newHub(), mux: http.NewServeMux(), coverInfo: map[string]string{}}
+	s := &Server{app: a, hub: newHub(), mux: http.NewServeMux(), coverInfo: map[string]string{}, ed: browse.NewEditor(a)}
 	for _, o := range opts {
 		o(s)
 	}
@@ -80,6 +82,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/tracks/{id}/cover", s.cover)
 	s.mux.HandleFunc("GET /api/peek", s.peek)
 	s.mux.HandleFunc("GET /api/events", s.hub.serve)
+	s.editRoutes()
 }
 
 // Serve answers requests on ln until ctx is done, and watches the library for

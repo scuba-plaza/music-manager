@@ -1,13 +1,14 @@
 import { S } from './state.js';
 import * as a from './actions.js';
 import * as tree from './tree.js';
+import * as e from './edits.js';
 
 // The keys, as the terminal interface had them. A key means different things
 // in the tree and in the inspector; the footer hints follow the same rules.
 
-function keyName(e) {
-  if (e.ctrlKey) return 'ctrl+' + e.key.toLowerCase();
-  return e.key;
+function keyName(ev) {
+  if (ev.ctrlKey) return 'ctrl+' + ev.key.toLowerCase();
+  return ev.key;
 }
 
 const common = {
@@ -35,52 +36,57 @@ const treeKeys = {
   '-': tree.closeAll,
   ' ': a.toggleMark,
   'ctrl+a': a.markAll,
-  e: notYet('Editing'), c: notYet('Copy'), v: notYet('Paste'), d: notYet('Removing'),
-  J: notYet('Moving a track'), K: notYet('Moving a track'), n: notYet('Numbering'), p: notYet('Playlists'),
+  e: e.bulkEdit, c: e.copyKey, v: e.paste, d: e.remove, Delete: e.remove,
+  J: () => e.moveTrack(1), K: () => e.moveTrack(-1), n: e.renumber, p: e.playlistKey,
   i: notYet('Identify'), I: notYet('Identify'), o: notYet('Adopting old tags'),
   a: notYet('Adding'), s: notYet('Sync'), D: notYet('The library check'),
-  u: notYet('Undo'), 'ctrl+r': notYet('Redo'),
+  u: e.undo, 'ctrl+r': e.redo,
 };
+
+// a track has tabs to turn to; an artist, an album or a playlist has only its fields
+const onTrack = () => S.detail && S.detail.kind === 'track';
+const left = () => (onTrack() && S.tab > 0 ? a.nextTab(-1) : a.focusTree());
+const right = () => { if (onTrack()) a.nextTab(1); };
+const tab = (i) => () => { if (onTrack()) a.chooseTab(i); };
 
 const inspectorKeys = {
   ArrowUp: () => a.moveField(-1), k: () => a.moveField(-1),
   ArrowDown: () => a.moveField(1), j: () => a.moveField(1),
-  ArrowLeft: () => (S.tab === 0 ? a.focusTree() : a.nextTab(-1)), h: () => (S.tab === 0 ? a.focusTree() : a.nextTab(-1)),
-  ArrowRight: () => a.nextTab(1), l: () => a.nextTab(1),
-  1: () => a.chooseTab(0), 2: () => a.chooseTab(1), 3: () => a.chooseTab(2), 4: () => a.chooseTab(3),
-  Enter: notYet('Editing'), c: notYet('Copy'), v: notYet('Paste'), p: notYet('Playing'),
-  '[': notYet('Nudging'), ']': notYet('Nudging'), '{': notYet('Nudging'), '}': notYet('Nudging'), 0: notYet('Clearing'),
-  x: notYet('Removing the cover'), i: notYet('Identify'), o: notYet('Adopting old tags'),
-  a: notYet('Adding'), s: notYet('Sync'), D: notYet('The library check'), u: notYet('Undo'), 'ctrl+r': notYet('Redo'),
+  ArrowLeft: left, h: left, ArrowRight: right, l: right,
+  1: tab(0), 2: tab(1), 3: tab(2), 4: tab(3),
+  Enter: e.startEdit, c: e.copyKey, v: e.paste, p: e.play,
+  '[': () => e.nudge(-1, false), ']': () => e.nudge(1, false), '{': () => e.nudge(-1, true), '}': () => e.nudge(1, true), 0: e.clearField,
+  x: e.removeCover, i: notYet('Identify'), o: notYet('Adopting old tags'),
+  a: notYet('Adding'), s: notYet('Sync'), D: notYet('The library check'), u: e.undo, 'ctrl+r': e.redo,
 };
 
-export function onKeydown(e) {
-  if (e.metaKey || e.altKey || e.isComposing) return;
+export function onKeydown(ev) {
+  if (ev.metaKey || ev.altKey || ev.isComposing) return;
   if (S.overlay) {
-    if (S.overlay.onKey(e)) e.preventDefault();
+    if (S.overlay.onKey(ev)) ev.preventDefault();
     return;
   }
   const el = document.activeElement;
-  if (el && el.id === 'filter') return filterKey(e);
+  if (el && el.id === 'filter') return filterKey(ev);
   if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
-  a.clearStatus();
-  const k = keyName(e);
+  const k = keyName(ev);
   const handler = (S.focus === 'inspector' ? inspectorKeys[k] : treeKeys[k]) || common[k];
-  if (handler) {
-    e.preventDefault();
-    handler();
-  }
+  if (!handler) return;
+  ev.preventDefault();
+  if (S.busy) return; // a change is on its way: keys wait, as they did in the terminal
+  a.clearStatus();
+  handler();
 }
 
-function filterKey(e) {
+function filterKey(ev) {
   const box = document.getElementById('filter');
-  if (e.key === 'Enter' || e.key === 'ArrowDown') {
-    e.preventDefault();
+  if (ev.key === 'Enter' || ev.key === 'ArrowDown') {
+    ev.preventDefault();
     box.blur();
     document.getElementById('tree').focus({ preventScroll: true });
     a.renderHints();
-  } else if (e.key === 'Escape') {
-    e.preventDefault();
+  } else if (ev.key === 'Escape') {
+    ev.preventDefault();
     box.blur();
     document.getElementById('tree').focus({ preventScroll: true });
     a.setFilter('');

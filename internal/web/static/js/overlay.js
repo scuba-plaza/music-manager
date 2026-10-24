@@ -6,6 +6,7 @@ import { h, clear } from './dom.js';
 //   render(body)     fills the dialog; called again by redraw()
 //   onKey(e)         handles a key; returns true if it did
 //   hints()          the keys the footer shows while it is open
+//   afterDraw(dialog) optional: runs after each draw, to put the focus in an input
 //   onClose()        optional
 let lastFocus = null;
 
@@ -27,6 +28,7 @@ function draw(o) {
   o.render(body);
   clear(root()).append(dialog);
   dialog.focus({ preventScroll: true });
+  if (o.afterDraw) o.afterDraw(dialog);
   document.dispatchEvent(new CustomEvent('mm:hints'));
 }
 

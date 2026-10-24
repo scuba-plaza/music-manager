@@ -26,7 +26,9 @@ type FieldView struct {
 	Empty string `json:"empty,omitempty"`
 	// Dim marks a value that is not the track's own: it comes from the old
 	// tags of a track nobody has identified, or is a Latin form worked out.
-	Dim      bool `json:"dim,omitempty"`
+	Dim bool `json:"dim,omitempty"`
+	// Mixed says the tracks of a group differ in this field.
+	Mixed    bool `json:"mixed,omitempty"`
 	Editable bool `json:"editable"`
 	// Edit is what the input starts with: the text, and for the track number
 	// the number of tracks.
@@ -107,7 +109,7 @@ func Track(s Snapshot, id string, o TrackOptions) (TrackView, bool) {
 	_, title, _ := app.Display(t)
 	v := TrackView{
 		ID: t.ID, Title: title, Identified: t.Status == manifest.Identified, CoverSHA: t.CoverSHA256,
-		Path: layout.PathFor(t, device.Generic.Layout()), Dates: datesText(t), About: aboutText(t),
+		Path: pathOf(t), Dates: datesText(t), About: aboutText(t),
 		Reveal: ancestorKeys(t),
 	}
 	if t.CoverSHA256 != "" && o.CoverInfo != nil {
@@ -319,3 +321,6 @@ func counted(s string, width int) string {
 	}
 	return "· " + strconv.Itoa(utf8.RuneCountInString(s)) + " of " + strconv.Itoa(width)
 }
+
+// pathOf is where the file of a track goes in the library folder.
+func pathOf(t manifest.Track) string { return layout.PathFor(t, device.Generic.Layout()) }

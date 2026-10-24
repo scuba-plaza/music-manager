@@ -211,3 +211,45 @@ export function firstChild(row) {
   const next = rows[i + 1];
   return next && next.depth > row.depth ? next : null;
 }
+
+// applyMoves follows the rows a change renamed: a folder that was open stays
+// open under its new name, and the cursor stays on it.
+export function applyMoves(moves) {
+  for (const [from, to] of Object.entries(moves || {})) {
+    if (S.expanded.delete(from)) S.expanded.add(to);
+    if (S.cursor === from) S.cursor = to;
+  }
+  saveExpanded();
+}
+
+// showTrack puts the cursor on a track and opens the folders above it. A
+// cursor already on the track (in a playlist, say) stays on it.
+export function showTrack(id) {
+  let row = cursorRow();
+  if (!row || row.trackId !== id) row = rowByKey(`track\x1f${id}`);
+  if (!row) return;
+  for (let p = row.parent; p; p = (rowByKey(p) || {}).parent) S.expanded.add(p);
+  saveExpanded();
+  S.cursor = row.key;
+}
+
+// titles maps the IDs of the tracks in the rows to their titles.
+export function titles() {
+  const out = new Map();
+  for (const r of S.lib ? S.lib.rows : []) if (r.trackId && !out.has(r.trackId)) out.set(r.trackId, r.label);
+  return out;
+}
+
+// markedIds lists the marked tracks in the order of the rows, then any the rows do not show.
+export function markedIds() {
+  const out = [];
+  const seen = new Set();
+  for (const r of S.lib ? S.lib.rows : []) {
+    if (r.trackId && S.marks.has(r.trackId) && !seen.has(r.trackId)) {
+      seen.add(r.trackId);
+      out.push(r.trackId);
+    }
+  }
+  for (const id of S.marks) if (!seen.has(id)) out.push(id);
+  return out;
+}

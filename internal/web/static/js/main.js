@@ -3,6 +3,7 @@ import { get } from './api.js';
 import * as a from './actions.js';
 import * as tree from './tree.js';
 import { onKeydown } from './keys.js';
+import * as edits from './edits.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,6 +23,7 @@ async function boot() {
   $('sync-chip').addEventListener('click', () => a.notYet('Sync'));
   wireTree();
   wireSplit();
+  wirePictures();
   await a.loadLibrary();
   a.renderFocus();
   a.renderHints();
@@ -49,6 +51,7 @@ function wireTree() {
     if (!row) return;
     const r = tree.rowByKey(row.dataset.key);
     if (!r) return;
+    if (S.edit) edits.cancelEdit();
     a.focusTree();
     if (e.target.classList.contains('twist')) {
       tree.setCursor(r.key);
@@ -67,6 +70,38 @@ function wireTree() {
     if (r && !e.target.classList.contains('twist')) a.enter();
   });
   el.addEventListener('focus', () => { if (S.focus !== 'tree') a.focusTree(); });
+}
+
+// A picture pasted with Ctrl+V or dropped on the page becomes the cover of the
+// marked tracks, or of what the cursor is on.
+function wirePictures() {
+  const typing = () => /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
+  document.addEventListener('paste', (ev) => {
+    if (S.overlay || typing()) return;
+    const file = edits.pictureIn(ev.clipboardData && ev.clipboardData.files);
+    if (!file) return;
+    ev.preventDefault();
+    edits.pastePicture(file);
+  });
+  const carries = (ev) => ev.dataTransfer && [...ev.dataTransfer.types].includes('Files');
+  const body = document.body;
+  document.addEventListener('dragover', (ev) => {
+    if (!carries(ev) || S.overlay) return;
+    ev.preventDefault();
+    body.classList.add('dropping');
+  });
+  document.addEventListener('dragleave', (ev) => {
+    if (ev.relatedTarget === null) body.classList.remove('dropping');
+  });
+  document.addEventListener('drop', (ev) => {
+    if (!carries(ev)) return;
+    ev.preventDefault();
+    body.classList.remove('dropping');
+    if (S.overlay) return;
+    const file = edits.pictureIn(ev.dataTransfer.files);
+    if (file) edits.dropPicture(file);
+    else a.setStatus('Only a JPEG or PNG picture can be dropped here: it becomes a cover', 'bad');
+  });
 }
 
 // The line between the panes can be dragged; where it was left is remembered.

@@ -97,7 +97,7 @@ bdi { unicode-bidi: isolate; }
 hr { border: 0; border-top: 1px solid var(--rule); margin: 0.4em 0; }
 .note { color: var(--dim); margin: 0.2em 0 0.5em; overflow-wrap: anywhere; }
 .note.warn { color: var(--warn); }
-.fields { display: grid; grid-template-columns: 14ch minmax(0, 1fr); }
+.fields { display: grid; grid-template-columns: 18ch minmax(0, 1fr); }
 .fields .label { color: var(--dim); padding-left: 1.5ch; position: relative; white-space: nowrap; }
 .fields .value { overflow-wrap: anywhere; min-width: 0; padding-left: 1ch; }
 .fields .value.dim { color: var(--dim); }
@@ -105,8 +105,8 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: 0.4em 0; }
 .fields .label.cur { color: var(--accent); }
 .fields .label.cur::before { content: "▌"; color: var(--accent); position: absolute; left: 0; }
 .fields .span { grid-column: 2; padding-left: 1ch; }
-.hintline { color: var(--dim); font-size: 0.92em; }
-.cover-box { margin: 0.8em 0 0.4em 14ch; }
+.hintline { color: var(--dim); font-size: 0.92em; overflow-wrap: anywhere; }
+.cover-box { margin: 0.8em 0 0.4em 18ch; }
 .cover-box img { display: block; max-width: min(100%, 22em); max-height: 22em; border: 1px solid var(--rule); background: var(--bg); }
 .pathline { color: var(--accent); overflow-wrap: anywhere; }
 .pathline::before { content: "→ "; }
@@ -128,7 +128,8 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: 0.4em 0; }
 /* overlays */
 #overlay-root:empty { display: none; }
 #overlay-root { position: fixed; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 70%, transparent); z-index: 10; padding: 1em; }
-.dialog { position: relative; background: var(--panel); border: 1px solid var(--accent); width: min(72ch, 100%); max-height: 100%; overflow: auto; padding: 0.8em 1.5ch 0.6em; box-shadow: 0 0.5em 2em rgba(0, 0, 0, 0.45); }
+.dialog { position: relative; background: var(--panel); border: 1px solid var(--accent); width: min(72ch, 100%); max-height: 100%; padding: 0.8em 1.5ch 0.6em; box-shadow: 0 0.5em 2em rgba(0, 0, 0, 0.45); }
+.dialog > .body { overflow: auto; max-height: calc(100dvh - 6em); padding-top: 0.3em; }
 .dialog > h2 { position: absolute; top: -0.85em; left: 1.5ch; margin: 0; padding: 0 0.7ch; background: var(--bg); color: var(--accent); font-size: inherit; line-height: 1.5; }
 .dialog .keys { display: grid; grid-template-columns: 14ch minmax(0, 1fr); column-gap: 1.5ch; }
 .dialog .keys .k { color: var(--accent); white-space: nowrap; }
@@ -154,3 +155,31 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: 0.4em 0; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 .chip.plain { border-bottom: 0; color: var(--dim); }
 .chip.plain:hover { color: var(--accent); }
+
+/* typing in a field */
+input.edit { width: 100%; background: var(--bg); border: 1px solid var(--accent); padding: 0 0.7ch; outline: 0; min-width: 0; caret-color: var(--accent); }
+input.edit::placeholder { color: var(--dim); }
+input.edit.short { width: 7ch; }
+.pair { display: flex; align-items: baseline; gap: 0.5ch; }
+.pair input.edit:first-child { flex: 1; }
+.fields .value.editing { background: var(--sel); padding-right: 0.5ch; }
+.note-live { color: var(--accent); overflow-wrap: anywhere; font-size: 0.92em; }
+.note-live:empty, #edit-error:empty { display: none; }
+
+/* dialogs that ask or take input */
+.ask-head { font-weight: bold; margin: 0.2em 0 0.6em; overflow-wrap: anywhere; }
+.ask-body { color: var(--dim); margin: 0.2em 0; overflow-wrap: anywhere; }
+.ask-item { margin: 0; overflow-wrap: anywhere; }
+.buttons { display: flex; gap: 1.5ch; margin-top: 0.9em; }
+.btn { background: none; border: 1px solid var(--rule); padding: 0.1em 1.5ch; cursor: pointer; color: var(--fg); }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { border-color: var(--accent); color: var(--accent); }
+.form { display: grid; gap: 0.15em 1ch; margin: 0.6em 0; }
+.form .label { display: grid; grid-template-columns: 17ch minmax(0, 1fr); align-items: baseline; color: var(--dim); }
+.form .label:focus-within { color: var(--accent); }
+.bulk-summary { color: var(--accent); min-height: 1.45em; overflow-wrap: anywhere; }
+.bulk-summary.bad { color: var(--bad); }
+.menu .item.off > * { color: var(--dim); opacity: 0.6; }
+
+/* a file dragged over the page */
+body.dropping #app { outline: 2px dashed var(--accent); outline-offset: -6px; }
