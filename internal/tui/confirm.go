@@ -106,10 +106,6 @@ func (m Model) openRemove() (tea.Model, tea.Cmd) {
 	}
 	body = append(body, styles.dim.Render("Nothing is deleted from disk until you sync with prune, and u brings "+pronoun+" back until then."))
 
-	ids := make([]string, len(ts))
-	for i, t := range ts {
-		ids[i] = t.ID
-	}
 	m.overlay = &confirm{head: head, body: body, yesText: "remove", yes: func(m *Model) tea.Cmd {
 		m.busy = true
 		return m.removing(ts)

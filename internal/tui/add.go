@@ -201,8 +201,8 @@ func (d *addDialog) formLines(w int) []string {
 	track, of := d.in[addTrack], d.in[addOf]
 	track.Width, of.Width = 5, 5
 	trackLabel := label(addTrack, "Track")
-	if d.focus == addOf {
-		trackLabel = label(addTrack, "Track")
+	if d.focus == addOf { // the label belongs to both inputs of the row
+		trackLabel = label(addOf, "Track")
 	}
 	lines = append(lines, " "+trackLabel+" "+track.View()+styles.dim.Render(" of ")+of.View())
 	row(addReleased, "Released")

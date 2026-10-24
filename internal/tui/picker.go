@@ -232,9 +232,6 @@ func (p *picker) lines(w int) []string {
 		lines = append(lines, " "+styles.dim.Render(fmt.Sprintf("%s for %s", plural(len(p.cands), "match"), p.words())))
 		visible := min(len(p.cands), 9)
 		first := clamp(p.cursor-visible+1, 0, len(p.cands)-visible)
-		if p.cursor < first {
-			first = p.cursor
-		}
 		for i := first; i < first+visible; i++ {
 			text := fit(candidateText(p.cands[i], p.cands[0].Title), w-4)
 			if i == p.cursor {

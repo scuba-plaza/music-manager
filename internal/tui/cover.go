@@ -3,7 +3,6 @@ package tui
 import (
 	"bytes"
 	"fmt"
-	tea "github.com/charmbracelet/bubbletea"
 	"image"
 	"image/color"
 	_ "image/jpeg" // the cover formats the library accepts
@@ -13,6 +12,7 @@ import (
 	"os"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"music-manager/internal/coverimg"
