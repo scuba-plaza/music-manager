@@ -331,8 +331,8 @@ func TestTheHintsTeachPlaylistsAndChangeInsideOne(t *testing.T) {
 	m = keys(t, m, "down")
 	contains(t, m, "J K move", "d take out")
 
-	m = keys(t, m, "?")
-	contains(t, m, "add to a playlist", "take out of a playlist")
+	m = keys(t, m, "?", "3") // the page of the several tracks and the playlists
+	contains(t, m, "add to a playlist", "in a playlist: take a track out of it")
 }
 
 func TestOHasNothingToDoWithTheGroupOfPlaylists(t *testing.T) {

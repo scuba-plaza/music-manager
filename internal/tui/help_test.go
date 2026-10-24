@@ -1,17 +1,80 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
 )
 
-func TestQuestionMarkShowsEveryKeyGroupedByWhatItDoes(t *testing.T) {
+// The help is one page for each kind of thing the keys do, with the tabs of
+// the pages along the top, so that no page is crowded.
+
+func TestQuestionMarkOpensTheHelpOnItsFirstPageWithTheTabsOfTheOthers(t *testing.T) {
 	m, _ := editingModel(t, "Flow")
 	m = keys(t, m, "?")
-	contains(t, m, "Keys", "Moving", "Editing the fields", "into the fields", "(mixed)", "Several tracks", "Looking up", "Library",
-		"space", "ctrl+a", "J K", "[ ]", "ctrl+r", "tab", "enter", "esc")
-	contains(t, m, "esc closes")
+	contains(t, m, "Keys", "1 Moving", "2 Editing", "3 Marking", "4 Library", "esc closes", "← → pages")
+	contains(t, m, "↑↓", "PgUp PgDn", "enter", "open / close")
+	lacks(t, m, "ctrl+a", "nudge", "undo")
+}
+
+func TestTheArrowsAndTheNumbersTurnTheHelpPages(t *testing.T) {
+	m, _ := editingModel(t, "Flow")
+	m = keys(t, m, "?", "right")
+	contains(t, m, "choose a field", "nudge 0.1 s", "(mixed)")
+	lacks(t, m, "PgUp PgDn", "ctrl+a")
+
+	m = keys(t, m, "l")
+	contains(t, m, "ctrl+a", "number an album")
+	lacks(t, m, "nudge", "undo")
+
+	m = keys(t, m, "right")
+	contains(t, m, "undo / redo", "MusicBrainz")
+	m = keys(t, m, "right") // there is no page after the last
+	contains(t, m, "undo / redo")
+
+	m = keys(t, m, "left", "h")
+	contains(t, m, "nudge 0.1 s")
+	m = keys(t, m, "1")
+	contains(t, m, "PgUp PgDn")
+	m = keys(t, m, "left") // nor before the first
+	contains(t, m, "PgUp PgDn")
+	m = keys(t, m, "4")
+	contains(t, m, "undo / redo")
+}
+
+func TestTabTurnsTheHelpPagesRoundAndBack(t *testing.T) {
+	m, _ := editingModel(t, "Flow")
+	m = keys(t, m, "?", "tab", "tab", "tab")
+	contains(t, m, "undo / redo")
+	lacks(t, m, "PgUp PgDn")
+	m = keys(t, m, "tab")
+	contains(t, m, "PgUp PgDn")
+	lacks(t, m, "undo / redo")
+	m = keys(t, m, "shift+tab")
+	contains(t, m, "undo / redo")
+	lacks(t, m, "PgUp PgDn")
+}
+
+func TestEveryDescriptionOfEveryPageIsShownInFullAtTheSmallestUsualSize(t *testing.T) {
+	m, _ := browserModel(t, 80, 24)
+	m = keys(t, m, "?")
+	for page := range helpPages {
+		m = keys(t, m, string(rune('1'+page)))
+		for _, s := range helpPages[page].sections {
+			contains(t, m, s.name)
+			for _, e := range s.entries {
+				contains(t, m, e.what)
+			}
+		}
+	}
+}
+
+func TestOpeningTheHelpAgainStartsOnTheFirstPage(t *testing.T) {
+	m, _ := editingModel(t, "Flow")
+	m = keys(t, m, "?", "3", "esc", "?")
+	contains(t, m, "PgUp PgDn")
+	lacks(t, m, "ctrl+a")
 }
 
 func TestHelpClosesWithAnyOfTheUsualKeysAndNeverQuits(t *testing.T) {
@@ -80,6 +143,25 @@ func TestAllTheDialogsWorkInTheNarrowLayoutToo(t *testing.T) {
 		m = keys(t, m, "esc")
 		if m.overlay != nil {
 			m.overlay = nil
+		}
+	}
+}
+
+func TestTheHelpDialogStaysWhereItIsWhenThePagesTurn(t *testing.T) {
+	m, _ := browserModel(t, 120, 36)
+	m = keys(t, m, "?")
+	row := func() int {
+		for i, l := range lines(m) {
+			if strings.Contains(l, "4 Library") {
+				return i
+			}
+		}
+		return -1
+	}
+	want := row()
+	for _, page := range []string{"2", "3", "4", "1"} {
+		if m = keys(t, m, page); row() != want {
+			t.Errorf("the tabs moved from row %d to %d on page %s", want, row(), page)
 		}
 	}
 }

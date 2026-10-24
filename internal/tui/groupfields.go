@@ -223,7 +223,7 @@ func (m Model) updateGroupFields(msg tea.KeyMsg, r Row) (tea.Model, tea.Cmd) {
 			return m.setGroupCover(g, "")
 		}
 	case key.Matches(msg, k.Help):
-		m.overlay = helpScreen{}
+		m.overlay = &helpScreen{}
 	case key.Matches(msg, k.Doctor):
 		return m.openDoctor()
 	case key.Matches(msg, k.Add):

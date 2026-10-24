@@ -320,21 +320,26 @@ func (m Model) quiet() Model {
 	return q
 }
 
+// tabLabel is the label of tab i in a strip of tabs: the number that jumps to
+// it and its name. The one shown has a mark as well as the colour, for
+// terminals without colour.
+func tabLabel(i int, name string, shown bool) string {
+	st, mark := styles.dim, " "
+	if shown {
+		st, mark = styles.selected, "▌"
+	}
+	return st.Render(fmt.Sprintf(" %s%d %s ", mark, i+1, name))
+}
+
 // tabStrip draws the names of the tabs, the one shown highlighted, and says
 // where each label starts and ends (columns inside the pane) for the mouse.
 func (m Model) tabStrip() (string, [][2]int) {
 	strip, x := " ", 1
 	spans := make([][2]int, m.tabCount())
 	for i, tab := range inspectorTabs[:m.tabCount()] {
-		// Each label has the number that jumps to it. The one shown has a mark
-		// as well as the colour, for terminals without colour.
-		st, mark := styles.dim, " "
-		if i == m.tab() {
-			st, mark = styles.selected, "▌"
-		}
-		label := fmt.Sprintf(" %s%d %s ", mark, i+1, tab.name)
+		label := tabLabel(i, tab.name, i == m.tab())
 		w := ansi.StringWidth(label)
-		strip += st.Render(label) + " "
+		strip += label + " "
 		spans[i] = [2]int{x, x + w}
 		x += w + 1
 	}

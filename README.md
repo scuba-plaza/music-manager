@@ -41,7 +41,7 @@ asks and fails if the title or artist is unknown.
 Run `mm` in a terminal (or `mm tui`) to browse and edit the library on one screen: artists, albums and
 tracks on the left, and on the right whatever the cursor is on: a track's details, or what is inside an album (its tracks), an artist (its albums and singles), a playlist (its tracks in play order) or the Needs work group (what each track lacks), as the preview column of a file manager does. Every change is saved at once to
 `library.json`; the music folder only changes when you sync (`s`), and the header says how many tracks
-are waiting (`3 to sync`). Press `?` for the list of keys; the bottom line always shows the ones that
+are waiting (`3 to sync`). Press `?` for the list of keys, one page for each kind (`←` `→` or `1`-`4` turn the pages); the bottom line always shows the ones that
 matter right now. Without a terminal, plain `mm` prints help as before.
 
 | | |

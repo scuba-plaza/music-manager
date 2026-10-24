@@ -345,7 +345,7 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, k.Remove):
 		return m.openRemove()
 	case key.Matches(msg, k.Help):
-		m.overlay = helpScreen{}
+		m.overlay = &helpScreen{}
 	case key.Matches(msg, k.Doctor):
 		return m.openDoctor()
 	case key.Matches(msg, k.Add):
