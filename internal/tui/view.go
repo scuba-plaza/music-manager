@@ -216,7 +216,7 @@ func (m Model) footerKeys() []key.Binding {
 		if r, ok := m.selectedRow(); ok {
 			switch _, in := playlistOf(r); {
 			case in && r.Kind == kindPlaylist:
-				bindings = []key.Binding{k.Up, k.EditGroup, k.OpenGroup, k.RenamePlaylist, k.DeletePlaylist, k.Mark}
+				bindings = []key.Binding{k.Up, k.EditGroup, k.OpenGroup, k.DeletePlaylist, k.Mark}
 			case in:
 				bindings = []key.Binding{k.Up, k.MoveDown, k.TakeOut, k.Mark, k.Filter}
 			case len(m.marks) == 0 && (r.Kind == kindArtist || editableRow(r) && r.Kind == kindAlbum):

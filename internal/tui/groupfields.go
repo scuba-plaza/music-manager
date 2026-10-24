@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -265,7 +266,7 @@ func newGroupDraft(g group, f fieldKind) draft {
 // startGroupEdit opens the field the cursor is on, in the pane of a group.
 func (m *Model) startGroupEdit(r Row) tea.Cmd {
 	g, ok := m.groupOf(r)
-	if !ok || g.kind == kindPlaylist {
+	if !ok {
 		return nil
 	}
 	f := m.curField()
@@ -304,6 +305,9 @@ func (m Model) commitGroup(r Row) (tea.Model, tea.Cmd) {
 	}
 	if m.dr.field == fCover {
 		return m.setGroupCover(g, m.dr.text)
+	}
+	if g.kind == kindPlaylist {
+		return m.commitPlaylist(g)
 	}
 	f := m.dr.field
 	text := strings.TrimSpace(m.dr.text)
@@ -359,6 +363,47 @@ func (m Model) commitGroup(r Row) (tea.Model, tea.Cmd) {
 			}
 			m.rebuild()
 		})
+}
+
+// commitPlaylist renames the playlist or sets its Latin name, whichever field
+// is being edited. A refusal (a name that is another playlist's, or that would
+// be the file of one) leaves everything as it was and is said under the input.
+func (m Model) commitPlaylist(g group) (tea.Model, tea.Cmd) {
+	f, old := m.dr.field, g.playlist.Name
+	text := strings.TrimSpace(m.dr.text)
+	shown, _, byHand := groupValue(g, f)
+	switch {
+	case text == shown, f == fPlaylistLatin && text == "" && !byHand:
+		m.editing = false // nothing changed, nothing to save
+		return m, nil
+	case f == fPlaylistName && text == "":
+		m.editErr = "The playlist's name cannot be empty"
+		return m, nil
+	}
+	m.busy = true
+	if f == fPlaylistLatin {
+		return m, m.editPlaylists("change of the Latin name of "+old, func(l Library) (string, error) {
+			return fmt.Sprintf("Latin name of %s is %s", old, latinNameText(text)), l.SetPlaylistLatin(old, text)
+		}, func(m *Model) { m.editing, m.editErr = false, "" })
+	}
+	return m, m.editPlaylists("renaming "+old, func(l Library) (string, error) {
+		return fmt.Sprintf("Renamed %s to %s", old, text), l.RenamePlaylist(old, text)
+	}, func(m *Model) { // the renamed playlist stays open, and selected
+		m.editing, m.editErr = false, ""
+		moves := map[string]string{playlistRowKey(old): playlistRowKey(text)}
+		moveKeys(m.expanded, moves)
+		if to, ok := moves[m.selKey]; ok {
+			m.selKey = to
+		}
+	})
+}
+
+// latinNameText is a Latin name as the status line says it.
+func latinNameText(latin string) string {
+	if latin == "" {
+		return "worked out"
+	}
+	return latin
 }
 
 // whatOf names a field of a group in a change: "name", "Latin name", "genre".

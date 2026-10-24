@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/key"
@@ -36,10 +35,10 @@ const (
 	bulkCutEnd
 )
 
-// newBulkForm opens the form on the given tracks with the cursor in field
-// focus, which may start out with prefill.
-func newBulkForm(head string, tracks []manifest.Track, focus int, prefill string) *bulkForm {
-	b := &bulkForm{head: head, tracks: tracks, focus: focus}
+// newBulkForm opens the form on the given tracks with the cursor in the first
+// field.
+func newBulkForm(head string, tracks []manifest.Track) *bulkForm {
+	b := &bulkForm{head: head, tracks: tracks}
 	for i := range b.in {
 		in := textinput.New()
 		in.Prompt = ""
@@ -48,9 +47,7 @@ func newBulkForm(head string, tracks []manifest.Track, focus int, prefill string
 		in.Cursor.SetMode(cursor.CursorStatic)
 		b.in[i] = in
 	}
-	b.in[focus].SetValue(prefill)
-	b.in[focus].CursorEnd()
-	b.in[focus].Focus()
+	b.in[b.focus].Focus()
 	return b
 }
 
@@ -171,8 +168,8 @@ func (m Model) tracksFor(ids []string) []manifest.Track {
 	return out
 }
 
-// openBulk is the e key: edit the marked tracks, or rename the artist or
-// album the cursor is on, or just edit a track's fields.
+// openBulk is the e key: edit the marked tracks, or go into the fields of what
+// the cursor is on (a track, an artist, an album, a playlist), as → does.
 func (m Model) openBulk() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
 	if !ok {
@@ -180,34 +177,20 @@ func (m Model) openBulk() (tea.Model, tea.Cmd) {
 	}
 	switch {
 	case r.Kind == kindPlaylist:
-		p, _ := m.playlistNamed(r.Label)
-		m.overlay = newPlaylistNamer(p)
+		m.focusInspector()
 	case r.Key == playlistsKey:
-		m.say("Select a playlist to rename it", true)
+		m.say("Select a playlist to edit it", true)
 	case len(m.marks) > 0:
 		ts := m.markedTracks()
-		m.overlay = newBulkForm("Edit "+plural(len(ts), "marked track"), ts, bulkArtist, "")
-	case r.Kind == kindTrack:
+		m.overlay = newBulkForm("Edit "+plural(len(ts), "marked track"), ts)
+	case editableRow(r):
 		m.focusInspector()
-	case r.Kind == kindArtist:
-		ts := m.tracksFor(r.IDs)
-		m.overlay = newBulkForm("Rename the artist", ts, bulkArtist, firstOriginal(ts, fArtist))
-	case r.Kind == kindAlbum && !strings.HasPrefix(r.Key, "singles"):
-		ts := m.tracksFor(r.IDs)
-		m.overlay = newBulkForm("Rename the album", ts, bulkAlbum, firstOriginal(ts, fAlbum))
 	default:
 		ts := m.tracksFor(r.IDs)
-		m.overlay = newBulkForm("Edit "+plural(len(ts), "track"), ts, bulkArtist, "")
+		m.overlay = newBulkForm("Edit "+plural(len(ts), "track"), ts)
 	}
 	if m.overlay != nil {
 		return m, textinput.Blink
 	}
 	return m, nil
-}
-
-func firstOriginal(ts []manifest.Track, f fieldKind) string {
-	if len(ts) == 0 {
-		return ""
-	}
-	return name(ts[0], f)
 }

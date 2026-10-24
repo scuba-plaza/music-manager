@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"music-manager/internal/app"
+	"music-manager/internal/manifest"
 	"music-manager/internal/testmp3"
 )
 
@@ -796,4 +797,188 @@ func TestAMissingOrNotAnImageCoverIsExplainedAndNothingIsSaved(t *testing.T) {
 	if !m.editing || m.editErr == "" || coverOf(t, hook.Library, "Flow") != "" {
 		t.Errorf("editing %v, error %q, cover %q", m.editing, m.editErr, coverOf(t, hook.Library, "Flow"))
 	}
+}
+
+// toPlaylist is the model on the playlist Study (another, Gym, is there too),
+// the cursor in the tree.
+func toPlaylist(t *testing.T) (Model, Library) {
+	t.Helper()
+	lib, _ := playlistLib(t)
+	if err := appOf(t, lib).CreatePlaylist("Gym"); err != nil {
+		t.Fatal(err)
+	}
+	m := newTestModel(t, lib, 120, 36)
+	m = keys(t, m, "right", "down") // open the group of playlists, then Study
+	if got := selectedLabel(t, m); got != "Study" {
+		t.Fatalf("setup: %q", got)
+	}
+	return m, lib
+}
+
+func playlistsOf(t *testing.T, lib Library) []manifest.Playlist {
+	t.Helper()
+	pls, err := lib.Playlists()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pls
+}
+
+func TestRenamingAPlaylistInThePaneKeepsItsTracksAndSelection(t *testing.T) {
+	m, lib := toPlaylist(t)
+	m = keys(t, m, "enter", "right", "enter") // open Study, into its fields, edit the name
+	if got := m.in[0].Value(); got != "Study" {
+		t.Fatalf("the editor starts from %q", got)
+	}
+	m = typed(t, clearField(t, m), "Exams")
+	m = keys(t, m, "enter")
+
+	pls := playlistsOf(t, lib)
+	if len(pls) != 2 || pls[0].Name != "Exams" || len(pls[0].Tracks) != 2 {
+		t.Fatalf("playlists = %+v", pls)
+	}
+	contains(t, m, "Renamed Study to Exams")
+	if m.focus != paneInspector || m.editing {
+		t.Errorf("focus %v, editing %v: the pane should stay, closed", m.focus, m.editing)
+	}
+	if got := selectedLabel(t, m); got != "Exams" {
+		t.Errorf("the cursor is on %q, want the renamed playlist", got)
+	}
+	if treeLine(m, "Flow") < 0 || treeLine(m, "Dream") < 0 {
+		t.Errorf("the playlist closed with the rename:\n%s", screen(m))
+	}
+	if pls[0].NameLatin != "" {
+		t.Errorf("the form worked out from the old name was kept as if set by hand: %q", pls[0].NameLatin)
+	}
+}
+
+func TestOneUndoPutsTheOldNameOfAPlaylistBack(t *testing.T) {
+	m, lib := toPlaylist(t)
+	m = keys(t, m, "right", "enter")
+	m = typed(t, clearField(t, m), "Exams")
+	m = keys(t, m, "enter", "u")
+	contains(t, m, "Undid")
+	if pls := playlistsOf(t, lib); pls[0].Name != "Study" || len(pls[0].Tracks) != 2 {
+		t.Errorf("after undo %+v", pls)
+	}
+	m = keys(t, m, "ctrl+r")
+	if pls := playlistsOf(t, lib); pls[0].Name != "Exams" {
+		t.Errorf("after redo %+v", pls)
+	}
+}
+
+func TestANameThatIsAnotherPlaylistsIsRefusedUnderTheInputAndNothingChanges(t *testing.T) {
+	m, lib := toPlaylist(t)
+	m = keys(t, m, "right", "enter")
+	m = typed(t, clearField(t, m), "gym")
+	m = keys(t, m, "enter")
+	if !m.editing {
+		t.Fatal("the input closed although the name was refused")
+	}
+	contains(t, m, "already a playlist")
+	if pls := playlistsOf(t, lib); pls[0].Name != "Study" || pls[1].Name != "Gym" {
+		t.Errorf("playlists = %+v", pls)
+	}
+	m = keys(t, m, "esc")
+	lacks(t, m, "already a playlist")
+}
+
+func TestThePlaylistNameCannotBeEmpty(t *testing.T) {
+	m, lib := toPlaylist(t)
+	m = keys(t, m, "right", "enter")
+	m = keys(t, clearField(t, m), "enter")
+	contains(t, m, "playlist's name cannot be empty")
+	if pls := playlistsOf(t, lib); pls[0].Name != "Study" {
+		t.Errorf("playlists = %+v", pls)
+	}
+}
+
+func TestAPlaylistLatinNameFromThePane(t *testing.T) {
+	m, lib := toPlaylist(t)
+	m = keys(t, m, "right", "down") // the Latin name
+	contains(t, m, "Latin name")
+	m = keys(t, m, "enter")
+	if got := m.in[0].Value(); got != "Study" {
+		t.Fatalf("the editor starts from %q, want the form worked out", got)
+	}
+	m = keys(t, m, "enter") // left as it is: nothing was asked for
+	if pls := playlistsOf(t, lib); pls[0].NameLatin != "" {
+		t.Fatalf("the worked-out form was saved as if set by hand: %q", pls[0].NameLatin)
+	}
+
+	m = typed(t, clearField(t, keys(t, m, "enter")), "Study hall")
+	m = keys(t, m, "enter")
+	if pls := playlistsOf(t, lib); pls[0].Name != "Study" || pls[0].NameLatin != "Study hall" || len(pls[0].Tracks) != 2 {
+		t.Fatalf("playlists = %+v", pls)
+	}
+	contains(t, m, "Latin name of Study is Study hall")
+
+	// An empty text takes the form set by hand away, and undo puts it back.
+	m = keys(t, m, "enter")
+	m = keys(t, clearField(t, m), "enter")
+	if pls := playlistsOf(t, lib); pls[0].NameLatin != "" {
+		t.Errorf("an empty Latin name should be forgotten: %+v", pls[0])
+	}
+	m = keys(t, m, "u")
+	if pls := playlistsOf(t, lib); pls[0].NameLatin != "Study hall" {
+		t.Errorf("undo gave %+v", pls[0])
+	}
+}
+
+func TestALatinNameThatWouldBeTheFileOfAnotherPlaylistIsRefusedInThePane(t *testing.T) {
+	m, lib := toPlaylist(t)
+	m = keys(t, m, "right", "down", "enter")
+	m = typed(t, clearField(t, m), "gym")
+	m = keys(t, m, "enter")
+	contains(t, m, "same file")
+	if !m.editing {
+		t.Error("the input closed although the form was refused")
+	}
+	if pls := playlistsOf(t, lib); pls[0].NameLatin != "" {
+		t.Errorf("playlists = %+v", pls)
+	}
+}
+
+func TestEOnAnArtistAnAlbumAndAPlaylistGoesIntoTheirFieldsLikeRight(t *testing.T) {
+	m, _ := toArtist(t)
+	m = keys(t, m, "e")
+	if m.overlay != nil || m.focus != paneInspector {
+		t.Fatalf("on an artist: overlay %v, focus %v", m.overlay, m.focus)
+	}
+	contains(t, m, "Name", "Latin name", "Genre")
+	lacks(t, m, "Released")
+
+	m = keys(t, m, "esc", "down", "e") // down to its album
+	if r, _ := m.selectedRow(); r.Kind != kindAlbum || m.overlay != nil || m.focus != paneInspector {
+		t.Fatalf("on an album: row %v, overlay %v, focus %v", r.Kind, m.overlay, m.focus)
+	}
+	contains(t, m, "Released", "Tracks on album")
+
+	p, _ := toPlaylist(t)
+	p = keys(t, p, "e")
+	if p.overlay != nil || p.focus != paneInspector {
+		t.Fatalf("on a playlist: overlay %v, focus %v", p.overlay, p.focus)
+	}
+	contains(t, p, "Latin name")
+	lacks(t, p, "Genre")
+}
+
+func TestEWithTracksMarkedStillEditsThemAllAtOnce(t *testing.T) {
+	m, _ := toArtist(t)
+	m = selectTrack(t, m, "Flow")
+	m = keys(t, m, "space")
+	for i := 0; i < 5; i++ { // back up to the artist
+		if r, _ := m.selectedRow(); r.Kind == kindArtist {
+			break
+		}
+		m = keys(t, m, "up")
+	}
+	if r, _ := m.selectedRow(); r.Kind != kindArtist {
+		t.Fatalf("setup: on a %v", r.Kind)
+	}
+	m = keys(t, m, "e")
+	if _, ok := m.overlay.(*bulkForm); !ok || m.focus != paneBrowser {
+		t.Fatalf("overlay %T, focus %v: marked tracks should open the form", m.overlay, m.focus)
+	}
+	contains(t, m, "Edit 1 marked track")
 }

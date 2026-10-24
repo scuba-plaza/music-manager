@@ -131,39 +131,6 @@ func TestEscClosesTheBulkFormWithoutChangingAnything(t *testing.T) {
 	lacks(t, m, "Edit 1 marked")
 }
 
-func TestRenameAnAlbumFromItsRow(t *testing.T) {
-	m, hook := editingModel(t, "Flow")
-	m = keys(t, m, "left", "e")
-	contains(t, m, "Rename the album", "Shadows")
-	m = keys(t, m, "tab") // the form starts on the album; go to Artist and back to be sure of the order
-	m = keys(t, m, "shift+tab")
-	m = keys(t, m, "ctrl+u")
-	m = typed(t, m, "Shadows (Deluxe)")
-	m = keys(t, m, "enter")
-	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
-		if got := trackNamed(t, hook.Library, title).Album; got != "Shadows (Deluxe)" {
-			t.Errorf("%s is on %q", title, got)
-		}
-	}
-	contains(t, m, "Shadows (Deluxe)", "Changed 3 tracks")
-}
-
-func TestRenameAnArtistMergesItWithAnother(t *testing.T) {
-	m, hook := editingModel(t, "Current")
-	m = keys(t, m, "left", "left", "left") // album, close it, artist
-	if r, _ := m.selectedRow(); r.Kind != kindArtist || r.Label != "Phoria" {
-		t.Fatalf("on %+v", r)
-	}
-	m = keys(t, m, "e")
-	contains(t, m, "Rename the artist")
-	m = keys(t, m, "ctrl+u")
-	m = typed(t, m, "Shawn James")
-	m = keys(t, m, "enter")
-	if got := trackNamed(t, hook.Library, "Current").Artist; got != "Shawn James" {
-		t.Errorf("artist = %q", got)
-	}
-}
-
 func TestEOnATrackGoesToItsFields(t *testing.T) {
 	m, _ := editingModel(t, "Flow")
 	m = keys(t, m, "e")
@@ -257,20 +224,4 @@ func TestTheBulkFormSetsTheReleaseDateOfTheMarkedTracks(t *testing.T) {
 	if got := trackNamed(t, hook.Library, "The Wanderer"); got.Released != "" {
 		t.Errorf("an unmarked track was changed: %+v", got)
 	}
-}
-
-func TestRenamingAnArtistCanSetItsLatinFormOnAllItsTracks(t *testing.T) {
-	m, hook := editingModel(t, "Flow")
-	m = keys(t, m, "left", "left", "left", "e") // album, close it, artist
-	contains(t, m, "Rename the artist", "Artist (Latin)", "Album (Latin)", "Genre (Latin)")
-	m = keys(t, m, "tab")
-	m = typed(t, m, "Shawn J")
-	contains(t, m, "Artist (Latin) → Shawn J")
-	m = keys(t, m, "enter")
-	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
-		if got := trackNamed(t, hook.Library, title); got.ArtistLatin != "Shawn J" || got.Artist != "Shawn James" {
-			t.Errorf("%s: artist %q, its Latin form %q", title, got.Artist, got.ArtistLatin)
-		}
-	}
-	contains(t, m, "Changed 3 tracks")
 }

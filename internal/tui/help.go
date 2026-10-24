@@ -47,7 +47,7 @@ var helpRight = []helpSection{
 	{"Several tracks", []helpEntry{
 		{"space", "mark (albums mark all)"},
 		{"ctrl+a", "mark everything shown"},
-		{"e", "edit marked, or rename"},
+		{"e", "edit marked, or fields"},
 		{"J K", "move a track down / up"},
 		{"n", "number an album 1…N"},
 		{"p", "add to a playlist"},

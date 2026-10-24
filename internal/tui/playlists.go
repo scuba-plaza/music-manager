@@ -47,6 +47,8 @@ func (m Model) playlistsEdited(msg playlistsMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		if o, ok := m.overlay.(interface{ setErr(string) }); ok {
 			o.setErr(msg.err.Error())
+		} else if m.editing {
+			m.editErr = msg.err.Error()
 		} else {
 			m.say(msg.err.Error(), true)
 		}
@@ -293,127 +295,4 @@ func (m Model) movePlaylistTrack(r Row, name string, dir int) (tea.Model, tea.Cm
 	return m, m.editPlaylists("move of a track in "+name, func(l Library) (string, error) {
 		return "Moved", l.MoveInPlaylist(name, id, to)
 	})
-}
-
-// playlistNamer is the dialog that renames a playlist and sets how it is named
-// in Latin letters.
-type playlistNamer struct {
-	old string
-	// latin is the Latin name the box started with, which is a name for the
-	// playlist whether it was set by hand or worked out: one left as it is was
-	// not asked for.
-	latin string
-	in    [2]textinput.Model // the name, the Latin name
-	focus int
-	err   string
-}
-
-func newPlaylistNamer(p manifest.Playlist) *playlistNamer {
-	n := &playlistNamer{old: p.Name, latin: p.LatinName()}
-	for i, value := range []string{p.Name, p.LatinName()} {
-		in := textinput.New()
-		in.Prompt = ""
-		in.CharLimit = 80
-		in.SetValue(value)
-		in.CursorEnd()
-		n.in[i] = in
-	}
-	n.in[0].Focus()
-	return n
-}
-
-func (n *playlistNamer) title() string   { return "Rename the playlist" }
-func (n *playlistNamer) width() int      { return 50 }
-func (n *playlistNamer) setErr(s string) { n.err = s }
-func (n *playlistNamer) hints(k keyMap) []key.Binding {
-	return []key.Binding{key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "rename")), k.Close2, k.NextField}
-}
-
-func (n *playlistNamer) lines(w int) []string {
-	lines := []string{"", " " + styles.dim.Render("A new name for “"+n.old+"”")}
-	row := func(i int, label string) {
-		n.in[i].Width = max(w-8, 1)
-		marker := " "
-		if i == n.focus {
-			marker = styles.accent.Render("▌")
-		}
-		lines = append(lines, "", " "+styles.dim.Render(label), " "+marker+" "+n.in[i].View())
-	}
-	row(0, "Name")
-	row(1, "Latin name, for a device that cannot show the name · empty works it out")
-	if n.err != "" {
-		lines = append(lines, "")
-		for _, l := range wrap(n.err, w-2) {
-			lines = append(lines, " "+styles.bad.Render(l))
-		}
-	}
-	return append(lines, "")
-}
-
-func (n *playlistNamer) key(m *Model, msg tea.KeyMsg) tea.Cmd {
-	switch {
-	case key.Matches(msg, m.keys.Close2):
-		m.overlay = nil
-		return nil
-	case key.Matches(msg, m.keys.NextField), key.Matches(msg, m.keys.PrevField):
-		n.in[n.focus].Blur()
-		n.focus = 1 - n.focus
-		return n.in[n.focus].Focus()
-	case key.Matches(msg, m.keys.Apply):
-		return n.apply(m)
-	}
-	var cmd tea.Cmd
-	n.in[n.focus], cmd = n.in[n.focus].Update(msg)
-	n.err = ""
-	return cmd
-}
-
-// apply renames the playlist, and sets its Latin name, whichever the box
-// changed. If the Latin name is refused after the rename was made, the rename is
-// taken back, so that a refusal changes nothing.
-func (n *playlistNamer) apply(m *Model) tea.Cmd {
-	name, latin := strings.TrimSpace(n.in[0].Value()), strings.TrimSpace(n.in[1].Value())
-	renamed, setLatin := name != n.old, latin != n.latin
-	if !renamed && !setLatin {
-		m.overlay = nil
-		return nil
-	}
-	old := n.old
-	m.busy = true
-	return m.editPlaylists("changing "+old, func(l Library) (string, error) {
-		if renamed {
-			if err := l.RenamePlaylist(old, name); err != nil {
-				return "", err
-			}
-		}
-		if setLatin {
-			if err := l.SetPlaylistLatin(name, latin); err != nil {
-				if renamed {
-					_ = l.RenamePlaylist(name, old)
-				}
-				return "", err
-			}
-		}
-		switch {
-		case renamed && setLatin:
-			return fmt.Sprintf("Renamed %s to %s, Latin name %s", old, name, latinNameText(latin)), nil
-		case renamed:
-			return fmt.Sprintf("Renamed %s to %s", old, name), nil
-		}
-		return fmt.Sprintf("Latin name of %s is %s", name, latinNameText(latin)), nil
-	}, func(m *Model) { // the renamed playlist stays open, and selected
-		if m.expanded[playlistRowKey(old)] && old != name {
-			delete(m.expanded, playlistRowKey(old))
-			m.expanded[playlistRowKey(name)] = true
-		}
-		m.selKey = playlistRowKey(name)
-	})
-}
-
-// latinNameText is a Latin name as the status line says it.
-func latinNameText(latin string) string {
-	if latin == "" {
-		return "worked out"
-	}
-	return latin
 }

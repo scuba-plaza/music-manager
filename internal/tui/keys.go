@@ -68,7 +68,7 @@ type keyMap struct {
 	Playlist                  key.Binding
 
 	// inside the playlists, where d, e and J K mean something else
-	TakeOut, DeletePlaylist, RenamePlaylist key.Binding
+	TakeOut, DeletePlaylist key.Binding
 
 	// in a dialog
 	Apply, Close2, NextField, PrevField key.Binding
@@ -149,7 +149,6 @@ func newKeyMap() keyMap {
 
 		TakeOut:        key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "take out")),
 		DeletePlaylist: key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "delete")),
-		RenamePlaylist: key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "rename")),
 
 		Apply:     key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "apply")),
 		Close2:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
