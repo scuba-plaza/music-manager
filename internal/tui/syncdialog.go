@@ -543,8 +543,10 @@ func (m Model) syncEvent(msg syncEventMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		d.collected, d.state = d.plan.Collected(), syncFinished
-		if d.target == "" {
+		if d.target == "" || d.collected > 0 { // the files of a removed track go with any sync, whatever it writes to
 			m.undoStack, m.redoStack = nil, nil // what a sync deleted cannot be brought back
+		}
+		if d.target == "" {
 			return m, m.refreshSync(false)
 		}
 	}

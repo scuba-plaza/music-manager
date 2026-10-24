@@ -2,6 +2,8 @@ package device
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -51,7 +53,8 @@ func (w wolfgang) Diagnose(tracks []manifest.Track) []Warning {
 		key := strings.ToLower(layout.PathFor(t, cut))
 		byName[key] = append(byName[key], t)
 	}
-	for _, same := range byName {
+	for _, key := range slices.Sorted(maps.Keys(byName)) { // in the same order every time
+		same := byName[key]
 		for _, t := range same {
 			var clashes []string
 			for _, u := range same {

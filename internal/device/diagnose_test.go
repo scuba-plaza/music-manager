@@ -1,6 +1,7 @@
 package device_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -161,5 +162,23 @@ func TestTheGenreWarningIsAboutWhatIsWritten(t *testing.T) {
 	tr.GenreLatin = "Alt Rock"
 	if got := warned(device.Wolfgang.Diagnose([]manifest.Track{tr}), "g"); len(got) != 0 {
 		t.Errorf("the Latin genre fits, yet %q", got)
+	}
+}
+
+func TestTheWarningsComeInTheSameOrderEveryTime(t *testing.T) {
+	var tracks []manifest.Track
+	for _, artist := range []string{"Zed", "Yan", "Xia", "Wen", "Vic", "Uma"} {
+		tracks = append(tracks,
+			track("b-"+artist, artist, "", "A Very Long Song Title Indeed Yes"),
+			track("a-"+artist, artist, "", "A Very Long Song Title Indeed No"))
+	}
+	first := device.Wolfgang.Diagnose(tracks)
+	if len(first) != len(tracks) {
+		t.Fatalf("%d warnings, want one for each of the %d tracks", len(first), len(tracks))
+	}
+	for i := 1; i < 20; i++ { // a map would give another order now and then
+		if ws := device.Wolfgang.Diagnose(tracks); !reflect.DeepEqual(ws, first) {
+			t.Fatalf("run %d came in another order:\n%+v\nafter\n%+v", i, ws, first)
+		}
 	}
 }

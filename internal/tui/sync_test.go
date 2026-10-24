@@ -425,3 +425,18 @@ func TestTheReviewOfAWolfgangPlanListsWhatThePlayerWillNotShowWell(t *testing.T)
 	m = keys(t, m, "esc", "s", "down", "w", "enter")
 	contains(t, m, "to create", "Wolfgang WMP01", "Alternative Rock", "12")
 }
+
+func TestASyncToADriveThatClearedAwayFilesAlsoClearsUndo(t *testing.T) {
+	m, _ := syncModel(t)
+	drive := filepath.Join(t.TempDir(), "PLAYER")
+	os.MkdirAll(drive, 0o755)
+	m.mounts = func() []string { return []string{drive} }
+	m = selectTrack(t, m, "Flow")
+	m = keys(t, m, "d", "y") // the audio of the removed track is only cleared away by a sync, of any target
+
+	m = keys(t, m, "s", "down", "enter", "enter")
+	contains(t, m, "Done", "cleared away")
+	m = keys(t, m, "enter", "u")
+	contains(t, m, "Nothing to undo")
+	lacks(t, m, "no longer stored")
+}
