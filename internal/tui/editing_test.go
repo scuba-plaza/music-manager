@@ -44,15 +44,14 @@ func TestRightOnATrackFocusesTheInspectorAndLeftComesBack(t *testing.T) {
 	}
 }
 
-func TestOnlyTracksHaveFieldsToEdit(t *testing.T) {
-	m, _ := editingModel(t, "Flow")
-	m = keys(t, m, "left", "left", "left") // album, close it, artist
-	if r, _ := m.selectedRow(); r.Kind != kindArtist {
-		t.Fatalf("setup: %v", r.Kind)
+func TestOnlyRowsWithFieldsTakeTheKeyboard(t *testing.T) {
+	m, _ := browserModel(t, 120, 36)
+	if got := selectedLabel(t, m); got != "Needs work" {
+		t.Fatalf("setup: %q", got)
 	}
 	m = keys(t, m, "tab")
 	if m.focus != paneBrowser {
-		t.Error("an artist has no fields to focus")
+		t.Error("the group of tracks that need work has no fields to focus")
 	}
 }
 

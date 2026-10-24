@@ -52,6 +52,8 @@ type Row struct {
 	Parent string // the key of the row above it in the tree, or ""
 
 	Label  string   // the artist, album or title
+	Artist string   // on an artist or an album: the artist
+	Album  string   // on an album: its name; empty on the singles of an artist
 	Detail string   // secondary text, e.g. the artist of a track nobody has identified
 	Num    string   // a track's number, padded to its album's width, or ""
 	Right  string   // shown at the right of a track in place of its length, or ""
@@ -129,7 +131,7 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 			sortTracks(byAlbum[album])
 			ids = append(ids, idsOf(byAlbum[album])...)
 		}
-		rows = append(rows, Row{Kind: kindArtist, Key: akey, Label: artist, Count: len(ts), IDs: ids, Expanded: isOpen})
+		rows = append(rows, Row{Kind: kindArtist, Key: akey, Label: artist, Artist: artist, Count: len(ts), IDs: ids, Expanded: isOpen})
 		if !isOpen {
 			continue
 		}
@@ -141,7 +143,7 @@ func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filte
 				bkey, label = singlesKey(artist), "Singles"
 			}
 			albumOpen := open(bkey)
-			rows = append(rows, Row{Kind: kindAlbum, Depth: 1, Key: bkey, Parent: akey, Label: label, Count: len(at), IDs: idsOf(at), Expanded: albumOpen})
+			rows = append(rows, Row{Kind: kindAlbum, Depth: 1, Key: bkey, Parent: akey, Label: label, Artist: artist, Album: album, Count: len(at), IDs: idsOf(at), Expanded: albumOpen})
 			if !albumOpen {
 				continue
 			}

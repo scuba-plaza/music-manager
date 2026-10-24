@@ -110,16 +110,21 @@ func (m Model) footLines(t, shown manifest.Track, w int) []string {
 	return append(lines, " "+styles.dim.Render(fit(about, w-2)))
 }
 
+// fieldPrefix is what starts the line of a field: its label in a column of
+// labelW, with a mark if the cursor is on it. It also gives the indent of the
+// lines beneath it and the width left for its value in a pane w wide.
+func fieldPrefix(label string, current bool, labelW, w int) (prefix, indent string, vw int) {
+	marker, shown := " ", styles.dim.Render(fit(label, labelW-2))
+	if current {
+		marker, shown = styles.accent.Render("▌"), styles.accent.Render(fit(label, labelW-2))
+	}
+	return " " + marker + shown + " ", strings.Repeat(" ", labelW+1), max(w-labelW-2, 1)
+}
+
 // fieldLines is one field: its label, its value or its open inputs, and
 // beneath them any error.
 func (m Model) fieldLines(t manifest.Track, f fieldKind, current bool, w int) []string {
-	marker, label := " ", styles.dim.Render(fit(f.label(), labelWidth-2))
-	if current {
-		marker, label = styles.accent.Render("▌"), styles.accent.Render(fit(f.label(), labelWidth-2))
-	}
-	prefix := " " + marker + label + " "
-	indent := strings.Repeat(" ", labelWidth+1)
-	vw := max(w-labelWidth-2, 1)
+	prefix, indent, vw := fieldPrefix(f.label(), current, labelWidth, w)
 
 	if m.editing && current {
 		return m.editorLines(prefix, indent, vw)

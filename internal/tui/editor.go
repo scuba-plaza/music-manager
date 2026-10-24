@@ -22,11 +22,16 @@ import (
 // This file is the right pane's behaviour: choosing a field, editing it,
 // saving at once, and undoing.
 
-// focusInspector gives the keyboard to the inspector if a track is selected.
+// focusInspector gives the keyboard to the pane on the right if what is
+// selected has fields: a track, an artist, an album or a playlist. The fields
+// of a group start at the first one.
 func (m *Model) focusInspector() bool {
 	r, ok := m.selectedRow()
-	if !ok || r.Kind != kindTrack {
+	if !ok || !editableRow(r) {
 		return false
+	}
+	if r.Kind != kindTrack && m.focus != paneInspector {
+		m.gfield = 0
 	}
 	m.focus = paneInspector
 	return true
@@ -34,6 +39,9 @@ func (m *Model) focusInspector() bool {
 
 func (m Model) updateInspector(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	k := m.keys
+	if r, ok := m.selectedRow(); ok && r.Kind != kindTrack {
+		return m.updateGroupFields(msg, r)
+	}
 	switch {
 	case key.Matches(msg, k.PrevTab) && m.tab() > 0:
 		m.field = firstFieldOf(m.tab() - 1)

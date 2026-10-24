@@ -22,6 +22,8 @@ type keyMap struct {
 	Centre            key.Binding
 	OpenAll, CloseAll key.Binding
 	Open, Close       key.Binding
+	EditGroup         key.Binding // the right arrow on an artist, album or playlist: into its fields
+	OpenGroup         key.Binding // enter on one: open or close it
 	Toggle            key.Binding
 	Switch            key.Binding
 
@@ -84,19 +86,21 @@ func newKeyMap() keyMap {
 		Undo: key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "undo")),
 		Redo: key.NewBinding(key.WithKeys("ctrl+r"), key.WithHelp("ctrl+r", "redo")),
 
-		Up:       key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑↓", "move")),
-		Down:     key.NewBinding(key.WithKeys("down", "j")),
-		PageUp:   key.NewBinding(key.WithKeys("pgup", "ctrl+u")),
-		PageDown: key.NewBinding(key.WithKeys("pgdown", "ctrl+d")),
-		Top:      key.NewBinding(key.WithKeys("g", "home")),
-		Bottom:   key.NewBinding(key.WithKeys("G", "end")),
-		Centre:   key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "centre")),
-		OpenAll:  key.NewBinding(key.WithKeys("+", "="), key.WithHelp("+", "open all")),
-		CloseAll: key.NewBinding(key.WithKeys("-"), key.WithHelp("-", "close all")),
-		Open:     key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("→", "open")),
-		Close:    key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("←", "close")),
-		Toggle:   key.NewBinding(key.WithKeys("enter")),
-		Switch:   key.NewBinding(key.WithKeys("tab", "shift+tab")),
+		Up:        key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑↓", "move")),
+		Down:      key.NewBinding(key.WithKeys("down", "j")),
+		PageUp:    key.NewBinding(key.WithKeys("pgup", "ctrl+u")),
+		PageDown:  key.NewBinding(key.WithKeys("pgdown", "ctrl+d")),
+		Top:       key.NewBinding(key.WithKeys("g", "home")),
+		Bottom:    key.NewBinding(key.WithKeys("G", "end")),
+		Centre:    key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "centre")),
+		OpenAll:   key.NewBinding(key.WithKeys("+", "="), key.WithHelp("+", "open all")),
+		CloseAll:  key.NewBinding(key.WithKeys("-"), key.WithHelp("-", "close all")),
+		Open:      key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("→", "open")),
+		EditGroup: key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("→", "edit")),
+		OpenGroup: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
+		Close:     key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("←", "close")),
+		Toggle:    key.NewBinding(key.WithKeys("enter")),
+		Switch:    key.NewBinding(key.WithKeys("tab", "shift+tab")),
 
 		Filter:      key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 		FilterKeep:  key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "keep")),

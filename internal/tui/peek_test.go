@@ -95,7 +95,7 @@ func TestALongListEndsWithHowManyMoreThereAre(t *testing.T) {
 		specs = append(specs, seedTrack{title: fmt.Sprintf("Song %02d", i), artist: "Band", album: "Long", n: i, of: 20})
 	}
 	seed(t, a, specs...)
-	m := newTestModel(t, NewLibrary(a), 120, 16)
+	m := newTestModel(t, NewLibrary(a), 120, 24)
 	m = keys(t, m, "enter", "down") // open the artist, then the album
 	if got := selectedLabel(t, m); got != "Long" {
 		t.Fatalf("setup: %q", got)

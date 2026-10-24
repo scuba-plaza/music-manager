@@ -37,6 +37,9 @@ const (
 	fLatinAlbum
 	fLatinGenre
 	fWolfgang // the read-only preview under --wolfgang
+	fAlbumOf  // the number of tracks on an album, of all its tracks
+	fPlaylistName
+	fPlaylistLatin
 )
 
 // An inspectorTab is a page of the inspector: some of the fields, under a name.
@@ -86,7 +89,7 @@ func firstFieldOf(tab int) int {
 func (m Model) tab() int { return tabOf(trackFields[m.field]) }
 
 func (f fieldKind) label() string {
-	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Volume", "Fade in", "Fade out", "Title", "Artist", "Album", "Genre", "Wolfgang"}[f]
+	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Volume", "Fade in", "Fade out", "Title", "Artist", "Album", "Genre", "Wolfgang", "Tracks on album", "Name", "Latin name"}[f]
 }
 
 // what is the field as a change of it is named: "title", or "Latin title" for

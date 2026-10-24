@@ -62,7 +62,8 @@ type Model struct {
 	// edited, its draft and inputs (the text, and a second one for the size of
 	// an album).
 	focus     pane
-	field     int
+	field     int // the field of the selected track the cursor is on
+	gfield    int // the field of the selected artist, album or playlist
 	editing   bool
 	dr        draft
 	prefilled bool // the draft started from the file's old tags, so saving it unchanged still counts
@@ -398,8 +399,10 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, k.Close):
 		m.close()
 	case key.Matches(msg, k.Toggle):
-		if !m.focusInspector() {
-			m.toggle()
+		if r, ok := m.selectedRow(); ok && r.Kind == kindTrack {
+			m.focusInspector()
+		} else {
+			m.toggle() // a group opens and closes; its fields are for the right arrow
 		}
 	}
 	return m, nil

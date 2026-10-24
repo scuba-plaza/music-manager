@@ -195,9 +195,11 @@ func (m Model) footerKeys() []key.Binding {
 	}
 
 	var bindings []key.Binding
-	if m.focus == paneInspector {
+	if r, ok := m.selectedRow(); ok && m.focus == paneInspector && r.Kind != kindTrack {
+		bindings = []key.Binding{k.Field, k.Edit, k.Back} // a group has no tabs
+	} else if m.focus == paneInspector {
 		bindings = []key.Binding{k.Field, k.Tabs, k.Edit, k.Back}
-		switch trackFields[m.field] {
+		switch m.curField() {
 		case fCutStart, fCutEnd, fVolume, fFadeIn, fFadeOut:
 			bindings = append(bindings, k.Less, k.Play)
 		case fCover:
@@ -211,9 +213,11 @@ func (m Model) footerKeys() []key.Binding {
 		if r, ok := m.selectedRow(); ok {
 			switch _, in := playlistOf(r); {
 			case in && r.Kind == kindPlaylist:
-				bindings = []key.Binding{k.Up, k.Open, k.RenamePlaylist, k.DeletePlaylist, k.Mark}
+				bindings = []key.Binding{k.Up, k.EditGroup, k.OpenGroup, k.RenamePlaylist, k.DeletePlaylist, k.Mark}
 			case in:
 				bindings = []key.Binding{k.Up, k.MoveDown, k.TakeOut, k.Mark, k.Filter}
+			case len(m.marks) == 0 && (r.Kind == kindArtist || editableRow(r) && r.Kind == kindAlbum):
+				bindings = []key.Binding{k.Up, k.EditGroup, k.OpenGroup, k.Sync, k.Mark, k.Filter, k.Sort, k.Playlist}
 			}
 		}
 		if m.filter != "" {

@@ -37,7 +37,13 @@ func peekTitle(r Row, ok bool) string {
 // peekLines draws the pane for a row that holds tracks, in a pane w wide and
 // h high.
 func (m Model) peekLines(r Row, w, h int) []string {
-	head := []string{"", " " + styles.bold.Render(fit(r.Label, w-2)), rule(w), ""}
+	head := []string{"", " " + styles.bold.Render(fit(r.Label, w-2)), rule(w)}
+	if g, ok := m.groupOf(r); ok && editableRow(r) {
+		head = append(head, m.groupBlock(g, w)...)
+		head = append(head, rule(w)) // the fields, then what is inside
+	} else {
+		head = append(head, "")
+	}
 	var info []string // under the rule
 	var list []string // the contents
 	switch r.Kind {

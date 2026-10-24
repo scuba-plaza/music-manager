@@ -42,7 +42,7 @@ func (m *Model) rebuild() {
 // checkFocus hands the keyboard back to the tree if what is selected has no
 // fields to edit.
 func (m *Model) checkFocus() {
-	if r, ok := m.selectedRow(); !ok || r.Kind != kindTrack {
+	if r, ok := m.selectedRow(); !ok || !editableRow(r) {
 		m.focus, m.editing = paneBrowser, false
 	}
 }
