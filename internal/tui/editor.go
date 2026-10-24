@@ -132,8 +132,11 @@ func prefilledFrom(t manifest.Track, f fieldKind) bool {
 
 func (m *Model) startEdit() tea.Cmd {
 	r, ok := m.selectedRow()
-	if !ok || r.Kind != kindTrack {
+	if !ok || !editableRow(r) {
 		return nil
+	}
+	if r.Kind != kindTrack {
+		return m.startGroupEdit(r)
 	}
 	f := trackFields[m.field]
 	if f == fWolfgang {
@@ -293,6 +296,9 @@ func (m Model) commit() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
 	if !ok {
 		return m, nil
+	}
+	if r.Kind != kindTrack {
+		return m.commitGroup(r)
 	}
 	t := r.Track
 	if m.dr.field == fCover {

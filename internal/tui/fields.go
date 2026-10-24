@@ -264,6 +264,9 @@ type draft struct {
 	// track is the track being edited, for the fades, which are typed as lengths
 	// from its cuts.
 	track manifest.Track
+	// mixed says that the tracks of a group differ in this field, so that it was
+	// opened empty.
+	mixed bool
 }
 
 func newDraft(t manifest.Track, f fieldKind) draft {
@@ -325,6 +328,12 @@ func (d draft) edit() (app.Edit, error) {
 		default:
 			e.GenreLatin = &text
 		}
+	case fAlbumOf:
+		of, err := count(d.text)
+		if err != nil {
+			return e, errors.New("Tracks on album must be a whole number, or empty")
+		}
+		e.TrackTotal = &of
 	case fTrack:
 		n, err := count(d.text)
 		if err != nil {

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"reflect"
 	"testing"
 
 	"music-manager/internal/app"
@@ -212,4 +213,168 @@ func TestTheFieldsOfAnArtistShowWhatItsTracksAgreeOnAndMixedForTheRest(t *testin
 	m = send(t, m, m.Init())
 	m = keys(t, selectTrack(t, m, "Flow"), "left", "left", "left", "right") // the artist's fields
 	contains(t, m, "Shawn James", "(mixed)")
+}
+
+// toArtist is the model with the cursor on the artist Shawn James, its album
+// still open, behind the hook that counts the calls to the library.
+func toArtist(t *testing.T) (Model, *editHook) {
+	t.Helper()
+	m, hook := editingModel(t, "Flow")
+	m = keys(t, m, "up", "up", "up") // The Wanderer, the album Shadows, the artist
+	if got := selectedLabel(t, m); got != "Shawn James" {
+		t.Fatalf("setup: %q", got)
+	}
+	return m, hook
+}
+
+func artistOf(t *testing.T, lib Library, title string) string {
+	t.Helper()
+	return trackNamed(t, lib, title).Artist
+}
+
+func TestRenamingAnArtistInThePaneRenamesAllItsTracks(t *testing.T) {
+	m, hook := toArtist(t)
+	m = keys(t, m, "right", "enter")
+	if got := m.in[0].Value(); got != "Shawn James" {
+		t.Fatalf("the editor starts from %q", got)
+	}
+	contains(t, m, "enter save", "esc cancel")
+	m = clearField(t, m)
+	m = typed(t, m, "Shawn J.")
+	m = keys(t, m, "enter")
+
+	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
+		if got := artistOf(t, hook.Library, title); got != "Shawn J." {
+			t.Errorf("%s is by %q", title, got)
+		}
+	}
+	if got := artistOf(t, hook.Library, "Current"); got != "Phoria" {
+		t.Errorf("another artist's track was changed: %q", got)
+	}
+	contains(t, m, "Changed 3 tracks", "Shawn J.")
+	if hook.manyCalls != 1 {
+		t.Errorf("%d saves, want the three tracks saved together", hook.manyCalls)
+	}
+}
+
+func TestAFilterDoesNotNarrowWhatARenameOfAnArtistReaches(t *testing.T) {
+	m, hook := editingModel(t, "Flow")
+	m = keys(t, m, "esc", "/")
+	m = typed(t, m, "flow")
+	m = keys(t, m, "enter")
+	if got := selectedLabel(t, m); got != "Shawn James" {
+		t.Fatalf("setup: the filter leaves the cursor on %q", got)
+	}
+	m = keys(t, m, "right", "enter")
+	contains(t, m, "all 3 tracks") // not only the one the filter shows
+	m = typed(t, clearField(t, m), "Shawn J.")
+	m = keys(t, m, "enter")
+	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
+		if got := artistOf(t, hook.Library, title); got != "Shawn J." {
+			t.Errorf("%s is by %q: the filter narrowed the rename", title, got)
+		}
+	}
+}
+
+func TestTheCursorAndTheOpenAlbumsFollowTheNewNameOfAnArtist(t *testing.T) {
+	m, _ := toArtist(t)
+	if treeLine(m, "Flow") < 0 {
+		t.Fatal("setup: the album is not open")
+	}
+	m = keys(t, m, "right", "enter")
+	m = typed(t, clearField(t, m), "Shawn J.")
+	m = keys(t, m, "enter")
+	if got := selectedLabel(t, m); got != "Shawn J." {
+		t.Errorf("the cursor is on %q, want the renamed artist", got)
+	}
+	if m.focus != paneInspector {
+		t.Error("the fields lost the keyboard after saving")
+	}
+	if treeLine(m, "Shadows") < 0 || treeLine(m, "Flow") < 0 {
+		t.Errorf("the artist or its album closed with the rename:\n%s", screen(m))
+	}
+}
+
+func TestMovingTheKeysOfAnArtistMovesThoseOfItsAlbumsToo(t *testing.T) {
+	open := map[string]bool{
+		artistKey("A"): true, albumRowKey("A", "X"): true, singlesKey("A"): true,
+		albumRowKey("B", "X"): true, // another artist's album of the same name
+	}
+	moveKeys(open, artistMoves("A", "C", []string{"X", "Y"}))
+	want := map[string]bool{
+		artistKey("C"): true, albumRowKey("C", "X"): true, singlesKey("C"): true,
+		albumRowKey("B", "X"): true,
+	}
+	if !reflect.DeepEqual(open, want) {
+		t.Errorf("keys = %v, want %v", open, want)
+	}
+}
+
+func TestRenamingAnArtistToAnotherOneJoinsThemAndSaysSoWhileTyping(t *testing.T) {
+	m, hook := editingModel(t, "Current")
+	m = keys(t, m, "up", "up") // the album, then the artist Phoria
+	if got := selectedLabel(t, m); got != "Phoria" {
+		t.Fatalf("setup: %q", got)
+	}
+	m = keys(t, m, "right", "enter")
+	lacks(t, m, "joins")
+	m = typed(t, clearField(t, m), "Shawn James")
+	contains(t, m, "joins the artist Shawn James (3 tracks)")
+	m = keys(t, m, "enter")
+	if got := artistOf(t, hook.Library, "Current"); got != "Shawn James" {
+		t.Errorf("artist = %q", got)
+	}
+	n := 0
+	for _, r := range m.rows {
+		if r.Kind == kindArtist && r.Label == "Shawn James" {
+			n++
+			if r.Count != 4 {
+				t.Errorf("the joined artist has %d tracks, want 4", r.Count)
+			}
+		}
+	}
+	if n != 1 || selectedLabel(t, m) != "Shawn James" {
+		t.Errorf("%d rows for the artist, cursor on %q", n, selectedLabel(t, m))
+	}
+}
+
+func TestTheNameOfAnArtistCannotBeEmpty(t *testing.T) {
+	m, hook := toArtist(t)
+	m = keys(t, m, "right", "enter")
+	m = clearField(t, m)
+	m = keys(t, m, "enter")
+	contains(t, m, "cannot be empty")
+	if !m.editing || hook.manyCalls != 0 {
+		t.Errorf("editing %v, saves %d", m.editing, hook.manyCalls)
+	}
+}
+
+func TestEscCancelsAndTheSameNameSavesNothing(t *testing.T) {
+	m, hook := toArtist(t)
+	m = typed(t, keys(t, m, "right", "enter"), "X")
+	m = keys(t, m, "esc")
+	if m.editing || m.focus != paneInspector || hook.manyCalls != 0 {
+		t.Errorf("editing %v, focus %v, saves %d", m.editing, m.focus, hook.manyCalls)
+	}
+	m = keys(t, m, "enter", "enter") // open it, change nothing, save
+	if m.editing || hook.manyCalls != 0 {
+		t.Errorf("editing %v, saves %d", m.editing, hook.manyCalls)
+	}
+}
+
+func TestOneUndoPutsTheOldNameOfAnArtistBack(t *testing.T) {
+	m, hook := toArtist(t)
+	m = keys(t, m, "right", "enter")
+	m = typed(t, clearField(t, m), "Shawn J.")
+	m = keys(t, m, "enter", "u")
+	contains(t, m, "Undid")
+	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
+		if got := artistOf(t, hook.Library, title); got != "Shawn James" {
+			t.Errorf("after undo %s is by %q", title, got)
+		}
+	}
+	m = keys(t, m, "ctrl+r")
+	if got := artistOf(t, hook.Library, "Flow"); got != "Shawn J." {
+		t.Errorf("after redo Flow is by %q", got)
+	}
 }

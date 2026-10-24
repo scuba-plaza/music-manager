@@ -1,9 +1,12 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"music-manager/internal/app"
 	"music-manager/internal/manifest"
 )
 
@@ -177,7 +180,10 @@ func (m Model) groupBlock(g group, w int) []string {
 
 // groupFieldLines is one field of a group: its label and its value.
 func (m Model) groupFieldLines(g group, f fieldKind, current bool, w int) []string {
-	prefix, _, vw := fieldPrefix(groupLabel(f), current, groupLabelWidth, w)
+	prefix, indent, vw := fieldPrefix(groupLabel(f), current, groupLabelWidth, w)
+	if m.editing && current {
+		return m.groupEditorLines(g, f, prefix, indent, vw)
+	}
 	text, mixed, byHand := groupValue(g, f)
 	switch {
 	case mixed:
@@ -201,6 +207,8 @@ func (m Model) updateGroupFields(msg tea.KeyMsg, r Row) (tea.Model, tea.Cmd) {
 		m.gfield = max(m.gfield-1, 0)
 	case key.Matches(msg, k.Down):
 		m.gfield = min(m.gfield+1, len(groupFields(r.Kind))-1)
+	case key.Matches(msg, k.Edit):
+		return m, m.startEdit()
 	case key.Matches(msg, k.Help):
 		m.overlay = helpScreen{}
 	case key.Matches(msg, k.Doctor):
@@ -215,4 +223,209 @@ func (m Model) updateGroupFields(msg tea.KeyMsg, r Row) (tea.Model, tea.Cmd) {
 		return m.redo()
 	}
 	return m, nil
+}
+
+// isNameField reports whether the field is the name of the group, which may not
+// be empty.
+func isNameField(f fieldKind) bool { return f == fArtist || f == fAlbum || f == fPlaylistName }
+
+// newGroupDraft is the field of a group as it starts being edited: the text is
+// what all the tracks have, or empty if they differ.
+func newGroupDraft(g group, f fieldKind) draft {
+	text, mixed, _ := groupValue(g, f)
+	return draft{field: f, text: text, mixed: mixed}
+}
+
+// startGroupEdit opens the field the cursor is on, in the pane of a group.
+func (m *Model) startGroupEdit(r Row) tea.Cmd {
+	g, ok := m.groupOf(r)
+	if !ok || g.kind == kindPlaylist {
+		return nil
+	}
+	m.dr = newGroupDraft(g, m.curField())
+	m.prefilled = false
+	m.in[0], m.in[1] = newInput(m.dr.text), newInput("")
+	if m.dr.mixed {
+		m.in[0].Placeholder, m.in[0].PlaceholderStyle = "(mixed)", styles.dim
+	}
+	m.inFocus, m.editing, m.editErr = 0, true, ""
+	return m.in[0].Focus()
+}
+
+// groupNoun names the kind of group, for messages.
+func groupNoun(kind rowKind) string {
+	switch kind {
+	case kindArtist:
+		return "artist"
+	case kindAlbum:
+		return "album"
+	}
+	return "playlist"
+}
+
+// commitGroup saves the field being edited on all the tracks of the group.
+// Text left as it started changes nothing; for fields whose tracks differ
+// (they start empty) empty keeps them, and - clears them.
+func (m Model) commitGroup(r Row) (tea.Model, tea.Cmd) {
+	g, ok := m.groupOf(r)
+	if !ok {
+		return m, nil
+	}
+	f := m.dr.field
+	text := strings.TrimSpace(m.dr.text)
+	start := newGroupDraft(g, f)
+	if text == start.text {
+		m.editing = false // nothing changed, nothing to save
+		return m, nil
+	}
+	if start.mixed && text == clearMark {
+		text = ""
+	}
+	if text == "" && isNameField(f) {
+		m.editErr = "The " + groupNoun(g.kind) + "'s name cannot be empty"
+		return m, nil
+	}
+	d := m.dr
+	d.text = text
+	e, err := d.edit()
+	if err != nil {
+		m.editErr = err.Error()
+		return m, nil
+	}
+	edits := map[string]app.Edit{}
+	var ids []string
+	for _, t := range g.tracks {
+		if changes(t, e) {
+			edits[t.ID] = e
+			ids = append(ids, t.ID)
+		}
+	}
+	if len(edits) == 0 {
+		m.editing = false
+		return m, nil
+	}
+	moves := map[string]string{}
+	switch f {
+	case fArtist:
+		moves = artistMoves(g.name, text, albumsOf(g.tracks))
+	case fAlbum:
+		moves = map[string]string{albumRowKey(g.artist, g.name): albumRowKey(g.artist, text)}
+	}
+	m.busy = true
+	return m, m.saveMany("change of "+groupNoun(g.kind)+" "+whatOf(f), "Changed "+plural(len(ids), "track"), ids,
+		func(l Library) (map[string]manifest.Track, error) { return l.EditMany(edits) },
+		func(m *Model) { // the rows keep their place under the new name
+			m.editing, m.editErr = false, ""
+			moveKeys(m.expanded, moves)
+			if to, ok := moves[m.selKey]; ok {
+				m.selKey = to
+			}
+			m.rebuild()
+		})
+}
+
+// whatOf names a field of a group in a change: "name", "Latin name", "genre".
+func whatOf(f fieldKind) string {
+	label := groupLabel(f)
+	if strings.HasPrefix(label, "Latin") {
+		return label
+	}
+	return strings.ToLower(label)
+}
+
+// albumsOf lists the albums of the tracks, each once, in the order they appear.
+func albumsOf(ts []manifest.Track) []string {
+	var albums []string
+	seen := map[string]bool{}
+	for _, t := range ts {
+		if t.Album != "" && !seen[t.Album] {
+			seen[t.Album] = true
+			albums = append(albums, t.Album)
+		}
+	}
+	return albums
+}
+
+// artistMoves are the keys of the rows that change with the name of an artist:
+// the artist, its singles and its albums.
+func artistMoves(from, to string, albums []string) map[string]string {
+	moves := map[string]string{artistKey(from): artistKey(to), singlesKey(from): singlesKey(to)}
+	for _, a := range albums {
+		moves[albumRowKey(from, a)] = albumRowKey(to, a)
+	}
+	return moves
+}
+
+// moveKeys carries the open rows over to the keys they have under their new
+// names.
+func moveKeys(open map[string]bool, moves map[string]string) {
+	var carried []string
+	for from, to := range moves {
+		if open[from] {
+			delete(open, from)
+			carried = append(carried, to)
+		}
+	}
+	for _, to := range carried {
+		open[to] = true
+	}
+}
+
+// groupEditorLines draws the field being edited in the pane of a group: the
+// input, and under it what the text does.
+func (m Model) groupEditorLines(g group, f fieldKind, prefix, indent string, vw int) []string {
+	first := m.in[0]
+	first.Width = max(vw-1, 1)
+	lines := []string{prefix + first.View()}
+	hint := ""
+	switch {
+	case f == fArtist || f == fAlbum:
+		hint = m.joinHint(g, f)
+	case f.isLatin():
+		hint = "for " + g.name + " · empty takes the form worked out back"
+	case f == fReleased:
+		hint = "e.g. 1999, 1999-05 or 1999-05-17 · empty if unknown"
+	case f == fGenre:
+		hint = "e.g. Folk or Neoclassical · empty for none"
+	case f == fAlbumOf:
+		hint = "how many tracks the album has · empty if unknown"
+	}
+	if hint != "" {
+		lines = append(lines, hintLines(indent, hint, vw)...)
+	}
+	if m.dr.mixed {
+		lines = append(lines, hintLines(indent, "the tracks differ · empty keeps them · - clears", vw)...)
+	}
+	if m.editErr != "" {
+		for _, l := range wrap(m.editErr, vw) {
+			lines = append(lines, indent+styles.bad.Render(l))
+		}
+	}
+	return lines
+}
+
+// joinHint says that the name being typed is one that exists already, so that
+// saving it joins the group with it.
+func (m Model) joinHint(g group, f fieldKind) string {
+	typed := strings.TrimSpace(m.dr.text)
+	if typed == "" || typed == g.name {
+		return ""
+	}
+	n := 0
+	for _, t := range m.tracks {
+		switch {
+		case t.Status != manifest.Identified:
+		case f == fArtist && t.Artist == typed:
+			n++
+		case f == fAlbum && t.Artist == g.artist && t.Album == typed:
+			n++
+		}
+	}
+	switch {
+	case n == 0:
+		return ""
+	case f == fArtist:
+		return "joins the artist " + typed + " (" + plural(n, "track") + ")"
+	}
+	return "joins the album " + typed + " of " + g.artist + " (" + plural(n, "track") + ")"
 }

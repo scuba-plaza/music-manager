@@ -77,11 +77,14 @@ type changedMsg struct {
 	label, status string
 	before, after []manifest.Track // aligned: the same tracks, before and after
 	err           error
+	// done, if there is one, is what is left to do once the change is shown, in
+	// place of selecting the first track changed.
+	done func(*Model)
 }
 
 // saveMany runs a change to the tracks with the given ids in the background
 // and reports it as a changedMsg.
-func (m Model) saveMany(label, status string, ids []string, call func(Library) (map[string]manifest.Track, error)) tea.Cmd {
+func (m Model) saveMany(label, status string, ids []string, call func(Library) (map[string]manifest.Track, error), done ...func(*Model)) tea.Cmd {
 	byID := map[string]manifest.Track{}
 	for _, t := range m.tracks {
 		byID[t.ID] = t
@@ -98,7 +101,11 @@ func (m Model) saveMany(label, status string, ids []string, call func(Library) (
 				before, after = append(before, byID[id]), append(after, t)
 			}
 		}
-		return changedMsg{label: label, status: status, before: before, after: after}
+		msg := changedMsg{label: label, status: status, before: before, after: after}
+		if len(done) > 0 {
+			msg.done = done[0]
+		}
+		return msg
 	}
 }
 
@@ -107,6 +114,8 @@ func (m Model) changed(msg changedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		if form, ok := m.overlay.(*bulkForm); ok {
 			form.err = msg.err.Error()
+		} else if m.editing {
+			m.editErr = msg.err.Error() // under the field being edited
 		} else {
 			m.say(msg.err.Error(), true)
 		}
@@ -118,7 +127,10 @@ func (m Model) changed(msg changedMsg) (tea.Model, tea.Cmd) {
 	}
 	m.record(change{label: msg.label, before: msg.before, after: msg.after})
 	m.say(msg.status, false)
-	if len(msg.after) > 0 {
+	switch {
+	case msg.done != nil:
+		msg.done(&m)
+	case len(msg.after) > 0:
 		m.revealTrack(msg.after[0])
 	}
 	return m, nil
