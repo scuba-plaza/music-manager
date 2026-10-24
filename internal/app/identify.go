@@ -262,8 +262,9 @@ func describe(c Candidate) string {
 }
 
 // applyCandidate identifies the track with this id as c, with a cover from src
-// if it has none, and saves it. The lookups take seconds, so the records are
-// read again after them: whatever another mm changed meanwhile is kept.
+// if it has none, and saves it. The lookups take seconds, so they are done
+// before the records are changed, which is done on the records as they are
+// then: whatever another mm changed meanwhile is kept.
 func (a *App) applyCandidate(ctx context.Context, id string, c Candidate, src MetadataSource) (manifest.Track, error) {
 	m, err := a.store.Load()
 	if err != nil {
@@ -281,12 +282,6 @@ func (a *App) applyCandidate(ctx context.Context, id string, c Candidate, src Me
 		}
 	}
 
-	if m, err = a.store.Load(); err != nil {
-		return manifest.Track{}, err
-	}
-	if t, ok = m.Get(id); !ok {
-		return manifest.Track{}, fmt.Errorf("no track with id %q", id)
-	}
 	e := Edit{
 		Title: &c.Title, Artist: &c.Artist, Album: &c.Album,
 		TrackNumber: &c.TrackNumber, TrackTotal: &c.TrackTotal,
@@ -294,16 +289,26 @@ func (a *App) applyCandidate(ctx context.Context, id string, c Candidate, src Me
 	if d := leadingDate(c.Date); d != "" { // a match that does not know the date keeps ours
 		e.Released = &d
 	}
-	t, err = applyEdit(t, e)
+	err = a.store.Update(func(m *manifest.Manifest) error {
+		var ok bool
+		if t, ok = m.Get(id); !ok {
+			return fmt.Errorf("no track with id %q", id)
+		}
+		var err error
+		if t, err = applyEdit(t, e); err != nil {
+			return err
+		}
+		t.MBRecordingID, t.MBReleaseID = c.RecordingID, c.ReleaseID
+		if t.CoverSHA256 == "" && coverSHA != "" && a.covers.Has(coverSHA) { // not if a sync has cleared it away meanwhile
+			t.CoverSHA256 = coverSHA
+		}
+		m.Update(t)
+		return nil
+	})
 	if err != nil {
-		return t, err
+		return manifest.Track{}, err
 	}
-	t.MBRecordingID, t.MBReleaseID = c.RecordingID, c.ReleaseID
-	if t.CoverSHA256 == "" {
-		t.CoverSHA256 = coverSHA
-	}
-	m.Update(t)
-	return t, a.store.Save(m)
+	return t, nil
 }
 
 // Display returns the artist, title and album to show for t: its own when

@@ -41,7 +41,7 @@ func TestSaveThenLoadRoundTrips(t *testing.T) {
 		CoverSHA256:  "def456",
 		AddedAt:      time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC),
 	}
-	if err := s.Save(&manifest.Manifest{Tracks: []manifest.Track{want}}); err != nil {
+	if err := replace(s, &manifest.Manifest{Tracks: []manifest.Track{want}}); err != nil {
 		t.Fatal(err)
 	}
 	m, err := s.Load()
@@ -66,10 +66,10 @@ func TestLoadRejectsUnknownVersion(t *testing.T) {
 func TestSaveKeepsPreviousVersionAsBackup(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "library.json")
 	s := manifest.NewStore(path)
-	if err := s.Save(&manifest.Manifest{Tracks: []manifest.Track{{ID: "first"}}}); err != nil {
+	if err := replace(s, &manifest.Manifest{Tracks: []manifest.Track{{ID: "first"}}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Save(&manifest.Manifest{Tracks: []manifest.Track{{ID: "second"}}}); err != nil {
+	if err := replace(s, &manifest.Manifest{Tracks: []manifest.Track{{ID: "second"}}}); err != nil {
 		t.Fatal(err)
 	}
 	bak, err := manifest.NewStore(path + ".bak").Load()
@@ -85,7 +85,7 @@ func TestSaveLeavesNoTempFilesBehind(t *testing.T) {
 	dir := t.TempDir()
 	s := manifest.NewStore(filepath.Join(dir, "library.json"))
 	for i := 0; i < 3; i++ {
-		if err := s.Save(&manifest.Manifest{}); err != nil {
+		if err := replace(s, &manifest.Manifest{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -94,7 +94,7 @@ func TestSaveLeavesNoTempFilesBehind(t *testing.T) {
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
-	want := []string{"library.json", "library.json.bak"}
+	want := []string{"library.json", "library.json.bak", "library.json.lock"}
 	if !reflect.DeepEqual(names, want) {
 		t.Errorf("dir = %v, want %v", names, want)
 	}
@@ -104,12 +104,12 @@ func TestFailedSaveKeepsExistingFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "library.json")
 	s := manifest.NewStore(path)
-	if err := s.Save(&manifest.Manifest{Tracks: []manifest.Track{{ID: "keep"}}}); err != nil {
+	if err := replace(s, &manifest.Manifest{Tracks: []manifest.Track{{ID: "keep"}}}); err != nil {
 		t.Fatal(err)
 	}
 	// An unencodable value makes marshalling fail before anything is written.
 	bad := &manifest.Manifest{Tracks: []manifest.Track{{ID: "bad", AddedAt: time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)}}}
-	if err := s.Save(bad); err == nil {
+	if err := replace(s, bad); err == nil {
 		t.Fatal("Save succeeded, want error")
 	}
 	m, err := s.Load()
@@ -125,7 +125,7 @@ func TestAGenreIsWrittenOnlyWhenThereIsOne(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "library.json")
 	s := manifest.NewStore(path)
 	m := &manifest.Manifest{Tracks: []manifest.Track{{ID: "aaaaaa", Genre: "Neoclassical"}, {ID: "bbbbbb"}}}
-	if err := s.Save(m); err != nil {
+	if err := replace(s, m); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(path)
@@ -156,4 +156,9 @@ func TestALibraryOfVersion1IsRefusedWithoutPointingToAVerbThatIsGone(t *testing.
 	if after, _ := os.ReadFile(path); string(after) != `{"version": 1, "tracks": []}` {
 		t.Error("loading changed the file")
 	}
+}
+
+// replace makes the records of the store exactly m, as a change.
+func replace(s *manifest.Store, m *manifest.Manifest) error {
+	return s.Update(func(cur *manifest.Manifest) error { *cur = *m; return nil })
 }

@@ -50,24 +50,26 @@ const MaxGainSteps = 16 // 24 dB
 // Edit applies e to the track with the given ID and returns the result. A
 // track with a title and an artist is identified.
 func (a *App) Edit(id string, e Edit) (manifest.Track, error) {
-	m, err := a.store.Load()
+	var t manifest.Track
+	err := a.store.Update(func(m *manifest.Manifest) error {
+		cur, ok := m.Get(id)
+		if !ok {
+			return fmt.Errorf("no track with id %q", id)
+		}
+		if err := a.checkCover(e); err != nil {
+			return err
+		}
+		var err error
+		if t, err = applyEdit(cur, e); err != nil {
+			return err
+		}
+		m.Update(t)
+		return nil
+	})
 	if err != nil {
 		return manifest.Track{}, err
 	}
-	t, ok := m.Get(id)
-	if !ok {
-		return manifest.Track{}, fmt.Errorf("no track with id %q", id)
-	}
-
-	if err := a.checkCover(e); err != nil {
-		return manifest.Track{}, err
-	}
-	t, err = applyEdit(t, e)
-	if err != nil {
-		return manifest.Track{}, err
-	}
-	m.Update(t)
-	return t, a.store.Save(m)
+	return t, nil
 }
 
 // checkCover refuses an edit that names a cover that is not in the store.

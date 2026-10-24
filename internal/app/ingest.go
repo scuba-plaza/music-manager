@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -56,6 +57,16 @@ func (a *App) stage(path string) (staged, error) {
 	}, nil
 }
 
+// stored says whether the audio and the cover of a staged file are still in the
+// stores. No record holds them until the file is added, so a sync may have
+// collected them; it cannot while the records are being changed.
+func (a *App) stored(s staged) bool {
+	return a.audio.Has(s.sha) && (s.coverSHA == "" || a.covers.Has(s.coverSHA))
+}
+
+// errClearedAway is why a staged file is not added when its files are gone.
+var errClearedAway = errors.New("its audio was cleared away by a sync before it was added; add it again")
+
 // newTrack is the record for a freshly staged file.
 func newTrack(s staged, sourceURL string) manifest.Track {
 	now := time.Now().UTC()
@@ -78,8 +89,7 @@ func newTrack(s staged, sourceURL string) manifest.Track {
 // Ingest adds the MP3 files at the given files or directories to the
 // library as unidentified tracks. The files themselves are left alone. The
 // files are read first and the records only afterwards, so that a long
-// ingest does not hold, and then save over, a copy of the records that
-// another mm has changed meanwhile.
+// ingest does not keep the records locked from the other mm.
 func (a *App) Ingest(paths []string) (IngestReport, error) {
 	var rep IngestReport
 	if _, err := a.store.Load(); err != nil { // not worth reading any file if the records cannot be used
@@ -111,16 +121,17 @@ func (a *App) Ingest(paths []string) (IngestReport, error) {
 		}
 	}
 
-	m, err := a.store.Load()
-	if err != nil {
-		return rep, err
-	}
-	for _, f := range files {
-		if _, dup := m.FindByAudio(f.s.sha); dup {
-			rep.Duplicates = append(rep.Duplicates, f.path)
-			continue
+	err := a.store.Update(func(m *manifest.Manifest) error {
+		for _, f := range files {
+			if _, dup := m.FindByAudio(f.s.sha); dup {
+				rep.Duplicates = append(rep.Duplicates, f.path)
+			} else if !a.stored(f.s) {
+				rep.Failed = append(rep.Failed, IngestFailure{f.path, errClearedAway})
+			} else {
+				rep.Added = append(rep.Added, m.Add(newTrack(f.s, "")))
+			}
 		}
-		rep.Added = append(rep.Added, m.Add(newTrack(f.s, "")))
-	}
-	return rep, a.store.Save(m)
+		return nil
+	})
+	return rep, err
 }

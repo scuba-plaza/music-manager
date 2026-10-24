@@ -24,30 +24,33 @@ func (a *App) SetCover(id string, image []byte) error {
 // takes the cover away from them if image is empty. Either all of them change
 // or none does; the tracks are returned as saved, by ID.
 func (a *App) SetCoverMany(ids []string, image []byte) (map[string]manifest.Track, error) {
-	m, err := a.store.Load()
-	if err != nil {
-		return nil, err
-	}
-	var ts []manifest.Track
-	for _, id := range ids {
-		t, ok := m.Get(id)
-		if !ok {
-			return nil, fmt.Errorf("no track with id %q", id)
+	var updated map[string]manifest.Track
+	err := a.store.Update(func(m *manifest.Manifest) error {
+		var ts []manifest.Track
+		for _, id := range ids {
+			t, ok := m.Get(id)
+			if !ok {
+				return fmt.Errorf("no track with id %q", id)
+			}
+			ts = append(ts, t)
 		}
-		ts = append(ts, t)
-	}
-	sha, err := a.StoreCover(image)
+		sha, err := a.StoreCover(image)
+		if err != nil {
+			return err
+		}
+		now := time.Now().UTC()
+		updated = make(map[string]manifest.Track, len(ts))
+		for _, t := range ts {
+			t.CoverSHA256, t.UpdatedAt = sha, now
+			m.Update(t)
+			updated[t.ID] = t
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	now := time.Now().UTC()
-	updated := make(map[string]manifest.Track, len(ts))
-	for _, t := range ts {
-		t.CoverSHA256, t.UpdatedAt = sha, now
-		m.Update(t)
-		updated[t.ID] = t
-	}
-	return updated, a.store.Save(m)
+	return updated, nil
 }
 
 // StoreCover files an image in the cover store, as it is, and returns its SHA,

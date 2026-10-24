@@ -51,7 +51,7 @@ func TestLatinFormsAreSavedAndOnlyWhenSet(t *testing.T) {
 		Tracks:    []manifest.Track{{ID: "aaaaaa", Title: "وطني", TitleLatin: "Watani", Artist: "A"}},
 		Playlists: []manifest.Playlist{{Name: "دراسة", NameLatin: "Study", Tracks: []string{"aaaaaa"}}},
 	}
-	if err := store.Save(m); err != nil {
+	if err := replace(store, m); err != nil {
 		t.Fatal(err)
 	}
 	got, err := store.Load()

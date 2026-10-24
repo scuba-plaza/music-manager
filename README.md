@@ -44,6 +44,8 @@ tracks on the left, and on the right whatever the cursor is on: a track's detail
 are waiting (`3 to sync`). Press `?` for the list of keys, one page for each kind (`←` `→` or `1`-`4` turn the pages); the bottom line always shows the ones that
 matter right now. Without a terminal, plain `mm` prints help.
 
+Several `mm` can work on one library at once, the interface in one terminal and a command in another. A change reads `library.json` as it is at that moment, changes it and writes it back while holding a lock on `library.json.lock`, so no change undoes another; the interface notices what the others did and shows it. A waiting `mm` carries on within a moment, or says that another `mm` has the library after 30 seconds. If an `mm` is killed, the system lets go of its lock by itself. `library.json.lock` is only a place to lock and can be deleted when no `mm` is running.
+
 | | |
 |---|---|
 | `↑↓` `/` | move, filter (same words as `mm ls`, e.g. `status:unidentified`) |

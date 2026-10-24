@@ -99,6 +99,9 @@ type Manifest struct {
 	Playlists []Playlist `json:"playlists,omitempty"`
 }
 
+// Store keeps the records in one file. Reading is free; every change to the
+// records goes through Update, which makes it take its turn with the changes
+// of other mm (see lock.go).
 type Store struct{ path string }
 
 func NewStore(path string) *Store { return &Store{path: path} }
@@ -130,9 +133,9 @@ func (s *Store) Load() (*Manifest, error) {
 	return &Manifest{Tracks: f.Tracks, Playlists: f.Playlists}, nil
 }
 
-// Save writes the manifest atomically: the data goes to a temp file that is
+// save writes the manifest atomically: the data goes to a temp file that is
 // renamed over the target, after the previous version is copied to .bak.
-func (s *Store) Save(m *Manifest) error {
+func (s *Store) save(m *Manifest) error {
 	data, err := json.MarshalIndent(file{Version: schemaVersion, Tracks: m.Tracks, Playlists: m.Playlists}, "", "  ")
 	if err != nil {
 		return err

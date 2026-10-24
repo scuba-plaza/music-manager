@@ -147,11 +147,8 @@ func (a *App) Finish(ctx context.Context, d *Draft, e Edit) (manifest.Track, err
 	if err != nil {
 		return manifest.Track{}, err
 	}
-	if dup, ok := m.FindByAudio(d.staged.sha); ok {
-		return manifest.Track{}, &DuplicateError{ID: dup.ID}
-	}
-	if !a.audio.Has(d.staged.sha) || d.staged.coverSHA != "" && !a.covers.Has(d.staged.coverSHA) { // no record held them, so a sync in between collected them
-		return manifest.Track{}, errors.New("the downloaded audio was cleared away by a sync before it was added; download it again")
+	if err := a.usable(m, d); err != nil { // so that a draft that cannot be added says so before anything is looked up
+		return manifest.Track{}, err
 	}
 	t, err := applyEdit(newTrack(d.staged, d.URL), e)
 	if err != nil {
@@ -168,8 +165,34 @@ func (a *App) Finish(ctx context.Context, d *Draft, e Edit) (manifest.Track, err
 			}
 		}
 	}
-	t = m.Add(t)
-	return t, a.store.Save(m)
+	var added manifest.Track
+	err = a.store.Update(func(m *manifest.Manifest) error {
+		if err := a.usable(m, d); err != nil { // and again on the records as they are now
+			return err
+		}
+		if t.CoverSHA256 != "" && !a.covers.Has(t.CoverSHA256) { // a cover looked up on the way, if a sync has cleared it away, is left out
+			t.CoverSHA256 = ""
+		}
+		added = m.Add(t)
+		return nil
+	})
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	return added, nil
+}
+
+// usable says whether the draft can still be added to the records m: its audio
+// is not in them, and its files are still stored, which no record held until
+// now, so a sync in between may have collected them.
+func (a *App) usable(m *manifest.Manifest, d *Draft) error {
+	if dup, ok := m.FindByAudio(d.staged.sha); ok {
+		return &DuplicateError{ID: dup.ID}
+	}
+	if !a.stored(d.staged) {
+		return errors.New("the downloaded audio was cleared away by a sync before it was added; download it again")
+	}
+	return nil
 }
 
 // Add downloads the audio at req.URL into the library as an identified

@@ -14,19 +14,15 @@ import (
 // any (and all of them exist: otherwise there is no playlist). Its name must
 // not be empty, nor come out as the same file name as another playlist's.
 func (a *App) CreatePlaylist(name string, ids ...string) error {
-	m, err := a.store.Load()
-	if err != nil {
-		return err
-	}
 	name = strings.TrimSpace(name)
-	if err := checkPlaylist(m, manifest.Playlist{Name: name}); err != nil {
+	return a.store.Update(func(m *manifest.Manifest) error {
+		if err := checkPlaylist(m, manifest.Playlist{Name: name}); err != nil {
+			return err
+		}
+		m.Playlists = append(m.Playlists, manifest.Playlist{Name: name, Tracks: []string{}})
+		_, err := addTracks(m, len(m.Playlists)-1, ids)
 		return err
-	}
-	m.Playlists = append(m.Playlists, manifest.Playlist{Name: name, Tracks: []string{}})
-	if _, err := addTracks(m, len(m.Playlists)-1, ids); err != nil {
-		return err
-	}
-	return a.store.Save(m)
+	})
 }
 
 // targets are the kinds of place a library is written to; two playlists may
@@ -64,18 +60,18 @@ func playlist(m *manifest.Manifest, name string) (int, error) {
 // and returns how many were added. A track already in the playlist is left
 // where it is. If any track is unknown nothing is added.
 func (a *App) AddToPlaylist(name string, ids []string) (added int, err error) {
-	m, err := a.store.Load()
+	err = a.store.Update(func(m *manifest.Manifest) error {
+		i, err := playlist(m, name)
+		if err != nil {
+			return err
+		}
+		added, err = addTracks(m, i, ids)
+		return err
+	})
 	if err != nil {
 		return 0, err
 	}
-	i, err := playlist(m, name)
-	if err != nil {
-		return 0, err
-	}
-	if added, err = addTracks(m, i, ids); err != nil {
-		return 0, err
-	}
-	return added, a.store.Save(m)
+	return added, nil
 }
 
 // addTracks appends the tracks that are not in playlist i yet, in order, and
@@ -103,104 +99,94 @@ func addTracks(m *manifest.Manifest, i int, ids []string) (added int, err error)
 // RemoveFromPlaylist takes tracks out of a playlist, leaving the rest in
 // order. If any of them is not in the playlist, nothing is removed.
 func (a *App) RemoveFromPlaylist(name string, ids []string) error {
-	m, err := a.store.Load()
-	if err != nil {
-		return err
-	}
-	i, err := playlist(m, name)
-	if err != nil {
-		return err
-	}
-	drop := map[string]bool{}
-	for _, id := range ids {
-		if !slices.Contains(m.Playlists[i].Tracks, id) {
-			return fmt.Errorf("track %q is not in the playlist %q", id, name)
+	return a.store.Update(func(m *manifest.Manifest) error {
+		i, err := playlist(m, name)
+		if err != nil {
+			return err
 		}
-		drop[id] = true
-	}
-	m.Playlists[i].Tracks = slices.DeleteFunc(m.Playlists[i].Tracks, func(id string) bool { return drop[id] })
-	return a.store.Save(m)
+		drop := map[string]bool{}
+		for _, id := range ids {
+			if !slices.Contains(m.Playlists[i].Tracks, id) {
+				return fmt.Errorf("track %q is not in the playlist %q", id, name)
+			}
+			drop[id] = true
+		}
+		m.Playlists[i].Tracks = slices.DeleteFunc(m.Playlists[i].Tracks, func(id string) bool { return drop[id] })
+		return nil
+	})
 }
 
 // MoveInPlaylist puts a track at position to (counting from 0) in a
 // playlist, shifting the tracks in between.
 func (a *App) MoveInPlaylist(name, id string, to int) error {
-	m, err := a.store.Load()
-	if err != nil {
-		return err
-	}
-	i, err := playlist(m, name)
-	if err != nil {
-		return err
-	}
-	tracks := m.Playlists[i].Tracks
-	from := slices.Index(tracks, id)
-	switch {
-	case from < 0:
-		return fmt.Errorf("track %q is not in the playlist %q", id, name)
-	case to < 0 || to >= len(tracks):
-		return fmt.Errorf("position %d is outside the playlist %q, which has %d tracks", to, name, len(tracks))
-	}
-	tracks = slices.Delete(tracks, from, from+1)
-	m.Playlists[i].Tracks = slices.Insert(tracks, to, id)
-	return a.store.Save(m)
+	return a.store.Update(func(m *manifest.Manifest) error {
+		i, err := playlist(m, name)
+		if err != nil {
+			return err
+		}
+		tracks := m.Playlists[i].Tracks
+		from := slices.Index(tracks, id)
+		switch {
+		case from < 0:
+			return fmt.Errorf("track %q is not in the playlist %q", id, name)
+		case to < 0 || to >= len(tracks):
+			return fmt.Errorf("position %d is outside the playlist %q, which has %d tracks", to, name, len(tracks))
+		}
+		tracks = slices.Delete(tracks, from, from+1)
+		m.Playlists[i].Tracks = slices.Insert(tracks, to, id)
+		return nil
+	})
 }
 
 // RenamePlaylist gives a playlist another name, keeping its tracks and its
 // place in the list of playlists.
 func (a *App) RenamePlaylist(name, to string) error {
-	m, err := a.store.Load()
-	if err != nil {
-		return err
-	}
-	i, err := playlist(m, name)
-	if err != nil {
-		return err
-	}
 	to = strings.TrimSpace(to)
-	// Check the new name against the others only: it may differ from the old
-	// one in nothing but case.
-	others := &manifest.Manifest{Playlists: slices.Delete(slices.Clone(m.Playlists), i, i+1)}
-	if err := checkPlaylist(others, manifest.Playlist{Name: to, NameLatin: m.Playlists[i].NameLatin}); err != nil {
-		return err
-	}
-	m.Playlists[i].Name = to
-	return a.store.Save(m)
+	return a.store.Update(func(m *manifest.Manifest) error {
+		i, err := playlist(m, name)
+		if err != nil {
+			return err
+		}
+		// Check the new name against the others only: it may differ from the old
+		// one in nothing but case.
+		others := &manifest.Manifest{Playlists: slices.Delete(slices.Clone(m.Playlists), i, i+1)}
+		if err := checkPlaylist(others, manifest.Playlist{Name: to, NameLatin: m.Playlists[i].NameLatin}); err != nil {
+			return err
+		}
+		m.Playlists[i].Name = to
+		return nil
+	})
 }
 
 // SetPlaylistLatin sets how a playlist is named in Latin letters, for the
 // targets that cannot show its name; "" takes the form set by hand away, and the
 // one worked out from the name is used again.
 func (a *App) SetPlaylistLatin(name, latin string) error {
-	m, err := a.store.Load()
-	if err != nil {
-		return err
-	}
-	i, err := playlist(m, name)
-	if err != nil {
-		return err
-	}
 	latin = strings.TrimSpace(latin)
-	others := &manifest.Manifest{Playlists: slices.Delete(slices.Clone(m.Playlists), i, i+1)}
-	if err := checkPlaylist(others, manifest.Playlist{Name: name, NameLatin: latin}); err != nil {
-		return err
-	}
-	m.Playlists[i].NameLatin = latin
-	return a.store.Save(m)
+	return a.store.Update(func(m *manifest.Manifest) error {
+		i, err := playlist(m, name)
+		if err != nil {
+			return err
+		}
+		others := &manifest.Manifest{Playlists: slices.Delete(slices.Clone(m.Playlists), i, i+1)}
+		if err := checkPlaylist(others, manifest.Playlist{Name: name, NameLatin: latin}); err != nil {
+			return err
+		}
+		m.Playlists[i].NameLatin = latin
+		return nil
+	})
 }
 
 // DeletePlaylist removes a playlist. The tracks stay in the library.
 func (a *App) DeletePlaylist(name string) error {
-	m, err := a.store.Load()
-	if err != nil {
-		return err
-	}
-	i, err := playlist(m, name)
-	if err != nil {
-		return err
-	}
-	m.Playlists = slices.Delete(m.Playlists, i, i+1)
-	return a.store.Save(m)
+	return a.store.Update(func(m *manifest.Manifest) error {
+		i, err := playlist(m, name)
+		if err != nil {
+			return err
+		}
+		m.Playlists = slices.Delete(m.Playlists, i, i+1)
+		return nil
+	})
 }
 
 // ReplacePlaylists makes the playlists exactly ps, which is what undo
@@ -208,39 +194,37 @@ func (a *App) DeletePlaylist(name string) error {
 // could have: an unknown track, a track twice in a playlist, or names that
 // are empty or would be the same file.
 func (a *App) ReplacePlaylists(ps []manifest.Playlist) error {
-	m, err := a.store.Load()
-	if err != nil {
-		return err
-	}
-	checked := &manifest.Manifest{}
-	for _, p := range ps {
-		if p.Name != strings.TrimSpace(p.Name) {
-			return fmt.Errorf("playlist name %q has spaces around it", p.Name)
-		}
-		if p.NameLatin != strings.TrimSpace(p.NameLatin) {
-			return fmt.Errorf("the Latin name %q of playlist %q has spaces around it", p.NameLatin, p.Name)
-		}
-		if err := checkPlaylist(checked, p); err != nil {
-			return err
-		}
-		seen := map[string]bool{}
-		for _, id := range p.Tracks {
-			if _, ok := m.Get(id); !ok {
-				return fmt.Errorf("playlist %q: no track with id %q", p.Name, id)
+	return a.store.Update(func(m *manifest.Manifest) error {
+		checked := &manifest.Manifest{}
+		for _, p := range ps {
+			if p.Name != strings.TrimSpace(p.Name) {
+				return fmt.Errorf("playlist name %q has spaces around it", p.Name)
 			}
-			if seen[id] {
-				return fmt.Errorf("playlist %q: track %q is in it twice", p.Name, id)
+			if p.NameLatin != strings.TrimSpace(p.NameLatin) {
+				return fmt.Errorf("the Latin name %q of playlist %q has spaces around it", p.NameLatin, p.Name)
 			}
-			seen[id] = true
+			if err := checkPlaylist(checked, p); err != nil {
+				return err
+			}
+			seen := map[string]bool{}
+			for _, id := range p.Tracks {
+				if _, ok := m.Get(id); !ok {
+					return fmt.Errorf("playlist %q: no track with id %q", p.Name, id)
+				}
+				if seen[id] {
+					return fmt.Errorf("playlist %q: track %q is in it twice", p.Name, id)
+				}
+				seen[id] = true
+			}
+			checked.Playlists = append(checked.Playlists, manifest.Playlist{Name: p.Name, NameLatin: p.NameLatin})
 		}
-		checked.Playlists = append(checked.Playlists, manifest.Playlist{Name: p.Name, NameLatin: p.NameLatin})
-	}
-	m.Playlists = slices.Clone(ps)
-	for i := range m.Playlists {
-		m.Playlists[i].Tracks = slices.Clone(m.Playlists[i].Tracks)
-		if m.Playlists[i].Tracks == nil {
-			m.Playlists[i].Tracks = []string{}
+		m.Playlists = slices.Clone(ps)
+		for i := range m.Playlists {
+			m.Playlists[i].Tracks = slices.Clone(m.Playlists[i].Tracks)
+			if m.Playlists[i].Tracks == nil {
+				m.Playlists[i].Tracks = []string{}
+			}
 		}
-	}
-	return a.store.Save(m)
+		return nil
+	})
 }
