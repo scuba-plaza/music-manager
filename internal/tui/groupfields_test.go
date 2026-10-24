@@ -1105,3 +1105,27 @@ func TestAClickBelowTheFieldsOfAGroupDoesNotChooseOrEditAField(t *testing.T) {
 		t.Errorf("a click on the list under the fields chose field %d (was %d), editing %v", m.gfield, before, m.editing)
 	}
 }
+
+func TestInTheNarrowLayoutTheFieldsOfAnArtistReplaceTheTreeAndRenameIt(t *testing.T) {
+	m, lib := browserModel(t, 65, 26)
+	m = keys(t, m, "down", "down", "down") // Shawn James
+	if got := selectedLabel(t, m); got != "Shawn James" {
+		t.Fatalf("setup: %q", got)
+	}
+	m = keys(t, m, "right")
+	contains(t, m, "Name", "Latin name", "Genre", "all 3 tracks")
+	lacks(t, m, "Library", "Phoria")
+
+	m = keys(t, m, "enter")
+	contains(t, m, "Shawn James") // the editor starts from the name
+	m = typed(t, clearField(t, m), "Shawn J.")
+	m = keys(t, m, "enter")
+	if got := artistOf(t, lib, "Flow"); got != "Shawn J." {
+		t.Errorf("Flow is by %q", got)
+	}
+	contains(t, m, "Shawn J.")
+
+	m = keys(t, m, "esc")
+	contains(t, m, "Library", "Phoria")
+	lacks(t, m, "Latin name")
+}

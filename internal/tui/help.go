@@ -20,20 +20,22 @@ type helpSection struct {
 var helpLeft = []helpSection{
 	{"Moving", []helpEntry{
 		{"↑↓  j k", "move"},
-		{"→ ←  l h", "open / close / into fields"},
+		{"→  l  e", "into the fields at the right"},
+		{"enter", "open / close in the tree"},
+		{"←  h", "close, or up a level"},
 		{"PgUp PgDn", "a page at a time"},
 		{"g G", "top / bottom"},
 		{"z", "centre the cursor"},
 		{"+  -", "open a level / close all"},
 		{"/", "filter  (esc clears it)"},
 	}},
-	{"Editing a track", []helpEntry{
-		{"→  enter", "from tree into fields"},
+	{"Editing the fields", []helpEntry{
 		{"↑↓", "choose a field"},
-		{"← →  1-3", "details, audio, Latin forms"},
 		{"enter", "edit it; enter saves"},
 		{"esc", "cancel, or back to tree"},
-		{"tab", "other number"},
+		{"← →  1-3", "track: details, audio, Latin"},
+		{"tab", "track: other number"},
+		{"-", "clear a (mixed) field"},
 	}},
 	{"Cuts, volume, fades", []helpEntry{
 		{"[ ]", "nudge 0.1 s or 1.5 dB"},

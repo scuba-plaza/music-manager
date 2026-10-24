@@ -51,26 +51,44 @@ func TestTheScreenLooksAsDesigned(t *testing.T) {
 	for _, size := range [][2]int{{120, 36}, {100, 30}, {80, 24}, {60, 20}, {40, 10}} {
 		w, h := size[0], size[1]
 		t.Run(fmt.Sprintf("%dx%d", w, h), func(t *testing.T) {
-			got := goldenScreen(t, w, h)
-			file := filepath.Join("testdata", fmt.Sprintf("browser-%dx%d.txt", w, h))
-			if *update {
-				if err := os.MkdirAll("testdata", 0o755); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(file, []byte(got+"\n"), 0o644); err != nil {
-					t.Fatal(err)
-				}
-				return
-			}
-			want, err := os.ReadFile(file)
-			if err != nil {
-				t.Fatalf("%v (run with -update to create it)", err)
-			}
-			if strings.TrimSuffix(string(want), "\n") != got {
-				t.Errorf("the screen at %dx%d changed.\n--- want\n%s\n--- got\n%s", w, h, want, got)
-			}
+			checkGolden(t, fmt.Sprintf("browser-%dx%d.txt", w, h), goldenScreen(t, w, h))
 		})
 	}
+}
+
+// checkGolden compares the screen with the one kept in testdata, or rewrites
+// that one with -update.
+func checkGolden(t *testing.T, name, got string) {
+	t.Helper()
+	file := filepath.Join("testdata", name)
+	if *update {
+		if err := os.MkdirAll("testdata", 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(got+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatalf("%v (run with -update to create it)", err)
+	}
+	if strings.TrimSuffix(string(want), "\n") != got {
+		t.Errorf("the screen %s changed.\n--- want\n%s\n--- got\n%s", name, want, got)
+	}
+}
+
+// TestTheFieldsOfAnArtistLookAsDesigned keeps the pane of an artist, with the
+// cursor in its fields, as a sixth screen to check by eye.
+func TestTheFieldsOfAnArtistLookAsDesigned(t *testing.T) {
+	t.Setenv("HOME", "/home/me")
+	m, lib := browserModel(t, 120, 36)
+	m.lib = atMusic{lib}
+	m = send(t, m, m.load())
+	m = selectTrack(t, m, "Flow")
+	m = keys(t, m, "up", "up", "up", "right", "down")
+	checkGolden(t, "artist-120x36.txt", ansi.Strip(m.View()))
 }
 
 func TestTheFooterDropsHintsRatherThanCuttingOneInHalf(t *testing.T) {

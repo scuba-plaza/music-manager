@@ -9,7 +9,7 @@ import (
 func TestQuestionMarkShowsEveryKeyGroupedByWhatItDoes(t *testing.T) {
 	m, _ := editingModel(t, "Flow")
 	m = keys(t, m, "?")
-	contains(t, m, "Keys", "Moving", "Editing", "Several tracks", "Looking up", "Library",
+	contains(t, m, "Keys", "Moving", "Editing the fields", "into the fields", "(mixed)", "Several tracks", "Looking up", "Library",
 		"space", "ctrl+a", "J K", "[ ]", "ctrl+r", "tab", "enter", "esc")
 	contains(t, m, "esc closes")
 }

@@ -46,16 +46,17 @@ matter right now. Without a terminal, plain `mm` prints help as before.
 
 | | |
 |---|---|
-| `↑↓` `→←` `/` | move, open and close, filter (same words as `mm ls`, e.g. `status:unidentified`) |
+| `↑↓` `/` | move, filter (same words as `mm ls`, e.g. `status:unidentified`) |
 | `z` | centre the cursor in the list, like `zz` in vim |
 | `S` | sort the list by artist, album, title, track number, length or any of the three dates (see below); the menu also reverses the order and goes back to the tree |
 | `+` `-` | open the tree one more level (artists, then albums) / close all of it |
-| `→` `enter` | from a track into its fields; `enter` edits a field, `enter` saves, `esc` cancels |
+| `enter` `←` | open and close the artist, album or playlist under the cursor (`←` closes it, or goes up to its parent) |
+| `→` `e` | into the fields in the right-hand pane of what the cursor is on: a track, an artist, an album or a playlist; `↑↓` choose a field, `enter` edits it, `enter` saves, `esc` cancels, `←` goes back to the tree (see below for artists, albums and playlists). On a track `enter` goes in too |
 | `→` `←` `1` `2` `3` | in the fields: the other tab (Details, Audio, Latin: the forms of the names in Latin letters, see below); `←` on the first tab goes back to the tree. The tab you are on stays when you select another track. Under `mm --wolfgang` there is a fourth, `4`: a preview of what a sync for the Wolfgang writes for the track (see below) |
 | `[` `]` `{` `}` `0` `p` | on a cut: nudge by 0.1 s / 1 s, clear, hear the 8 s around it (needs `ffplay` or `mpv`) |
-| `space` `ctrl+a` `e` | mark tracks (an album marks all of its tracks); edit the marked ones, or rename an artist or album; the form has the Latin forms of the artist, album and genre too |
+| `space` `ctrl+a` `e` | mark tracks (an album marks all of its tracks); `e` edits the marked ones in one form, which has the Latin forms of the artist, album and genre too (with nothing marked, `e` is `→`) |
 | `J` `K` `n` | move a track down or up in its album; number the album 1…N |
-| `p` | add the marked tracks (or the selected track, album or artist) to a playlist, or start a new one. The **Playlists** group at the top of the tree opens into each playlist and its tracks in play order; there `J` `K` reorder, `d` takes a track out of the playlist (never out of the library), `d` on the playlist itself deletes it after asking, and `e` renames it and sets its Latin name |
+| `p` | add the marked tracks (or the selected track, album or artist) to a playlist, or start a new one. The **Playlists** group at the top of the tree opens into each playlist and its tracks in play order; there `J` `K` reorder, `d` takes a track out of the playlist (never out of the library), `d` on the playlist itself deletes it after asking, and `→` edits its name and its Latin name |
 | `i` `I` `o` | find a track on MusicBrainz and pick the match; do all unidentified tracks; use the file's old tags |
 | `a` | add from a YouTube link: one form, pre-filled from the match |
 | `s` | sync: choose the folder (or a mounted player), see what will change, apply. A drive has a Format row, Generic or Wolfgang WMP01, switched with `w` and never remembered (under `mm --wolfgang` a drive starts on the Wolfgang); the library folder is always written the standard way. The header says `N to sync · press s` when something is waiting; clicking it works too |
@@ -63,7 +64,7 @@ matter right now. Without a terminal, plain `mm` prints help as before.
 
 Covers are shown in full resolution in terminals that speak the kitty graphics protocol (kitty, Ghostty), and as coloured half-blocks everywhere else. `MM_COVERS=blocks` or `MM_COVERS=kitty` overrides the guess; inside tmux or screen, which do not pass pictures on, blocks are used. The cover takes the room the fields leave below them.
 
-The mouse works too: click to select, click again to open, double-click a folder row to open it, wheel
+The mouse works too: click to select, click the selected track, artist, album or playlist again to go into its fields (a click on a field chooses it, another edits it), double-click a folder row to open or close it, wheel
 to scroll. Colours follow your terminal's light or dark background and honour `NO_COLOR`. If another `mm`
 changes the library while the interface is open, the change appears within a couple of seconds.
 
@@ -116,11 +117,26 @@ The sections are `## ARTISTS`, `## ALBUMS` and `## TRACKS`, each followed by `->
 
 `mm review apply <file>` checks the whole file first, so that one invalid value changes nothing, then sets all the values in one save. Entries marked `low` are left out unless you pass `--include-low`, `--dry-run` only reports, and entries that match no track are listed. Applying a file twice changes nothing the second time.
 
+## Editing an artist, an album or a playlist
+
+To rename an artist or fix an album you do not go from track to track: press `→` (or `e`) on its row and the right-hand pane shows its fields, which are edited like a track's. `enter` opens the tree instead.
+
+| | fields |
+|---|---|
+| artist | Name, Latin name, Genre, Latin genre |
+| album | Name, Latin name, Released, Genre, Latin genre, Tracks on album, Cover |
+| playlist | Name, Latin name |
+
+* **An edit reaches all the tracks of the artist or album**, whatever the filter shows, so that an artist is never split in two; an album means that artist's tracks of that name only. The pane says `all 3 tracks · one undo step`: the whole edit is one step for `u`, and `ctrl+r` redoes it. The *Needs work* group, *Singles* and the *Playlists* group have no fields.
+* **What a field shows** is what all the tracks agree on. If they differ it says `(mixed)` and opens empty: leaving it empty keeps every track as it is, `-` clears the field on all of them, and any other text is set on all of them. A field that all the tracks agree on is cleared by emptying it. A Latin form is dim while it is worked out and normal once it was set by hand; it is only written on the tracks that have a name to write.
+* **Names cannot be empty**, and a name that is already another artist's (or the same artist's album) joins the two: the pane says `joins the artist Phoria (4 tracks)` while you type. To turn tracks into singles, mark them and use `e` with `-` in Album. The cursor and the open albums follow the new name.
+* **The cover of an album** is a JPEG or PNG file, set on every track of the album; an empty path or `x` takes the covers away. A playlist's name must not be another playlist's or give the same file name; the pane says so and nothing changes.
+
 ## Latin forms
 
 Names are kept as they really are, in any script. Some places can only show Latin letters: the Wolfgang WMP01 (below) and the order of the list, which puts فيروز among the F. For these, each name has a **Latin form**: how it reads in Latin letters. Unless you set one, it is worked out from the name, word by word. That is rough for Arabic, which is written without its short vowels: فيروز comes out as "Firuz" and جوليا بطرس as "Julya Btrs". So a form can be set by hand, for the title, the artist, the album and the genre of a track and for the name of a playlist, and it is used instead of the worked-out one:
 
-* **In the full-screen interface**, the **Latin** tab (`3`) of a track lists the four. The form shown is the one in use: dim when it is worked out, normal when it was set by hand, `—` when there is no name to write. `enter` edits it starting from what is shown; saving what was there changes nothing, and saving it empty goes back to the worked-out form. The change is one step for `u` to undo, like any other. For many tracks at once, `e` on an artist or an album, or on marked tracks, has rows for the Latin form of the artist, the album and the genre (`-` takes it away). `e` on a playlist has its Latin name under its name.
+* **In the full-screen interface**, the **Latin** tab (`3`) of a track lists the four. The form shown is the one in use: dim when it is worked out, normal when it was set by hand, `—` when there is no name to write. `enter` edits it starting from what is shown; saving what was there changes nothing, and saving it empty goes back to the worked-out form. The change is one step for `u` to undo, like any other. An artist and an album have a Latin name and a Latin genre among their fields, a playlist a Latin name, and these are set on all their tracks at once (see above). For marked tracks, `e` has rows for the Latin form of the artist, the album and the genre (`-` takes it away).
 * **On the command line**, `mm edit <id> --title-latin "Watani" --artist-latin "Fairouz" --album-latin … --genre-latin …`, with `""` to take one away, and `mm playlist latin <name> [latin name]`. `mm show <id>` lists the forms that were set.
 
 A form belongs to the name it was written for, and changing the name does not touch it, so a corrected spelling keeps its form; a name that becomes empty loses its form. Forms are searched (`mm ls`, `/` in the interface finds "watani" as well as وطني) and put the track in order (`S` and `--sort`). The library folder and a plain sync never use them: the tags and the file names there are the true names, and setting a form leaves nothing to sync. `mm sync --wolfgang` uses them for the folders, the file names, the artist, album and genre tags and the name of the playlist file; the title tag stays the true title.
