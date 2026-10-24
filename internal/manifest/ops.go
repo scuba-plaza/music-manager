@@ -113,3 +113,20 @@ func (m *Manifest) FindByAudio(sha string) (Track, bool) {
 	}
 	return Track{}, false
 }
+
+// PlaylistNamed finds the playlist with this name, exactly as it is written,
+// and says where in ps it is.
+func PlaylistNamed(ps []Playlist, name string) (int, bool) {
+	i := slices.IndexFunc(ps, func(p Playlist) bool { return p.Name == name })
+	return i, i >= 0
+}
+
+// AddedBefore reports whether t entered the library before u, breaking a tie
+// by ID. It decides which of two tracks keeps the plain file name and whose
+// cover an album folder holds.
+func (t Track) AddedBefore(u Track) bool {
+	if !t.AddedAt.Equal(u.AddedAt) {
+		return t.AddedAt.Before(u.AddedAt)
+	}
+	return t.ID < u.ID
+}

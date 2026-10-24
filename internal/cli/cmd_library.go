@@ -2,14 +2,14 @@ package cli
 
 import (
 	"fmt"
-	"music-manager/internal/app"
-	"music-manager/internal/device"
 	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/manifest"
 	"music-manager/internal/timecode"
 )
@@ -82,7 +82,7 @@ dates sort newest first. Tracks with no value for the key always come last.
 			fmt.Fprintln(w, header)
 			for _, t := range found {
 				artist, title, album := display(t)
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s", t.ID, t.Status, artist, title, album, clock(t.PlayingLength()))
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s", t.ID, t.Status, artist, title, album, timecode.Clock(t.PlayingLength()))
 				if key.IsDate() {
 					v := app.SortValue(t, key)
 					if v == "" {
@@ -151,7 +151,7 @@ func showCmd(open opener) *cobra.Command {
 					}
 				}
 			}
-			row("Length", clock(t.PlayingLength()))
+			row("Length", timecode.Clock(t.PlayingLength()))
 			if t.GainSteps != 0 {
 				row("Volume", app.VolumeText(t.GainSteps)+" ("+plural(max(t.GainSteps, -t.GainSteps), "step", "steps")+")")
 			}
@@ -188,9 +188,3 @@ func stamp(t time.Time) string {
 
 // display is app.Display under a shorter name.
 var display = app.Display
-
-// clock formats d as m:ss, rounding down.
-func clock(d time.Duration) string {
-	s := int(d / time.Second)
-	return fmt.Sprintf("%d:%02d", s/60, s%60)
-}

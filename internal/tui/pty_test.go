@@ -11,7 +11,6 @@ package tui
 import (
 	"fmt"
 	"io"
-	"music-manager/internal/testmp3"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -26,6 +25,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/vt"
 	"github.com/creack/pty"
+
+	"music-manager/internal/testmp3"
 )
 
 var (

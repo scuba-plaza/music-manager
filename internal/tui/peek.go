@@ -10,6 +10,7 @@ import (
 	"music-manager/internal/app"
 	"music-manager/internal/device"
 	"music-manager/internal/manifest"
+	"music-manager/internal/timecode"
 )
 
 // The pane on the right shows what the cursor is on, as the preview column of
@@ -135,12 +136,12 @@ func (m Model) artistPeek(r Row, w int) (info, list []string) {
 	if len(albums) > 0 {
 		summary += " · " + plural(len(albums), "album")
 	}
-	info = []string{" " + summary + " · " + clock(lengthOf(ts))}
+	info = []string{" " + summary + " · " + timecode.Clock(lengthOf(ts))}
 	for _, g := range albums {
-		list = append(list, listRow(w, g.name, fmt.Sprintf("%3d", len(g.tracks)), fmt.Sprintf("%5s", clock(lengthOf(g.tracks)))))
+		list = append(list, listRow(w, g.name, fmt.Sprintf("%3d", len(g.tracks)), fmt.Sprintf("%5s", timecode.Clock(lengthOf(g.tracks)))))
 	}
 	if len(singles) > 0 {
-		list = append(list, listRow(w, styles.dim.Render("Singles"), fmt.Sprintf("%3d", len(singles)), fmt.Sprintf("%5s", clock(lengthOf(singles)))))
+		list = append(list, listRow(w, styles.dim.Render("Singles"), fmt.Sprintf("%3d", len(singles)), fmt.Sprintf("%5s", timecode.Clock(lengthOf(singles)))))
 	}
 	return info, list
 }
@@ -152,7 +153,7 @@ func (m Model) albumPeek(r Row, w int) (info, list []string) {
 	if len(ts) > 0 {
 		artist, _, _ = app.Display(ts[0])
 	}
-	info = []string{" " + strings.TrimPrefix(artist+" · ", " · ") + plural(r.Count, "track") + " · " + clock(lengthOf(ts))}
+	info = []string{" " + strings.TrimPrefix(artist+" · ", " · ") + plural(r.Count, "track") + " · " + timecode.Clock(lengthOf(ts))}
 	numberWidth := 0
 	for _, t := range ts {
 		numberWidth = max(numberWidth, len(numberText(t.TrackNumber)))
@@ -163,7 +164,7 @@ func (m Model) albumPeek(r Row, w int) (info, list []string) {
 		if numberWidth > 0 {
 			num = fmt.Sprintf("%*s  ", numberWidth, numberText(t.TrackNumber))
 		}
-		list = append(list, listRow(w, num+title, fmt.Sprintf("%5s", clock(t.PlayingLength()))))
+		list = append(list, listRow(w, num+title, fmt.Sprintf("%5s", timecode.Clock(t.PlayingLength()))))
 	}
 	return info, list
 }
@@ -172,7 +173,7 @@ func (m Model) albumPeek(r Row, w int) (info, list []string) {
 // play, with their artists.
 func (m Model) playlistPeek(r Row, w int) (info, list []string) {
 	ts := m.tracksFor(r.IDs)
-	info = []string{" " + plural(r.Count, "track") + " · " + clock(lengthOf(ts)) + " plays", ""}
+	info = []string{" " + plural(r.Count, "track") + " · " + timecode.Clock(lengthOf(ts)) + " plays", ""}
 	for i, l := range wrap(device.Generic.PlaylistFile(manifest.Playlist{Name: r.Label}), w-4) {
 		prefix := "   "
 		if i == 0 {
@@ -190,7 +191,7 @@ func (m Model) playlistPeek(r Row, w int) (info, list []string) {
 	for i, t := range ts {
 		artist, title, _ := app.Display(t)
 		left := fmt.Sprintf("%*d  %s", numberWidth, i+1, title)
-		list = append(list, listRow(w, left, styles.dim.Render(fit(artist, artistWidth)), fmt.Sprintf("%5s", clock(t.PlayingLength()))))
+		list = append(list, listRow(w, left, styles.dim.Render(fit(artist, artistWidth)), fmt.Sprintf("%5s", timecode.Clock(t.PlayingLength()))))
 	}
 	return info, list
 }
@@ -200,7 +201,7 @@ func (m Model) playlistsList(w int) []string {
 	var list []string
 	for _, p := range m.playlists {
 		ts := m.tracksFor(p.Tracks)
-		list = append(list, listRow(w, p.Name, fmt.Sprintf("%3d", len(p.Tracks)), fmt.Sprintf("%5s", clock(lengthOf(ts)))))
+		list = append(list, listRow(w, p.Name, fmt.Sprintf("%3d", len(p.Tracks)), fmt.Sprintf("%5s", timecode.Clock(lengthOf(ts)))))
 	}
 	return list
 }
@@ -216,7 +217,7 @@ func (m Model) needsList(r Row, w int) []string {
 		if t.Artist == "" {
 			lacking = append(lacking, "no artist")
 		}
-		list = append(list, listRow(w, needsLabel(t), styles.dim.Render(strings.Join(lacking, ", ")), fmt.Sprintf("%5s", clock(t.PlayingLength()))))
+		list = append(list, listRow(w, needsLabel(t), styles.dim.Render(strings.Join(lacking, ", ")), fmt.Sprintf("%5s", timecode.Clock(t.PlayingLength()))))
 	}
 	return list
 }

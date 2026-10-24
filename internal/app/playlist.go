@@ -54,10 +54,8 @@ func checkPlaylist(m *manifest.Manifest, add manifest.Playlist) error {
 
 // playlist returns the index of the playlist with this name.
 func playlist(m *manifest.Manifest, name string) (int, error) {
-	for i, p := range m.Playlists {
-		if p.Name == name {
-			return i, nil
-		}
+	if i, ok := manifest.PlaylistNamed(m.Playlists, name); ok {
+		return i, nil
 	}
 	return 0, fmt.Errorf("no playlist named %q", name)
 }

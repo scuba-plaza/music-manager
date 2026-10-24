@@ -59,3 +59,10 @@ func Format(d time.Duration) string {
 	}
 	return fmt.Sprintf("%d:%s", m, secs)
 }
+
+// Clock renders d as m:ss, rounded down, for a column of lengths: the minutes
+// go past 59 rather than turn into hours.
+func Clock(d time.Duration) string {
+	s := int(d / time.Second)
+	return fmt.Sprintf("%d:%02d", s/60, s%60)
+}

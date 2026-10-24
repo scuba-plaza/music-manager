@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"music-manager/internal/render"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"music-manager/internal/app"
 	"music-manager/internal/device"
 	"music-manager/internal/manifest"
+	"music-manager/internal/render"
 )
 
 // Library is everything the interface needs from the music library. The real

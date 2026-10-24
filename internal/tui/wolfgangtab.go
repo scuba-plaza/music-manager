@@ -2,6 +2,7 @@ package tui
 
 import (
 	"path"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -16,7 +17,7 @@ import (
 func WithWolfgang() Option {
 	return func(m *Model) {
 		m.wolfgang = true
-		m.keys.Tabs.SetHelp("1-"+itoa(len(inspectorTabs)), "tabs")
+		m.keys.Tabs.SetHelp("1-"+strconv.Itoa(len(inspectorTabs)), "tabs")
 	}
 }
 
@@ -62,7 +63,7 @@ func (m Model) wolfgangLines(t manifest.Track, w int) []string {
 	if n := utf8.RuneCountInString(whole); n > device.WolfgangStemWidth {
 		kept := string([]rune(whole)[:device.WolfgangStemWidth])
 		row("Cut", kept, styles.dim.Render(string([]rune(whole)[device.WolfgangStemWidth:])))
-		lines = append(lines, hintLines(strings.Repeat(" ", labelWidth+1), "The player shows 24 characters of a name, the .mp3 included, and scrolls a longer one: the name is cut at "+itoa(device.WolfgangStemWidth)+", the dim part is cut off.", vw)...)
+		lines = append(lines, hintLines(strings.Repeat(" ", labelWidth+1), "The player shows 24 characters of a name, the .mp3 included, and scrolls a longer one: the name is cut at "+strconv.Itoa(device.WolfgangStemWidth)+", the dim part is cut off.", vw)...)
 	}
 	if t.Status == manifest.Identified {
 		tags := dev.Tags(t)
@@ -85,7 +86,7 @@ func counted(s string, width int) string {
 	if s == "" {
 		return ""
 	}
-	return styles.dim.Render("  · " + itoa(utf8.RuneCountInString(s)) + " of " + itoa(width))
+	return styles.dim.Render("  · " + strconv.Itoa(utf8.RuneCountInString(s)) + " of " + strconv.Itoa(width))
 }
 
 // appendWarnings adds what the target will not do well for the track.

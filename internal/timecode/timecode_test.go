@@ -43,3 +43,17 @@ func TestFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestClockIsMinutesAndSecondsRoundedDown(t *testing.T) {
+	cases := map[time.Duration]string{
+		0:                                     "0:00",
+		90*time.Second + 500*time.Millisecond: "1:30",
+		59*time.Second + 999*time.Millisecond: "0:59",
+		time.Hour + 2*time.Minute + 3*time.Second: "62:03", // minutes go past 59: no hours
+	}
+	for d, want := range cases {
+		if got := timecode.Clock(d); got != want {
+			t.Errorf("Clock(%v) = %q, want %q", d, got, want)
+		}
+	}
+}

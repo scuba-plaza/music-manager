@@ -1,9 +1,11 @@
 package tui
 
 import (
+	"strconv"
 	"strings"
 
 	"music-manager/internal/manifest"
+	"music-manager/internal/timecode"
 )
 
 // This file is the left pane: moving through the tree, opening and closing
@@ -281,12 +283,12 @@ func renderRow(r Row, w int, selected bool, mark string) string {
 	right := ""
 	switch r.Kind {
 	case kindTrack:
-		right = clock(r.Track.PlayingLength())
+		right = timecode.Clock(r.Track.PlayingLength())
 		if r.Right != "" {
 			right = r.Right
 		}
 	default:
-		right = itoa(r.Count)
+		right = strconv.Itoa(r.Count)
 	}
 
 	if selected {

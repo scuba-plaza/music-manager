@@ -32,7 +32,7 @@ func (a *App) renderInputs(tracks []manifest.Track, dev device.Target) (paths ma
 		}
 		if t.Album != "" {
 			dir := path.Dir(paths[t.ID])
-			if cur, ok := folders[dir]; !ok || older(t, cur) {
+			if cur, ok := folders[dir]; !ok || t.AddedBefore(cur) {
 				folders[dir] = t
 			}
 		} else if dev.SingleCovers() {

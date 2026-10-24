@@ -12,6 +12,7 @@ import (
 
 	"music-manager/internal/device"
 	"music-manager/internal/manifest"
+	"music-manager/internal/timecode"
 )
 
 func playlistCmd(open opener) *cobra.Command {
@@ -42,7 +43,7 @@ func playlistNewCmd(open opener) *cobra.Command {
 			if err := a.CreatePlaylist(args[0], args[1:]...); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "created %s with %s\n", args[0], tracksText(len(args)-1))
+			fmt.Fprintf(cmd.OutOrStdout(), "created %s with %s\n", args[0], plural(len(args)-1, "track", "tracks"))
 			return nil
 		},
 	}
@@ -79,9 +80,9 @@ func playlistLsCmd(open opener) *cobra.Command {
 			}
 			for _, p := range m.Playlists {
 				if latin {
-					fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", p.Name, p.NameLatin, len(p.Tracks), clock(playlistLength(m, p)))
+					fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", p.Name, p.NameLatin, len(p.Tracks), timecode.Clock(playlistLength(m, p)))
 				} else {
-					fmt.Fprintf(w, "%s\t%d\t%s\n", p.Name, len(p.Tracks), clock(playlistLength(m, p)))
+					fmt.Fprintf(w, "%s\t%d\t%s\n", p.Name, len(p.Tracks), timecode.Clock(playlistLength(m, p)))
 				}
 			}
 			return w.Flush()
@@ -103,36 +104,28 @@ func playlistShowCmd(open opener) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			p, ok := findPlaylist(m, args[0])
+			found, ok := manifest.PlaylistNamed(m.Playlists, args[0])
 			if !ok {
 				return fmt.Errorf("no playlist named %q", args[0])
 			}
+			p := m.Playlists[found]
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
 			fmt.Fprintln(w, "#\tID\tARTIST\tTITLE\tLENGTH")
 			for i, id := range p.Tracks {
 				t, _ := m.Get(id)
 				artist, title, _ := display(t)
-				fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, id, artist, title, clock(t.PlayingLength()))
+				fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, id, artist, title, timecode.Clock(t.PlayingLength()))
 			}
 			if err := w.Flush(); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%s, %s\n", tracksText(len(p.Tracks)), clock(playlistLength(m, p)))
+			fmt.Fprintf(cmd.OutOrStdout(), "%s, %s\n", plural(len(p.Tracks), "track", "tracks"), timecode.Clock(playlistLength(m, p)))
 			if p.NameLatin != "" {
 				fmt.Fprintf(cmd.OutOrStdout(), "Latin name: %s\n", p.NameLatin)
 			}
 			return nil
 		},
 	}
-}
-
-func findPlaylist(m *manifest.Manifest, name string) (manifest.Playlist, bool) {
-	for _, p := range m.Playlists {
-		if p.Name == name {
-			return p, true
-		}
-	}
-	return manifest.Playlist{}, false
 }
 
 func playlistLength(m *manifest.Manifest, p manifest.Playlist) time.Duration {
@@ -142,13 +135,6 @@ func playlistLength(m *manifest.Manifest, p manifest.Playlist) time.Duration {
 		total += t.PlayingLength()
 	}
 	return total
-}
-
-func tracksText(n int) string {
-	if n == 1 {
-		return "1 track"
-	}
-	return fmt.Sprintf("%d tracks", n)
 }
 
 func playlistAddCmd(open opener) *cobra.Command {
@@ -166,7 +152,7 @@ func playlistAddCmd(open opener) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "added %s to %s\n", tracksText(n), args[0])
+			fmt.Fprintf(cmd.OutOrStdout(), "added %s to %s\n", plural(n, "track", "tracks"), args[0])
 			return nil
 		},
 	}
@@ -185,7 +171,7 @@ func playlistRmCmd(open opener) *cobra.Command {
 			if err := a.RemoveFromPlaylist(args[0], args[1:]); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "removed %s from %s\n", tracksText(len(args)-1), args[0])
+			fmt.Fprintf(cmd.OutOrStdout(), "removed %s from %s\n", plural(len(args)-1, "track", "tracks"), args[0])
 			return nil
 		},
 	}
@@ -344,13 +330,13 @@ missing. --dry-run only lists.`,
 				}
 			}
 			if dryRun {
-				fmt.Fprintf(out, "%s found of %d; nothing was made\n", tracksText(len(ids)), len(names))
+				fmt.Fprintf(out, "%s found of %d; nothing was made\n", plural(len(ids), "track", "tracks"), len(names))
 				return nil
 			}
 			if err := a.CreatePlaylist(args[1], ids...); err != nil {
 				return err
 			}
-			fmt.Fprintf(out, "created %s with %s", args[1], tracksText(len(ids)))
+			fmt.Fprintf(out, "created %s with %s", args[1], plural(len(ids), "track", "tracks"))
 			if problems > 0 {
 				fmt.Fprintf(out, "; %d of the %d entries need a look (~ ? -)", problems, len(names))
 			}

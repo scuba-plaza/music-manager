@@ -9,7 +9,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"music-manager/internal/app"
-
 	"music-manager/internal/manifest"
 )
 
@@ -53,7 +52,6 @@ func (m Model) headerView() string {
 	return fit(spread(left, right, m.w), m.w)
 }
 
-// summary is the count shown at the right of the header.
 // syncChip is the header's note that the library folder is behind, with the
 // key that fixes it. It is empty when nothing waits.
 func (m Model) syncChip() string {
@@ -63,6 +61,7 @@ func (m Model) syncChip() string {
 	return fmt.Sprintf("%d to sync · press s", m.syncN)
 }
 
+// summary is the count shown at the right of the header.
 func (m Model) summary() string {
 	s := plural(len(m.tracks), "track")
 	needs := 0

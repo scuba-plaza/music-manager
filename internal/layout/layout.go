@@ -90,10 +90,7 @@ func PlaylistPath(name, ext string, r Rules) string {
 func Assign(tracks []manifest.Track, r Rules) map[string]string {
 	ordered := append([]manifest.Track(nil), tracks...)
 	sort.Slice(ordered, func(i, j int) bool {
-		if !ordered[i].AddedAt.Equal(ordered[j].AddedAt) {
-			return ordered[i].AddedAt.Before(ordered[j].AddedAt)
-		}
-		return ordered[i].ID < ordered[j].ID
+		return ordered[i].AddedBefore(ordered[j])
 	})
 	taken := map[string]bool{}
 	out := make(map[string]string, len(ordered))

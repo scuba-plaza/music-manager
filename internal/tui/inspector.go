@@ -12,6 +12,7 @@ import (
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
+	"music-manager/internal/timecode"
 )
 
 // inspectorLines draws the right pane for whatever is selected.
@@ -100,7 +101,7 @@ func (m Model) footLines(t, shown manifest.Track, w int) []string {
 		lines = append(lines, prefix+styles.accent.Render(l))
 	}
 	lines = append(lines, " "+styles.dim.Render(fit(datesText(t), w-2)))
-	about := clock(t.PlayingLength()) + " plays"
+	about := timecode.Clock(t.PlayingLength()) + " plays"
 	if t.Status == manifest.Identified {
 		about += " · identified"
 	}
@@ -240,7 +241,7 @@ func (m Model) cuts(t manifest.Track) (start, end time.Duration) {
 func (m Model) barLines(t manifest.Track, w int) string {
 	start, end := m.cuts(t)
 	kept := max(t.SourceLength-start-end, 0)
-	text := clock(kept) + " of " + clock(t.SourceLength)
+	text := timecode.Clock(kept) + " of " + timecode.Clock(t.SourceLength)
 	prefix := " " + " " + styles.dim.Render(fit("Kept", labelWidth-2)) + " "
 	width := max(w-labelWidth-2-ansi.StringWidth(text)-2, 8)
 	return prefix + trimBar(t.SourceLength, start, end, width) + "  " + styles.dim.Render(text)
@@ -289,14 +290,6 @@ func (m Model) editorLines(prefix, indent string, vw int) []string {
 	}
 	return lines
 }
-
-// clock formats a length as m:ss.
-func clock(d time.Duration) string {
-	s := int(d / time.Second)
-	return fmt.Sprintf("%d:%02d", s/60, s%60)
-}
-
-func itoa(n int) string { return fmt.Sprintf("%d", n) }
 
 // datesText says when a track was added to the library and last edited.
 func datesText(t manifest.Track) string {

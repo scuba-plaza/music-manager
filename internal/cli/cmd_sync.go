@@ -3,6 +3,8 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -104,7 +106,7 @@ func collected(n int) string {
 	return fmt.Sprintf("; collected %d unused files", n)
 }
 
-func summary(out interface{ Write([]byte) (int, error) }, counts [4]int, unused int) {
+func summary(out io.Writer, counts [4]int, unused int) {
 	var parts []string
 	for _, k := range []struct {
 		kind  render.Kind
@@ -114,13 +116,7 @@ func summary(out interface{ Write([]byte) (int, error) }, counts [4]int, unused 
 			parts = append(parts, fmt.Sprintf("%d %s", n, k.label))
 		}
 	}
-	line := ""
-	for i, p := range parts {
-		if i > 0 {
-			line += ", "
-		}
-		line += p
-	}
+	line := strings.Join(parts, ", ")
 	if n := counts[render.Stray]; n > 0 {
 		if line != "" {
 			line += "; "

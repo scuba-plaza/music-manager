@@ -120,3 +120,29 @@ func TestSearchFindsAGenreAsAWordOrWithTheGenrePrefix(t *testing.T) {
 		}
 	}
 }
+
+func TestPlaylistNamed(t *testing.T) {
+	ps := []manifest.Playlist{{Name: "Study"}, {Name: "Run"}}
+	if i, ok := manifest.PlaylistNamed(ps, "Run"); !ok || i != 1 {
+		t.Errorf("PlaylistNamed(Run) = %d, %v", i, ok)
+	}
+	if _, ok := manifest.PlaylistNamed(ps, "run"); ok {
+		t.Error("a name that differs in case is another name")
+	}
+	if _, ok := manifest.PlaylistNamed(nil, "Run"); ok {
+		t.Error("found a playlist among none")
+	}
+}
+
+func TestAddedBeforeOrdersByDateThenByID(t *testing.T) {
+	now := time.Now()
+	early := manifest.Track{ID: "zzzzzz", AddedAt: now}
+	late := manifest.Track{ID: "aaaaaa", AddedAt: now.Add(time.Second)}
+	if !early.AddedBefore(late) || late.AddedBefore(early) {
+		t.Error("the track added first comes first, whatever the IDs")
+	}
+	a, b := manifest.Track{ID: "aaaaaa", AddedAt: now}, manifest.Track{ID: "bbbbbb", AddedAt: now}
+	if !a.AddedBefore(b) || b.AddedBefore(a) || a.AddedBefore(a) {
+		t.Error("tracks added at the same moment go by ID, and none is before itself")
+	}
+}

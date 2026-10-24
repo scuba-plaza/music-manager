@@ -96,11 +96,11 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 		if f.in == nil {
 			continue
 		}
-		if s := strings.TrimSpace(*f.in); strings.ContainsAny(s, "\r\n") {
+		s := strings.TrimSpace(*f.in)
+		if strings.ContainsAny(s, "\r\n") {
 			return t, fmt.Errorf("the Latin form of the %s, %q, must be on one line", f.name, s)
-		} else {
-			*f.out = s
 		}
+		*f.out = s
 	}
 	if e.TrackNumber != nil {
 		t.TrackNumber = *e.TrackNumber

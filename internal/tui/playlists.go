@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -132,7 +133,7 @@ func (p *playlistPicker) lines(w int) []string {
 		for i := 0; i <= len(p.names); i++ {
 			label, right := "+ New playlist…", ""
 			if i < len(p.names) {
-				label, right = p.names[i], styles.dim.Render(itoa(p.counts[i])+" ")
+				label, right = p.names[i], styles.dim.Render(strconv.Itoa(p.counts[i])+" ")
 			}
 			line := "   " + label
 			if i == p.cursor {
@@ -224,10 +225,8 @@ func playlistOf(r Row) (name string, ok bool) {
 
 // playlistNamed finds a playlist by name.
 func (m Model) playlistNamed(name string) (manifest.Playlist, bool) {
-	for _, p := range m.playlists {
-		if p.Name == name {
-			return p, true
-		}
+	if i, ok := manifest.PlaylistNamed(m.playlists, name); ok {
+		return m.playlists[i], true
 	}
 	return manifest.Playlist{}, false
 }

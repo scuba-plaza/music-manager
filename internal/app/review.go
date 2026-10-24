@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -85,7 +86,7 @@ func ParseReview(text string) ([]ReviewEntry, error) {
 				return nil, fmt.Errorf("line %d: a section looks like %q", n, "## ARTISTS -> genre")
 			}
 			section = strings.ToUpper(head[1])
-			if !contains(reviewSections, section) {
+			if !slices.Contains(reviewSections, section) {
 				return nil, fmt.Errorf("line %d: section %s is not one of %s", n, head[1], strings.Join(reviewSections, ", "))
 			}
 			parts := reviewArrow.Split(strings.TrimSpace(head[2]), 2)
@@ -96,7 +97,7 @@ func ParseReview(text string) ([]ReviewEntry, error) {
 			if _, ok := reviewFields[field]; !ok {
 				return nil, fmt.Errorf("line %d: %s is not a field a review can set (%s)", n, field, strings.Join(reviewFieldNames(), ", "))
 			}
-		case strings.HasPrefix(line, "#"), strings.TrimSpace(line) == "" && line == "":
+		case strings.HasPrefix(line, "#"), line == "":
 			// a comment, or a gap between entries
 		case line[0] == ' ' || line[0] == '\t':
 			if pending == nil {
@@ -156,15 +157,6 @@ func reviewFieldNames() []string {
 	}
 	sort.Strings(names)
 	return names
-}
-
-func contains(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
 
 // ReviewOptions say how to apply a review.

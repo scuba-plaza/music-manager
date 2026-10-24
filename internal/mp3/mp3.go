@@ -34,7 +34,7 @@ func frameAt(b []byte) (frame, bool) {
 	if version == 1 || layer != 1 || brIdx == 0 || brIdx == 15 || srIdx == 3 {
 		return frame{}, false
 	}
-	vi := map[int]int{0: 0, 2: 1, 3: 2}[version]
+	vi := max(version-1, 0) // versions 0, 2 and 3 are rows 0, 1 and 2 of sampleRates
 	rate := sampleRates[vi][srIdx]
 	f := frame{size: 144*v1Bitrates[brIdx]*1000/rate + pad, samples: 1152, rate: rate}
 	if version != 3 {

@@ -6,17 +6,17 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"music-manager/internal/app"
 
+	"music-manager/internal/app"
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
-	"strings"
 )
 
 // This file is the right pane's behaviour: choosing a field, editing it,
@@ -405,9 +405,6 @@ func idsMissingFrom(a, b []manifest.Track) []string {
 	return ids
 }
 
-// target is what undoing or redoing a change puts back, and gone the ids of
-// the tracks that must vanish for that (those the change added, when
-// undoing; those it removed, when redoing).
 // playlistTarget is the playlists as undoing or redoing the change leaves them.
 func (c change) playlistTarget(undone bool) []manifest.Playlist {
 	if undone {
@@ -416,6 +413,9 @@ func (c change) playlistTarget(undone bool) []manifest.Playlist {
 	return c.playlistsAfter
 }
 
+// target is what undoing or redoing a change puts back, and gone the ids of
+// the tracks that must vanish for that (those the change added, when
+// undoing; those it removed, when redoing).
 func (c change) target(undone bool) (tracks []manifest.Track, gone []string) {
 	if undone {
 		return c.before, idsMissingFrom(c.after, c.before)

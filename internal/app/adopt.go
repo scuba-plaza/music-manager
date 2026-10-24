@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"time"
 
 	"music-manager/internal/artist"
 	"music-manager/internal/manifest"
@@ -67,7 +66,6 @@ func (a *App) Adopt(ids []string) ([]AdoptResult, error) {
 				res.Reason = err.Error()
 				break
 			}
-			updated.UpdatedAt = time.Now().UTC()
 			m.Update(updated)
 			res.Adopted = true
 		}
