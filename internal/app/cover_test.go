@@ -230,3 +230,50 @@ func TestTheWolfgangGetsEveryCoverAsASmallJPEG(t *testing.T) {
 		t.Error("a cover.png was written")
 	}
 }
+
+func TestSetCoverManySetsTheSameCoverOnAllOrNone(t *testing.T) {
+	a := libWithTracks(t, 10, 20, 30)
+	ts := tracks(t, a)
+	ids := []string{ts[0].ID, ts[2].ID}
+
+	got, err := a.SetCoverMany(ids, testmp3.JPEG)
+	if err != nil || len(got) != 2 {
+		t.Fatalf("got %d tracks, err %v", len(got), err)
+	}
+	after := tracks(t, a)
+	if after[0].CoverSHA256 == "" || after[0].CoverSHA256 != after[2].CoverSHA256 {
+		t.Errorf("covers %q and %q, want the same one", after[0].CoverSHA256, after[2].CoverSHA256)
+	}
+	if after[1].CoverSHA256 != "" {
+		t.Error("a track that was not named got the cover")
+	}
+	if got[ts[0].ID].CoverSHA256 != after[0].CoverSHA256 {
+		t.Error("the tracks returned are not the ones saved")
+	}
+
+	// A track that does not exist, or a file that is not an image, changes nothing.
+	if _, err := a.SetCoverMany([]string{ts[1].ID, "nope"}, testmp3.PNG); err == nil {
+		t.Error("an unknown track was accepted")
+	}
+	if _, err := a.SetCoverMany([]string{ts[1].ID}, []byte("not an image")); err == nil {
+		t.Error("a file that is not an image was accepted")
+	}
+	if tracks(t, a)[1].CoverSHA256 != "" {
+		t.Error("a refused change was saved")
+	}
+}
+
+func TestSetCoverManyWithNoImageTakesTheCoverAway(t *testing.T) {
+	a := libWithTracks(t, 10, 20)
+	ts := tracks(t, a)
+	a.SetCover(ts[0].ID, testmp3.JPEG)
+	a.SetCover(ts[1].ID, testmp3.PNG)
+	if _, err := a.SetCoverMany([]string{ts[0].ID, ts[1].ID}, nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, tr := range tracks(t, a) {
+		if tr.CoverSHA256 != "" {
+			t.Errorf("%s still has a cover", tr.ID)
+		}
+	}
+}

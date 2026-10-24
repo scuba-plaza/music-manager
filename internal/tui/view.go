@@ -197,6 +197,9 @@ func (m Model) footerKeys() []key.Binding {
 	var bindings []key.Binding
 	if r, ok := m.selectedRow(); ok && m.focus == paneInspector && r.Kind != kindTrack {
 		bindings = []key.Binding{k.Field, k.Edit, k.Back} // a group has no tabs
+		if m.curField() == fCover {
+			bindings = append(bindings, k.RemoveCover)
+		}
 	} else if m.focus == paneInspector {
 		bindings = []key.Binding{k.Field, k.Tabs, k.Edit, k.Back}
 		switch m.curField() {

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -71,7 +72,7 @@ func groupFields(kind rowKind) []fieldKind {
 	case kindArtist:
 		return []fieldKind{fArtist, fLatinArtist, fGenre, fLatinGenre}
 	case kindAlbum:
-		return []fieldKind{fAlbum, fLatinAlbum, fReleased, fGenre, fLatinGenre, fAlbumOf}
+		return []fieldKind{fAlbum, fLatinAlbum, fReleased, fGenre, fLatinGenre, fAlbumOf, fCover}
 	case kindPlaylist:
 		return []fieldKind{fPlaylistName, fPlaylistLatin}
 	}
@@ -184,6 +185,13 @@ func (m Model) groupFieldLines(g group, f fieldKind, current bool, w int) []stri
 	if m.editing && current {
 		return m.groupEditorLines(g, f, prefix, indent, vw)
 	}
+	if f == fCover {
+		text := coverSummary(g.tracks)
+		if text == "none" {
+			return []string{prefix + styles.dim.Render(text)}
+		}
+		return []string{prefix + fit(text, vw)}
+	}
 	text, mixed, byHand := groupValue(g, f)
 	switch {
 	case mixed:
@@ -209,6 +217,10 @@ func (m Model) updateGroupFields(msg tea.KeyMsg, r Row) (tea.Model, tea.Cmd) {
 		m.gfield = min(m.gfield+1, len(groupFields(r.Kind))-1)
 	case key.Matches(msg, k.Edit):
 		return m, m.startEdit()
+	case key.Matches(msg, k.RemoveCover) && m.curField() == fCover:
+		if g, ok := m.groupOf(r); ok {
+			return m.setGroupCover(g, "")
+		}
 	case key.Matches(msg, k.Help):
 		m.overlay = helpScreen{}
 	case key.Matches(msg, k.Doctor):
@@ -243,6 +255,9 @@ func isNameField(f fieldKind) bool { return f == fArtist || f == fAlbum || f == 
 // newGroupDraft is the field of a group as it starts being edited: the text is
 // what all the tracks have, or empty if they differ.
 func newGroupDraft(g group, f fieldKind) draft {
+	if f == fCover {
+		return draft{field: f} // the text is the path of a new image
+	}
 	text, mixed, _ := groupValue(g, f)
 	return draft{field: f, text: text, mixed: mixed}
 }
@@ -286,6 +301,9 @@ func (m Model) commitGroup(r Row) (tea.Model, tea.Cmd) {
 	g, ok := m.groupOf(r)
 	if !ok {
 		return m, nil
+	}
+	if m.dr.field == fCover {
+		return m.setGroupCover(g, m.dr.text)
 	}
 	f := m.dr.field
 	text := strings.TrimSpace(m.dr.text)
@@ -408,11 +426,13 @@ func (m Model) groupEditorLines(g group, f fieldKind, prefix, indent string, vw 
 		hint = "e.g. Folk or Neoclassical · empty for none"
 	case f == fAlbumOf:
 		hint = "how many tracks the album has · empty if unknown"
+	case f == fCover:
+		hint = "a JPEG or PNG file · empty removes the cover"
 	}
 	if hint != "" {
 		lines = append(lines, hintLines(indent, hint, vw)...)
 	}
-	if m.dr.mixed {
+	if m.dr.mixed && f != fCover {
 		lines = append(lines, hintLines(indent, "the tracks differ · empty keeps them · - clears", vw)...)
 	}
 	if m.editErr != "" {
@@ -447,4 +467,60 @@ func (m Model) joinHint(g group, f fieldKind) string {
 		return "joins the artist " + typed + " (" + plural(n, "track") + ")"
 	}
 	return "joins the album " + typed + " of " + g.artist + " (" + plural(n, "track") + ")"
+}
+
+// coverSummary says what the covers of the tracks are: none, the same on all of
+// them, or how they differ.
+func coverSummary(ts []manifest.Track) string {
+	distinct := map[string]bool{}
+	without := 0
+	for _, t := range ts {
+		if t.CoverSHA256 == "" {
+			without++
+		} else {
+			distinct[t.CoverSHA256] = true
+		}
+	}
+	switch {
+	case len(distinct) == 0:
+		return "none"
+	case len(distinct) == 1 && without == 0:
+		return "the same on all " + plural(len(ts), "track")
+	case without == 0:
+		return plural(len(distinct), "cover") + " among the tracks"
+	}
+	return plural(len(distinct), "cover") + ", " + plural(without, "track") + " without one"
+}
+
+// setGroupCover gives all the tracks of the group the image in the file at path,
+// or takes their covers away if path is empty.
+func (m Model) setGroupCover(g group, path string) (tea.Model, tea.Cmd) {
+	path = cleanPath(path)
+	var ids []string
+	for _, t := range g.tracks {
+		if path != "" || t.CoverSHA256 != "" {
+			ids = append(ids, t.ID)
+		}
+	}
+	if len(ids) == 0 {
+		m.editing = false // no cover to remove
+		return m, nil
+	}
+	label := "change of " + groupNoun(g.kind) + " cover"
+	if path == "" {
+		label = "removal of the " + groupNoun(g.kind) + "'s cover"
+	}
+	m.busy = true
+	return m, m.saveMany(label, "Changed "+plural(len(ids), "track"), ids,
+		func(l Library) (map[string]manifest.Track, error) {
+			var data []byte
+			if path != "" {
+				var err error
+				if data, err = os.ReadFile(path); err != nil {
+					return nil, friendlyFileError(path, err)
+				}
+			}
+			return l.SetCoverMany(ids, data)
+		},
+		func(m *Model) { m.editing, m.editErr = false, "" })
 }

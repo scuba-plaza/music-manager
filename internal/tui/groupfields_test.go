@@ -1,10 +1,13 @@
 package tui
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	"music-manager/internal/app"
+	"music-manager/internal/testmp3"
 )
 
 // An artist, an album and a playlist have fields of their own in the right
@@ -654,5 +657,143 @@ func TestABadDateOrCountForAnAlbumIsExplainedAndNothingIsSaved(t *testing.T) {
 	contains(t, m, "whole number")
 	if hook.manyCalls != 0 {
 		t.Errorf("saves %d", hook.manyCalls)
+	}
+}
+
+// toCover is the model on the Cover field of the album Shadows.
+func toCover(t *testing.T, m Model) Model {
+	t.Helper()
+	if m.focus == paneInspector {
+		m = keys(t, m, "esc")
+	}
+	m = selectTrack(t, m, "Flow")
+	m = keys(t, m, "up", "up", "right")
+	for i := 0; i < 10 && m.curField() != fCover; i++ {
+		m = keys(t, m, "down")
+	}
+	if m.curField() != fCover {
+		t.Fatal("no Cover field")
+	}
+	return m
+}
+
+// imageFile writes a small JPEG and returns its path.
+func imageFile(t *testing.T, name string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(p, testmp3.JPEG, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func coverOf(t *testing.T, lib Library, title string) string {
+	t.Helper()
+	return trackNamed(t, lib, title).CoverSHA256
+}
+
+func TestTheCoverOfAnAlbumSaysWhetherItsTracksShareOne(t *testing.T) {
+	m, hook := toAlbum(t)
+	m = toCover(t, m)
+	contains(t, m, "Cover", "none")
+
+	a := appOf(t, hook.Library)
+	ids := []string{trackNamed(t, hook.Library, "Flow").ID, trackNamed(t, hook.Library, "The Wanderer").ID}
+	if _, err := a.SetCoverMany(ids, testmp3.JPEG); err != nil {
+		t.Fatal(err)
+	}
+	m = toCover(t, send(t, m, m.Init()))
+	contains(t, m, "1 cover, 1 track without one")
+
+	if _, err := a.SetCoverMany([]string{trackNamed(t, hook.Library, "Along Our Way").ID}, testmp3.JPEG); err != nil {
+		t.Fatal(err)
+	}
+	m = toCover(t, send(t, m, m.Init()))
+	contains(t, m, "the same on all 3 tracks")
+}
+
+func TestAnImageFileBecomesTheCoverOfEveryTrackOfTheAlbumInOneStep(t *testing.T) {
+	m, hook := toAlbum(t)
+	m = toCover(t, m)
+	m = keys(t, m, "enter")
+	contains(t, m, "a JPEG or PNG file", "empty removes")
+	m = typed(t, m, imageFile(t, "front.jpg"))
+	m = keys(t, m, "enter")
+	sha := coverOf(t, hook.Library, "Flow")
+	if sha == "" {
+		t.Fatalf("no cover was set:\n%s", screen(m))
+	}
+	for _, title := range []string{"The Wanderer", "Along Our Way"} {
+		if got := coverOf(t, hook.Library, title); got != sha {
+			t.Errorf("%s has the cover %q, want %q", title, got, sha)
+		}
+	}
+	if got := coverOf(t, hook.Library, "Current"); got != "" {
+		t.Error("a track of another album got the cover")
+	}
+	contains(t, m, "Changed 3 tracks", "the same on all 3 tracks")
+
+	m = keys(t, m, "esc", "u")
+	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
+		if got := coverOf(t, hook.Library, title); got != "" {
+			t.Errorf("after undo %s has the cover %q", title, got)
+		}
+	}
+}
+
+func TestTheCoverOfAnAlbumIsTakenAwayWithXOrWithAnEmptyPath(t *testing.T) {
+	m, hook := toAlbum(t)
+	a := appOf(t, hook.Library)
+	var ids []string
+	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
+		ids = append(ids, trackNamed(t, hook.Library, title).ID)
+	}
+	if _, err := a.SetCoverMany(ids, testmp3.JPEG); err != nil {
+		t.Fatal(err)
+	}
+	m = toCover(t, send(t, m, m.Init()))
+	m = keys(t, m, "x")
+	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
+		if got := coverOf(t, hook.Library, title); got != "" {
+			t.Errorf("x left %s the cover %q", title, got)
+		}
+	}
+	contains(t, m, "none")
+
+	if _, err := a.SetCoverMany(ids, testmp3.JPEG); err != nil {
+		t.Fatal(err)
+	}
+	m = toCover(t, send(t, m, m.Init()))
+	m = keys(t, m, "enter", "enter") // an empty path removes the cover
+	if got := coverOf(t, hook.Library, "Flow"); got != "" {
+		t.Errorf("an empty path left the cover %q", got)
+	}
+
+	// With no cover to take away there is nothing to do.
+	m = toCover(t, send(t, m, m.Init()))
+	m = keys(t, m, "enter", "enter")
+	if m.editing {
+		t.Error("an empty path with no cover to remove should just close the editor")
+	}
+}
+
+func TestAMissingOrNotAnImageCoverIsExplainedAndNothingIsSaved(t *testing.T) {
+	m, hook := toAlbum(t)
+	m = toCover(t, m)
+	m = typed(t, keys(t, m, "enter"), "/nowhere/front.png")
+	m = keys(t, m, "enter")
+	contains(t, m, "front.png", "no such file")
+	if !m.editing || coverOf(t, hook.Library, "Flow") != "" {
+		t.Errorf("editing %v, cover %q", m.editing, coverOf(t, hook.Library, "Flow"))
+	}
+
+	notImage := filepath.Join(t.TempDir(), "notes.txt")
+	if err := os.WriteFile(notImage, []byte("not a picture"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m = typed(t, clearField(t, m), notImage)
+	m = keys(t, m, "enter")
+	if !m.editing || m.editErr == "" || coverOf(t, hook.Library, "Flow") != "" {
+		t.Errorf("editing %v, error %q, cover %q", m.editing, m.editErr, coverOf(t, hook.Library, "Flow"))
 	}
 }

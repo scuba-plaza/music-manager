@@ -81,6 +81,9 @@ type Library interface {
 	// SetCover sets a track's cover image (JPEG or PNG), or removes it if
 	// image is empty, and returns the track as saved.
 	SetCover(id string, image []byte) (manifest.Track, error)
+	// SetCoverMany does the same for several tracks at once, all or none,
+	// and returns them as saved.
+	SetCoverMany(ids []string, image []byte) (map[string]manifest.Track, error)
 	// CoverImage returns the stored cover image with the given SHA.
 	CoverImage(sha string) ([]byte, error)
 }

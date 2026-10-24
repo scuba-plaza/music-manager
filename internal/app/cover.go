@@ -34,6 +34,36 @@ func (a *App) SetCover(id string, image []byte) error {
 	return a.store.Save(m)
 }
 
+// SetCoverMany gives all the tracks with these ids the same cover image, or
+// takes the cover away from them if image is empty. Either all of them change
+// or none does; the tracks are returned as saved, by ID.
+func (a *App) SetCoverMany(ids []string, image []byte) (map[string]manifest.Track, error) {
+	m, err := a.store.Load()
+	if err != nil {
+		return nil, err
+	}
+	var ts []manifest.Track
+	for _, id := range ids {
+		t, ok := m.Get(id)
+		if !ok {
+			return nil, fmt.Errorf("no track with id %q", id)
+		}
+		ts = append(ts, t)
+	}
+	sha, err := a.storeCover(image)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	updated := make(map[string]manifest.Track, len(ts))
+	for _, t := range ts {
+		t.CoverSHA256, t.UpdatedAt = sha, now
+		m.Update(t)
+		updated[t.ID] = t
+	}
+	return updated, a.store.Save(m)
+}
+
 // storeCover files an image in the cover store, as it is, and returns its SHA;
 // empty input gives an empty SHA, and an image that is not a JPEG or a PNG is
 // refused.
