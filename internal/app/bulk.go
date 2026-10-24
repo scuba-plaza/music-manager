@@ -48,6 +48,9 @@ func (a *App) EditMany(edits map[string]Edit) (map[string]manifest.Track, error)
 		if !ok {
 			return nil, fmt.Errorf("no track with id %q", id)
 		}
+		if err := a.checkCover(edits[id]); err != nil {
+			return nil, fmt.Errorf("%s: %w", id, err)
+		}
 		if t, err = applyEdit(t, edits[id]); err != nil {
 			return nil, fmt.Errorf("%s: %w", id, err)
 		}

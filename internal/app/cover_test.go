@@ -277,3 +277,50 @@ func TestSetCoverManyWithNoImageTakesTheCoverAway(t *testing.T) {
 		}
 	}
 }
+
+func TestAnEditCanGiveTracksTheCoverAnotherTrackHasAndNeverOneThatIsNotStored(t *testing.T) {
+	a := libWithTracks(t, 10, 20, 30)
+	ts := tracks(t, a)
+	if err := a.SetCover(ts[0].ID, testmp3.JPEG); err != nil {
+		t.Fatal(err)
+	}
+	sha := tracks(t, a)[0].CoverSHA256
+	artist := "Band"
+
+	got, err := a.EditMany(map[string]app.Edit{
+		ts[1].ID: {Cover: &sha, Artist: &artist}, // together with another change
+		ts[2].ID: {Cover: &sha},
+	})
+	if err != nil || len(got) != 2 {
+		t.Fatalf("got %d tracks, err %v", len(got), err)
+	}
+	after := tracks(t, a)
+	if after[1].CoverSHA256 != sha || after[2].CoverSHA256 != sha || after[1].Artist != "Band" {
+		t.Errorf("tracks after: %+v", after)
+	}
+	if again := tracks(t, a); again[1].CoverSHA256 != sha {
+		t.Error("the change was not saved")
+	}
+
+	// A cover that is not in the store is refused, and so is the whole edit.
+	unknown := "0000000000000000000000000000000000000000000000000000000000000000"
+	other := "Other"
+	if _, err := a.EditMany(map[string]app.Edit{ts[0].ID: {Artist: &other}, ts[1].ID: {Cover: &unknown}}); err == nil {
+		t.Error("a cover that is not stored was accepted")
+	}
+	if tracks(t, a)[0].Artist == "Other" {
+		t.Error("a refused edit was partly saved")
+	}
+	if _, err := a.Edit(ts[1].ID, app.Edit{Cover: &unknown}); err == nil {
+		t.Error("Edit accepted a cover that is not stored")
+	}
+
+	// An empty one takes the cover away.
+	none := ""
+	if _, err := a.Edit(ts[1].ID, app.Edit{Cover: &none}); err != nil {
+		t.Fatal(err)
+	}
+	if got := tracks(t, a)[1].CoverSHA256; got != "" {
+		t.Errorf("cover = %q, want none", got)
+	}
+}

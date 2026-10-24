@@ -38,6 +38,10 @@ type Edit struct {
 	// FadeIn and FadeOut are stretches of the original audio; an empty one
 	// takes the fade away.
 	FadeIn, FadeOut *manifest.Span
+	// Cover is the SHA of a cover image that is in the store already, for
+	// giving a track the cover that another has; "" takes the cover away. An
+	// image that is not in the store is refused by Edit and EditMany.
+	Cover *string
 }
 
 // MaxGainSteps is the most a track may be made louder or quieter, in steps.
@@ -55,12 +59,23 @@ func (a *App) Edit(id string, e Edit) (manifest.Track, error) {
 		return manifest.Track{}, fmt.Errorf("no track with id %q", id)
 	}
 
+	if err := a.checkCover(e); err != nil {
+		return manifest.Track{}, err
+	}
 	t, err = applyEdit(t, e)
 	if err != nil {
 		return manifest.Track{}, err
 	}
 	m.Update(t)
 	return t, a.store.Save(m)
+}
+
+// checkCover refuses an edit that names a cover that is not in the store.
+func (a *App) checkCover(e Edit) error {
+	if e.Cover != nil && *e.Cover != "" && !a.covers.Has(*e.Cover) {
+		return fmt.Errorf("there is no cover with the SHA %q in the library", *e.Cover)
+	}
+	return nil
 }
 
 // applyEdit returns t with e applied and its status recomputed. It changes
@@ -128,6 +143,9 @@ func applyEdit(t manifest.Track, e Edit) (manifest.Track, error) {
 	}
 	if e.FadeOut != nil {
 		t.FadeOut = *e.FadeOut
+	}
+	if e.Cover != nil {
+		t.CoverSHA256 = *e.Cover
 	}
 	if err := validate(t); err != nil {
 		return t, err
