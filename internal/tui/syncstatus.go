@@ -13,10 +13,9 @@ import (
 
 // syncStatusMsg is the result of working out how far behind the folder is.
 type syncStatusMsg struct {
-	n     int
-	known bool
-	err   error
-	keep  bool // nothing new was learned: leave the count as it is
+	n    int
+	err  error
+	keep bool // nothing new was learned: leave the count as it is
 }
 
 // refreshSync works out the header's count. With scan set it may also scan
@@ -26,7 +25,7 @@ func (m Model) refreshSync(scan bool) tea.Cmd {
 	return func() tea.Msg {
 		n, known, err := lib.Unsynced()
 		if err != nil || known {
-			return syncStatusMsg{n: n, known: known, err: err}
+			return syncStatusMsg{n: n, err: err}
 		}
 		if !scan {
 			// Never synced, and scanning the folder again for every edit would
@@ -43,7 +42,7 @@ func (m Model) refreshSync(scan bool) tea.Cmd {
 		if err := lib.RecordSynced(); err != nil {
 			return syncStatusMsg{err: err}
 		}
-		return syncStatusMsg{known: true}
+		return syncStatusMsg{}
 	}
 }
 
@@ -54,13 +53,13 @@ func (m Model) recordSynced() tea.Cmd {
 		if err := lib.RecordSynced(); err != nil {
 			return syncStatusMsg{err: err}
 		}
-		return syncStatusMsg{known: true}
+		return syncStatusMsg{}
 	}
 }
 
 func (m Model) syncStatus(msg syncStatusMsg) (tea.Model, tea.Cmd) {
 	if msg.err == nil && !msg.keep {
-		m.syncN, m.syncKnown = msg.n, msg.known
+		m.syncN = msg.n
 	}
 	return m, nil
 }

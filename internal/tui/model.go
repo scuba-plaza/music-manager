@@ -105,7 +105,6 @@ type Model struct {
 	// How far the library folder lags behind the records, and what is needed to
 	// keep that up to date: rev changes whenever the tracks do.
 	syncN        int
-	syncKnown    bool
 	rev, syncRev int
 
 	// Looking for changes made elsewhere, and telling double clicks apart.

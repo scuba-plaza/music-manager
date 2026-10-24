@@ -27,8 +27,6 @@ func tuiCmd(open opener, deps Deps) *cobra.Command {
 func wolfgangFlag(cmd *cobra.Command, wolfgang *bool) {
 	f := cmd.Flags()
 	f.BoolVar(wolfgang, "wolfgang", false, "also show what a sync for the Wolfgang WMP01 will write")
-	f.BoolVar(wolfgang, "wolfang", false, "")
-	_ = f.MarkHidden("wolfang")
 }
 
 func runTUI(cmd *cobra.Command, open opener, deps Deps, wolfgang bool) error {

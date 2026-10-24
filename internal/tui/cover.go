@@ -50,11 +50,8 @@ func describeCover(data []byte) (string, error) {
 	return fmt.Sprintf("%d×%d %s", cfg.Width, cfg.Height, strings.ToUpper(format)), nil
 }
 
-// loadThumb decodes a cover and shrinks it.
-func loadThumb(data []byte) (thumb, error) { return loadThumbFor(data, false) }
-
-// loadThumbFor is loadThumb that also prepares the full-resolution picture
-// for the graphics protocol if asked to.
+// loadThumbFor decodes a cover and shrinks it, and also prepares the
+// full-resolution picture for the graphics protocol if asked to.
 func loadThumbFor(data []byte, graphics bool) (thumb, error) {
 	info, err := describeCover(data)
 	if err != nil {

@@ -91,8 +91,6 @@ Wolfgang WMP01 player instead, with everything its limits call for; it needs
 	f.BoolVar(&dryRun, "dry-run", false, "show what would change without changing anything")
 	f.BoolVar(&yes, "yes", false, "confirm deletions")
 	f.BoolVar(&wolfgang, "wolfgang", false, "write for the Wolfgang WMP01 player (needs --target)")
-	f.BoolVar(&wolfgang, "wolfang", false, "")
-	_ = f.MarkHidden("wolfang")
 	return cmd
 }
 

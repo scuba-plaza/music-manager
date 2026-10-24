@@ -5,12 +5,6 @@ import (
 )
 
 // marking helpers: select a track by title and press space on it
-func mark(t *testing.T, m Model, title string) Model {
-	t.Helper()
-	m = selectTrack(t, m, title)
-	return keys(t, m, "space")
-}
-
 func TestSpaceMarksATrackAndMovesDown(t *testing.T) {
 	m, _ := editingModel(t, "The Wanderer")
 	m = keys(t, m, "space")

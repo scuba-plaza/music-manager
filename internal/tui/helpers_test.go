@@ -322,19 +322,3 @@ func (h *editHook) RemoveMany(ids []string) ([]manifest.Track, error) {
 }
 
 func ansiStrip(s string) string { return ansi.Strip(s) }
-
-// loadedMsgFor is what loading the library gives, for a test that changed it
-// behind the model's back.
-func loadedMsgFor(t *testing.T, lib Library) loadedMsg {
-	t.Helper()
-	ts, err := lib.Tracks()
-	if err != nil {
-		t.Fatal(err)
-	}
-	pls, err := lib.Playlists()
-	if err != nil {
-		t.Fatal(err)
-	}
-	stamp, _ := lib.Stamp()
-	return loadedMsg{tracks: ts, playlists: pls, stamp: stamp}
-}

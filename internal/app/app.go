@@ -31,7 +31,11 @@ func Open(root string) (*App, error) {
 	}, nil
 }
 
+// Manifest reads the records of the library as they are now.
 func (a *App) Manifest() (*manifest.Manifest, error) { return a.store.Load() }
 
 // AudioPath is where the stored audio with the given SHA lives.
 func (a *App) AudioPath(sha string) string { return a.audio.Path(sha) }
+
+// CoverPath is where the stored cover image with the given SHA lives.
+func (a *App) CoverPath(sha string) string { return a.covers.Path(sha) }

@@ -41,7 +41,7 @@ func expandAll(tracks []manifest.Track) map[string]bool {
 	open := map[string]bool{}
 	for changed := true; changed; {
 		changed = false
-		for _, r := range buildRows(tracks, "", open) {
+		for _, r := range buildRowsWith(tracks, nil, "", open) {
 			if !open[r.Key] {
 				open[r.Key] = true
 				changed = true
@@ -63,7 +63,7 @@ var sampleTracks = []manifest.Track{
 }
 
 func TestRowsGroupByArtistThenAlbumAndSortSensibly(t *testing.T) {
-	got := labels(buildRows(sampleTracks, "", expandAll(sampleTracks)))
+	got := labels(buildRowsWith(sampleTracks, nil, "", expandAll(sampleTracks)))
 	want := []string{
 		"Needs work",
 		"  ?",
@@ -89,7 +89,7 @@ func TestRowsGroupByArtistThenAlbumAndSortSensibly(t *testing.T) {
 }
 
 func TestEverythingStartsCollapsedExceptWhatWasOpened(t *testing.T) {
-	rows := buildRows(sampleTracks, "", map[string]bool{})
+	rows := buildRowsWith(sampleTracks, nil, "", map[string]bool{})
 	if got, want := labels(rows), []string{"Needs work", "Fairuz", "phoria", "Shawn James"}; !equal(got, want) {
 		t.Errorf("collapsed = %v, want %v", got, want)
 	}
@@ -103,7 +103,7 @@ func TestEverythingStartsCollapsedExceptWhatWasOpened(t *testing.T) {
 		t.Errorf("Fairuz = %+v", fairuz)
 	}
 
-	open := buildRows(sampleTracks, "", map[string]bool{fairuz.Key: true})
+	open := buildRowsWith(sampleTracks, nil, "", map[string]bool{fairuz.Key: true})
 	if got, want := labels(open), []string{"Needs work", "Fairuz", "  Jerusalem in My Heart", "  Singles", "phoria", "Shawn James"}; !equal(got, want) {
 		t.Errorf("one artist open = %v, want %v", got, want)
 	}
@@ -117,7 +117,7 @@ func TestEverythingStartsCollapsedExceptWhatWasOpened(t *testing.T) {
 func TestNeedsWorkGroupListsUnidentifiedTracksAndIsHiddenWhenEmpty(t *testing.T) {
 	unid := trk("u1", "", "", "", 0)
 	unid.Hint = manifest.Hint{Title: "Bahlam Bek", Artist: "Abdel Halim", Filename: "01 Bahlam Bek"}
-	rows := buildRows([]manifest.Track{unid, trk("a", "A", "Band", "", 0)}, "", map[string]bool{"needs": true})
+	rows := buildRowsWith([]manifest.Track{unid, trk("a", "A", "Band", "", 0)}, nil, "", map[string]bool{"needs": true})
 	if rows[0].Kind != kindGroup || rows[0].Count != 1 || rows[0].Label != "Needs work" {
 		t.Fatalf("first row = %+v", rows[0])
 	}
@@ -125,7 +125,7 @@ func TestNeedsWorkGroupListsUnidentifiedTracksAndIsHiddenWhenEmpty(t *testing.T)
 		t.Errorf("unidentified row = %+v; it should show what the file said about itself", rows[1])
 	}
 
-	for _, r := range buildRows([]manifest.Track{trk("a", "A", "Band", "", 0)}, "", map[string]bool{}) {
+	for _, r := range buildRowsWith([]manifest.Track{trk("a", "A", "Band", "", 0)}, nil, "", map[string]bool{}) {
 		if r.Kind == kindGroup {
 			t.Error("Needs work should not appear when everything is identified")
 		}
@@ -140,7 +140,7 @@ func TestTrackRowsCarryTheirNumberPaddedToTheAlbum(t *testing.T) {
 		trk("d", "Four", "Band", "Long", 120),
 	}
 	nums := map[string]string{}
-	for _, r := range buildRows(tracks, "", expandAll(tracks)) {
+	for _, r := range buildRowsWith(tracks, nil, "", expandAll(tracks)) {
 		if r.Kind == kindTrack {
 			nums[r.Label] = r.Num
 		}
@@ -154,27 +154,27 @@ func TestTrackRowsCarryTheirNumberPaddedToTheAlbum(t *testing.T) {
 }
 
 func TestFilteringUsesTheSameWordsAsLs(t *testing.T) {
-	rows := buildRows(sampleTracks, "shawn flow", map[string]bool{})
+	rows := buildRowsWith(sampleTracks, nil, "shawn flow", map[string]bool{})
 	if got, want := labels(rows), []string{"Shawn James", "  Shadows", "    Flow"}; !equal(got, want) {
 		t.Errorf("rows = %v, want %v (a filter opens everything it finds)", got, want)
 	}
 	if rows[0].Count != 1 {
 		t.Errorf("counts should describe the matches, got %d", rows[0].Count)
 	}
-	if got := labels(buildRows(sampleTracks, "status:unidentified", map[string]bool{})); !equal(got, []string{"Needs work", "  ?"}) {
+	if got := labels(buildRowsWith(sampleTracks, nil, "status:unidentified", map[string]bool{})); !equal(got, []string{"Needs work", "  ?"}) {
 		t.Errorf("status filter = %v", got)
 	}
-	if got := buildRows(sampleTracks, "zzz", map[string]bool{}); len(got) != 0 {
+	if got := buildRowsWith(sampleTracks, nil, "zzz", map[string]bool{}); len(got) != 0 {
 		t.Errorf("no match = %v", labels(got))
 	}
-	if got := len(buildRows(sampleTracks, "   ", map[string]bool{})); got != 4 {
+	if got := len(buildRowsWith(sampleTracks, nil, "   ", map[string]bool{})); got != 4 {
 		t.Errorf("a blank filter filters nothing: %d rows", got)
 	}
 }
 
 func TestEveryRowHasAStableUniqueKeyAndAParent(t *testing.T) {
 	expanded := expandAll(sampleTracks)
-	rows := buildRows(sampleTracks, "", expanded)
+	rows := buildRowsWith(sampleTracks, nil, "", expanded)
 	seen := map[string]bool{}
 	byKey := map[string]Row{}
 	for _, r := range rows {
@@ -192,7 +192,7 @@ func TestEveryRowHasAStableUniqueKeyAndAParent(t *testing.T) {
 			}
 		}
 	}
-	again := buildRows(sampleTracks, "", expanded)
+	again := buildRowsWith(sampleTracks, nil, "", expanded)
 	for i := range rows {
 		if rows[i].Key != again[i].Key {
 			t.Errorf("keys are not stable: %q vs %q", rows[i].Key, again[i].Key)
@@ -206,7 +206,7 @@ func TestAncestorKeysSaySoWhatToOpenToRevealATrack(t *testing.T) {
 		expanded[k] = true
 	}
 	var revealed bool
-	for _, r := range buildRows(sampleTracks, "", expanded) {
+	for _, r := range buildRowsWith(sampleTracks, nil, "", expanded) {
 		if r.Kind == kindTrack && r.Track.ID == "t1" {
 			revealed = true
 		}
@@ -220,7 +220,7 @@ func TestAncestorKeysSaySoWhatToOpenToRevealATrack(t *testing.T) {
 }
 
 func TestNonTrackRowsKnowWhichTracksTheyHold(t *testing.T) {
-	rows := buildRows(sampleTracks, "", map[string]bool{artistKey("Fairuz"): true})
+	rows := buildRowsWith(sampleTracks, nil, "", map[string]bool{artistKey("Fairuz"): true})
 	byLabel := map[string]Row{}
 	for _, r := range rows {
 		byLabel[r.Label] = r
@@ -246,7 +246,7 @@ func TestTheTreeShowsTheTrueNamesInTheOrderOfTheirLatinForms(t *testing.T) {
 		trk("t2", "وطني", "فيروز", "", 0), // Firuz
 		trk("t3", "Song", "Abba", "", 0),
 	}
-	got := labels(buildRows(tracks, "", expandAll(tracks)))
+	got := labels(buildRowsWith(tracks, nil, "", expandAll(tracks)))
 	want := []string{"Abba", "Singles", "Song", "فيروز", "Singles", "وطني", "Zed", "Singles", "Song"}
 	for i := range got {
 		got[i] = strings.TrimSpace(got[i])
@@ -265,7 +265,7 @@ func TestTheTreeIsInTheOrderOfTheLatinFormsSetByHand(t *testing.T) {
 	fairouz := trk("t1", "وطني", "فيروز", "ألبوم", 0)
 	fairouz.ArtistLatin = "Fairouz"
 	other := trk("t2", "Song", "Fb", "", 0)
-	got := labels(buildRows([]manifest.Track{other, fairouz}, "", map[string]bool{}))
+	got := labels(buildRowsWith([]manifest.Track{other, fairouz}, nil, "", map[string]bool{}))
 	if want := []string{"فيروز", "Fb"}; !equal(got, want) { // the rows show the true name; only the place follows the form
 		t.Errorf("rows = %q, want %q", got, want)
 	}
@@ -279,7 +279,7 @@ func TestTheTreeIsInTheOrderOfTheLatinFormsSetByHand(t *testing.T) {
 	b.TitleLatin = "Bravo"
 	c := trk("c", "Song", "X", "Beta", 0)
 	tracks := []manifest.Track{c, a, b}
-	rows := labels(buildRows(tracks, "", expandAll(tracks)))
+	rows := labels(buildRowsWith(tracks, nil, "", expandAll(tracks)))
 	for i := range rows {
 		rows[i] = strings.TrimSpace(rows[i])
 	}

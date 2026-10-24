@@ -31,9 +31,6 @@ type Problem struct {
 	Message  string
 }
 
-// CoverPath is where the stored cover image with the given SHA lives.
-func (a *App) CoverPath(sha string) string { return a.covers.Path(sha) }
-
 // Doctor checks the library for damage: every record's audio and cover must
 // be in the stores and still match their hashes. It also warns about tracks
 // that are not identified yet and about tracks that claim the same place on

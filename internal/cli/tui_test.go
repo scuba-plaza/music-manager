@@ -86,7 +86,7 @@ func TestTheInterfaceShowsTheWolfgangPreviewOnlyWhenAsked(t *testing.T) {
 	for _, c := range []struct {
 		args []string
 		want bool
-	}{{nil, false}, {[]string{"--wolfgang"}, true}, {[]string{"tui"}, false}, {[]string{"tui", "--wolfgang"}, true}, {[]string{"tui", "--wolfang"}, true}} {
+	}{{nil, false}, {[]string{"--wolfgang"}, true}, {[]string{"tui"}, false}, {[]string{"tui", "--wolfgang"}, true}} {
 		p := &tuiProbe{}
 		if code, _, errs := runWith(t, cli.Deps{RunTUI: p.run}, lib, c.args...); code != 0 || p.calls != 1 || p.wolfgang != c.want {
 			t.Errorf("mm %v: code %d, calls %d, wolfgang %v, err %q; want wolfgang %v", c.args, code, p.calls, p.wolfgang, errs, c.want)

@@ -64,16 +64,11 @@ type Row struct {
 	Track    manifest.Track // for track rows
 }
 
-// buildRows lays out the visible rows. A non-blank filter (same syntax as
-// "mm ls") keeps only the matching tracks and opens everything they sit
-// under; otherwise only the rows in expanded are open.
-func buildRows(tracks []manifest.Track, filter string, expanded map[string]bool) []Row {
-	return buildRowsWith(tracks, nil, filter, expanded)
-}
-
-// buildRowsWith is buildRows with the playlists, which form a group of their
-// own ahead of the artists. A filter keeps only the tracks that match, in
-// the playlists too, and the playlists that still have any.
+// buildRowsWith lays out the visible rows: the playlists, which form a group
+// of their own, ahead of the artists. A non-blank filter (same syntax as "mm
+// ls") keeps only the matching tracks, in the playlists too, and the playlists
+// that still have any, and opens everything they sit under; otherwise only the
+// rows in expanded are open.
 func buildRowsWith(tracks []manifest.Track, playlists []manifest.Playlist, filter string, expanded map[string]bool) []Row {
 	filtering := strings.TrimSpace(filter) != ""
 	all := tracks

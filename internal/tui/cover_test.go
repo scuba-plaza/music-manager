@@ -138,7 +138,7 @@ func TestDescribeCoverGivesSizeAndFormat(t *testing.T) {
 }
 
 func TestLoadThumbDecodesAndShrinksAnImage(t *testing.T) {
-	th, err := loadThumb(encodePNG(t, twoTone(800, 600)))
+	th, err := loadThumbFor(encodePNG(t, twoTone(800, 600)), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestLoadThumbDecodesAndShrinksAnImage(t *testing.T) {
 	if th.info != "800×600 PNG" {
 		t.Errorf("info = %q", th.info)
 	}
-	if _, err := loadThumb([]byte("nope")); err == nil {
+	if _, err := loadThumbFor([]byte("nope"), false); err == nil {
 		t.Error("garbage loaded")
 	}
 }
