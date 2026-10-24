@@ -616,3 +616,34 @@ func TestEditRefusesALatinFormOnSeveralLines(t *testing.T) {
 		t.Errorf("code %d, err %q", code, errs)
 	}
 }
+
+func TestRemoveWithARepeatedIDRemovesNothing(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib)
+
+	code, out, errs := run(t, lib, "rm", id, id)
+	if code == 0 || !strings.Contains(errs, id) {
+		t.Errorf("rm with a repeated id: code %d, out %q, err %q", code, out, errs)
+	}
+	if strings.Contains(out, "removed") {
+		t.Errorf("rm said it removed something and then failed: %q", out)
+	}
+	if _, out, _ := run(t, lib, "ls"); !strings.Contains(out, id) {
+		t.Error("a failed rm removed the track")
+	}
+}
+
+func TestEditWithACoverThatIsNotAnImageChangesNothing(t *testing.T) {
+	lib := filepath.Join(t.TempDir(), "lib")
+	id := ingestOne(t, lib)
+	notAnImage := filepath.Join(t.TempDir(), "front.txt")
+	writeMP3(t, notAnImage, []byte("not a picture"))
+
+	code, _, errs := run(t, lib, "edit", id, "--title", "Song", "--artist", "Band", "--cover", notAnImage)
+	if code == 0 || !strings.Contains(errs, "JPEG or PNG") {
+		t.Fatalf("code %d, err %q", code, errs)
+	}
+	if _, out, _ := run(t, lib, "show", id); strings.Contains(out, "Song") || strings.Contains(out, "Band") {
+		t.Errorf("the edit was half applied:\n%s", out)
+	}
+}

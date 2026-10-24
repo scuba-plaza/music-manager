@@ -24,7 +24,7 @@ func (a *App) SetCover(id string, image []byte) error {
 	if !ok {
 		return fmt.Errorf("no track with id %q", id)
 	}
-	sha, err := a.storeCover(image)
+	sha, err := a.StoreCover(image)
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,7 @@ func (a *App) SetCoverMany(ids []string, image []byte) (map[string]manifest.Trac
 		}
 		ts = append(ts, t)
 	}
-	sha, err := a.storeCover(image)
+	sha, err := a.StoreCover(image)
 	if err != nil {
 		return nil, err
 	}
@@ -64,10 +64,11 @@ func (a *App) SetCoverMany(ids []string, image []byte) (map[string]manifest.Trac
 	return updated, a.store.Save(m)
 }
 
-// storeCover files an image in the cover store, as it is, and returns its SHA;
-// empty input gives an empty SHA, and an image that is not a JPEG or a PNG is
-// refused.
-func (a *App) storeCover(image []byte) (string, error) {
+// StoreCover files an image in the cover store, as it is, and returns its SHA,
+// which Edit.Cover gives to a track; empty input gives an empty SHA, which takes
+// a cover away, and an image that is not a JPEG or a PNG is refused. The image
+// stays in the store, unused, if nothing then takes its SHA; a sync collects it.
+func (a *App) StoreCover(image []byte) (string, error) {
 	if len(image) == 0 {
 		return "", nil
 	}

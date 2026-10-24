@@ -49,7 +49,7 @@ func (a *App) stage(path string) (staged, error) {
 		return staged{}, err
 	}
 	tags := mp3.ReadTagSet(data)
-	coverSHA, _ := a.storeCover(tags.Cover) // a bad cover is not worth losing the track over
+	coverSHA, _ := a.StoreCover(tags.Cover) // a bad cover is not worth losing the track over
 	return staged{
 		sha: sha, coverSHA: coverSHA, length: length, tags: tags,
 		name: strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),

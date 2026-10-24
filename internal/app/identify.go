@@ -277,7 +277,7 @@ func (a *App) applyCandidate(ctx context.Context, id string, c Candidate, src Me
 	if t.CoverSHA256 == "" {
 		// A missing cover is not worth failing the identification over.
 		if img, err := src.CoverFront(ctx, c.ReleaseID); err == nil && len(img) > 0 {
-			coverSHA, _ = a.storeCover(img)
+			coverSHA, _ = a.StoreCover(img)
 		}
 	}
 

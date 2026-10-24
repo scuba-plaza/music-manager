@@ -21,20 +21,11 @@ and their rendered files by "mm sync --prune".`,
 			if err != nil {
 				return err
 			}
-			m, err := a.Manifest()
+			removed, err := a.RemoveMany(ids) // all or none: a typo or a repeated id removes nothing
 			if err != nil {
-				return err
+				return fmt.Errorf("%w; nothing was removed", err)
 			}
-			for _, id := range ids { // check everything first, so a typo removes nothing
-				if _, ok := m.Get(id); !ok {
-					return fmt.Errorf("no track with id %q; nothing was removed", id)
-				}
-			}
-			for _, id := range ids {
-				t, err := a.Remove(id)
-				if err != nil {
-					return err
-				}
+			for _, t := range removed {
 				artist, title, _ := display(t)
 				fmt.Fprintf(cmd.OutOrStdout(), "removed %s: %s - %s\n", t.ID, artist, title)
 			}

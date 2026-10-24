@@ -88,15 +88,15 @@ original, so cutting the track again afterwards does not move them.`,
 					*fade.dst = &span
 				}
 			}
-			if p.edit != (app.Edit{}) {
-				if _, err := a.Edit(args[0], p.edit); err != nil {
+			if p.coverChanged { // the image is checked and filed first, so that a bad one changes nothing
+				sha, err := a.StoreCover(p.cover)
+				if err != nil {
 					return err
 				}
+				p.edit.Cover = &sha
 			}
-			if p.coverChanged {
-				if err := a.SetCover(args[0], p.cover); err != nil {
-					return err
-				}
+			if _, err := a.Edit(args[0], p.edit); err != nil {
+				return err
 			}
 			m, err := a.Manifest()
 			if err != nil {

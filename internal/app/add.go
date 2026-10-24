@@ -126,7 +126,7 @@ func (a *App) Fetch(ctx context.Context, req AddRequest, dl Downloader) (*Draft,
 		return nil, &DuplicateError{ID: dup.ID}
 	}
 	if len(req.Cover) > 0 {
-		if s.coverSHA, err = a.storeCover(req.Cover); err != nil {
+		if s.coverSHA, err = a.StoreCover(req.Cover); err != nil {
 			return nil, err
 		}
 	}
@@ -164,7 +164,7 @@ func (a *App) Finish(ctx context.Context, d *Draft, e Edit) (manifest.Track, err
 		t.MBRecordingID, t.MBReleaseID = match.RecordingID, match.ReleaseID
 		if t.CoverSHA256 == "" && d.source != nil {
 			if img, err := d.source.CoverFront(ctx, match.ReleaseID); err == nil && len(img) > 0 {
-				t.CoverSHA256, _ = a.storeCover(img)
+				t.CoverSHA256, _ = a.StoreCover(img)
 			}
 		}
 	}
