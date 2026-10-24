@@ -46,6 +46,18 @@ func (m Model) fieldStarts(t manifest.Track, w, h int) []fieldStart {
 	return starts
 }
 
+// groupFieldStarts says, for each field of an artist, an album or a playlist, at
+// which line of the pane it starts.
+func (m Model) groupFieldStarts(g group, w int) []fieldStart {
+	line := 3 // a blank line, the title and a rule
+	var starts []fieldStart
+	for i, f := range groupFields(g.kind) {
+		starts = append(starts, fieldStart{i, line})
+		line += len(m.groupFieldLines(g, f, false, w))
+	}
+	return starts
+}
+
 func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.overlay != nil || m.busy || m.editing {
 		return m, nil
@@ -113,7 +125,7 @@ func (m Model) clickTree(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		m.focusInspector()
 		m.lastClickKey = ""
 		return m, m.startEdit()
-	case wasSelected && row.Kind == kindTrack:
+	case wasSelected && editableRow(row):
 		m.focusInspector()
 	}
 	return m, nil
@@ -121,7 +133,7 @@ func (m Model) clickTree(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) clickInspector(msg tea.MouseMsg, l layoutInfo) (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
-	if !ok || r.Kind != kindTrack {
+	if !ok {
 		return m, nil
 	}
 	w := l.right - 2
@@ -129,6 +141,9 @@ func (m Model) clickInspector(msg tea.MouseMsg, l layoutInfo) (tea.Model, tea.Cm
 		w = l.left - 2
 	}
 	line := msg.Y - firstContentRow
+	if r.Kind != kindTrack {
+		return m.clickGroupFields(r, line, w)
+	}
 	if line == 0 { // the strip of tabs
 		left := l.left
 		if l.mode == modeOnePane {
@@ -166,4 +181,33 @@ func (m Model) clock() time.Time {
 		return m.now()
 	}
 	return time.Now()
+}
+
+// clickGroupFields is a click, line lines down the pane, on the pane of an
+// artist, an album or a playlist: the first click on a field goes into the
+// pane and chooses it, the next one edits it.
+func (m Model) clickGroupFields(r Row, line, w int) (tea.Model, tea.Cmd) {
+	g, ok := m.groupOf(r)
+	if !ok || !editableRow(r) {
+		return m, nil
+	}
+	field, fields := -1, groupFields(g.kind)
+	for _, s := range m.groupFieldStarts(g, w) {
+		if line >= s.line && line < s.line+len(m.groupFieldLines(g, fields[s.field], false, w)) {
+			field = s.field
+		}
+	}
+	if field < 0 { // not on a field: the title, the note, what is inside
+		return m, nil
+	}
+	if m.focus != paneInspector {
+		m.focusInspector()
+		m.gfield = field
+		return m, nil
+	}
+	if m.gfield == field {
+		return m, m.startEdit()
+	}
+	m.gfield = field
+	return m, nil
 }

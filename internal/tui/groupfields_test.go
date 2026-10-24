@@ -4,7 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"music-manager/internal/app"
 	"music-manager/internal/manifest"
@@ -981,4 +983,125 @@ func TestEWithTracksMarkedStillEditsThemAllAtOnce(t *testing.T) {
 		t.Fatalf("overlay %T, focus %v: marked tracks should open the form", m.overlay, m.focus)
 	}
 	contains(t, m, "Edit 1 marked track")
+}
+
+// ---- the mouse
+
+// clickRow clicks the row of the tree that has the label.
+func clickRow(t *testing.T, m Model, label string) Model {
+	t.Helper()
+	i := treeLine(m, label)
+	if i < 0 {
+		t.Fatalf("no row %q in the tree:\n%s", label, screen(m))
+	}
+	return send(t, m, click(10, rowY(i)))
+}
+
+func TestClickingTheSelectedArtistAlbumOrPlaylistGoesIntoItsFields(t *testing.T) {
+	m, _ := browserModel(t, 120, 36)
+	now := time.Now()
+	m.now = func() time.Time { return now }
+	lib, _ := playlistLib(t)
+	p := newTestModel(t, lib, 120, 36)
+	p.now = m.now
+	p = keys(t, p, "right") // open the group of playlists
+
+	for _, c := range []struct {
+		name string
+		m    Model
+		row  string
+	}{{"an artist", m, "Shawn James"}, {"a playlist", p, "Study"}} {
+		m := clickRow(t, c.m, c.row) // the first click selects
+		if m.focus != paneBrowser {
+			t.Errorf("%s: the first click went into the fields", c.name)
+		}
+		now = now.Add(2 * time.Second) // too slow to be a double click
+		m = clickRow(t, m, c.row)
+		if m.focus != paneInspector {
+			t.Errorf("%s: clicking the selected row did not go into its fields", c.name)
+		}
+		if c.name == "an artist" && treeLine(m, "Shadows") >= 0 {
+			t.Errorf("%s: the click opened the artist", c.name)
+		}
+	}
+
+	a, _ := toAlbum(t)
+	a.now = func() time.Time { return now }
+	now = now.Add(2 * time.Second)
+	a = clickRow(t, a, "Shadows")
+	if a.focus != paneInspector {
+		t.Error("an album: clicking the selected row did not go into its fields")
+	}
+	contains(t, a, "Tracks on album")
+}
+
+func TestDoubleClickStillOpensAndClosesAGroup(t *testing.T) {
+	m, _ := toArtist(t) // the artist is selected, and open
+	now := time.Now()
+	m.now = func() time.Time { return now }
+	now = now.Add(2 * time.Second)
+	m = clickRow(t, m, "Shawn James")
+	now = now.Add(100 * time.Millisecond)
+	m = clickRow(t, m, "Shawn James")
+	if m.focus != paneBrowser {
+		t.Error("a double click ended in the fields")
+	}
+	if treeLine(m, "Shadows") >= 0 {
+		t.Errorf("a double click did not close the artist:\n%s", screen(m))
+	}
+}
+
+func TestClickingAFieldOfAGroupChoosesItAndAgainEditsIt(t *testing.T) {
+	m, _ := toAlbum(t)
+	m = keys(t, m, "right")
+	l := computeLayout(m.w, m.h)
+	for _, f := range []struct {
+		label string
+		field fieldKind
+	}{{"Tracks on album", fAlbumOf}, {"Latin genre", fLatinGenre}, {"Released", fReleased}, {"Name", fAlbum}, {"Cover", fCover}} {
+		y := fieldRow(t, m, f.label)
+		m = send(t, m, click(l.left+8, y))
+		if m.curField() != f.field {
+			t.Fatalf("a click on the %s row chose %v", f.label, m.curField())
+		}
+		if m.editing {
+			t.Errorf("the first click on %s only chooses the field", f.label)
+		}
+	}
+	y := fieldRow(t, m, "Released")
+	m = send(t, m, click(l.left+8, y))
+	m = send(t, m, click(l.left+8, y))
+	if !m.editing || m.curField() != fReleased {
+		t.Errorf("clicking the chosen field should edit it: editing %v on %v", m.editing, m.curField())
+	}
+}
+
+func TestAClickOnTheFieldsFromTheTreeGoesInWithoutEditing(t *testing.T) {
+	m, _ := toArtist(t) // the cursor is in the tree
+	l := computeLayout(m.w, m.h)
+	y := fieldRow(t, m, "Genre")
+	m = send(t, m, click(l.left+8, y))
+	if m.focus != paneInspector || m.editing || m.curField() != fGenre {
+		t.Errorf("focus %v, editing %v, on %v", m.focus, m.editing, m.curField())
+	}
+}
+
+func TestAClickBelowTheFieldsOfAGroupDoesNotChooseOrEditAField(t *testing.T) {
+	m, _ := toArtist(t)
+	m = keys(t, m, "right")
+	l := computeLayout(m.w, m.h)
+	y := -1
+	for i, line := range strings.Split(screen(m), "\n") {
+		if cells := []rune(line); len(cells) > l.left && strings.Contains(string(cells[l.left:]), "Shadows") {
+			y = i
+		}
+	}
+	if y < 0 {
+		t.Fatalf("no album in the list under the fields:\n%s", screen(m))
+	}
+	before := m.gfield
+	m = send(t, m, click(l.left+8, y), click(l.left+8, y))
+	if m.gfield != before || m.editing {
+		t.Errorf("a click on the list under the fields chose field %d (was %d), editing %v", m.gfield, before, m.editing)
+	}
 }
