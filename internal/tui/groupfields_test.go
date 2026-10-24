@@ -520,3 +520,139 @@ func TestTheLatinGenreOnlyReachesTheTracksThatHaveAGenre(t *testing.T) {
 	}
 	contains(t, m, "Changed 1 track")
 }
+
+// toAlbum is the model with the cursor on the album Shadows of Shawn James.
+func toAlbum(t *testing.T) (Model, *editHook) {
+	t.Helper()
+	m, hook := editingModel(t, "Flow")
+	m = keys(t, m, "up", "up") // The Wanderer, then the album
+	if got := selectedLabel(t, m); got != "Shadows" {
+		t.Fatalf("setup: %q", got)
+	}
+	return m, hook
+}
+
+func albumOf(t *testing.T, lib Library, title string) string {
+	t.Helper()
+	return trackNamed(t, lib, title).Album
+}
+
+func TestAnAlbumEditOnlyTouchesTheTracksOfThatArtist(t *testing.T) {
+	m, hook := toAlbum(t)
+	// Another artist has an album of the same name.
+	m = withEdits(t, m, hook, map[string]app.Edit{"Current": {Album: ptr("Shadows")}})
+	m = selectTrack(t, m, "Flow")
+	m = keys(t, m, "up", "up", "right", "enter")
+	if got := m.in[0].Value(); got != "Shadows" {
+		t.Fatalf("the editor starts from %q", got)
+	}
+	contains(t, m, "all 3 tracks")
+	m = typed(t, clearField(t, m), "Shadows (Deluxe)")
+	m = keys(t, m, "enter")
+	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
+		if got := albumOf(t, hook.Library, title); got != "Shadows (Deluxe)" {
+			t.Errorf("%s is on %q", title, got)
+		}
+	}
+	if got := albumOf(t, hook.Library, "Current"); got != "Shadows" {
+		t.Errorf("the album of another artist was renamed: %q", got)
+	}
+	contains(t, m, "Changed 3 tracks")
+}
+
+func TestTheCursorAndTheOpenStateFollowTheNewNameOfAnAlbum(t *testing.T) {
+	m, _ := toAlbum(t)
+	if treeLine(m, "Flow") < 0 {
+		t.Fatal("setup: the album is not open")
+	}
+	m = keys(t, m, "right", "enter")
+	m = typed(t, clearField(t, m), "Shadows II")
+	m = keys(t, m, "enter")
+	if got := selectedLabel(t, m); got != "Shadows II" {
+		t.Errorf("the cursor is on %q", got)
+	}
+	if m.focus != paneInspector || treeLine(m, "Flow") < 0 {
+		t.Errorf("focus %v, album open: %v", m.focus, treeLine(m, "Flow") >= 0)
+	}
+}
+
+func TestTheNameOfAnAlbumCannotBeEmptyAndJoiningAnotherIsSaid(t *testing.T) {
+	m, hook := toAlbum(t)
+	m = withEdits(t, m, hook, map[string]app.Edit{"Along Our Way": {Album: ptr("Other")}})
+	m = selectTrack(t, m, "Flow")
+	m = keys(t, m, "up", "up", "right", "enter") // Shadows now holds two tracks
+	m = typed(t, clearField(t, m), "Other")
+	contains(t, m, "joins the album Other of Shawn James (1 track)")
+	m = keys(t, m, "enter")
+	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
+		if got := albumOf(t, hook.Library, title); got != "Other" {
+			t.Errorf("%s is on %q", title, got)
+		}
+	}
+
+	m = keys(t, m, "enter")
+	m = keys(t, clearField(t, m), "enter")
+	contains(t, m, "cannot be empty")
+	if !m.editing {
+		t.Error("the editor closed on an empty name")
+	}
+}
+
+func TestTheOtherFieldsOfAnAlbumAreSetOnAllItsTracks(t *testing.T) {
+	m, hook := toAlbum(t)
+	set := func(f fieldKind, text string) {
+		t.Helper()
+		m = keys(t, m, "esc")
+		m = selectTrack(t, m, "Flow")
+		m = keys(t, m, "up", "up", "right")
+		for i := 0; i < 10 && m.curField() != f; i++ {
+			m = keys(t, m, "down")
+		}
+		if m.curField() != f {
+			t.Fatalf("no field %v", f)
+		}
+		m = keys(t, m, "enter")
+		m = typed(t, clearField(t, m), text)
+		m = keys(t, m, "enter")
+		if m.editing {
+			t.Fatalf("%v: %s", f, screen(m))
+		}
+	}
+	set(fReleased, "2012-03")
+	set(fGenre, "طرب")
+	set(fLatinGenre, "Tarab")
+	set(fLatinAlbum, "Shadows (Latin)")
+	set(fAlbumOf, "10")
+	for _, title := range []string{"The Wanderer", "Flow", "Along Our Way"} {
+		got := trackNamed(t, hook.Library, title)
+		if got.Released != "2012-03" || got.Genre != "طرب" || got.GenreLatin != "Tarab" || got.AlbumLatin != "Shadows (Latin)" || got.TrackTotal != 10 {
+			t.Errorf("%s = released %q, genre %q / %q, album form %q, of %d", title, got.Released, got.Genre, got.GenreLatin, got.AlbumLatin, got.TrackTotal)
+		}
+	}
+	if got := trackNamed(t, hook.Library, "Current"); got.Released != "" || got.Genre != "" {
+		t.Errorf("a track of another album was changed: %+v", got)
+	}
+	// Each of them was one step to undo: the last was the count.
+	m = keys(t, m, "esc", "u")
+	if got := trackNamed(t, hook.Library, "Flow"); got.TrackTotal != 12 || got.AlbumLatin != "Shadows (Latin)" {
+		t.Errorf("after one undo: of %d, album form %q", got.TrackTotal, got.AlbumLatin)
+	}
+}
+
+func TestABadDateOrCountForAnAlbumIsExplainedAndNothingIsSaved(t *testing.T) {
+	m, hook := toAlbum(t)
+	m = keys(t, m, "right", "down", "down", "enter") // Released
+	m = typed(t, m, "next spring")
+	m = keys(t, m, "enter")
+	contains(t, m, "is not a date")
+	if hook.manyCalls != 0 || !m.editing {
+		t.Errorf("saves %d, editing %v", hook.manyCalls, m.editing)
+	}
+	m = keys(t, m, "esc", "down", "down", "down", "enter") // Tracks on album
+	m = typed(t, m, "many")
+	m = keys(t, m, "enter")
+	contains(t, m, "whole number")
+	if hook.manyCalls != 0 {
+		t.Errorf("saves %d", hook.manyCalls)
+	}
+}
