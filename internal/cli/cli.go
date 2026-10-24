@@ -30,6 +30,8 @@ type Deps struct {
 	// when there is a terminal for it; without it plain "mm" prints help.
 	// wolfgang asks for the preview of what a sync for the Wolfgang WMP01 writes.
 	RunTUI func(ctx context.Context, a *app.App, wolfgang bool) error
+	// RunWeb serves the web interface on a library until ctx is done.
+	RunWeb func(ctx context.Context, a *app.App, o WebOptions) error
 }
 
 // opener lazily opens the library, so commands that fail on bad flags never
@@ -65,7 +67,7 @@ func Run(ctx context.Context, args []string, streams IO, deps Deps) int {
 	root.PersistentFlags().StringVar(&library, "library", defaultLibrary(), "library directory (env MM_LIBRARY)")
 	wolfgangFlag(root, &wolfgang)
 
-	root.AddCommand(ingestCmd(open), lsCmd(open), showCmd(open), editCmd(open), syncCmd(open), addCmd(open, deps), rmCmd(open), doctorCmd(open), identifyCmd(open, deps), adoptCmd(open), playlistCmd(open), reviewCmd(open), tuiCmd(open, deps))
+	root.AddCommand(ingestCmd(open), lsCmd(open), showCmd(open), editCmd(open), syncCmd(open), addCmd(open, deps), rmCmd(open), doctorCmd(open), identifyCmd(open, deps), adoptCmd(open), playlistCmd(open), reviewCmd(open), tuiCmd(open, deps), webCmd(open, deps))
 
 	if err := root.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(streams.Err, "mm:", err)

@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
+	"syscall"
 
 	"golang.org/x/term"
 
@@ -15,11 +17,12 @@ import (
 	"music-manager/internal/prompt"
 	"music-manager/internal/tui"
 	"music-manager/internal/version"
+	"music-manager/internal/web"
 	"music-manager/internal/ytdlp"
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	lookup := musicbrainz.New(userAgent())
@@ -30,6 +33,24 @@ func main() {
 		lookup.CoverURL = strings.TrimRight(url, "/")
 	}
 	deps := cli.Deps{Downloader: ytdlp.New(), Metadata: lookup}
+	deps.RunWeb = func(ctx context.Context, a *app.App, o cli.WebOptions) error {
+		opts := []web.Option{web.WithSource(lookup), web.WithDownloader(deps.Downloader)}
+		if o.Wolfgang {
+			opts = append(opts, web.WithWolfgang())
+		}
+		ln, err := web.Listen(o.Addr, !o.AddrSet)
+		if err != nil {
+			return err
+		}
+		url := web.URL(ln)
+		fmt.Fprintf(o.Out, "mm is at %s  (Ctrl+C stops it)\n", url)
+		if !o.NoOpen {
+			if err := web.OpenBrowser(url); err != nil {
+				fmt.Fprintln(o.Out, "mm: cannot open a browser:", err)
+			}
+		}
+		return web.New(a, opts...).Serve(ctx, ln)
+	}
 	if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 		deps.Prompter = prompt.New(os.Stdin, os.Stderr)
 		deps.RunTUI = func(ctx context.Context, a *app.App, wolfgang bool) error {
