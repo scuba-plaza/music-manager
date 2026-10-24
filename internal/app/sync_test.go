@@ -328,3 +328,41 @@ func TestSyncWritesTheGenreIntoTheTagAndChangingItNeedsASync(t *testing.T) {
 		t.Errorf("the genre should rewrite the file: %v", ops)
 	}
 }
+
+func TestSyncDoesNotCollectTheFilesOfATrackAddedAfterThePlanWasMade(t *testing.T) {
+	a := libWithTracks(t, 40)
+	plan := mustPlan(t, a, app.SyncOptions{}) // the review screen stays open while...
+
+	other, err := app.Open(a.Root()) // ...another mm adds a track
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := filepath.Join(t.TempDir(), "new.mp3")
+	writeFile(t, f, testmp3.WithCover(testmp3.Silent(25), "image/jpeg", testmp3.JPEG))
+	if _, err := other.Ingest([]string{f}); err != nil {
+		t.Fatal(err)
+	}
+	added := tracks(t, a)[1]
+	if added.CoverSHA256 == "" {
+		t.Fatal("the added track has no cover to lose")
+	}
+
+	if err := plan.Apply(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(a.AudioPath(added.AudioSHA256)); err != nil {
+		t.Errorf("the audio of the track added meanwhile was collected: %v", err)
+	}
+	if _, err := os.Stat(a.CoverPath(added.CoverSHA256)); err != nil {
+		t.Errorf("the cover of the track added meanwhile was collected: %v", err)
+	}
+	issues, err := a.Doctor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range issues {
+		if p.Severity == app.Error {
+			t.Errorf("doctor: %s: %s", p.TrackID, p.Message)
+		}
+	}
+}

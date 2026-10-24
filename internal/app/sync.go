@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -155,11 +156,15 @@ func (p *SyncPlan) ApplyWith(progress func(done, total int)) error {
 	if err := removeEmptyDirs(p.target); err != nil {
 		return err
 	}
-	audio, err := p.a.audio.GC(p.keepAudio)
+	keepAudio, keepCovers, err := p.keepNow()
 	if err != nil {
 		return err
 	}
-	covers, err := p.a.covers.GC(p.keepCovers)
+	audio, err := p.a.audio.GC(keepAudio)
+	if err != nil {
+		return err
+	}
+	covers, err := p.a.covers.GC(keepCovers)
 	p.Collected = len(audio) + len(covers)
 	if err != nil {
 		return err
@@ -168,6 +173,22 @@ func (p *SyncPlan) ApplyWith(progress func(done, total int)) error {
 		return p.a.writeSynced(p.sigs)
 	}
 	return nil
+}
+
+// keepNow is the audio and the covers that must not be collected: those the
+// records needed when the plan was made, and those they need now. A plan can
+// wait for review, and a sync to a card takes minutes, in which another mm may
+// have added a track whose files are not in the plan.
+func (p *SyncPlan) keepNow() (audio, covers map[string]bool, err error) {
+	m, err := p.a.store.Load()
+	if err != nil {
+		return nil, nil, err
+	}
+	audio, covers = maps.Clone(p.keepAudio), maps.Clone(p.keepCovers)
+	for _, t := range m.Tracks {
+		audio[t.AudioSHA256], covers[t.CoverSHA256] = true, true
+	}
+	return audio, covers, nil
 }
 
 func (a *App) renderTrack(t manifest.Track, dev device.Target) ([]byte, error) {

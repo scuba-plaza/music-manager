@@ -151,6 +151,10 @@ func (s *Store) Save(m *Manifest) error {
 		tmp.Close()
 		return err
 	}
+	if err := tmp.Sync(); err != nil { // on disk before the rename, or a power cut leaves an empty library.json
+		tmp.Close()
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}

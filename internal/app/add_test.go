@@ -553,3 +553,20 @@ func TestAddAsksForAGenreUnlessOneIsGiven(t *testing.T) {
 		t.Errorf("non-interactive: genre %q, %v", got.Genre, err)
 	}
 }
+
+func TestFinishRefusesADraftWhoseAudioASyncCollectedMeanwhile(t *testing.T) {
+	a, dl := openLib(t), newDownloader()
+	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "https://youtu.be/x"}, dl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustSync(t, a, app.SyncOptions{}) // no record holds the draft's audio yet, so a sync collects it
+
+	_, err = a.Finish(context.Background(), d, app.Edit{Title: strp("Song"), Artist: strp("Band")})
+	if err == nil || !strings.Contains(err.Error(), "download it again") {
+		t.Fatalf("err = %v, want one that says to download it again", err)
+	}
+	if saved := tracks(t, a); len(saved) != 0 {
+		t.Errorf("a record was added for audio that is gone: %+v", saved)
+	}
+}

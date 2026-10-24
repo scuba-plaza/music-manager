@@ -480,3 +480,60 @@ func TestIdentifyAsksForTheFirstArtistOfSeveral(t *testing.T) {
 		t.Errorf("queries = %+v", src.queries)
 	}
 }
+
+// meddlingSource does something else to the library while a track is looked
+// up, as another mm would.
+type meddlingSource struct {
+	*fakeSource
+	meanwhile func()
+}
+
+func (m *meddlingSource) Search(ctx context.Context, q app.Query) ([]app.Candidate, error) {
+	if m.meanwhile != nil {
+		m.meanwhile()
+		m.meanwhile = nil
+	}
+	return m.fakeSource.Search(ctx, q)
+}
+
+func TestIdentifyKeepsWhatAnotherMmChangedWhileTheLookupWaited(t *testing.T) {
+	a, _ := hinted(t, "01 - dream three", "01 - Dream 3", "Max Richter")
+	f := filepath.Join(t.TempDir(), "other.mp3")
+	writeFile(t, f, testmp3.Silent(30))
+	rep, err := a.Ingest([]string{f})
+	if err != nil || len(rep.Added) != 1 {
+		t.Fatalf("%+v, %v", rep, err)
+	}
+	bystander := rep.Added[0]
+	identify(t, a, bystander.ID, "Song", "Band", "Album", 1, 1)
+
+	other, err := app.Open(a.Root())
+	if err != nil {
+		t.Fatal(err)
+	}
+	genre := "Folk"
+	src := &meddlingSource{
+		fakeSource: &fakeSource{results: map[string][]app.Candidate{"Dream 3|Max Richter": {dream3}}},
+		meanwhile: func() { // the lookup takes seconds on the network
+			if _, err := other.Edit(bystander.ID, app.Edit{Genre: &genre}); err != nil {
+				t.Error(err)
+			}
+		},
+	}
+	if _, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tr := range tracks(t, a) {
+		switch tr.ID {
+		case bystander.ID:
+			if tr.Genre != "Folk" {
+				t.Errorf("the genre set meanwhile was overwritten: %q", tr.Genre)
+			}
+		default:
+			if tr.Status != manifest.Identified {
+				t.Errorf("the track looked up was not identified: %+v", tr)
+			}
+		}
+	}
+}

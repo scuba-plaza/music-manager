@@ -76,13 +76,20 @@ func newTrack(s staged, sourceURL string) manifest.Track {
 }
 
 // Ingest adds the MP3 files at the given files or directories to the
-// library as unidentified tracks. The files themselves are left alone.
+// library as unidentified tracks. The files themselves are left alone. The
+// files are read first and the records only afterwards, so that a long
+// ingest does not hold, and then save over, a copy of the records that
+// another mm has changed meanwhile.
 func (a *App) Ingest(paths []string) (IngestReport, error) {
 	var rep IngestReport
-	m, err := a.store.Load()
-	if err != nil {
+	if _, err := a.store.Load(); err != nil { // not worth reading any file if the records cannot be used
 		return rep, err
 	}
+	type found struct {
+		path string
+		s    staged
+	}
+	var files []found
 	for _, p := range paths {
 		err := filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
 			if err == nil && d.IsDir() && d.Name() == ".mm" {
@@ -96,16 +103,24 @@ func (a *App) Ingest(paths []string) (IngestReport, error) {
 				rep.Failed = append(rep.Failed, IngestFailure{path, err})
 				return nil
 			}
-			if _, dup := m.FindByAudio(s.sha); dup {
-				rep.Duplicates = append(rep.Duplicates, path)
-				return nil
-			}
-			rep.Added = append(rep.Added, m.Add(newTrack(s, "")))
+			files = append(files, found{path, s})
 			return nil
 		})
 		if err != nil {
 			return rep, err
 		}
+	}
+
+	m, err := a.store.Load()
+	if err != nil {
+		return rep, err
+	}
+	for _, f := range files {
+		if _, dup := m.FindByAudio(f.s.sha); dup {
+			rep.Duplicates = append(rep.Duplicates, f.path)
+			continue
+		}
+		rep.Added = append(rep.Added, m.Add(newTrack(f.s, "")))
 	}
 	return rep, a.store.Save(m)
 }

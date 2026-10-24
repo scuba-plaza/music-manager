@@ -150,6 +150,9 @@ func (a *App) Finish(ctx context.Context, d *Draft, e Edit) (manifest.Track, err
 	if dup, ok := m.FindByAudio(d.staged.sha); ok {
 		return manifest.Track{}, &DuplicateError{ID: dup.ID}
 	}
+	if !a.audio.Has(d.staged.sha) || d.staged.coverSHA != "" && !a.covers.Has(d.staged.coverSHA) { // no record held them, so a sync in between collected them
+		return manifest.Track{}, errors.New("the downloaded audio was cleared away by a sync before it was added; download it again")
+	}
 	t, err := applyEdit(newTrack(d.staged, d.URL), e)
 	if err != nil {
 		return manifest.Track{}, err

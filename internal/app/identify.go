@@ -100,15 +100,10 @@ func (a *App) Identify(ctx context.Context, ids []string, src MetadataSource, p 
 			record(res)
 			continue
 		}
-		updated, err := a.applyCandidate(ctx, t, *pick, src)
-		if err != nil {
+		if _, err := a.applyCandidate(ctx, t.ID, *pick, src); err != nil {
 			res.Err = err
 			record(res)
 			continue
-		}
-		m.Update(updated)
-		if err := a.store.Save(m); err != nil {
-			return results, err
 		}
 		res.Applied = pick
 		record(res)
@@ -158,20 +153,7 @@ func (a *App) Candidates(ctx context.Context, id string, src MetadataSource, q *
 // ApplyCandidate identifies the track with the given id as c, fetching a
 // cover if it has none, and returns the updated track.
 func (a *App) ApplyCandidate(ctx context.Context, id string, c Candidate, src MetadataSource) (manifest.Track, error) {
-	m, err := a.store.Load()
-	if err != nil {
-		return manifest.Track{}, err
-	}
-	t, ok := m.Get(id)
-	if !ok {
-		return manifest.Track{}, fmt.Errorf("no track with id %q", id)
-	}
-	updated, err := a.applyCandidate(ctx, t, c, src)
-	if err != nil {
-		return manifest.Track{}, err
-	}
-	m.Update(updated)
-	return updated, a.store.Save(m)
+	return a.applyCandidate(ctx, id, c, src)
 }
 
 // queryFor is what to search for to find t.
@@ -279,8 +261,32 @@ func describe(c Candidate) string {
 	return fmt.Sprintf("%s · %d%%", s, c.Score)
 }
 
-// applyCandidate returns t described as c, with a cover from src if it had none.
-func (a *App) applyCandidate(ctx context.Context, t manifest.Track, c Candidate, src MetadataSource) (manifest.Track, error) {
+// applyCandidate identifies the track with this id as c, with a cover from src
+// if it has none, and saves it. The lookups take seconds, so the records are
+// read again after them: whatever another mm changed meanwhile is kept.
+func (a *App) applyCandidate(ctx context.Context, id string, c Candidate, src MetadataSource) (manifest.Track, error) {
+	m, err := a.store.Load()
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	t, ok := m.Get(id)
+	if !ok {
+		return manifest.Track{}, fmt.Errorf("no track with id %q", id)
+	}
+	coverSHA := ""
+	if t.CoverSHA256 == "" {
+		// A missing cover is not worth failing the identification over.
+		if img, err := src.CoverFront(ctx, c.ReleaseID); err == nil && len(img) > 0 {
+			coverSHA, _ = a.storeCover(img)
+		}
+	}
+
+	if m, err = a.store.Load(); err != nil {
+		return manifest.Track{}, err
+	}
+	if t, ok = m.Get(id); !ok {
+		return manifest.Track{}, fmt.Errorf("no track with id %q", id)
+	}
 	e := Edit{
 		Title: &c.Title, Artist: &c.Artist, Album: &c.Album,
 		TrackNumber: &c.TrackNumber, TrackTotal: &c.TrackTotal,
@@ -288,20 +294,16 @@ func (a *App) applyCandidate(ctx context.Context, t manifest.Track, c Candidate,
 	if d := leadingDate(c.Date); d != "" { // a match that does not know the date keeps ours
 		e.Released = &d
 	}
-	t, err := applyEdit(t, e)
+	t, err = applyEdit(t, e)
 	if err != nil {
 		return t, err
 	}
 	t.MBRecordingID, t.MBReleaseID = c.RecordingID, c.ReleaseID
 	if t.CoverSHA256 == "" {
-		// A missing cover is not worth failing the identification over.
-		if img, err := src.CoverFront(ctx, c.ReleaseID); err == nil && len(img) > 0 {
-			if sha, err := a.storeCover(img); err == nil {
-				t.CoverSHA256 = sha
-			}
-		}
+		t.CoverSHA256 = coverSHA
 	}
-	return t, nil
+	m.Update(t)
+	return t, a.store.Save(m)
 }
 
 // Display returns the artist, title and album to show for t: its own when
