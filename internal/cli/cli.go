@@ -42,20 +42,14 @@ type opener func() (*app.App, error)
 // process exit code.
 func Run(ctx context.Context, args []string, streams IO, deps Deps) int {
 	var library string
-	var root *cobra.Command
 	open := func() (*app.App, error) {
-		if !root.PersistentFlags().Changed("library") && os.Getenv("MM_LIBRARY") == "" {
-			if err := checkNotMoved(); err != nil {
-				return nil, err
-			}
-		}
 		a, err := app.Open(library)
 		if err == nil && deps.Loudness != nil {
 			a.UseLoudness(deps.Loudness)
 		}
 		return a, err
 	}
-	root = &cobra.Command{
+	root := &cobra.Command{
 		Use:           "mm",
 		Short:         "Manage a music library for an MP3 player",
 		Long:          "Manage a music library for an MP3 player: one record per track, rendered into a clean folder by sync.\n\nRun mm web to browse and edit the library in a browser.",
@@ -85,22 +79,4 @@ func defaultLibrary() string {
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, "Music", "Library")
-}
-
-// checkNotMoved stops mm from making a new library beside an old one. The default
-// folder used to be ~/Music/mp3-player, from when it only fed a player; it is
-// ~/Music/Library now that a desktop player plays it. mm makes the folder of a
-// library on any command, and an empty Library made before the move would take
-// the old folder in as a subfolder of itself when it was moved.
-func checkNotMoved() error {
-	home, _ := os.UserHomeDir()
-	old := filepath.Join(home, "Music", "mp3-player")
-	now := filepath.Join(home, "Music", "Library")
-	if _, err := os.Stat(filepath.Join(old, "library.json")); err != nil {
-		return nil
-	}
-	if _, err := os.Stat(now); err == nil {
-		return nil
-	}
-	return fmt.Errorf("the library folder is now %s, but a library is still in %s: move it with `mv %s %s`, or name the folder with --library or MM_LIBRARY", now, old, old, now)
 }

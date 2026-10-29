@@ -244,8 +244,7 @@ mm sync --prune --yes
 
 ## Settings
 
-* `--library DIR` or `MM_LIBRARY`: the library folder (default `~/Music/Library`). It used to be `~/Music/mp3-player`, from when it only fed a player; while that folder still holds a library and `~/Music/Library` does not exist, `mm` stops and prints the `mv` command instead of starting an empty library beside it.
-* `MM_CONTACT`: an email or URL added to the User-Agent sent to MusicBrainz, which they ask for.
+* `--library DIR` or `MM_LIBRARY`: the library folder (default `~/Music/Library`).* `MM_CONTACT`: an email or URL added to the User-Agent sent to MusicBrainz, which they ask for.
 * `ACCESSIBLE=1` or `TERM=dumb`: plain line-based questions instead of the full-screen form of `mm add`.
 
 Needs `yt-dlp` (and `ffmpeg`, which yt-dlp uses) on `PATH` for `mm add` and for adding from a link in the web interface. `mm web` opens the browser with `xdg-open`; hearing a cut needs nothing more than the browser.
