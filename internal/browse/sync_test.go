@@ -62,8 +62,8 @@ func TestMountCandidatesAreTheFoldersUnderTheMountRoots(t *testing.T) {
 
 func TestTheLibraryFolderComesFirstAmongTheTargets(t *testing.T) {
 	t.Setenv("HOME", "/home/me")
-	got := Targets("/home/me/Music/mp3-player", []string{"/run/media/tau/PLAYER"})
-	if len(got) != 2 || got[0] != (TargetView{Label: "Library folder", Path: "~/Music/mp3-player", Kind: "library"}) ||
+	got := Targets("/home/me/Music/Library", []string{"/run/media/tau/PLAYER"})
+	if len(got) != 2 || got[0] != (TargetView{Label: "Library folder", Path: "~/Music/Library", Kind: "library"}) ||
 		got[1] != (TargetView{Label: "PLAYER", Path: "/run/media/tau/PLAYER", Kind: "drive"}) {
 		t.Errorf("= %+v", got)
 	}
