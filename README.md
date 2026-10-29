@@ -21,6 +21,14 @@ does have limits gets what it needs worked out from the record while syncing:
 `mm sync --wolfgang --target …` does it for the Wolfgang WMP01 (see below), and
 nothing of it is stored.
 
+## What plays the library
+
+On the desktop, the library folder is played as it is by [Gapless](https://gitlab.gnome.org/neithern/g4music). Its music folder is `~/Music`, so `~/Music/mp3-player` is found without a setting: it groups the tracks by artist and album, shows the embedded covers, lists `Playlists/*.m3u8` as playlists and evens out the volume with the ReplayGain tags (see below). Gapless skips hidden files and folders, which is why `.mm/` (the stored audio and covers) is never played twice. `library.json` and `.mm/` are what `mm` keeps; everything else is rendered from them by `mm sync`.
+
+That makes the folder output: a playlist file is not the playlist. If a playlist is edited inside Gapless (added to or renamed), Gapless rewrites its `.m3u8`, and the next `mm sync` puts back the one the records describe. Change playlists in `mm`.
+
+The other target is the Wolfgang WMP01 player: `mm sync --wolfgang --target …` writes its card with the names, tags, covers and playlists it can show (see below). Nothing of that is stored; the library folder always stays the standard form.
+
 ## Everyday use
 
 ```sh
@@ -172,6 +180,14 @@ mm edit <id> --gain 0 --fade-in "" --fade-out ""     # all away
 ```
 
 A length counts from where the track now starts (fade-in) or back from where it now ends (fade-out); a stretch is in the time of the original, as it is stored, so cutting the track again later does not move a fade. In the web interface the Audio tab (`2`) has Volume, Fade in and Fade out below the cuts, with the same `[ ]` and `{ }` nudge keys (1.5 dB and 6 dB for the volume, 0.1 s and 1 s for the length of a fade), `0` to clear, and `p` to hear the start or the end with the change applied. A line under the fields draws the ramps.
+
+## ReplayGain
+
+A standard `mm sync` writes how loud each track is into its tags as ReplayGain (`REPLAYGAIN_TRACK_GAIN`, `REPLAYGAIN_TRACK_PEAK` and `REPLAYGAIN_REFERENCE_LOUDNESS`), so that a player that evens out volume plays a quiet piano piece and a loud rap track at the same level. In Gapless that is Preferences, ReplayGain, Track. The sound itself is never changed.
+
+The loudness is measured with `ffmpeg` (EBU R128 integrated loudness) on the track as it is played, with its volume, fades and cuts applied, and the gain brings it to -18 LUFS, the ReplayGain 2.0 level. Most music is louder than that, so a player that uses the tags plays quieter than one that does not: turn the volume up. A measurement is remembered under `.mm/loudness`, named by the SHA-256 of the audio, so a track is only measured again when its sound changes; the first sync of a long library takes a few minutes (about 4 for 30 hours), the next ones none.
+
+A track with nothing audible has no loudness and gets no tags. A track `ffmpeg` cannot read is synced without them and listed with the warnings of the sync. If `ffmpeg` is not installed the sync stops, rather than strip the tags from every file. The Wolfgang sync writes no ReplayGain tags, since the player has no volume setting that could use them. Only the track gain is written, not an album gain, because Gapless is used here with singles and mixed playlists.
 
 ## Dates and sorting
 

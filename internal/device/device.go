@@ -34,6 +34,9 @@ type Target interface {
 	CoverFile(storedMIME string) string
 	// SingleCovers says whether a single gets a cover file of its own.
 	SingleCovers() bool
+	// ReplayGain says whether the files carry their loudness, as ReplayGain tags,
+	// for a player that evens out volume.
+	ReplayGain() bool
 	// PlaylistFile is where the playlist is written in the target: under its true
 	// name, or under the Latin form of it where the target cannot show the true one.
 	PlaylistFile(p manifest.Playlist) string
@@ -159,6 +162,10 @@ func (generic) CoverFile(storedMIME string) string {
 // SingleCovers: a single has its cover in its tag, and no file of its own.
 func (generic) SingleCovers() bool { return false }
 
+// ReplayGain: the library is played by programs that can use it, so the files
+// carry how loud they are.
+func (generic) ReplayGain() bool { return true }
+
 func (g generic) PlaylistFile(p manifest.Playlist) string {
 	return layout.PlaylistPath(p.Name, ".m3u8", g.Layout())
 }
@@ -213,6 +220,10 @@ func (wolfgang) CoverFile(string) string { return "cover.jpg" }
 // SingleCovers: the player shows a photo named like the track, so a single gets
 // one beside its file.
 func (wolfgang) SingleCovers() bool { return true }
+
+// ReplayGain: the player has no volume setting to use it, and its tags are
+// counted to the byte.
+func (wolfgang) ReplayGain() bool { return false }
 
 func (w wolfgang) PlaylistFile(p manifest.Playlist) string {
 	return layout.PlaylistPath(p.LatinName(), ".m3u", w.Layout())

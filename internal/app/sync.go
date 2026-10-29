@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"music-manager/internal/device"
+	"music-manager/internal/loudness"
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
 	"music-manager/internal/render"
@@ -73,13 +74,20 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 	paths, covers, _ := a.renderInputs(m.Tracks, dev)
 	desired := render.Tree{}
 	build := map[string]func() ([]byte, error){}
+	warnings := dev.Diagnose(m.Tracks)
 	for i, t := range m.Tracks {
 		t := t
 		p := paths[t.ID]
-		build[p] = func() ([]byte, error) { return a.renderTrack(t, dev) }
-		data, err := build[p]()
+		build[p] = func() ([]byte, error) {
+			data, _, err := a.renderTrack(t, dev)
+			return data, err
+		}
+		data, note, err := a.renderTrack(t, dev)
 		if err != nil {
 			return nil, fmt.Errorf("track %s: %w", t.ID, err)
+		}
+		if note != "" {
+			warnings = append(warnings, device.Warning{TrackID: t.ID, Message: note})
 		}
 		desired[p] = fingerprint(data)
 		if opts.OnProgress != nil {
@@ -107,7 +115,7 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 		Ops: render.Plan(desired, existing, opts.Prune), a: a, target: target, build: build,
 		keepAudio: keepAudio, keepCovers: keepCovers,
 		desired: desired, existing: existing, sigs: a.signatures(m),
-		Warnings: dev.Diagnose(m.Tracks),
+		Warnings: warnings,
 	}, nil
 }
 
@@ -187,26 +195,47 @@ func (p *SyncPlan) collect() error {
 	})
 }
 
-func (a *App) renderTrack(t manifest.Track, dev device.Target) ([]byte, error) {
+// renderTrack is the file of t for dev. A note says what it could not do for
+// this track without failing, such as measuring its loudness.
+func (a *App) renderTrack(t manifest.Track, dev device.Target) (file []byte, note string, err error) {
 	audio, err := os.ReadFile(a.audio.Path(t.AudioSHA256))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if audio, err = shaped(t, audio); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if t.TrimStart > 0 || t.TrimEnd > 0 {
 		if audio, err = mp3.Trim(audio, t.TrimStart, t.TrimEnd); err != nil {
-			return nil, err
+			return nil, "", err
 		}
 	}
 	ts := dev.Tags(t)
-	if t.Status == manifest.Identified && t.CoverSHA256 != "" {
-		if ts.Cover, ts.CoverMIME, err = a.coverFile(t.CoverSHA256, dev); err != nil {
-			return nil, err
+	if a.loudness != nil && dev.ReplayGain() {
+		// The audio as it is played: volume, fades and cuts applied.
+		switch m, err := a.loudness.Measure(audio); {
+		case err == nil:
+			if ts.Extra == nil {
+				ts.Extra = map[string]string{}
+			}
+			for name, value := range loudness.Tags(m) {
+				ts.Extra[name] = value
+			}
+		case errors.Is(err, loudness.ErrUnmeasurable):
+			// nothing audible, so no loudness to tag
+		case errors.Is(err, loudness.ErrNotInstalled):
+			return nil, "", err // every track would lose its tags
+		default:
+			note = "its loudness could not be measured, so it has no ReplayGain tags: " + err.Error()
 		}
 	}
-	return mp3.Render(audio, ts)
+	if t.Status == manifest.Identified && t.CoverSHA256 != "" {
+		if ts.Cover, ts.CoverMIME, err = a.coverFile(t.CoverSHA256, dev); err != nil {
+			return nil, "", err
+		}
+	}
+	file, err = mp3.Render(audio, ts)
+	return file, note, err
 }
 
 func fingerprint(data []byte) render.File {

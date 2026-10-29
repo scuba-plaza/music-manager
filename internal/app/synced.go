@@ -58,6 +58,10 @@ func singleCoverPath(trackPath string) string {
 func (a *App) signatures(m *manifest.Manifest) map[string]string {
 	paths, _, folders := a.renderInputs(m.Tracks, device.Generic)
 	sigs := make(map[string]string, len(m.Tracks)+len(m.Playlists))
+	replayGain := "" // files that carry ReplayGain tags differ from those that do not
+	if a.loudness != nil && device.Generic.ReplayGain() {
+		replayGain = "\x00replaygain-1"
+	}
 	for _, p := range m.Playlists {
 		_, content := device.Generic.Playlist(p, byID(m.Tracks), paths)
 		sum := sha256.Sum256(append([]byte(p.Name+"\x00"), content...))
@@ -74,7 +78,7 @@ func (a *App) signatures(m *manifest.Manifest) map[string]string {
 		t.AddedAt, t.UpdatedAt = time.Time{}, time.Time{}                        // saving a record is not changing it
 		t.TitleLatin, t.ArtistLatin, t.AlbumLatin, t.GenreLatin = "", "", "", "" // the library folder keeps the true names
 		raw, _ := json.Marshal(t)
-		sum := sha256.Sum256(append(raw, "\x00"+p+"\x00"+folderCover...))
+		sum := sha256.Sum256(append(raw, "\x00"+p+"\x00"+folderCover+replayGain...))
 		sigs[t.ID] = hex.EncodeToString(sum[:])
 	}
 	return sigs

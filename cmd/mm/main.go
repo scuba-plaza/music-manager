@@ -12,6 +12,7 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/cli"
+	"music-manager/internal/loudness"
 	"music-manager/internal/musicbrainz"
 	"music-manager/internal/prompt"
 	"music-manager/internal/version"
@@ -30,7 +31,7 @@ func main() {
 	if url := os.Getenv("MM_COVERART_URL"); url != "" { // likewise for cover art
 		lookup.CoverURL = strings.TrimRight(url, "/")
 	}
-	deps := cli.Deps{Downloader: ytdlp.New(), Metadata: lookup}
+	deps := cli.Deps{Downloader: ytdlp.New(), Metadata: lookup, Loudness: loudness.NewFFmpeg()}
 	deps.RunWeb = func(ctx context.Context, a *app.App, o cli.WebOptions) error {
 		opts := []web.Option{web.WithSource(lookup), web.WithDownloader(deps.Downloader)}
 		if o.Wolfgang {

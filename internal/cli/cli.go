@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"music-manager/internal/app"
+	"music-manager/internal/loudness"
 	"music-manager/internal/version"
 )
 
@@ -26,6 +27,9 @@ type Deps struct {
 	Downloader app.Downloader
 	Metadata   app.MetadataSource
 	Prompter   app.Prompter
+	// Loudness measures tracks so that sync can write their ReplayGain tags. Nil
+	// means it writes none.
+	Loudness loudness.Analyzer
 	// RunWeb serves the web interface on a library until ctx is done.
 	RunWeb func(ctx context.Context, a *app.App, o WebOptions) error
 }
@@ -38,7 +42,13 @@ type opener func() (*app.App, error)
 // process exit code.
 func Run(ctx context.Context, args []string, streams IO, deps Deps) int {
 	var library string
-	open := func() (*app.App, error) { return app.Open(library) }
+	open := func() (*app.App, error) {
+		a, err := app.Open(library)
+		if err == nil && deps.Loudness != nil {
+			a.UseLoudness(deps.Loudness)
+		}
+		return a, err
+	}
 	root := &cobra.Command{
 		Use:           "mm",
 		Short:         "Manage a music library for an MP3 player",
