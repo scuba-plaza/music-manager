@@ -199,7 +199,7 @@ export function playlistPicker({ count, choose }) {
           list.append(h('div', {
             class: `item${i === cursor ? ' on' : ''}`, role: 'option', 'aria-selected': String(i === cursor),
             onclick: () => { cursor = i; pick(); },
-          }, h('span', { class: 't' }, name(label)), h('span', { class: 'd' }, right)));
+          }, h('span', { class: 'n' }), h('span', { class: 't' }, name(label)), h('span', { class: 'd' }, right)));
         });
         body.append(list);
       }
