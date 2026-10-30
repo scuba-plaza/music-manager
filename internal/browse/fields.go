@@ -75,15 +75,6 @@ func tabOf(f fieldKind) int {
 	return 0
 }
 
-// firstFieldOf is the place in trackFields of the first field of a tab.
-func firstFieldOf(tab int) int {
-	n := 0
-	for _, t := range inspectorTabs[:tab] {
-		n += len(t.fields)
-	}
-	return n
-}
-
 func (f fieldKind) label() string {
 	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Volume", "Fade in", "Fade out", "Title", "Artist", "Album", "Genre", "Wolfgang", "Tracks on album", "Name", "Latin name"}[f]
 }

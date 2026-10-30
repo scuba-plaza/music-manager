@@ -124,9 +124,6 @@ func (s *Store) Load() (*Manifest, error) {
 	if err := json.Unmarshal(data, &f); err != nil {
 		return nil, fmt.Errorf("%s: %w", s.path, err)
 	}
-	if f.Version == 1 {
-		return nil, fmt.Errorf("%s is a version 1 library, which this mm no longer reads; an older build of mm can still convert it", s.path)
-	}
 	if f.Version != schemaVersion {
 		return nil, fmt.Errorf("%s: unsupported library version %d (want %d)", s.path, f.Version, schemaVersion)
 	}

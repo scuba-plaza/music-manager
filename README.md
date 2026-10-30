@@ -23,7 +23,7 @@ nothing of it is stored.
 
 ## What plays the library
 
-On the desktop, the library folder is played as it is by [Gapless](https://gitlab.gnome.org/neithern/g4music). Its music folder is `~/Music`, so `~/Music/Library` is found without a setting: it groups the tracks by artist and album, shows the embedded covers, lists `Playlists/*.m3u8` as playlists and evens out the volume with the ReplayGain tags (see below). Gapless skips hidden files and folders, which is why `.mm/` (the stored audio and covers) is never played twice. `library.json` and `.mm/` are what `mm` keeps; everything else is rendered from them by `mm sync`.
+On the desktop, the library folder is played as it is by [Gapless](https://gitlab.gnome.org/neithern/g4music). With its music folder set to `~/Music/Library` it groups the tracks by artist and album, shows the embedded covers, lists `Playlists/*.m3u8` as playlists and evens out the volume with the ReplayGain tags (see below). Gapless skips hidden files and folders, which is why `.mm/` (the stored audio and covers) is never played twice. `library.json` and `.mm/` are what `mm` keeps; everything else is rendered from them by `mm sync`.
 
 That makes the folder output: a playlist file is not the playlist. If a playlist is edited inside Gapless (added to or renamed), Gapless rewrites its `.m3u8`, and the next `mm sync` puts back the one the records describe. Change playlists in `mm`.
 
@@ -229,8 +229,8 @@ changed, so a trim can always be redone.
 
 ## Moving an existing folder over
 
-The library folder is also where the old music lives, so ingest first, check
-the result with `--dry-run`, and only then prune:
+If the music already lives in the library folder, ingest it first, check the
+result with `--dry-run`, and only then prune:
 
 ```sh
 cp -r ~/Music/Library ~/library.backup
@@ -244,7 +244,8 @@ mm sync --prune --yes
 
 ## Settings
 
-* `--library DIR` or `MM_LIBRARY`: the library folder (default `~/Music/Library`).* `MM_CONTACT`: an email or URL added to the User-Agent sent to MusicBrainz, which they ask for.
+* `--library DIR` or `MM_LIBRARY`: the library folder (default `~/Music/Library`).
+* `MM_CONTACT`: an email or URL added to the User-Agent sent to MusicBrainz, which they ask for.
 * `ACCESSIBLE=1` or `TERM=dumb`: plain line-based questions instead of the full-screen form of `mm add`.
 
 Needs `yt-dlp` (and `ffmpeg`, which yt-dlp uses) on `PATH` for `mm add` and for adding from a link in the web interface. `mm web` opens the browser with `xdg-open`; hearing a cut needs nothing more than the browser.

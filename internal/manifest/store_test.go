@@ -61,6 +61,9 @@ func TestLoadRejectsUnknownVersion(t *testing.T) {
 	if _, err := manifest.NewStore(path).Load(); err == nil {
 		t.Fatal("Load accepted version 99, want error")
 	}
+	if after, _ := os.ReadFile(path); string(after) != `{"version": 99, "tracks": []}` {
+		t.Error("loading changed the file")
+	}
 }
 
 func TestSaveKeepsPreviousVersionAsBackup(t *testing.T) {
@@ -138,23 +141,6 @@ func TestAGenreIsWrittenOnlyWhenThereIsOne(t *testing.T) {
 	back, err := s.Load()
 	if err != nil || back.Tracks[0].Genre != "Neoclassical" || back.Tracks[1].Genre != "" {
 		t.Errorf("loaded %+v, %v", back.Tracks, err)
-	}
-}
-
-func TestALibraryOfVersion1IsRefusedWithoutPointingToAVerbThatIsGone(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "library.json")
-	if err := os.WriteFile(path, []byte(`{"version": 1, "tracks": []}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	_, err := manifest.NewStore(path).Load()
-	if err == nil || !strings.Contains(err.Error(), "version 1") {
-		t.Fatalf("err = %v, want a refusal that names the version", err)
-	}
-	if strings.Contains(err.Error(), "run mm migrate") {
-		t.Errorf("err = %v: mm migrate is gone, so it cannot be asked for", err)
-	}
-	if after, _ := os.ReadFile(path); string(after) != `{"version": 1, "tracks": []}` {
-		t.Error("loading changed the file")
 	}
 }
 

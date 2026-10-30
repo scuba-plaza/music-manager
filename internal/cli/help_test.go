@@ -18,9 +18,6 @@ func TestAnUnknownCommandStillFails(t *testing.T) {
 	if code, _, errs := run(t, lib, "nonsense"); code == 0 || !strings.Contains(errs, "unknown command") {
 		t.Errorf("code %d, err %q", code, errs)
 	}
-	if code, _, errs := run(t, lib, "tui"); code == 0 || !strings.Contains(errs, "unknown command") {
-		t.Errorf("the terminal interface is gone: code %d, err %q", code, errs)
-	}
 }
 
 func TestTheWolfgangPreviewIsAFlagOfWebOnly(t *testing.T) {
