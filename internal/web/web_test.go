@@ -338,3 +338,301 @@ func TestThePageIsToldWhenTheLibraryChanges(t *testing.T) {
 	}
 	wait("library")
 }
+
+type sortRow struct {
+	Kind, TrackID, Right string
+}
+
+func rowsOf(t *testing.T, url string) []sortRow {
+	t.Helper()
+	var got struct {
+		View struct{ Rows []sortRow }
+	}
+	if code := getJSON(t, url, &got); code != 200 {
+		t.Fatalf("%s: status %d", url, code)
+	}
+	return got.View.Rows
+}
+
+func TestTheLibraryCanBeSortedByEveryKeyBothWaysAndStillFiltered(t *testing.T) {
+	a, err := app.Open(filepath.Join(t.TempDir(), "lib"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	titleOfID := map[string]string{}
+	for _, s := range []struct {
+		frames                        int
+		title, artist, album, release string
+		track                         int
+	}{
+		{300, "Beta", "Zed", "Second", "2001", 2},
+		{200, "Gamma", "Abe", "First", "1999-05", 1},
+		{100, "Alpha", "Mo", "", "", 0},
+	} {
+		file := filepath.Join(t.TempDir(), "song.mp3")
+		if err := os.WriteFile(file, testmp3.Silent(s.frames), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		rep, err := a.Ingest([]string{file})
+		if err != nil || len(rep.Added) != 1 {
+			t.Fatalf("%+v, %v", rep, err)
+		}
+		tr, err := a.Edit(rep.Added[0].ID, app.Edit{Title: &s.title, Artist: &s.artist, Album: &s.album, Released: &s.release, TrackNumber: &s.track})
+		if err != nil {
+			t.Fatal(err)
+		}
+		titleOfID[tr.ID] = s.title
+	}
+	srv := start(t, a)
+	order := func(query string) string {
+		var titles []string
+		for _, r := range rowsOf(t, srv.URL+"/api/library?"+query) {
+			if r.Kind != "track" {
+				t.Fatalf("%s: a %s row in a sorted list", query, r.Kind)
+			}
+			titles = append(titles, titleOfID[r.TrackID])
+		}
+		return strings.Join(titles, " ")
+	}
+	for _, c := range []struct{ query, want string }{
+		{"sort=title", "Alpha Beta Gamma"},
+		{"sort=title&reverse=1", "Gamma Beta Alpha"},
+		{"sort=artist", "Gamma Alpha Beta"},
+		{"sort=album", "Gamma Beta Alpha"},
+		{"sort=track", "Gamma Beta Alpha"},
+		{"sort=length", "Alpha Gamma Beta"},
+		{"sort=length&reverse=1", "Beta Gamma Alpha"},
+		{"sort=released", "Beta Gamma Alpha"},
+		{"sort=released&reverse=1", "Gamma Beta Alpha"},
+		{"sort=added", "Alpha Gamma Beta"},
+		{"sort=edited", "Alpha Gamma Beta"},
+		{"sort=TITLE&q=beta", "Beta"},
+	} {
+		if got := order(c.query); got != c.want {
+			t.Errorf("?%s: %s, want %s", c.query, got, c.want)
+		}
+	}
+}
+
+func TestSortingByADateShowsTheDateBesideEachTrack(t *testing.T) {
+	a, ts := seed(t, sample...)
+	released := "1999-05"
+	if _, err := a.Edit(ts[0].ID, app.Edit{Released: &released}); err != nil {
+		t.Fatal(err)
+	}
+	srv := start(t, a)
+	var shown []string
+	for _, r := range rowsOf(t, srv.URL+"/api/library?sort=released") {
+		shown = append(shown, r.Right)
+	}
+	if got := strings.Join(shown, "|"); got != "1999-05|—|—|—" {
+		t.Errorf("beside the tracks: %s, want the date and a dash for each without one", got)
+	}
+	for _, r := range rowsOf(t, srv.URL+"/api/library?sort=title") {
+		if r.Right != "" {
+			t.Errorf("a date beside a track sorted by its title: %q", r.Right)
+		}
+	}
+}
+
+func TestASortKeyThatDoesNotExistSaysWhichDo(t *testing.T) {
+	a, _ := seed(t, sample...)
+	var r reply
+	if code := sendInto(t, start(t, a).URL, "GET", "/api/library?sort=colour", nil, &r); code != 400 {
+		t.Fatalf("status %d", code)
+	}
+	for _, key := range []string{"artist", "released", "edited"} {
+		if !strings.Contains(r.Error, key) {
+			t.Errorf("the error %q does not list %s", r.Error, key)
+		}
+	}
+}
+
+type inspectorField struct {
+	Key, Text string
+	Dim       bool
+}
+
+type inspected struct {
+	Tabs []struct {
+		Name   string
+		Fields []inspectorField
+	}
+	Dates, About string
+}
+
+func (v inspected) field(key string) inspectorField {
+	for _, tab := range v.Tabs {
+		for _, f := range tab.Fields {
+			if f.Key == key {
+				return f
+			}
+		}
+	}
+	return inspectorField{Key: "missing: " + key}
+}
+
+func inspect(t *testing.T, srv *httptest.Server, id string) inspected {
+	t.Helper()
+	var v inspected
+	if code := getJSON(t, srv.URL+"/api/tracks/"+id, &v); code != 200 {
+		t.Fatalf("inspector of %s: status %d", id, code)
+	}
+	return v
+}
+
+func trackIDsOf(t *testing.T, srv *httptest.Server, query string) []string {
+	t.Helper()
+	var ids []string
+	for _, r := range rowsOf(t, srv.URL+"/api/library?q="+query) {
+		if r.TrackID != "" {
+			ids = append(ids, r.TrackID)
+		}
+	}
+	return ids
+}
+
+func TestAGenreIsSetOverHTTPAndFoundByTheGenreFilter(t *testing.T) {
+	a, ts := seed(t, sample...)
+	srv := start(t, a)
+	id := ts[0].ID
+
+	if code, r := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "genre", "text": "Neoclassical"}); code != 200 || r.Message != "Saved" {
+		t.Fatalf("%d %+v", code, r)
+	}
+	if got := inspect(t, srv, id).field("genre").Text; got != "Neoclassical" {
+		t.Errorf("the inspector shows the genre %q", got)
+	}
+	if got := trackIDsOf(t, srv, "genre:neo"); len(got) != 1 || got[0] != id {
+		t.Errorf("genre:neo finds %v, want only %s", got, id)
+	}
+	if got := trackIDsOf(t, srv, "genre:folk"); len(got) != 0 {
+		t.Errorf("genre:folk finds %v", got)
+	}
+
+	if code, _ := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "genre", "text": ""}); code != 200 {
+		t.Fatal(code)
+	}
+	if got := inspect(t, srv, id).field("genre").Text; got != "" {
+		t.Errorf("a cleared genre is still shown: %q", got)
+	}
+	if got := trackIDsOf(t, srv, "genre:neo"); len(got) != 0 {
+		t.Errorf("genre:neo still finds %v after the genre was cleared", got)
+	}
+}
+
+func TestTheInspectorSaysWhenATrackWasReleasedAddedAndEdited(t *testing.T) {
+	a, ts := seed(t, sample...)
+	srv := start(t, a)
+	id := ts[0].ID
+	today := time.Now().Format("2006-01-02")
+
+	if code, r := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "released", "text": "1999-05"}); code != 200 || r.Message != "Saved" {
+		t.Fatalf("%d %+v", code, r)
+	}
+	v := inspect(t, srv, id)
+	if got := v.field("released").Text; got != "1999-05" {
+		t.Errorf("released %q", got)
+	}
+	if want := "added " + today + " · edited " + today; v.Dates != want {
+		t.Errorf("dates %q, want %q", v.Dates, want)
+	}
+
+	if code, _ := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "released", "text": ""}); code != 200 {
+		t.Fatal(code)
+	}
+	if got := inspect(t, srv, id).field("released").Text; got != "" {
+		t.Errorf("a cleared date is still shown: %q", got)
+	}
+}
+
+func TestTheInspectorSaysWhereATrackCameFrom(t *testing.T) {
+	a, ts := seed(t, sample...)
+	srv := start(t, a)
+	id := ts[0].ID
+	link, none := "https://www.youtube.com/watch?v=abc123", ""
+
+	if _, err := a.Edit(id, app.Edit{SourceURL: &link}); err != nil {
+		t.Fatal(err)
+	}
+	if got := inspect(t, srv, id).About; !strings.Contains(got, "from "+link) {
+		t.Errorf("about %q does not say where the track is from", got)
+	}
+	if _, err := a.Edit(id, app.Edit{SourceURL: &none}); err != nil {
+		t.Fatal(err)
+	}
+	if got := inspect(t, srv, id).About; strings.Contains(got, "from") {
+		t.Errorf("about %q still says where the track is from", got)
+	}
+}
+
+func TestTheLatinTabShowsAFormSetByHandAsSetAndAWorkedOutFormDimly(t *testing.T) {
+	a, ts := seed(t, sample...)
+	srv := start(t, a)
+	id := ts[2].ID
+	before := inspect(t, srv, id)
+	workedOut := before.field("latinTitle")
+	if !workedOut.Dim || workedOut.Text == "" || !before.field("latinArtist").Dim {
+		t.Fatalf("nothing is set by hand yet: %+v, %+v", workedOut, before.field("latinArtist"))
+	}
+
+	if code, r := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "latinTitle", "text": "Salam"}); code != 200 || r.Message != "Saved" {
+		t.Fatalf("%d %+v", code, r)
+	}
+	after := inspect(t, srv, id)
+	if got := after.field("latinTitle"); got.Text != "Salam" || got.Dim {
+		t.Errorf("the form set by hand: %+v", got)
+	}
+	if got := after.field("latinArtist"); !got.Dim {
+		t.Errorf("the artist's form, which nobody set, is not dim: %+v", got)
+	}
+
+	if code, _ := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "latinTitle", "text": ""}); code != 200 {
+		t.Fatal(code)
+	}
+	if got := inspect(t, srv, id).field("latinTitle"); got != workedOut {
+		t.Errorf("after clearing: %+v, want the worked-out form back: %+v", got, workedOut)
+	}
+}
+
+type wolfgangPreview struct {
+	Rows     []struct{ Label, Value string }
+	Warnings []string
+}
+
+func wolfgangTabOf(t *testing.T, srv *httptest.Server, id string) wolfgangPreview {
+	t.Helper()
+	var v struct {
+		Tabs []struct {
+			Name     string
+			Wolfgang *wolfgangPreview
+		}
+	}
+	if code := getJSON(t, srv.URL+"/api/tracks/"+id, &v); code != 200 || len(v.Tabs) != 4 || v.Tabs[3].Name != "Wolfgang" || v.Tabs[3].Wolfgang == nil {
+		t.Fatalf("%d %+v", code, v)
+	}
+	return *v.Tabs[3].Wolfgang
+}
+
+func TestTheWolfgangTabSaysWhatThePlayerWillShowAndWhatItWillNotShowWell(t *testing.T) {
+	a, ts := seed(t, seedTrack{"Bahlam Bek", "Abdel Halim Hafez", "Abd El Halim Hafez", 1}, seedTrack{"Song", "Band", "", 0})
+	genre := "Alternative Rock"
+	if _, err := a.Edit(ts[1].ID, app.Edit{Genre: &genre}); err != nil {
+		t.Fatal(err)
+	}
+	srv := start(t, a, WithWolfgang())
+
+	shown := map[string]string{}
+	for _, r := range wolfgangTabOf(t, srv, ts[0].ID).Rows {
+		shown[r.Label] = r.Value
+	}
+	if shown["Artist"] != "A. H. Hafez" || shown["Album"] != "Abd El Halim" {
+		t.Errorf("the player shows %+v, want the artist and the album within its 12 characters", shown)
+	}
+	if w := wolfgangTabOf(t, srv, ts[0].ID).Warnings; len(w) != 0 {
+		t.Errorf("a track the player shows well has warnings: %v", w)
+	}
+	if w := wolfgangTabOf(t, srv, ts[1].ID).Warnings; len(w) != 1 || !strings.Contains(w[0], "genre") {
+		t.Errorf("warnings %v, want one about the genre", w)
+	}
+}

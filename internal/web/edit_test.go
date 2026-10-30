@@ -362,3 +362,23 @@ func TestAudioToHearACut(t *testing.T) {
 		t.Errorf("a track that is not there: %d", code)
 	}
 }
+
+func TestAPictureThatIsNotACoverLeavesTheCoverAsItWas(t *testing.T) {
+	a, ts := seed(t, sample...)
+	srv := start(t, a)
+	one := "/api/cover?ids=" + ts[0].ID
+	if code, _ := send(t, srv, "PUT", one, testmp3.JPEG); code != 200 {
+		t.Fatal(code)
+	}
+	m, _ := a.Manifest()
+	before, _ := m.Get(ts[0].ID)
+
+	code, r := send(t, srv, "PUT", one, []byte("not a picture"))
+	if code != 415 || !strings.Contains(r.Error, "JPEG or PNG") {
+		t.Errorf("%d %+v; want a refusal that says a cover must be a JPEG or PNG image", code, r)
+	}
+	m, _ = a.Manifest()
+	if after, _ := m.Get(ts[0].ID); after.CoverSHA256 != before.CoverSHA256 || !after.UpdatedAt.Equal(before.UpdatedAt) {
+		t.Errorf("a refused picture changed the track: %+v, was %+v", after, before)
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -175,5 +176,99 @@ func TestTheLibraryCheckSaysWhatIsWrong(t *testing.T) {
 	}
 	if !found || v.Warnings == 0 || v.Errors != 0 {
 		t.Errorf("a track that is not identified is a warning: %+v", v)
+	}
+}
+
+func TestTheLibraryCheckReportsAMissingFileAsAnError(t *testing.T) {
+	a, ts := seed(t, sample...)
+	if err := os.Remove(a.AudioPath(ts[0].AudioSHA256)); err != nil {
+		t.Fatal(err)
+	}
+	var v browse.DoctorView
+	if code := getJSON(t, start(t, a).URL+"/api/doctor", &v); code != 200 {
+		t.Fatal(code)
+	}
+	var found bool
+	for _, p := range v.Problems {
+		if p.TrackID == ts[0].ID && p.Severity == "error" && strings.Contains(p.Message, "missing") {
+			found = true
+		}
+	}
+	if !found || v.Errors != 1 {
+		t.Errorf("a track whose audio is gone is an error that says it is missing: %+v", v)
+	}
+}
+
+func TestTheLibraryCheckOfALibraryWithNothingWrongFindsNothing(t *testing.T) {
+	a, _ := seed(t, seedTrack{"The Wanderer", "Shawn James", "Shadows", 1}, seedTrack{"Flow", "Shawn James", "Shadows", 2})
+	var found map[string]json.RawMessage
+	if code := getJSON(t, start(t, a).URL+"/api/doctor", &found); code != 200 {
+		t.Fatal(code)
+	}
+	if string(found["problems"]) != "[]" || string(found["errors"]) != "0" || string(found["warnings"]) != "0" {
+		t.Errorf("a library with nothing wrong reports %s", found)
+	}
+}
+
+func fetched(t *testing.T, srv *httptest.Server, link string) browse.Fetched {
+	t.Helper()
+	var v JobView
+	if code := raw(t, srv.URL, "POST", "/api/add/fetch", obj{"url": link}, &v); code != 200 {
+		t.Fatalf("fetch: %d", code)
+	}
+	done := waitJob(t, srv.URL, v.ID)
+	var out browse.Fetched
+	data, _ := json.Marshal(done.Data)
+	if err := json.Unmarshal(data, &out); err != nil || done.State != jobDone || out.Draft == nil {
+		t.Fatalf("%+v %s %v", done, data, err)
+	}
+	return out
+}
+
+func addForm(released, genre string) obj {
+	return obj{"title": "A song", "artist": "Some Band", "album": "", "track": "", "of": "", "released": released, "genre": genre, "cutStart": "", "cutEnd": ""}
+}
+
+func TestATrackIsAddedWithItsReleaseDate(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a, WithDownloader(&downloader{audio: testmp3.Silent(700), info: app.Info{Title: "A song", Uploader: "Some Band - Topic"}}))
+	draft := fetched(t, srv, "https://example.org/watch?v=1").Draft.Draft
+
+	code, r := send(t, srv, "POST", "/api/add/finish", obj{"draft": draft, "form": addForm("2001", "")})
+	if code != 200 || r.Reveal == "" {
+		t.Fatalf("%d %+v", code, r)
+	}
+	m, _ := a.Manifest()
+	if added, _ := m.Get(r.Reveal); added.Released != "2001" {
+		t.Errorf("released %q, want 2001", added.Released)
+	}
+}
+
+func TestATrackIsAddedWithItsGenre(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a, WithDownloader(&downloader{audio: testmp3.Silent(700), info: app.Info{Title: "A song", Uploader: "Some Band - Topic"}}))
+	draft := fetched(t, srv, "https://example.org/watch?v=1").Draft.Draft
+
+	code, r := send(t, srv, "POST", "/api/add/finish", obj{"draft": draft, "form": addForm("", "Folk")})
+	if code != 200 || r.Reveal == "" {
+		t.Fatalf("%d %+v", code, r)
+	}
+	m, _ := a.Manifest()
+	if added, _ := m.Get(r.Reveal); added.Genre != "Folk" {
+		t.Errorf("genre %q, want Folk", added.Genre)
+	}
+}
+
+func TestATrackIsNotAddedWithAReleaseDateThatIsNotADate(t *testing.T) {
+	a, ts := seed(t, sample...)
+	srv := start(t, a, WithDownloader(&downloader{audio: testmp3.Silent(700), info: app.Info{Title: "A song", Uploader: "Some Band - Topic"}}))
+	draft := fetched(t, srv, "https://example.org/watch?v=1").Draft.Draft
+
+	code, r := send(t, srv, "POST", "/api/add/finish", obj{"draft": draft, "form": addForm("soon", "")})
+	if code != 422 || !strings.Contains(r.Error, "1999-05-17") {
+		t.Errorf("%d %+v; want a refusal that shows the format of a date", code, r)
+	}
+	if m, _ := a.Manifest(); len(m.Tracks) != len(ts) {
+		t.Errorf("%d tracks, want %d: a track was added anyway", len(m.Tracks), len(ts))
 	}
 }

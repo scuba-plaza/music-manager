@@ -206,3 +206,26 @@ func TestSyncWritesReplayGainTagsFromTheMeasuredLoudness(t *testing.T) {
 		t.Errorf("the other tags are gone: %v", loud)
 	}
 }
+
+func TestSyncWritesNoReplayGainTagsWhenThereIsNoMeter(t *testing.T) {
+	a := libWithTracks(t, 100, 60)
+	ts := tracks(t, a)
+	identify(t, a, ts[0].ID, "Loud", "Band", "", 0, 0)
+	identify(t, a, ts[1].ID, "Calm", "Band", "", 0, 0)
+
+	plan := mustPlan(t, a, app.SyncOptions{})
+	if err := plan.Apply(); err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{"Band/Loud.mp3", "Band/Calm.mp3"} {
+		if got := replayGainTags(t, a, rel); len(got) != 0 {
+			t.Errorf("%s carries %v although there is no meter", rel, got)
+		}
+		if tags := mp3.ReadTagSet(readFile(t, a.Root(), rel)); tags.Extra["MM_ID"] == "" {
+			t.Errorf("%s lost its other tags: %v", rel, tags.Extra)
+		}
+	}
+	if len(plan.Warnings) != 0 {
+		t.Errorf("warnings = %v, want none", plan.Warnings)
+	}
+}

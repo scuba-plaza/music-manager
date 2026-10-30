@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"music-manager/internal/app"
+	"music-manager/internal/browse"
 	"music-manager/internal/manifest"
 )
 
@@ -187,4 +190,61 @@ func TestOldTagsAreAdoptedOverHTTP(t *testing.T) {
 		t.Errorf("%d %+v", code, r)
 	}
 	_ = manifest.Identified
+}
+
+type lookups struct {
+	failFor string
+	found   []app.Candidate
+}
+
+func (l lookups) Search(_ context.Context, q app.Query) ([]app.Candidate, error) {
+	if q.Title == l.failFor {
+		return nil, errors.New("network down")
+	}
+	return l.found, nil
+}
+
+func (l lookups) CoverFront(context.Context, string) ([]byte, error) { return nil, nil }
+
+func identifiedEverything(t *testing.T, srv *httptest.Server) browse.IdentifyProgress {
+	t.Helper()
+	var v JobView
+	if code := raw(t, srv.URL, "POST", "/api/identify-all", obj{}, &v); code != 200 || v.Kind != "identify" {
+		t.Fatalf("%d %+v", code, v)
+	}
+	done := waitJob(t, srv.URL, v.ID)
+	var progress browse.IdentifyProgress
+	data, _ := json.Marshal(done.Data)
+	if err := json.Unmarshal(data, &progress); err != nil || done.State != jobDone {
+		t.Fatalf("%+v %s %v", done, data, err)
+	}
+	return progress
+}
+
+func TestIdentifyingEverythingLeavesTracksAloneWhoseBestMatchIsWeak(t *testing.T) {
+	a, _ := seed(t, seedTrack{}, seedTrack{})
+	weak := app.Candidate{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 60}
+	srv := start(t, a, WithSource(lookups{found: []app.Candidate{weak}}))
+
+	p := identifiedEverything(t, srv)
+	if p.Total != 2 || p.Identified != 0 || p.Left != 2 || p.Failed != 0 {
+		t.Errorf("%+v; want both tracks left alone", p)
+	}
+	m, _ := a.Manifest()
+	for _, tr := range m.Tracks {
+		if tr.Status == manifest.Identified {
+			t.Errorf("%s was identified by a match that scores only 60", tr.ID)
+		}
+	}
+}
+
+func TestAFailedLookupIsReportedAndTheOtherTracksAreStillIdentified(t *testing.T) {
+	a, _ := seed(t, seedTrack{}, seedTrack{})
+	found := app.Candidate{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 99}
+	srv := start(t, a, WithSource(lookups{failFor: "a", found: []app.Candidate{found}}))
+
+	p := identifiedEverything(t, srv)
+	if p.Total != 2 || p.Identified != 1 || p.Failed != 1 || len(p.Failures) != 1 || !strings.Contains(p.Failures[0], "network down") {
+		t.Errorf("%+v; want one track identified and the failure of the other said", p)
+	}
 }

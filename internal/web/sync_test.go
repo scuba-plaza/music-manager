@@ -325,3 +325,26 @@ func TestAFolderInsideALibraryGivenByARelativePathIsStillRefused(t *testing.T) {
 		t.Errorf("the library folder is shown as %q", out.Targets[0].Path)
 	}
 }
+
+func TestAPlanForTheWolfgangNamesItAndWarnsAboutWhatItWillNotShowWell(t *testing.T) {
+	a, ts := seed(t, sample...)
+	genre := "Alternative Rock"
+	if _, err := a.Edit(ts[0].ID, app.Edit{Genre: &genre}); err != nil {
+		t.Fatal(err)
+	}
+	_, srv := syncServer(t, a)
+	target := t.TempDir()
+
+	_, d := planned(t, srv.URL, obj{"folder": target, "wolfgang": true})
+	if !strings.HasSuffix(d.Plan.Where, "Wolfgang WMP01") {
+		t.Errorf("the plan is for %q, want it to name the Wolfgang", d.Plan.Where)
+	}
+	if len(d.Plan.Warnings) != 1 || d.Plan.Warnings[0].Track != ts[0].Title || !strings.Contains(d.Plan.Warnings[0].Message, genre) {
+		t.Errorf("warnings %+v, want one about the genre of %q", d.Plan.Warnings, ts[0].Title)
+	}
+
+	_, plain := planned(t, srv.URL, obj{"folder": target})
+	if strings.HasSuffix(plain.Plan.Where, "Wolfgang WMP01") || len(plain.Plan.Warnings) != 0 {
+		t.Errorf("a plan that is not for the Wolfgang talks about it: %q, %+v", plain.Plan.Where, plain.Plan.Warnings)
+	}
+}

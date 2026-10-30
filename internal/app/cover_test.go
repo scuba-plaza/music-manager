@@ -10,6 +10,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"music-manager/internal/app"
@@ -322,5 +323,22 @@ func TestAnEditCanGiveTracksTheCoverAnotherTrackHasAndNeverOneThatIsNotStored(t 
 	}
 	if got := tracks(t, a)[1].CoverSHA256; got != "" {
 		t.Errorf("cover = %q, want none", got)
+	}
+}
+
+func TestACoverThatIsNotAnImageChangesNothing(t *testing.T) {
+	a := libWithTracks(t, 10)
+	id := tracks(t, a)[0].ID
+	if err := a.SetCover(id, testmp3.JPEG); err != nil {
+		t.Fatal(err)
+	}
+	before := tracks(t, a)[0]
+
+	err := a.SetCover(id, []byte("not a picture"))
+	if err == nil || !strings.Contains(err.Error(), "JPEG or PNG") {
+		t.Fatalf("err = %v, want one that says a cover must be a JPEG or PNG image", err)
+	}
+	if after := tracks(t, a)[0]; after.CoverSHA256 != before.CoverSHA256 || !after.UpdatedAt.Equal(before.UpdatedAt) {
+		t.Errorf("a refused cover changed the track: %+v, was %+v", after, before)
 	}
 }

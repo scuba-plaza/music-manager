@@ -122,3 +122,19 @@ func TestTracksAreSortedByTheLatinFormSetByHand(t *testing.T) {
 		t.Errorf("order = %v, want %v", artists, want)
 	}
 }
+
+func TestALatinFormOnSeveralLinesIsRefusedWithAMessageAndChangesNothing(t *testing.T) {
+	a, tr := ingested(t)
+	if _, err := a.Edit(tr.ID, app.Edit{Title: ptr("وطني"), Artist: ptr("فيروز")}); err != nil {
+		t.Fatal(err)
+	}
+	before := tracks(t, a)[0]
+
+	_, err := a.Edit(tr.ID, app.Edit{Album: ptr("Hits"), TitleLatin: ptr("Wa\ntani")})
+	if err == nil || !strings.Contains(err.Error(), "one line") {
+		t.Fatalf("err = %v, want one that says the form must be on one line", err)
+	}
+	if after := tracks(t, a)[0]; after.Album != "" || after.TitleLatin != "" || !after.UpdatedAt.Equal(before.UpdatedAt) {
+		t.Errorf("a refused edit changed the track: %+v, was %+v", after, before)
+	}
+}
