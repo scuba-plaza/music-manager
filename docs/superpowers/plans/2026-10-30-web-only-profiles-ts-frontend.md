@@ -1,55 +1,103 @@
 # mm: web-only, device profiles, TypeScript front end — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
->
-> **REQUIRED SUB-SKILL FOR EVERY TASK: superpowers:test-driven-development** (the TDD skill). Invoke it at the start of each task. No production code is written before a failing test that you have watched fail for the stated reason. Where a task changes existing behaviour that already has tests, the existing tests are the safety net and must stay green.
+> **For the controller agent:** this file is a complete work order. Read "Run this plan" below and execute everything from start to finish without checking in with the human. REQUIRED SUB-SKILL: `superpowers:subagent-driven-development`. REQUIRED SUB-SKILL FOR EVERY TASK, for every implementer and every fixer: `superpowers:test-driven-development` (the TDD skill). No production code is written before a failing test that has been watched failing for the stated reason.
 
-**Goal:** Turn `mm` into a web-only program (no CLI), make device targets data-driven profiles, and replace the vanilla-JS page with a typed, testable React front end, while keeping the Go core, the record/render model and first-class Nix support.
+**Goal:** Turn `mm` into a web-only program (no CLI), make device targets data-driven profiles, and replace the vanilla-JS page with a typed, testable React front end, keeping the Go core, the record/render model and first-class Nix support.
 
-**Architecture:** The Go core (`app`, `browse`, `device`, `manifest`, `mp3`, …) stays; it is already a headless core with a thin client. `mm` becomes one binary that starts the loopback web server. `device.Target` gains a data-driven implementation, `Profile`, so the Wolfgang WMP01 and the generic target become built-in TOML profiles and the user can add more in `devices.toml`. A new `web/` project (React 19 + TypeScript + Vite) talks to the same JSON API with types generated from the Go structs, and is embedded into the Go binary.
+**Architecture:** The Go core stays. `mm` becomes one binary that starts the loopback web server. `device.Target` gains a data-driven implementation, `Profile`, so the Wolfgang WMP01 and the generic target become built-in TOML profiles and users add more in `devices.toml`. A new `web/` project (React 19 + TypeScript + Vite) talks to the same JSON API with types generated from the Go structs and is embedded into the Go binary.
 
-**Tech Stack:** Go 1.26 (stdlib `net/http`, `embed`, `github.com/pelletier/go-toml/v2`), TypeScript (strict), React 19, Vite, zustand, Vitest 4 (Browser Mode, Playwright provider), Playwright Test, ESLint, Nix flakes (`buildGoModule`, `buildNpmPackage`, home-manager module).
+**Tech Stack:** Go 1.26 (stdlib, `github.com/pelletier/go-toml/v2`), TypeScript (strict), React 19, Vite, zustand, Vitest 4 (node unit project and Browser Mode project), Playwright Test, ESLint, **pnpm 10** (never npm, never Bun), Nix flakes (`buildGoModule`, `fetchPnpmDeps`, home-manager module).
 
-**Spec:** none written separately; you asked for a plan directly. The approved decisions are in "Decisions" below and are the spec this plan argues from.
+**Spec:** `docs/superpowers/specs/2026-10-30-web-only-profiles-ts-frontend-design.md` is the binding authority. Read it before anything else. This plan is its argument; where they disagree, the spec wins.
 
-## Decisions (from the conversation)
+## Run this plan
 
-| # | Decision |
+You are the controller. The human wants this plan executed unattended, from the first task to a pushed, reviewed branch. The skill `superpowers:subagent-driven-development` defines the machinery (workspace and ledger, task briefs, review packages, the fix loop, the final review); follow it exactly. This section adds what is specific to this project and overrides nothing in it.
+
+**The shape of the work.** For every task in order: a fresh implementer subagent builds it test-first, then a fresh task reviewer reviews the diff (spec compliance and quality), then fix rounds alternate (resume the implementer to fix, a fresh scoped re-reviewer to verify), at most five rounds, then the next task. After the last task, one whole-branch review. Implementation and review take alternate turns; you never implement, fix, or review anything yourself, and an implementer never reviews. Never run two implementers at once.
+
+### Setup (once, before Task 1)
+
+1. **Branch.** Work on `claude/optimistic-thompson-eignis`: `git fetch origin && git switch claude/optimistic-thompson-eignis`. If your checkout is on another branch with work in it, use `superpowers:using-git-worktrees` instead. Never work on `main`.
+2. **Environment.** The agent runs on the human's local NixOS machine with full network access. Every command in this plan runs inside the flake's dev shell: prefix it with `nix develop -c`. Preflight, and record each result in the ledger: `nix --version`; `nix flake metadata` (proves the network); `nix develop -c go version` (1.26 or newer); `git status --short` (clean). If `nix` is missing or `nix develop` fails, stop and tell the human: nothing else can be verified.
+3. **Ledger and todos** as the skill says. The ledger's first line is `# SDD ledger — plan: docs/superpowers/plans/2026-10-30-web-only-profiles-ts-frontend.md`.
+4. **Global Constraints file.** Write the "Global Constraints" section below, verbatim, to `<workspace>/global-constraints.md` (for example `awk '/^## Global Constraints/{f=1;next} /^## /{f=0} f' <plan file> > <workspace>/global-constraints.md`). Every dispatch names that file instead of pasting the text.
+5. **Pre-flight scan** as the skill says, before Task 1, as a table in the ledger. Pay particular attention to these shared files and interfaces: Tasks 5, 6, 7 (`internal/device`); Tasks 7 and 22 (the legacy Wolfgang fields are added to, then removed); Tasks 8 and 9 (named responses feed the contract); Tasks 10, 11 and 12 (scripts, configs, fixtures); Tasks 15 and 17 (the sort dialog); Tasks 11 and 20 (the e2e `--config` fixture).
+
+### Every dispatch
+
+- **Implementer dispatch** carries: the brief path; one line on where the task fits; "invoke `superpowers:test-driven-development` before writing any code"; the path of `<workspace>/global-constraints.md` with "read it first; it binds this task"; the instruction to run the task's verification commands through `nix develop -c` and to put the commands and their output in its report; "commit as the task's Commit step says, do not push, do not dispatch subagents".
+- **Reviewer dispatch** carries the path of `<workspace>/global-constraints.md` (its attention lens: it must read it first) and, for the task under review, the Review Focus lines that name it. The reviewer must reject: a code comment, a TypeScript `any`, a change to `*.golden` files, an edit outside the task's files without a stated reason, a test that could pass without the new behaviour, and missing evidence that each new test was seen failing first (for Task 1, the mutation evidence).
+- **After each approved task** you append the ledger line, then push: `git push -u origin claude/optimistic-thompson-eignis` (on a network error retry up to four times, waiting 2, 4, 8, 16 seconds).
+
+### Models (always pass `model` explicitly)
+
+| Role | Default | Use `opus` instead for |
+|---|---|---|
+| Implementer | `sonnet` | Tasks 5, 9, 13, 16, 17, 18, 21, 23 |
+| Task reviewer | `sonnet` | Tasks 5, 7, 9, 22, 23, 24 |
+| Scoped re-reviewer | `sonnet` | nothing |
+| Fix rounds 4–5 | one tier above the implementer that got stuck (`opus`, or `fable` if it was `opus`) | |
+| Final whole-branch review | the most capable model the Agent tool offers (currently `fable`, otherwise `opus`) | |
+
+### Phase gates
+
+The controller runs these itself when the last task of a phase is approved. A failing gate is fixed by one fix dispatch (never by you) and re-run.
+
+| After | Gate (each prefixed `nix develop -c`) |
 |---|---|
-| D1 | Drop the CLI entirely, including `review apply`, `playlist import`, the interactive `mm add` form, shell completions. `mm` starts the web server. |
-| D2 | Keep the model: records in `library.json` + content-addressed `.mm/`; the music folder is rendered output by sync. |
-| D3 | Drop the terminal look. Proportional UI font, Arabic-capable. Keep the keyboard shortcuts as one declarative keymap that also generates the footer hints and the `?` help. |
-| D4 | Keep the on-demand local server on `127.0.0.1:7878`. |
-| D5 | Device profiles as data: built-in `generic` and `wolfgang-wmp01`, plus user profiles in `devices.toml`. The library folder is always written with `generic`. Not included: remembering a card by label/UUID. |
-| D6 | No in-app player. Keep the 8-second cut preview. Gapless stays the player. |
-| D7 | Keep the Go core; rebuild the front end in TypeScript with React 19, Vite, Vitest, Playwright; types generated from Go. |
-| D8 | Browser tests (Vitest browser project, Playwright e2e) run only in the dev shell (`nix develop`). Go tests, `tsc`, ESLint and node-mode unit tests run in `nix flake check`. |
-| D9 | Also ship a home-manager module that writes `devices.toml` from Nix options. |
+| Task 3 | `go vet ./...`, `go test ./...`, `go run ./cmd/mm --library <tmp> --no-open --version` |
+| Task 7 | the Task 3 gate, and `git diff --stat main -- internal/app/testdata` shows no change to any `*.golden` |
+| Task 9 | `go vet ./...`, `go test ./...` |
+| Task 13 | `pnpm --dir web run check`, `pnpm --dir web run test:browser`, `go test ./...` |
+| Task 21 | `pnpm --dir web run test` (unit, browser, end to end), `go test ./...` |
+| Task 25 | `go vet ./...`, `go test ./...`, `pnpm --dir web run check`, `pnpm --dir web run test`, `nix flake check`, `nix build` |
 
-**Assumptions (change them before starting if you disagree):** npm, not pnpm; `zustand` for state; TOML via `go-toml/v2` with strict decoding; the TypeScript generator is a small in-repo reflect-based tool, because the only maintained-looking generator found (`tygo`) last tagged a release in 2022; config path is `$MM_CONFIG`, else `$XDG_CONFIG_HOME/mm/devices.toml`, else `~/.config/mm/devices.toml`; a missing default config means built-ins only, an invalid one refuses to start; new front end lives in `web/`, builds into `internal/web/dist/`.
+### Authorisations and prohibitions
+
+The human authorises: commits on this branch; pushing this branch to `origin` after each task; installing project dependencies (Go modules, pnpm packages, Nix store paths); the fake-hash round trip for `vendorHash` and the pnpm `hash`.
+
+Not authorised, and none of it is ever worth doing to unblock a task: force-pushing; pushing any other branch; merging; opening a pull request; deleting or rewriting anything outside the repository; publishing; touching `~/Music` or any real library; running `mm` without an explicit `--library <temporary directory>`; disabling, skipping or deleting a test to make a gate pass.
+
+### Rulings, amendments and stops
+
+- Decide, do not stall. Every decision is a ledger line `Ruling: <what> — <why> — <cost if wrong>`; the skill collects them for the final message.
+- You may correct this plan without asking when it names a path, line number, symbol or command that does not match the repository: ledger it as a ruling and carry the correction in the dispatch.
+- A spec decision (D1–D13) changes only if it is impossible to carry out, never because it is inconvenient: take the smallest deviation, ledger it with its cost, continue.
+- Stop and ask the human only for the four things the skill names, or when `nix` is unusable. A failing test, a failing reviewer, a hash mismatch, a flaky browser or a tool upgrade is not a stop: it is what the fix loop is for.
+
+### Finish
+
+When the final whole-branch review is clean, follow the skill's Finish. For `superpowers:finishing-a-development-branch` choose the option that leaves the branch pushed with no merge and no pull request, since neither is authorised. Your final message contains: what was built, per phase; the verification evidence (the Task 25 gate and its output); "Rulings I made", exhaustive; every deferred minor finding; anything that could not be verified and why; and how to try it (`nix run .# -- --library /tmp/mm-try`, `nix develop -c pnpm --dir web run test`).
 
 ## Global Constraints
 
-- **No comments in code.** Applies to every Go, TypeScript, CSS and Nix file written or edited in this plan. Names and tests carry the meaning. (Markdown docs are exempt.)
-- **TypeScript never uses `any`.** ESLint enforces `@typescript-eslint/no-explicit-any: error`; use `unknown` and narrow. The type generator maps `any`/`interface{}`/`json.RawMessage` to `unknown`.
+Every task's requirements include this section. The controller stores it verbatim in the workspace during Setup, and every dispatch points to that file.
+
+- **No comments in code.** Applies to every Go, TypeScript, CSS and Nix file written or edited. Names and tests carry the meaning. (Markdown documents are exempt.)
+- **TypeScript never uses `any`.** ESLint enforces `@typescript-eslint/no-explicit-any: error`; use `unknown` and narrow. The type generator maps `any`, `interface{}` and `json.RawMessage` to `unknown`.
+- **pnpm 10 is the only package manager.** Never npm, never Bun. The lockfile is `web/pnpm-lock.yaml`; a `package-lock.json` must never exist. From the repository root the commands are `pnpm --dir web run <script>` and `pnpm --dir web exec <bin>`. `web/package.json` has `packageManager` pinned to the exact version `pnpm --version` prints inside the dev shell and `"pnpm": {"onlyBuiltDependencies": ["esbuild"]}`.
+- **Everything runs inside the dev shell:** prefix commands with `nix develop -c`. Task 10 extends the shell with `nodejs`, `pnpm_10` and `playwright-driver.browsers`.
 - Go `1.26.0`; `CGO_ENABLED=0`; one static binary; module name `music-manager`.
-- Nix: `nix build` runs the Go tests in the sandbox, so Go tests must not need a browser, network, or a built front end. Nix only sees git-tracked files: `git add` new files before `nix build`. When Go dependencies change set `vendorHash = lib.fakeHash;`, build once, paste the printed hash. When npm dependencies change do the same with `npmDepsHash`.
+- **Never touch a real library.** Tests use `t.TempDir()`; every manual run passes `--library <temporary directory>`; never run `mm` against `~/Music/Library`.
+- Nix: `nix build` runs the Go tests in the sandbox, so Go tests must not need a browser, network or a built front end. Nix only sees git-tracked files: `git add` new files before `nix build` or `nix flake check`. When Go dependencies change, set `vendorHash = lib.fakeHash;`, build once, paste the hash Nix prints. Do the same with the `hash` of `fetchPnpmDeps` when the pnpm lockfile changes.
 - The web server listens on loopback only; `guard` stays as is: Host must be loopback; a request that changes anything needs the `X-MM` header and an `Origin` equal to the Host. The Vite dev proxy must not rewrite Host (`changeOrigin: false`).
 - The library folder is always rendered with the built-in `generic` profile; no profile choice applies to it.
 - Existing golden outputs `internal/app/testdata/sync-generic.golden` and `sync-wolfgang.golden` must not change at any point.
 - Names in Arabic or any other right-to-left script are laid out in their own direction without reordering the text around them (`<bdi dir="auto">` for every displayed name). Below 800 px width one pane shows at a time.
-- UI tests assert DOM and layout metrics (rects, line counts, order), never pixel snapshots: font rendering differs across machines.
-- The legacy API fields (`wolfgang` in the sync request, `info.wolfgang`, the Wolfgang tab, `WithWolfgang`) stay until Task 22 so the old page keeps working until the cutover.
-- Commit after every task on branch `claude/optimistic-thompson-eignis`. Do not open a pull request unless asked.
+- UI tests assert DOM and layout metrics (rects, line counts, order), never pixel snapshots: font rendering differs across machines. When `MM_CHROMIUM` is set, the Playwright and Vitest browser configs use it as the browser executable.
+- The legacy API fields (`wolfgang` in the sync request, `info.wolfgang`, the Wolfgang tab payload, `WithWolfgang`) stay until Task 22 so the old page keeps working until the cutover.
+- Phase 5 tasks (14–21) are finished only when their browser and end-to-end tests pass in both Playwright projects and their behaviour matches the README's description of the old page (`README.md`, "The web interface" and its key table; the old code in `internal/web/static/js/` is the reference for edge cases until Task 22 deletes it).
+- One commit per task (more only if the task says so), on branch `claude/optimistic-thompson-eignis`. End commit messages with the attribution lines your own session instructions specify, if any.
 
 ## Review Focus
 
 Inputs the spec implies but no feature task would obviously test; each has its test in the task named.
 
 1. An invalid `devices.toml` (unknown or misspelled key, duplicate or reserved name, zero or negative width, unknown enum) must refuse to start and name the file, the profile and the key; it must never fall back silently to writing the wrong format to a card. (Tasks 4, 6, 7)
-2. Typing in an input, IME composition (`isComposing`) and modifier combinations must not trigger single-key shortcuts; `ctrl+r`, `ctrl+a`, `ctrl+u/d` must still work outside inputs. (Task 13)
+2. Typing in an input, IME composition (`isComposing`) and modifier combinations must not trigger single-key shortcuts; `ctrl+r`, `ctrl+a`, `ctrl+u`, `ctrl+d` must still work outside inputs. (Task 13)
 3. Arabic and mixed-direction names in rows, dialogs, the inspector and the Latin tab keep their own direction, never overlap the count column, and sort under their Latin form. (Task 21)
-4. A binary built without the front end (`go run` before `npm run build`) answers HTTP 503 with a page saying what to run, not a 404 or a panic. (Task 10)
+4. A binary built without the front end (`go run` before `pnpm --dir web run build`) answers HTTP 503 with a page saying what to run, not a 404 or a panic. (Task 10)
 5. Empty states: an empty library, a library with no playlists (the `p` dialog goes straight to naming), an unidentified track, an empty playlist. (Task 21)
 
 ## File Structure
@@ -66,15 +114,39 @@ Inputs the spec implies but no feature task would obviously test; each has its t
 - `internal/web/contract.go` — the list of types that cross the wire.
 - `internal/web/webtest/` — `Seed`, `FakeSource`, `FakeDownloader` shared by Go tests and the e2e server; `cmd/e2e-server/main.go`.
 
-**Create (front end, `web/`):** `package.json`, `package-lock.json`, `tsconfig.json`, `vite.config.ts`, `vitest.config.ts`, `playwright.config.ts`, `eslint.config.js`, `index.html`, and under `src/`: `main.tsx`, `App.tsx`, `api/{client,events}.ts`, `api/types.gen.ts`, `state/{store,actions}.ts`, `keys/{keymap,dispatch}.ts`, `components/{Header,Footer,Split,Tree,Inspector,Fields,Cover}.tsx`, `overlay/{OverlayHost,Dialog}.tsx`, `dialogs/{Ask,Help,SortMenu,PlaylistPicker,CopyList,BulkForm,Identify,Add,Doctor,Sync}.tsx`, `styles/{tokens,app}.css`; tests beside sources (`*.test.ts` node, `*.browser.test.tsx` browser); end-to-end in `web/e2e/`.
+**Create (front end, `web/`):** `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `vite.config.ts`, `vitest.config.ts`, `playwright.config.ts`, `eslint.config.js`, `index.html`, and under `src/`: `main.tsx`, `App.tsx`, `api/{client,events}.ts`, `api/types.gen.ts`, `state/{store,actions}.ts`, `keys/{keymap,dispatch}.ts`, `components/{Header,Footer,Split,Tree,Inspector,Fields,Cover}.tsx`, `overlay/{OverlayHost,Dialog}.tsx`, `dialogs/{Ask,Help,SortMenu,PlaylistPicker,CopyList,BulkForm,Identify,Add,Doctor,Sync}.tsx`, `styles/{tokens,app}.css`; tests beside sources (`*.test.ts` node, `*.browser.test.tsx` browser); end-to-end in `web/e2e/`.
 
 **Create (Nix):** `nix/frontend.nix`, `nix/hm-module.nix`.
 
 **Modify:** `cmd/mm/main.go`, `go.mod`, `go.sum`, `flake.nix`, `nix/package.nix`, `.gitignore`, `README.md`, and the `app`, `browse`, `web` files named in the tasks.
 
----
+## Coverage map
 
-# Phase 1 — Remove the CLI
+| Spec decision | Tasks |
+|---|---|
+| D1 drop the CLI | 1, 2, 3 |
+| D2 keep records and render | guarded by the goldens in 5, 7, 22 |
+| D3 look and keymap | 13, 14, 17 |
+| D4 local server | 2, 10 |
+| D5 profiles | 4, 5, 6, 7, 20 |
+| D6 no player | 16 keeps the preview; no player task by design |
+| D7, D8 TypeScript front end | 8–22 |
+| D9 browser tests in the dev shell | 10, 23 |
+| D10 pnpm | 10, 23, 25 |
+| D11 home-manager module | 24 |
+| D12 generated types | 9 |
+| D13 TOML | 4, 6 |
+
+| Phase | Tasks |
+|---|---|
+| 1 Remove the CLI | 1–3 |
+| 2 Device profiles | 4–7 |
+| 3 Typed contract | 8–9 |
+| 4 Front-end foundation | 10–13 |
+| 5 Port the interface | 14–21 |
+| 6 Cutover, Nix, docs | 22–25 |
+
+Task headings are `### Task N:` and must not be renamed: the skill's brief extractor finds tasks by them.
 
 ### Task 1: Preserve the behaviour only the CLI tests pin
 
@@ -152,9 +224,7 @@ func DefaultLibrary(getenv func(string) string, home string) string
 - [ ] **Step 4: Run** `go build ./... && go vet ./... && go test ./...`. Expected: PASS, goldens untouched. If `nix` is available: set `vendorHash = lib.fakeHash;`, `git add -A`, `nix build`, paste the printed hash, `nix build` again.
 - [ ] **Step 5: Commit:** `The command line is gone: mm is the web interface`.
 
----
 
-# Phase 2 — Device profiles
 
 ### Task 4: Profile, parsing and validation
 
@@ -298,9 +368,7 @@ type ProfileView struct {
 - [ ] **Step 4: Run** `go test ./...`. Expected: PASS.
 - [ ] **Step 5: Commit:** `Sync and the device preview take a profile; the config file is read and checked at start`.
 
----
 
-# Phase 3 — A typed contract
 
 ### Task 8: Name every response
 
@@ -369,9 +437,7 @@ func Contract() []any
 - [ ] **Step 4: Run** the same. Expected: PASS.
 - [ ] **Step 5: Commit:** `The page's types are generated from the Go structs and a test says when they drift`.
 
----
 
-# Phase 4 — Front-end foundation
 
 ### Task 10: Scaffold `web/` and let the server take a front end
 
@@ -379,7 +445,7 @@ func Contract() []any
 
 **Files:**
 - Create: `web/` scaffold (see File Structure), `internal/web/dist/.gitkeep`
-- Modify: `internal/web/server.go`, `.gitignore`
+- Modify: `internal/web/server.go`, `.gitignore`, `flake.nix`
 - Test: `internal/web/frontend_test.go`, `web/src/App.browser.test.tsx`
 
 **Interfaces:**
@@ -387,15 +453,17 @@ func Contract() []any
 ```go
 func WithFrontend(fsys fs.FS) Option
 ```
-  `//go:embed all:dist` gives `distFiles`. Until Task 22 the default front end is the old `static`. `WithFrontend` replaces it; when the given FS has no `index.html`, `GET /` answers `503` with a page saying: the front end is not built; run `npm --prefix web run build`. `.gitignore` adds `web/node_modules`, `internal/web/dist/*` and `!internal/web/dist/.gitkeep`.
-  `web/package.json` scripts: `dev` (`vite`), `build` (`tsc -b && vite build --outDir ../internal/web/dist --emptyOutDir false`, preceded by removing the old `assets/` and `index.html` there), `build:nix` (`tsc -b && vite build --outDir dist`), `check` (`tsc --noEmit && eslint . && vitest run --project unit`), `test:unit`, `test:browser` (`vitest run --project browser`), `test:e2e` (`npm run build && playwright test`), `test` (all three), `gen:types` (`cd .. && go run ./cmd/gentypes > web/src/api/types.gen.ts`). Vite dev server proxies `/api` to `127.0.0.1:7878` with `changeOrigin: false`. ESLint: `@typescript-eslint/no-explicit-any: error`, strict type-checked config.
+  `//go:embed all:dist` gives `distFiles`. Until Task 22 the default front end is the old `static`. `WithFrontend` replaces it; when the given FS has no `index.html`, `GET /` answers `503` with a page saying: the front end is not built; run `pnpm --dir web run build`. `.gitignore` adds `web/node_modules`, `internal/web/dist/*` and `!internal/web/dist/.gitkeep`.
+  `web/package.json` scripts: `dev` (`vite`), `build` (`tsc -b && vite build --outDir ../internal/web/dist --emptyOutDir false`, preceded by removing the old `assets/` and `index.html` there), `build:nix` (`tsc -b && vite build --outDir dist`), `check` (`tsc --noEmit && eslint . && vitest run --project unit`), `test:unit`, `test:browser` (`vitest run --project browser`), `test:e2e` (`pnpm run build && playwright test`), `test` (all three), `gen:types` (`cd .. && go run ./cmd/gentypes > web/src/api/types.gen.ts`). Vite dev server proxies `/api` to `127.0.0.1:7878` with `changeOrigin: false`. ESLint: `@typescript-eslint/no-explicit-any: error`, strict type-checked config.
+  `web/package.json` also sets `packageManager` and `"pnpm": {"onlyBuiltDependencies": ["esbuild"]}` (pnpm 10 does not run dependency install scripts otherwise); `web/pnpm-lock.yaml` is committed. The Playwright and Vitest browser configs read `MM_CHROMIUM` as the browser executable when it is set.
+  `flake.nix`'s `devShells.default` gains `nodejs`, `pnpm_10` and `playwright-driver.browsers`, with `PLAYWRIGHT_BROWSERS_PATH` set to that package and `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true"`. This is done here, not in Task 23, so that every later task runs under `nix develop`.
 
 - [ ] **Step 1: Write the failing tests:**
-  - Go: `TestWithoutAFrontendTheServerSays503AndWhatToRun` (empty `fstest.MapFS` → status 503, body contains `npm --prefix web run build`); `TestWithFrontendServesItsIndex` (MapFS with `index.html` → 200, `Cache-Control: no-cache`); `TestAPIRoutesStillWinOverTheFrontend`.
+  - Go: `TestWithoutAFrontendTheServerSays503AndWhatToRun` (empty `fstest.MapFS` → status 503, body contains `pnpm --dir web run build`); `TestWithFrontendServesItsIndex` (MapFS with `index.html` → 200, `Cache-Control: no-cache`); `TestAPIRoutesStillWinOverTheFrontend`.
   - Browser: `App.browser.test.tsx`: `renders the application shell` (mount `<App/>`, expect a `banner` landmark with the text `mm`).
-- [ ] **Step 2: Run** `go test ./internal/web -run 'Frontend|503'` and `npm --prefix web ci && npm --prefix web run test:browser`. Expected: FAIL (undefined `WithFrontend`; no `App`).
-- [ ] **Step 3: Implement** `WithFrontend`, the 503 page, the scaffold, a minimal `App` with a `<header role="banner">`, and pin `@playwright/test` to exactly the version `nix eval --raw nixpkgs#playwright-driver.version` prints (write the version into `web/package.json`; Task 23 relies on it).
-- [ ] **Step 4: Run** the same commands plus `npm --prefix web run check`. Expected: PASS.
+- [ ] **Step 2: Run** `go test ./internal/web -run 'Frontend|503'` and, after `pnpm --dir web install` (the first time this creates `pnpm-lock.yaml`; every later run uses `--frozen-lockfile`), `pnpm --dir web run test:browser`. Expected: FAIL (undefined `WithFrontend`; no `App`).
+- [ ] **Step 3: Implement** `WithFrontend`, the 503 page, the scaffold, a minimal `App` with a `<header role="banner">`, pin `@playwright/test` to exactly the version `nix eval --inputs-from . --raw nixpkgs#playwright-driver.version` prints and `packageManager` to the output of `nix develop -c pnpm --version` (both in `web/package.json`; Task 23 relies on them), and extend the dev shell as described above.
+- [ ] **Step 4: Run** the same commands plus `pnpm --dir web run check`. Expected: PASS.
 - [ ] **Step 5: Commit:** `A web/ project, and a server that can take its front end from outside`.
 
 ### Task 11: The seeded end-to-end server and the Playwright harness
@@ -418,9 +486,9 @@ type FakeDownloader struct{}
   `web/e2e/fixtures.ts` exports `test` with a fresh server state per test file and helpers `press(key)`, `tree()`, `dialog()`.
 
 - [ ] **Step 1: Write the failing tests:** Go `TestSeedBuildsTheUILibrary` (tracks, the Arabic track's Latin form, both playlists, one unidentified track); e2e `smoke.spec.ts` › `the seeded server answers /api/library with four artists, two playlists and one unidentified track` and `/api/profiles lists generic, wolfgang-wmp01 and my-player` (Playwright's `request` fixture; no page is needed).
-- [ ] **Step 2: Run** `go test ./internal/web/webtest` and `npm --prefix web run test:e2e`. Expected: FAIL (package missing; server command missing).
+- [ ] **Step 2: Run** `go test ./internal/web/webtest` and `pnpm --dir web run test:e2e`. Expected: FAIL (package missing; server command missing).
 - [ ] **Step 3: Implement** `Seed`, the fakes (moved out of the `_test.go` files so both Go tests and the e2e server share them), the server command, the Playwright config and fixtures.
-- [ ] **Step 4: Run** `go test ./... && npm --prefix web run test:e2e`. Expected: PASS.
+- [ ] **Step 4: Run** `go test ./... && pnpm --dir web run test:e2e`. Expected: PASS.
 - [ ] **Step 5: Commit:** `A seeded server for end-to-end tests, and the fakes shared with the Go tests`.
 
 ### Task 12: Typed client, store and event stream
@@ -467,9 +535,9 @@ export const useApp: UseBoundStore<StoreApi<AppState>>
   Behaviour mirrors `internal/web/static/js/api.js` and `state.js`: `X-MM: 1` on every request; JSON bodies; `Content-Type` only when sending JSON; an error body `{error}` becomes `ApiError.message`; a network failure becomes `ApiError("Cannot reach mm. Is it still running?")`; `AbortError` passes through; `expanded` and `tab` persist in `localStorage` guarded by try/catch.
 
 - [ ] **Step 1: Write the failing tests** (node project, `fetch` stubbed): `sends X-MM on every request`; `sets Content-Type only for a JSON body`; `turns an error body into the message`; `turns a failed fetch into the unreachable message`; `rethrows AbortError`; `query skips empty, null and false and writes true as 1`; events: `reconnect after open reloads the library`, `a library event with the same stamp does nothing`; store: `expanded survives a reload`, `a thrown localStorage does not break the store`.
-- [ ] **Step 2: Run** `npm --prefix web run test:unit -- src/api src/state`. Expected: FAIL (modules missing).
+- [ ] **Step 2: Run** `pnpm --dir web run test:unit -- src/api src/state`. Expected: FAIL (modules missing).
 - [ ] **Step 3: Implement** the client and store over generated types only (no hand-written response types).
-- [ ] **Step 4: Run** the same plus `npm --prefix web run check`. Expected: PASS.
+- [ ] **Step 4: Run** the same plus `pnpm --dir web run check`. Expected: PASS.
 - [ ] **Step 5: Commit:** `A typed API client, an event stream and the application state`.
 
 ### Task 13: One declarative keymap
@@ -507,16 +575,13 @@ export function installKeys(target: Document, run: (a: ActionName) => void): () 
   - `every binding with a hint or help appears in hintsFor / helpPages` (iterate `bindings`).
   - `no two bindings in one scope share a key`.
   - Review Focus 2: `a key typed in an INPUT, TEXTAREA or SELECT is ignored`; `isComposing ignores the key`; `meta and alt combinations are ignored`; `ctrl+r, ctrl+a, ctrl+u, ctrl+d resolve when focus is not in an input`; `the filter box handles only Enter, ArrowDown and Escape`; `keys wait while busy`.
-- [ ] **Step 2: Run** `npm --prefix web run test:unit -- src/keys`. Expected: FAIL.
+- [ ] **Step 2: Run** `pnpm --dir web run test:unit -- src/keys`. Expected: FAIL.
 - [ ] **Step 3: Implement** the table and `installKeys`; `ActionName` is a string-literal union defined next to `bindings`.
-- [ ] **Step 4: Run** the same plus `npm --prefix web run check`. Expected: PASS.
+- [ ] **Step 4: Run** the same plus `pnpm --dir web run check`. Expected: PASS.
 - [ ] **Step 5: Commit:** `One keymap: the keys, the footer hints and the help come from the same table`.
 
----
 
-# Phase 5 — Port the interface
 
-Each task here is finished only when its browser tests and e2e tests pass in both Playwright projects, and its behaviour matches the README's description of the old page (`README.md`, "The web interface" and its key table; the old code in `internal/web/static/js/` is the reference for edge cases).
 
 ### Task 14: Shell, theme, typography, narrow layout
 
@@ -530,7 +595,7 @@ Each task here is finished only when its browser tests and e2e tests pass in bot
 **Interfaces:** Produces `<Header/>` (root path, summary `N tracks`, sync chip `N to sync · press s`, theme button), `<Footer/>` (status line + hints from `hintsFor`), `<Split/>` (draggable divider, width persisted under `mm.left`). Fonts: `system-ui` with `"Noto Sans Arabic", "Noto Naskh Arabic"` fallbacks for text; a monospace face only for times and IDs. Light and dark themes via tokens; dark default; the choice persists under `mm.theme`.
 
 - [ ] **Step 1: Write the failing tests:** browser: `the footer shows the hints for the focused pane`; `the theme button toggles data-theme and remembers it`; `the sync chip is hidden when nothing waits and shows the count when it does`; e2e: `below 800px one pane shows at a time: → into the fields shows the right pane and ← returns to the tree`; `dragging the divider changes the left width and survives a reload`; `no horizontal scrollbar at 500px`.
-- [ ] **Step 2: Run** `npm --prefix web run test:browser -- Shell` and `npx --prefix web playwright test shell`. Expected: FAIL.
+- [ ] **Step 2: Run** `pnpm --dir web run test:browser -- Shell` and `pnpm --dir web exec playwright test shell`. Expected: FAIL.
 - [ ] **Step 3: Implement** the three components and styles with CSS custom properties; use logical properties (`margin-inline`, `inset-inline`) throughout.
 - [ ] **Step 4: Run** the same. Expected: PASS.
 - [ ] **Step 5: Commit:** `The shell: header, footer, panes, theme, a proportional font`.
@@ -546,7 +611,7 @@ Each task here is finished only when its browser tests and e2e tests pass in bot
 **Interfaces:** Consumes `useApp`, `get<LibraryResponse>('/api/library' + query(...))`. `S` opens the sort dialog built in Task 17. Behaviour: rows from `lib.rows`; cursor; open/close (`enter`, `→ l`, `← h`, twist click); `+ = -` open one level / close all; `space` mark, `ctrl+a` mark all visible; `PageUp/Down`, `Home/End`, `z` centre; `/` focuses the filter (same query words as the server: `status:unidentified`, `genre:folk`); the Playlists group at the top; the Needs work group; a single click puts the cursor on a row, a second opens; marks shown by a marker column.
 
 - [ ] **Step 1: Write the failing tests:** browser: `moves the cursor with j and k and the arrow keys`; `enter opens an artist and shows its albums`; `space marks and an album marks all its tracks`; `the filter box narrows the tree through the server`; `escape clears the filter`. e2e: `the tree lists Playlists, John Coltrane, Miles Davis and فيروز`; `status:unidentified shows only the unidentified track`; `the Arabic artist row is a bdi with dir=auto`.
-- [ ] **Step 2: Run** `npm --prefix web run test:browser -- Tree` and `npx --prefix web playwright test tree smoke`. Expected: FAIL.
+- [ ] **Step 2: Run** `pnpm --dir web run test:browser -- Tree` and `pnpm --dir web exec playwright test tree smoke`. Expected: FAIL.
 - [ ] **Step 3: Implement** `Tree` (roles `tree`/`treeitem`, `aria-level`, `aria-selected`); no virtualization (hundreds of rows).
 - [ ] **Step 4: Run** the same. Expected: PASS.
 - [ ] **Step 5: Commit:** `The tree: rows, cursor, marks, filter`.
@@ -562,7 +627,7 @@ Each task here is finished only when its browser tests and e2e tests pass in bot
 **Interfaces:** Consumes `get<TrackView>('/api/tracks/' + id + query({ profile }))`, `get<PeekView>('/api/peek...')`, `send('PATCH', '/api/tracks/' + id, …)`, `send('POST', '/api/tracks/' + id + '/nudge' | '/clear')`, `/api/tracks/{id}/preview` (audio). Right pane shows a track (tabs Details, Audio, Latin, Device), an artist, an album, a playlist or the Needs work group as the old page did. Device tab: a profile `<select>` defaulting to the first non-generic profile from `GET /api/profiles`, then the preview rows and warnings. `→`/`←`/`1–4` switch tabs; `↑↓` choose a field; `enter` edits; `enter` saves, `esc` cancels; `(mixed)` fields open empty (blank keeps, `-` clears); `[ ] { }` nudge cuts and gains, `0` clears, `p` plays the 8 s preview through an `<audio>` element; `x` removes the cover.
 
 - [ ] **Step 1: Write the failing tests:** browser: `enter edits a field and escape cancels`; `a mixed field opens empty and blank keeps every value`; `the device tab previews with the chosen profile`; `p on a cut starts the preview audio`. e2e: `editing the title saves it and the tree row follows`; `the Latin tab shows a hand-set form as normal text and a worked-out one as dim`; `the cover is shown for a track that has one`.
-- [ ] **Step 2: Run** `npm --prefix web run test:browser -- Inspector` and `npx --prefix web playwright test inspector`. Expected: FAIL.
+- [ ] **Step 2: Run** `pnpm --dir web run test:browser -- Inspector` and `pnpm --dir web exec playwright test inspector`. Expected: FAIL.
 - [ ] **Step 3: Implement.** Field rendering and editing state live in the store (`edit`), the server owns validation; show its error text under the field.
 - [ ] **Step 4: Run** the same. Expected: PASS.
 - [ ] **Step 5: Commit:** `The inspector: tabs, fields, editing, cuts, preview`.
@@ -581,7 +646,7 @@ Each task here is finished only when its browser tests and e2e tests pass in bot
   - e2e `the playlist picker rows line up` (the regression for the bug fixed in commit 474abd5, ported from `internal/web/layout_test.go`), at both Playwright projects, with the seeded `Late night` (1) and the long-named playlist (2): press `p` on a track; every row's cells share one top and height; columns line up from row to row; no cell overlaps its neighbour; each cell lies inside the dialog; the label column is at least half the dialog width; the count is right of the label; `Late night` and `New playlist…` are one line each; the long name may wrap; the dialog lies inside the window.
   - browser: `ask goes ahead only on y or enter`; `escape closes and focus returns`; `the sort menu picks by number`; `the copy list cannot tick an attribute the track lacks`; `n turns the picker into a name input`.
   - e2e: `the help dialog lists every binding by page and ← → turns the pages`; `S then 3 sorts by title into one flat list and choosing the tree goes back to the tree`.
-- [ ] **Step 2: Run** `npm --prefix web run test:browser -- Dialogs` and `npx --prefix web playwright test dialogs`. Expected: FAIL.
+- [ ] **Step 2: Run** `pnpm --dir web run test:browser -- Dialogs` and `pnpm --dir web exec playwright test dialogs`. Expected: FAIL.
 - [ ] **Step 3: Implement** the overlay host, the dialogs and `MenuList`; the Help pages come from `helpPages()`.
 - [ ] **Step 4: Run** the same. Expected: PASS.
 - [ ] **Step 5: Commit:** `Dialogs: one shell, one menu list, and the playlist picker pinned by a layout test`.
@@ -598,7 +663,7 @@ Each task here is finished only when its browser tests and e2e tests pass in bot
 **Interfaces:** Consumes `/api/bulk/preview`, `/api/bulk`, `/api/group`, `/api/group/hint`, `/api/copy`, `/api/paste`, `/api/remove`, `/api/renumber`, `/api/move`, `/api/playlists`, `/api/playlists/add`, `/api/playlists/takeout`, `/api/playlists/delete`, `/api/undo`, `/api/redo`, `PUT/DELETE /api/cover`. Behaviour: `e` edits marked tracks in one form with a live summary (debounced 150 ms, only the latest answer shown); `c` on a track opens the copy list, `v` pastes on marks or the cursor target, `ctrl+v` with an image on the clipboard and a dropped picture file set the cover; `d` asks first; `J K` move a track in its album or playlist, `n` renumbers; `u` / `ctrl+r`; `p` adds the marked tracks (or the cursor's track, album or artist) to a playlist; in a playlist `d` removes a track from it, `d` on the playlist deletes it after asking; renaming an artist or album that equals another joins them and the pane says so while typing.
 
 - [ ] **Step 1: Write the failing tests:** unit: `a stale bulk preview answer is dropped`; `busy blocks keys until the change returns`; e2e: `marking two tracks and e sets the album on both with one undo step`; `d asks and y removes the track and it disappears from its playlists`; `J moves a track down and renumbers`; `u then ctrl+r undoes and redoes`; `pasting a copied cover`; `p adds the selected album to Late night and the count becomes 3`; `renaming an artist to another artist's name says it joins them`; `dropping a non-image on the page is refused with a message`.
-- [ ] **Step 2: Run** `npm --prefix web run test:unit -- src/state` and `npx --prefix web playwright test editing`. Expected: FAIL.
+- [ ] **Step 2: Run** `pnpm --dir web run test:unit -- src/state` and `pnpm --dir web exec playwright test editing`. Expected: FAIL.
 - [ ] **Step 3: Implement** the actions and bulk form.
 - [ ] **Step 4: Run** the same. Expected: PASS.
 - [ ] **Step 5: Commit:** `Editing: bulk, copy and paste, move, remove, undo, playlists`.
@@ -615,7 +680,7 @@ Each task here is finished only when its browser tests and e2e tests pass in bot
 **Interfaces:** Consumes `/api/tracks/{id}/candidates`, `/api/identify/apply`, `/api/identify-all`, `/api/adopt`, `/api/add/fetch|path|finish`, `DELETE /api/add/{draft}`, `/api/ingest`, `/api/doctor`, `/api/jobs`, `/api/jobs/{id}` and the SSE `job` events. Keys `i I o a D`. Dropped MP3 files are ingested as unidentified tracks; the add form is pre-filled from the match and shows its path preview and duplicates; progress bars follow `JobView`.
 
 - [ ] **Step 1: Write the failing tests:** e2e (with `FakeSource` / `FakeDownloader`): `i on the unidentified track lists candidates, shows what would change, and applying identifies it`; `I identifies all with a progress bar`; `o adopts the file's old tags`; `a adds from a link, pre-filled, and the path preview shows where it will be written`; `a duplicate is flagged`; `dropping two mp3 files adds two unidentified tracks`; `D lists the problems and a click moves the cursor to the track`.
-- [ ] **Step 2: Run** `npx --prefix web playwright test identify add`. Expected: FAIL.
+- [ ] **Step 2: Run** `pnpm --dir web exec playwright test identify add`. Expected: FAIL.
 - [ ] **Step 3: Implement** the dialogs; job progress uses the store and `subscribe`.
 - [ ] **Step 4: Run** the same. Expected: PASS.
 - [ ] **Step 5: Commit:** `Identify, add, doctor and drop-to-ingest`.
@@ -631,7 +696,7 @@ Each task here is finished only when its browser tests and e2e tests pass in bot
 **Interfaces:** Consumes `GET /api/sync/targets`, `GET /api/profiles`, `POST /api/sync/plan {library, folder, profile}`, `POST /api/sync/{plan}/apply`, `/prune`, `DELETE /api/sync/{plan}`. Steps as before: choose the library folder, a mounted drive or a typed folder; a Format row (profile `<select>`; `w` cycles) shown only for a folder other than the library, default `generic`, never remembered; review the plan with counts and warnings; apply; strays are deleted only after typing `delete`.
 
 - [ ] **Step 1: Write the failing tests:** e2e: `s opens the targets and the library folder has no format row`; `a typed folder offers every profile, generic first`; `choosing wolfgang-wmp01 shows its warnings in the review`; `a profile from the user's devices.toml appears` (the e2e server gets a `--config` fixture with `my-player`); `strays are removed only after typing delete`; `the header says N to sync · press s and the chip opens the dialog`.
-- [ ] **Step 2: Run** `npx --prefix web playwright test sync`. Expected: FAIL.
+- [ ] **Step 2: Run** `pnpm --dir web exec playwright test sync`. Expected: FAIL.
 - [ ] **Step 3: Implement** the dialog; send `profile`, never the legacy `wolfgang` field.
 - [ ] **Step 4: Run** the same. Expected: PASS.
 - [ ] **Step 5: Commit:** `Sync from the new page, with a choice of device profile`.
@@ -647,14 +712,12 @@ Each task here is finished only when its browser tests and e2e tests pass in bot
 **Interfaces:** Consumes everything above. `ui-parity.md` is a checklist with one line per row of the README key table and per paragraph of "The web interface"; each line names the test that pins it or `NEW`.
 
 - [ ] **Step 1: Write the failing tests** for every `NEW` line, plus: Review Focus 3 — `Arabic rows keep dir=auto and the count column does not move` (compare the count's x in an Arabic row and a Latin row), `the Latin tab and the Device tab show the Latin form for the Arabic track`, `sorting by artist puts فيروز among the F`, `a mixed Latin and Arabic title does not reorder its neighbours` (the bdi's text content order is preserved); Review Focus 5 — `an empty library shows an empty tree and keys do nothing harmful`, `a library without playlists makes p open on the name input`, `an unidentified track shows its fields and the Needs work group lists it`, `an empty playlist opens with no rows and d deletes it after asking`; mouse — `click selects, double-click opens, click on a field then again edits, the twist arrow opens at once`.
-- [ ] **Step 2: Run** `npx --prefix web playwright test parity rtl empty`. Expected: FAIL for exactly the gaps.
+- [ ] **Step 2: Run** `pnpm --dir web exec playwright test parity rtl empty`. Expected: FAIL for exactly the gaps.
 - [ ] **Step 3: Fix** each gap in the component the test points at.
-- [ ] **Step 4: Run** `npm --prefix web run test`. Expected: PASS (unit, browser and e2e).
+- [ ] **Step 4: Run** `pnpm --dir web run test`. Expected: PASS (unit, browser and e2e).
 - [ ] **Step 5: Commit:** `The new page matches the old one, and right-to-left and empty cases are pinned`.
 
----
 
-# Phase 6 — Cutover and Nix
 
 ### Task 22: Cut over and delete the old page
 
@@ -670,7 +733,7 @@ Each task here is finished only when its browser tests and e2e tests pass in bot
 - [ ] **Step 1: Write the failing tests:** `TestTheLegacyWolfgangFieldIsGone` (a sync plan body with `wolfgang: true` and no `profile` is planned with `generic`, the unknown field ignored; `/api/info` and `/api/sync/targets` have no `wolfgang` key); `TestWithoutOptionsTheServerServesTheEmbeddedDist` (a server without `WithFrontend` answers `/` with 200 when `fs.Stat(distFiles, "dist/index.html")` succeeds and with 503 otherwise, so it passes both in the Nix sandbox and after a local build); `TestGeneratedTypesAreCurrent` keeps passing after the removals.
 - [ ] **Step 2: Run** `go test ./internal/web ./internal/browse`. Expected: FAIL.
 - [ ] **Step 3: Delete and remove** as listed; regenerate `types.gen.ts`; fix compile errors; remove `web.WithWolfgang()` from `cmd/mm/main.go`.
-- [ ] **Step 4: Run** `go vet ./... && go test ./... && npm --prefix web run test`. Expected: PASS; then `npm --prefix web run build && go run ./cmd/mm --library /tmp/lib` and use the page by hand: browse, edit a field, `p`, `s` to a temp folder with each profile.
+- [ ] **Step 4: Run** `go vet ./... && go test ./... && pnpm --dir web run test`. Expected: PASS; then `pnpm --dir web run build && go run ./cmd/mm --library /tmp/lib` and use the page by hand: browse, edit a field, `p`, `s` to a temp folder with each profile.
 - [ ] **Step 5: Commit:** `The new page is the page; the old one and the legacy Wolfgang fields are gone`.
 
 ### Task 23: Nix packaging for the TypeScript front end
@@ -682,12 +745,14 @@ Each task here is finished only when its browser tests and e2e tests pass in bot
 - Modify: `nix/package.nix`, `flake.nix`
 - Test: flake `checks`
 
-**Interfaces:** Produces `packages.<system>.frontend` (the built `dist`), `packages.<system>.music-manager` (Go with the dist embedded), `checks.<system>.{frontend,build}`, `devShells.default` with `go`, `nodejs`, `yt-dlp`, `ffmpeg`, `playwright-driver.browsers`, env `PLAYWRIGHT_BROWSERS_PATH`, `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true`. `frontend.nix` uses `buildNpmPackage` with `src = ../web`, `npmBuildScript = "build:nix"`, `doCheck = true` with `checkPhase = "npm run check"` (type-check, ESLint, node unit tests; no browser), and installs `dist` to `$out`. `package.nix` copies the frontend into `internal/web/dist` in `postPatch`, keeps `vendorHash`, and its `lib.fileset` additionally includes `../web/src/api/types.gen.ts` so `TestGeneratedTypesAreCurrent` runs in the sandbox.
+**Interfaces:** Produces `packages.<system>.frontend` (the built `dist`), `packages.<system>.music-manager` (Go with the dist embedded) and `checks.<system>.{frontend,build}`. The dev shell was extended in Task 10 and is only verified here.
+  `frontend.nix` is a `stdenvNoCC.mkDerivation` with `src = ../web`; `pnpmDeps = fetchPnpmDeps { inherit pname version src; pnpm = pnpm_10; fetcherVersion = 2; hash = lib.fakeHash; }`; `nativeBuildInputs = [ nodejs pnpmConfigHook pnpm_10 ]`; `env.PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"`; pnpm's package-manager version switching disabled (for example `env.npm_config_manage_package_manager_versions = "false"`), so the build never tries to download another pnpm; `buildPhase = "pnpm run build:nix"`; `doCheck = true` with `checkPhase = "pnpm run check"` (type-check, ESLint, node unit tests; no browser); `installPhase` copies `dist` to `$out`. If the locked nixpkgs lacks `fetchPnpmDeps` and `pnpmConfigHook`, use `pnpm.fetchDeps` and `pnpm.configHook` (check with `nix eval --inputs-from . nixpkgs#fetchPnpmDeps --apply 'f: true'`).
+  `package.nix` copies the frontend into `internal/web/dist` in `postPatch`, keeps `vendorHash`, and its `lib.fileset` additionally includes `../web/src/api/types.gen.ts` so `TestGeneratedTypesAreCurrent` runs in the sandbox.
 
 - [ ] **Step 1: Write the failing check:** add `checks.<system>.frontend = self.packages.<system>.frontend;` to `flake.nix` and run `nix flake check`. Expected: FAIL (attribute missing).
-- [ ] **Step 2: Implement** `nix/frontend.nix` (`npmDepsHash = lib.fakeHash;`, build once, paste the hash printed; `nix run nixpkgs#prefetch-npm-deps web/package-lock.json` also prints it) and the `package.nix` wiring. `git add` every new file first.
+- [ ] **Step 2: Implement** `nix/frontend.nix` (start with `hash = lib.fakeHash;`, build once, paste the hash Nix prints, build again) and the `package.nix` wiring. `git add` every new file first.
 - [ ] **Step 3: Run** `nix flake check` and `nix build`. Expected: PASS; `result/bin/mm --version` prints the version; `result/bin/mm --library /tmp/lib --no-open` serves a page whose `/` returns 200.
-- [ ] **Step 4: Run** the dev-shell tests: `nix develop -c npm --prefix web ci && nix develop -c npm --prefix web run test`. Expected: PASS (unit, browser, e2e). If Playwright rejects the browsers, the cause is a version mismatch between `@playwright/test` and `playwright-driver`; the pin from Task 10 must equal `nix eval --raw nixpkgs#playwright-driver.version`.
+- [ ] **Step 4: Run** the dev-shell tests: `nix develop -c pnpm --dir web install --frozen-lockfile && nix develop -c pnpm --dir web run test`. Expected: PASS (unit, browser, e2e). If Playwright rejects the browsers, the cause is a version mismatch between `@playwright/test` and `playwright-driver`; the pin from Task 10 must equal `nix eval --inputs-from . --raw nixpkgs#playwright-driver.version`.
 - [ ] **Step 5: Commit:** `Nix builds the front end and embeds it; the dev shell runs the browser tests`.
 
 ### Task 24: The home-manager module
@@ -714,15 +779,9 @@ Each task here is finished only when its browser tests and e2e tests pass in bot
 - Modify: `README.md`
 - Create: none
 
-- [ ] **Step 1:** Rewrite `README.md`: remove every CLI command and the `mm ls/edit/review/playlist` sections; document `mm` (flags `--library --addr --no-open --config --check-config --version`), the web interface and its keys (generated list equals `helpPages()`), device profiles (the full field table from Task 4 with the Wolfgang profile as the worked example and `devices.toml` location), the home-manager module, the new Development section (`go test ./...`, `npm --prefix web run test`, `go run ./cmd/e2e-server`, `go run ./cmd/gentypes`, `nix flake check`, `nix develop`), and installing with Nix. Keep the sections on the record/render model, covers, Latin forms, the Wolfgang limits, volume and fades, ReplayGain, dates and sorting, playlists in the web UI.
+- [ ] **Step 1:** Rewrite `README.md`: remove every CLI command and the `mm ls/edit/review/playlist` sections; document `mm` (flags `--library --addr --no-open --config --check-config --version`), the web interface and its keys (generated list equals `helpPages()`), device profiles (the full field table from Task 4 with the Wolfgang profile as the worked example and `devices.toml` location), the home-manager module, the new Development section (`go test ./...`, `pnpm --dir web run test`, `go run ./cmd/e2e-server`, `go run ./cmd/gentypes`, `nix flake check`, `nix develop`), and installing with Nix. Keep the sections on the record/render model, covers, Latin forms, the Wolfgang limits, volume and fades, ReplayGain, dates and sorting, playlists in the web UI.
 - [ ] **Step 2:** Verify each claim: run `mm --check-config` against the README's `devices.toml` example (copy it into a temp file); `grep -n "mm add\|mm ls\|mm edit\|mm playlist\|mm review\|--wolfgang" README.md` must print nothing; compare the key table with `bindings` by eye once.
-- [ ] **Step 3: Run the whole verification:** `go vet ./... && go test ./... && npm --prefix web run check && npm --prefix web run test && nix flake check`. Expected: all PASS; `git status --short` shows only intended files.
+- [ ] **Step 3: Run the whole verification:** `go vet ./... && go test ./... && pnpm --dir web run check && pnpm --dir web run test && nix flake check`. Expected: all PASS; `git status --short` shows only intended files.
 - [ ] **Step 4: Commit:** `The README describes the web-only program, device profiles and the new development workflow`.
 
----
 
-## Self-review (completed)
-
-- **Spec coverage:** D1 → Tasks 1–3; D2 → unchanged, guarded by the goldens in Tasks 5, 22; D3 → Tasks 13, 14, 17; D4 → Task 2 plus the guard constraint and Task 10 proxy note; D5 → Tasks 4–7, 20; D6 → Task 16 keeps `p` preview, no player task by design; D7 → Tasks 8–22; D8 → Task 23; D9 → Task 24. Review Focus 1 → Tasks 4, 6, 7; 2 → 13; 3 → 21; 4 → 10; 5 → 21.
-- **Type consistency:** `Profile`/`Registry`/`ProfileInfo`/`ProfileView`/`UseProfiles`/`WithProfiles`/`WithFrontend`/`Contract`/`Generate`, `useApp`/`OverlayState`/`bindings`/`hintsFor`/`helpPages` are defined once and reused with the same names.
-- **Known judgement calls for review:** Task 1 uses mutation as the "watch it fail" step because the behaviour already exists; Task 5 records the old targets' outputs as a golden file before deleting them; the in-repo TypeScript generator replaces a library on purpose (see Assumptions).
