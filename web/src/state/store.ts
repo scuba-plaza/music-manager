@@ -19,6 +19,7 @@ export interface AppState {
   info: InfoView | null;
   lib: LibraryResponse | null;
   filter: string;
+  filterFocused: boolean;
   sort: { key: string; reverse: boolean };
   expanded: Set<string>;
   cursor: string | null;
@@ -71,6 +72,7 @@ export const useApp = create<AppState>()(() => ({
   info: null,
   lib: null,
   filter: '',
+  filterFocused: false,
   sort: { key: '', reverse: false },
   expanded: recallExpanded(),
   cursor: null,

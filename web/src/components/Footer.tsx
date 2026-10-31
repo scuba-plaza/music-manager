@@ -1,4 +1,4 @@
-import { hintsFor } from '../keys/keymap';
+import { filterHints, hintsFor } from '../keys/keymap';
 import { useApp } from '../state/store';
 
 export function Footer() {
@@ -10,7 +10,7 @@ export function Footer() {
         {text}
       </div>
       <ul className="hints" aria-label="Keys">
-        {hintsFor(state).map((hint) => (
+        {(state.filterFocused ? filterHints() : hintsFor(state)).map((hint) => (
           <li key={`${hint.keys} ${hint.label}`} className="hint">
             <kbd>{hint.keys}</kbd> {hint.label}
           </li>

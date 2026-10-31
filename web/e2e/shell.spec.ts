@@ -16,6 +16,12 @@ async function openPage(page: Page, width: number, height = 700): Promise<void> 
   await expect(page.getByRole('banner')).toContainText('6 tracks');
 }
 
+async function putCursorOnTrack(page: Page): Promise<void> {
+  await page.getByRole('treeitem', { name: /Needs work/ }).dblclick();
+  await page.getByRole('treeitem', { name: /Rough Mix/ }).click();
+  await expect(page.getByRole('treeitem', { name: /Rough Mix/ })).toHaveAttribute('aria-selected', 'true');
+}
+
 async function dragDivider(page: Page, to: number): Promise<void> {
   const divider = await boxOf(page.getByRole('separator'));
   const y = divider.y + divider.height / 2;
@@ -46,6 +52,7 @@ test('below 800px one pane shows at a time: → into the fields shows the right 
   await expect(tree).toBeVisible();
   await expect(fields).toBeHidden();
   expect((await boxOf(tree)).width).toBeGreaterThan(400);
+  await putCursorOnTrack(page);
 
   await press('ArrowRight');
 
@@ -155,6 +162,7 @@ test('no horizontal scrollbar at 500px', async ({ page, press }) => {
   expect((await overflow()).page).toBeLessThanOrEqual(0);
   expect((await overflow()).body).toBeLessThanOrEqual(0);
 
+  await putCursorOnTrack(page);
   await press('ArrowRight');
   await expect(page.getByTestId('inspector-pane')).toBeVisible();
 

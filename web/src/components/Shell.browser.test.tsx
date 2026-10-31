@@ -18,7 +18,8 @@ function hints(): string[] {
 
 function libraryOf(tracks: number, needWork: number, n: number) {
   const base = libraryResponse('s1', { unsynced: { known: true, n } });
-  return { ...base, view: { ...base.view, tracks, needWork } };
+  const rows = [{ kind: 'track', depth: 0, key: 'track\u001fsowhat', label: 'So What', trackId: 'sowhat', length: '0:02' }];
+  return { ...base, view: { ...base.view, rows, tracks, needWork } };
 }
 
 const themeButton = () => page.getByRole('button', { name: 'Switch theme' });
@@ -174,6 +175,7 @@ describe('the application', () => {
   test('both panes show in a window of 800px or more', async () => {
     await page.viewport(800, 700);
     await render(<App />);
+    await expect.element(page.getByRole('treeitem')).toBeVisible();
 
     await expect.element(page.getByTestId('tree-pane')).toBeVisible();
     await expect.element(page.getByTestId('inspector-pane')).toBeVisible();
@@ -181,6 +183,7 @@ describe('the application', () => {
 
   test('text is set in the proportional face with the Arabic faces behind it, and only .mono is monospace', async () => {
     await render(<App />);
+    await expect.element(page.getByRole('treeitem')).toBeVisible();
     const mono = document.createElement('span');
     mono.className = 'mono';
     document.body.append(mono);

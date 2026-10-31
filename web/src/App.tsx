@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Footer } from './components/Footer';
 import { Header } from './components/Header';
 import { Split } from './components/Split';
+import { Tree } from './components/Tree';
 import { installKeys } from './keys/dispatch';
 import { connect, loadInfo, loadLibrary, run } from './state/actions';
 import { useApp } from './state/store';
@@ -29,7 +30,7 @@ export function App() {
       <Split
         leftTitle={title}
         rightTitle="Details"
-        left={<div className="pane-body" data-testid="tree-pane" />}
+        left={<Tree />}
         right={<div className="pane-body" data-testid="inspector-pane" />}
       />
       <Footer />

@@ -24,6 +24,7 @@ describe('the store', () => {
       info: null,
       lib: null,
       filter: '',
+      filterFocused: false,
       cursor: null,
       focus: 'tree',
       field: 0,

@@ -31,6 +31,7 @@ function state(overrides: Partial<AppState> = {}): AppState {
     info: null,
     lib: null,
     filter: '',
+    filterFocused: false,
     sort: { key: '', reverse: false },
     expanded: new Set(),
     cursor: null,

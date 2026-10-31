@@ -220,6 +220,162 @@ kbd {
   background: var(--rule);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.tree-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.filterbar {
+  display: flex;
+  gap: 0.75rem;
+  padding-block: 0.3rem;
+  padding-inline: 1rem;
+  border-block-end: 1px solid var(--rule);
+}
+
+.filterbar:focus-within {
+  background: var(--sel);
+}
+
+.prompt {
+  color: var(--accent);
+}
+
+.filter {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  text-align: start;
+}
+
+.filter::placeholder {
+  color: var(--dim);
+  opacity: 0.7;
+}
+
+.tree {
+  flex: 1 1 0;
+  min-height: 0;
+  padding-block: 0.25rem;
+  overflow: auto;
+  outline: 0;
+  scrollbar-color: var(--rule) transparent;
+  scrollbar-width: thin;
+}
+
+.tree:empty {
+  flex: none;
+  padding: 0;
+}
+
+.tree .row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  min-height: 1.45em;
+  padding-inline-end: 1rem;
+  border-inline-start: 3px solid transparent;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.tree .mark,
+.tree .twist {
+  flex: none;
+  align-self: stretch;
+  width: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+.tree .mark {
+  color: var(--accent);
+}
+
+.tree .twist {
+  color: var(--dim);
+}
+
+.tree .num {
+  flex: none;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.tree .label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: start;
+  text-overflow: ellipsis;
+}
+
+.tree .detail {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dim);
+  text-align: start;
+  text-overflow: ellipsis;
+}
+
+.tree .spacer {
+  flex: 1 1 0;
+}
+
+.tree .right {
+  flex: none;
+  margin-inline-start: auto;
+  padding-inline-start: 0.75rem;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.tree .row.group .label,
+.tree .row.artist .label {
+  font-weight: bold;
+}
+
+.tree .row.cursor {
+  border-inline-start-color: var(--accent);
+  background: var(--sel);
+}
+
+.tree .row.cursor .label {
+  font-weight: bold;
+}
+
+.pane-tree:not(.focus) .tree .row.cursor {
+  border-inline-start-color: var(--dim);
+}
+
+.tree .row.marked .label {
+  color: var(--accent);
+}
+
+.tree .row:hover:not(.cursor) {
+  background: color-mix(in srgb, var(--sel) 50%, transparent);
+}
+
+.empty {
+  padding-block: 1.2rem;
+  padding-inline: 1rem;
+  color: var(--dim);
+}
+
 @media (width < 800px) {
   body {
     font-size: 14px;
