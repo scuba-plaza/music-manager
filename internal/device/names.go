@@ -11,20 +11,16 @@ import (
 	"music-manager/internal/translit"
 )
 
-// PlayerFieldWidth is how many characters of an artist or an album the
-// player's index keeps; it cuts the rest, wherever that falls.
-const PlayerFieldWidth = 12
-
 // PlayerTags are the artist and album the track's file carries, which is what
 // the player shows: worked out from the Latin forms of the names. A single has
 // no album, so its title stands in for it (otherwise the player says "Unknown
 // Album").
-func PlayerTags(t manifest.Track) (artist, album string) {
+func PlayerTags(t manifest.Track, width int) (artist, album string) {
 	source := t.LatinAlbum()
 	if t.Album == "" {
 		source = t.LatinTitle()
 	}
-	return ArtistName(t.LatinArtist()), AlbumName(source, t.LatinArtist())
+	return ArtistName(t.LatinArtist(), width), AlbumName(source, t.LatinArtist(), width)
 }
 
 // latinName is a name in Latin letters, as one line of words without an
@@ -40,7 +36,7 @@ func latinName(s string) string {
 	return strings.Join(words, " ")
 }
 
-func fits(s string) bool { return utf8.RuneCountInString(s) <= PlayerFieldWidth }
+func fits(s string, width int) bool { return utf8.RuneCountInString(s) <= width }
 
 var (
 	leadingThe    = regexp.MustCompile(`(?i)^the\s+`)
@@ -66,18 +62,18 @@ var particles = map[string]bool{
 }
 
 // ArtistName is the artist as the Wolfgang shows it: the name in Latin
-// letters, in PlayerFieldWidth characters. The first of these that fits
+// letters, in width characters. The first of these that fits
 // wins: the name; without a leading "The" and what is in parentheses;
 // "Various Artists" as "Various"; for two words or more, the initials of the
 // given names and the surname ("M. A. Wahab"), the first initial and the
 // surname, the surname alone, the last word alone; the name shortened at a
 // word; the name cut.
-func ArtistName(name string) string {
+func ArtistName(name string, width int) string {
 	name = latinName(name)
-	if fits(name) {
+	if fits(name, width) {
 		return name
 	}
-	if name = unadorned(name); fits(name) {
+	if name = unadorned(name); fits(name, width) {
 		return name
 	}
 	if strings.EqualFold(name, "Various Artists") {
@@ -101,12 +97,12 @@ func ArtistName(name string) string {
 		}
 		candidates = append(candidates, surname, words[len(words)-1])
 		for _, c := range candidates {
-			if fits(c) {
+			if fits(c, width) {
 				return c
 			}
 		}
 	}
-	return layout.Shorten(name, PlayerFieldWidth)
+	return layout.Shorten(name, width)
 }
 
 // initial is the first letter or digit of a word, in capitals, and a dot.
@@ -120,26 +116,26 @@ func initial(word string) string {
 }
 
 // AlbumName is the album as the Wolfgang shows it, in the same way: the name
-// in Latin letters, in PlayerFieldWidth characters. The first of these that
+// in Latin letters, in width characters. The first of these that
 // fits wins: the name; without a leading "The", what is in parentheses and a
 // trailing "- EP" or "- Single"; without the artist's name, or a word of
 // four letters or more from it, at the start; the name shortened at a word;
 // the name cut.
-func AlbumName(name, artist string) string {
+func AlbumName(name, artist string, width int) string {
 	name, artist = latinName(name), latinName(artist)
-	if fits(name) {
+	if fits(name, width) {
 		return name
 	}
 	name = strings.TrimSpace(trailingEP.ReplaceAllString(unadorned(name), ""))
-	if fits(name) {
+	if fits(name, width) {
 		return name
 	}
 	if rest := withoutArtist(name, artist); rest != "" {
-		if name = rest; fits(name) {
+		if name = rest; fits(name, width) {
 			return name
 		}
 	}
-	return layout.Shorten(name, PlayerFieldWidth)
+	return layout.Shorten(name, width)
 }
 
 // withoutArtist is name without the artist, or a word of four letters or

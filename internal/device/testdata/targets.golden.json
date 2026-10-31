@@ -1,0 +1,716 @@
+{
+  "generic": {
+    "Name": "generic",
+    "Layout": {
+      "ComponentMax": 200,
+      "StemMax": 0,
+      "Latin": false,
+      "Fold": null
+    },
+    "Paths": {
+      "album1": "Nils Frahm/Spaces/03 - Says.mp3",
+      "arabic": "عبد الحليم حافظ/روائع/02 - بحلم بيك.mp3",
+      "arsing": "فيروز/وطني.mp3",
+      "cuta01": "Artist/A Very Long Song Title Indeed Yes.mp3",
+      "cutb01": "Artist/A Very Long Song Title Indeed No.mp3",
+      "duo001": "Fairuz \u0026 Ziad Rahbani/Song.mp3",
+      "emoji1": "🎵🎶/Song.mp3",
+      "ep0001": "Some Long Artist Name/Name - EP/Opening.mp3",
+      "genre1": "Rock Band/Loud.mp3",
+      "handst": "عبد الحليم حافظ/روائع/01 - بحلم بيك.mp3",
+      "inbox1": "_Inbox/inbox1 - 01 x.mp3.mp3",
+      "live01": "The Band (Live)/The Last Waltz (Live)/The Weight.mp3",
+      "long80": "Nils Frahm/Spaces/An Eighty Character Title That Goes On And On Well Past What Any Player Shows Ok.mp3",
+      "single": "Max Richter/On the Nature of Daylight.mp3",
+      "twelve": "Fairouz Band/Songs (Live)/Exactly Twelve.mp3",
+      "varios": "Various Artists/Now That's What I Call Music Volume One/Song.mp3",
+      "wahab1": "Mohamed Abdel Wahab/Ahwak/Ahwak.mp3"
+    },
+    "Tags": {
+      "album1": {
+        "Title": "Says",
+        "Artist": "Nils Frahm",
+        "Album": "Spaces",
+        "Genre": "Neoclassical",
+        "Track": 3,
+        "Total": 10,
+        "Date": "2013-11-15",
+        "Length": 188000000000,
+        "Extra": {
+          "MM_ID": "album1",
+          "MUSICBRAINZ_ALBUMID": "rel-1",
+          "MUSICBRAINZ_TRACKID": "rec-1",
+          "SOURCE_URL": "https://example.org/says"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "arabic": {
+        "Title": "بحلم بيك",
+        "Artist": "عبد الحليم حافظ",
+        "Album": "روائع",
+        "Genre": "طرب",
+        "Track": 2,
+        "Total": 6,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "arabic"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "arsing": {
+        "Title": "وطني",
+        "Artist": "فيروز",
+        "Album": "",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "arsing"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "cuta01": {
+        "Title": "A Very Long Song Title Indeed Yes",
+        "Artist": "Artist",
+        "Album": "",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "cuta01"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "cutb01": {
+        "Title": "A Very Long Song Title Indeed No",
+        "Artist": "Artist",
+        "Album": "",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "cutb01"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "duo001": {
+        "Title": "Song",
+        "Artist": "Fairuz \u0026 Ziad Rahbani",
+        "Album": "",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "duo001"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "emoji1": {
+        "Title": "Song",
+        "Artist": "🎵🎶",
+        "Album": "",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "emoji1"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "ep0001": {
+        "Title": "Opening",
+        "Artist": "Some Long Artist Name",
+        "Album": "Name - EP",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "ep0001"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "genre1": {
+        "Title": "Loud",
+        "Artist": "Rock Band",
+        "Album": "",
+        "Genre": "Alternative Rock Pop",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "genre1"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "handst": {
+        "Title": "بحلم بيك",
+        "Artist": "عبد الحليم حافظ",
+        "Album": "روائع",
+        "Genre": "طرب",
+        "Track": 1,
+        "Total": 6,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "handst"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "inbox1": {
+        "Title": "",
+        "Artist": "",
+        "Album": "",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 0,
+        "Extra": {
+          "MM_ID": "inbox1"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "live01": {
+        "Title": "The Weight",
+        "Artist": "The Band (Live)",
+        "Album": "The Last Waltz (Live)",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "live01"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "long80": {
+        "Title": "An Eighty Character Title That Goes On And On Well Past What Any Player Shows Ok",
+        "Artist": "Nils Frahm",
+        "Album": "Spaces",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "long80"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "single": {
+        "Title": "On the Nature of Daylight",
+        "Artist": "Max Richter",
+        "Album": "",
+        "Genre": "Ambient",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "single"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "twelve": {
+        "Title": "Exactly Twelve",
+        "Artist": "Fairouz Band",
+        "Album": "Songs (Live)",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "twelve"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "varios": {
+        "Title": "Song",
+        "Artist": "Various Artists",
+        "Album": "Now That's What I Call Music Volume One",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "varios"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "wahab1": {
+        "Title": "Ahwak",
+        "Artist": "Mohamed Abdel Wahab",
+        "Album": "Ahwak",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "wahab1"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      }
+    },
+    "CoverFile": {
+      "image/jpeg": "cover.jpg",
+      "image/png": "cover.png"
+    },
+    "SingleCovers": false,
+    "ReplayGain": true,
+    "Playlists": [
+      {
+        "File": "Playlists/دراسة.m3u8",
+        "Name": "Playlists/دراسة.m3u8",
+        "Data": "#EXTM3U\n#EXTINF:188,Nils Frahm - Says\n../Nils Frahm/Spaces/03 - Says.mp3\n#EXTINF:200,Max Richter - On the Nature of Daylight\n../Max Richter/On the Nature of Daylight.mp3\n#EXTINF:-1,inbox1 - 01 x.mp3\n../_Inbox/inbox1 - 01 x.mp3.mp3\n#EXTINF:200,عبد الحليم حافظ - بحلم بيك\n../عبد الحليم حافظ/روائع/02 - بحلم بيك.mp3\n#EXTINF:200,عبد الحليم حافظ - بحلم بيك\n../عبد الحليم حافظ/روائع/01 - بحلم بيك.mp3\n#EXTINF:200,فيروز - وطني\n../فيروز/وطني.mp3\n#EXTINF:200,Nils Frahm - An Eighty Character Title That Goes On And On Well Past What Any Player Shows Ok\n../Nils Frahm/Spaces/An Eighty Character Title That Goes On And On Well Past What Any Player Shows Ok.mp3\n#EXTINF:200,The Band (Live) - The Weight\n../The Band (Live)/The Last Waltz (Live)/The Weight.mp3\n#EXTINF:200,Various Artists - Song\n../Various Artists/Now That's What I Call Music Volume One/Song.mp3\n#EXTINF:200,Mohamed Abdel Wahab - Ahwak\n../Mohamed Abdel Wahab/Ahwak/Ahwak.mp3\n#EXTINF:200,Some Long Artist Name - Opening\n../Some Long Artist Name/Name - EP/Opening.mp3\n#EXTINF:200,Rock Band - Loud\n../Rock Band/Loud.mp3\n#EXTINF:200,Artist - A Very Long Song Title Indeed Yes\n../Artist/A Very Long Song Title Indeed Yes.mp3\n#EXTINF:200,Artist - A Very Long Song Title Indeed No\n../Artist/A Very Long Song Title Indeed No.mp3\n#EXTINF:200,Fairuz \u0026 Ziad Rahbani - Song\n../Fairuz \u0026 Ziad Rahbani/Song.mp3\n#EXTINF:200,🎵🎶 - Song\n../🎵🎶/Song.mp3\n#EXTINF:200,Fairouz Band - Exactly Twelve\n../Fairouz Band/Songs (Live)/Exactly Twelve.mp3\n"
+      },
+      {
+        "File": "Playlists/دراسة ٢.m3u8",
+        "Name": "Playlists/دراسة ٢.m3u8",
+        "Data": "#EXTM3U\n#EXTINF:200,عبد الحليم حافظ - بحلم بيك\n../عبد الحليم حافظ/روائع/01 - بحلم بيك.mp3\n#EXTINF:-1,inbox1 - 01 x.mp3\n../_Inbox/inbox1 - 01 x.mp3.mp3\n#EXTINF:188,Nils Frahm - Says\n../Nils Frahm/Spaces/03 - Says.mp3\n"
+      },
+      {
+        "File": "Playlists/Road Trip.m3u8",
+        "Name": "Playlists/Road Trip.m3u8",
+        "Data": "#EXTM3U\n#EXTINF:200,Max Richter - On the Nature of Daylight\n../Max Richter/On the Nature of Daylight.mp3\n#EXTINF:200,Artist - A Very Long Song Title Indeed Yes\n../Artist/A Very Long Song Title Indeed Yes.mp3\n#EXTINF:200,Artist - A Very Long Song Title Indeed No\n../Artist/A Very Long Song Title Indeed No.mp3\n"
+      },
+      {
+        "File": "Playlists/Empty.m3u8",
+        "Name": "Playlists/Empty.m3u8",
+        "Data": "#EXTM3U\n"
+      }
+    ],
+    "Diagnose": null,
+    "Covers": [
+      {
+        "Stored": "png",
+        "SHA256": "2639b2636451896f6fc49a0dbfdecdd7451853b532b9321577d25a56da6d9732",
+        "MIME": "image/png",
+        "Err": ""
+      },
+      {
+        "Stored": "jpeg",
+        "SHA256": "ce88f0404138be564159121ed37e478829f871dedb58d23810c4f6e07d36cabb",
+        "MIME": "image/jpeg",
+        "Err": ""
+      },
+      {
+        "Stored": "jpeg-3000",
+        "SHA256": "d699e9c4f55bb1d26cd5d19c53497136a2d12c5e11926436bc680aafe8b852c6",
+        "MIME": "image/jpeg",
+        "Err": ""
+      },
+      {
+        "Stored": "not-an-image",
+        "SHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "MIME": "",
+        "Err": "cover must be a JPEG or PNG image"
+      }
+    ]
+  },
+  "wolfgang-wmp01": {
+    "Name": "wolfgang-wmp01",
+    "Layout": {
+      "ComponentMax": 100,
+      "StemMax": 20,
+      "Latin": true,
+      "Fold": [
+        "Fairuz",
+        "Firuz",
+        "Beyonce",
+        "AEro -- Strasse",
+        "",
+        "Mohamed Abdel Wahab"
+      ]
+    },
+    "Paths": {
+      "album1": "Nils Frahm/Spaces/03 - Says.mp3",
+      "arabic": "Bd al-Hlim Hafz/Rwa/02 - Bhlm Bik.mp3",
+      "arsing": "Firuz/Wtni.mp3",
+      "cuta01": "Artist/A Very Long Song Tit.mp3",
+      "cutb01": "Artist/A Very Long Song (2).mp3",
+      "duo001": "Fairuz \u0026 Ziad Rahbani/Song.mp3",
+      "emoji1": "Unknown/Song.mp3",
+      "ep0001": "Some Long Artist Name/Name - EP/Opening.mp3",
+      "genre1": "Rock Band/Loud.mp3",
+      "handst": "Abdel Halim Hafez/Rawaa'e/01 - Bahlam Bek.mp3",
+      "inbox1": "_Inbox/inbox1 - 01 x.mp3.mp3",
+      "live01": "The Band (Live)/The Last Waltz (Live)/The Weight.mp3",
+      "long80": "Nils Frahm/Spaces/An Eighty Character.mp3",
+      "single": "Max Richter/On the Nature of Day.mp3",
+      "twelve": "Fairouz Band/Songs (Live)/Exactly Twelve.mp3",
+      "varios": "Various Artists/Now That's What I Call Music Volume One/Song.mp3",
+      "wahab1": "Mohamed Abdel Wahab/Ahwak/Ahwak.mp3"
+    },
+    "Tags": {
+      "album1": {
+        "Title": "Says",
+        "Artist": "Nils Frahm",
+        "Album": "Spaces",
+        "Genre": "Neoclassical",
+        "Track": 3,
+        "Total": 10,
+        "Date": "2013-11-15",
+        "Length": 188000000000,
+        "Extra": {
+          "MM_ID": "album1",
+          "MUSICBRAINZ_ALBUMID": "rel-1",
+          "MUSICBRAINZ_TRACKID": "rec-1",
+          "SOURCE_URL": "https://example.org/says"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "arabic": {
+        "Title": "بحلم بيك",
+        "Artist": "B. A. Hafz",
+        "Album": "Rwa",
+        "Genre": "Trb",
+        "Track": 2,
+        "Total": 6,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "arabic"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "arsing": {
+        "Title": "وطني",
+        "Artist": "Firuz",
+        "Album": "Wtni",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "arsing"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "cuta01": {
+        "Title": "A Very Long Song Title Indeed Yes",
+        "Artist": "Artist",
+        "Album": "A Very Long",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "cuta01"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "cutb01": {
+        "Title": "A Very Long Song Title Indeed No",
+        "Artist": "Artist",
+        "Album": "A Very Long",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "cutb01"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "duo001": {
+        "Title": "Song",
+        "Artist": "F. Rahbani",
+        "Album": "Song",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "duo001"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "emoji1": {
+        "Title": "Song",
+        "Artist": "",
+        "Album": "Song",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "emoji1"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "ep0001": {
+        "Title": "Opening",
+        "Artist": "S. Name",
+        "Album": "Name - EP",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "ep0001"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "genre1": {
+        "Title": "Loud",
+        "Artist": "Rock Band",
+        "Album": "Loud",
+        "Genre": "Alternative Rock Pop",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "genre1"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "handst": {
+        "Title": "بحلم بيك",
+        "Artist": "A. H. Hafez",
+        "Album": "Rawaa'e",
+        "Genre": "Tarab",
+        "Track": 1,
+        "Total": 6,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "handst"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "inbox1": {
+        "Title": "",
+        "Artist": "",
+        "Album": "",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 0,
+        "Extra": {
+          "MM_ID": "inbox1"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "live01": {
+        "Title": "The Weight",
+        "Artist": "Band",
+        "Album": "Last Waltz",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "live01"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "long80": {
+        "Title": "An Eighty Character Title That Goes On And On Well Past What Any Player Shows Ok",
+        "Artist": "Nils Frahm",
+        "Album": "Spaces",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "long80"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "single": {
+        "Title": "On the Nature of Daylight",
+        "Artist": "Max Richter",
+        "Album": "On",
+        "Genre": "Ambient",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "single"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "twelve": {
+        "Title": "Exactly Twelve",
+        "Artist": "Fairouz Band",
+        "Album": "Songs (Live)",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "twelve"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "varios": {
+        "Title": "Song",
+        "Artist": "Various",
+        "Album": "Now That's",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "varios"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      },
+      "wahab1": {
+        "Title": "Ahwak",
+        "Artist": "M. A. Wahab",
+        "Album": "Ahwak",
+        "Genre": "",
+        "Track": 0,
+        "Total": 0,
+        "Date": "",
+        "Length": 200000000000,
+        "Extra": {
+          "MM_ID": "wahab1"
+        },
+        "Cover": null,
+        "CoverMIME": ""
+      }
+    },
+    "CoverFile": {
+      "image/jpeg": "cover.jpg",
+      "image/png": "cover.jpg"
+    },
+    "SingleCovers": true,
+    "ReplayGain": false,
+    "Playlists": [
+      {
+        "File": "Playlists/Drasa.m3u",
+        "Name": "Playlists/Drasa.m3u",
+        "Data": "\\Nils Frahm\\Spaces\\03 - Says.mp3\r\n\\Max Richter\\On the Nature of Day.mp3\r\n\\_Inbox\\inbox1 - 01 x.mp3.mp3\r\n\\Bd al-Hlim Hafz\\Rwa\\02 - Bhlm Bik.mp3\r\n\\Abdel Halim Hafez\\Rawaa'e\\01 - Bahlam Bek.mp3\r\n\\Firuz\\Wtni.mp3\r\n\\Nils Frahm\\Spaces\\An Eighty Character.mp3\r\n\\The Band (Live)\\The Last Waltz (Live)\\The Weight.mp3\r\n\\Various Artists\\Now That's What I Call Music Volume One\\Song.mp3\r\n\\Mohamed Abdel Wahab\\Ahwak\\Ahwak.mp3\r\n\\Some Long Artist Name\\Name - EP\\Opening.mp3\r\n\\Rock Band\\Loud.mp3\r\n\\Artist\\A Very Long Song Tit.mp3\r\n\\Artist\\A Very Long Song (2).mp3\r\n\\Fairuz \u0026 Ziad Rahbani\\Song.mp3\r\n\\Unknown\\Song.mp3\r\n\\Fairouz Band\\Songs (Live)\\Exactly Twelve.mp3\r\n"
+      },
+      {
+        "File": "Playlists/Study Two.m3u",
+        "Name": "Playlists/Study Two.m3u",
+        "Data": "\\Abdel Halim Hafez\\Rawaa'e\\01 - Bahlam Bek.mp3\r\n\\_Inbox\\inbox1 - 01 x.mp3.mp3\r\n\\Nils Frahm\\Spaces\\03 - Says.mp3\r\n"
+      },
+      {
+        "File": "Playlists/Road Trip.m3u",
+        "Name": "Playlists/Road Trip.m3u",
+        "Data": "\\Max Richter\\On the Nature of Day.mp3\r\n\\Artist\\A Very Long Song Tit.mp3\r\n\\Artist\\A Very Long Song (2).mp3\r\n"
+      },
+      {
+        "File": "Playlists/Empty.m3u",
+        "Name": "Playlists/Empty.m3u",
+        "Data": ""
+      }
+    ],
+    "Diagnose": [
+      {
+        "TrackID": "genre1",
+        "Message": "the genre \"Alternative Rock Pop\" is 20 characters, the player shows 12"
+      },
+      {
+        "TrackID": "duo001",
+        "Message": "the artist \"Fairuz \u0026 Ziad Rahbani\" looks like several artists; the player's name for it is made from all of it"
+      },
+      {
+        "TrackID": "emoji1",
+        "Message": "the artist \"🎵🎶\" has no Latin letters, it becomes \"Unknown\" on the player (set a Latin form for it)"
+      },
+      {
+        "TrackID": "cuta01",
+        "Message": "its file name is cut at 20 characters and becomes the same as that of cutb01; one of them is renamed with (2)"
+      },
+      {
+        "TrackID": "cutb01",
+        "Message": "its file name is cut at 20 characters and becomes the same as that of cuta01; one of them is renamed with (2)"
+      }
+    ],
+    "Covers": [
+      {
+        "Stored": "png",
+        "SHA256": "817bd3b1d09dd20855efb10e2887aac44670e5e3ee61a5418cf045faf9e4cac9",
+        "MIME": "image/jpeg",
+        "Err": ""
+      },
+      {
+        "Stored": "jpeg",
+        "SHA256": "4804635e3634b096da59d1d8bf7da8035e36f61f32a8070f935018f5434b0418",
+        "MIME": "image/jpeg",
+        "Err": ""
+      },
+      {
+        "Stored": "jpeg-3000",
+        "SHA256": "a04e113bc19f676678b3c2ac776a2e8c13aaa21444632ab421ae81e3981924ba",
+        "MIME": "image/jpeg",
+        "Err": ""
+      },
+      {
+        "Stored": "not-an-image",
+        "SHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "MIME": "image/jpeg",
+        "Err": "cover must be a JPEG or PNG image: image: unknown format"
+      }
+    ]
+  }
+}

@@ -287,22 +287,23 @@ func wolfgangView(s Snapshot, t manifest.Track) *WolfgangView {
 		WolfgangRow{Label: "Folder", Value: path.Dir(p)},
 		WolfgangRow{Label: "File", Value: path.Base(p)},
 	)
+	stem, width := dev.Profile().StemMax, dev.Profile().TagWidth
 	uncut := dev.Layout()
 	uncut.StemMax = 0
 	whole := strings.TrimSuffix(path.Base(layout.PathFor(t, uncut)), ".mp3")
-	if n := utf8.RuneCountInString(whole); n > device.WolfgangStemWidth {
+	if n := utf8.RuneCountInString(whole); n > stem {
 		runes := []rune(whole)
 		v.Rows = append(v.Rows, WolfgangRow{
-			Label: "Cut", Value: string(runes[:device.WolfgangStemWidth]), Tail: string(runes[device.WolfgangStemWidth:]), Cut: true,
-			Hint: "The player shows 24 characters of a name, the .mp3 included, and scrolls a longer one: the name is cut at " + strconv.Itoa(device.WolfgangStemWidth) + ", the dim part is cut off.",
+			Label: "Cut", Value: string(runes[:stem]), Tail: string(runes[stem:]), Cut: true,
+			Hint: "The player shows 24 characters of a name, the .mp3 included, and scrolls a longer one: the name is cut at " + strconv.Itoa(stem) + ", the dim part is cut off.",
 		})
 	}
 	if t.Status == manifest.Identified {
 		tags := dev.Tags(t)
 		v.Rows = append(v.Rows,
-			WolfgangRow{Label: "Artist", Value: tags.Artist, Tail: counted(tags.Artist, device.PlayerFieldWidth)},
-			WolfgangRow{Label: "Album", Value: tags.Album, Tail: counted(tags.Album, device.PlayerFieldWidth)},
-			WolfgangRow{Label: "Genre", Value: tags.Genre, Tail: counted(tags.Genre, device.PlayerFieldWidth)},
+			WolfgangRow{Label: "Artist", Value: tags.Artist, Tail: counted(tags.Artist, width)},
+			WolfgangRow{Label: "Album", Value: tags.Album, Tail: counted(tags.Album, width)},
+			WolfgangRow{Label: "Genre", Value: tags.Genre, Tail: counted(tags.Genre, width)},
 			WolfgangRow{Label: "Title", Value: tags.Title, Hint: "The title is kept whole: the player shows file names, not titles."},
 		)
 		for _, w := range dev.Diagnose(s.Tracks) {

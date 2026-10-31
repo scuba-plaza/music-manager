@@ -5,22 +5,14 @@
 package device
 
 import (
-	"errors"
-	"fmt"
-	"math"
-	"path"
-	"strings"
-
-	"music-manager/internal/coverimg"
 	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
-	"music-manager/internal/translit"
 )
 
 // Target is a kind of place the library is written to.
 type Target interface {
-	// Name is how the target is called on the command line and in messages.
+	// Name is the name of the profile the target is made from, as messages give it.
 	Name() string
 	// Layout says how paths are made.
 	Layout() layout.Rules
@@ -45,62 +37,7 @@ type Target interface {
 	Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (name string, data []byte)
 	// Diagnose says what the target will not do well for these tracks.
 	Diagnose(tracks []manifest.Track) []Warning
-}
-
-// Generic is the default: any folder or device that is not known better. It
-// gets the names as they are, in any script.
-var Generic Target = generic{}
-
-// The Wolfgang shows 24 characters of a name, the extension included, and moves
-// a longer one along when it is hovered. A file name is cut so that all of it
-// fits, which leaves this many characters before ".mp3".
-const (
-	nameShown = 24
-
-	// WolfgangStemWidth is how long the part of a file name before ".mp3" is.
-	WolfgangStemWidth = nameShown - len(".mp3")
-)
-
-// Wolfgang is the Wolfgang WMP01 player: Latin names of a width it can show.
-var Wolfgang Target = wolfgang{}
-
-// wolfgangPlaylist is the M3U file of a playlist for the Wolfgang WMP01. The
-// player was found to read paths from the root of its card with backslashes,
-// one per line, in plain UTF-8 with Windows line endings; slashes, and paths
-// relative to the playlist, give an empty playlist.
-func wolfgangPlaylist(p manifest.Playlist, paths map[string]string) []byte {
-	var b strings.Builder
-	for _, id := range p.Tracks {
-		if path, ok := paths[id]; ok {
-			b.WriteString(`\` + strings.ReplaceAll(path, "/", `\`) + "\r\n")
-		}
-	}
-	return []byte(b.String())
-}
-
-// genericPlaylist is the M3U8 file of a playlist: UTF-8, one line per track
-// with its length and name, and the paths relative to the playlist, which is
-// what players and phones understand.
-func genericPlaylist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) []byte {
-	var b strings.Builder
-	b.WriteString("#EXTM3U\n")
-	for _, id := range p.Tracks {
-		file, ok := paths[id]
-		if !ok {
-			continue
-		}
-		t := tracks[id]
-		seconds := int(math.Round(t.PlayingLength().Seconds()))
-		if seconds <= 0 {
-			seconds = -1 // unknown
-		}
-		name := strings.TrimSuffix(path.Base(file), path.Ext(file))
-		if t.Status == manifest.Identified {
-			name = t.Artist + " - " + t.Title
-		}
-		fmt.Fprintf(&b, "#EXTINF:%d,%s\n../%s\n", seconds, name, file)
-	}
-	return []byte(b.String())
+	Profile() Profile
 }
 
 // extras are the tag fields that belong to no standard frame. A track not yet
@@ -120,115 +57,4 @@ func extras(t manifest.Track) map[string]string {
 		}
 	}
 	return extra
-}
-
-type generic struct{}
-
-func (generic) Name() string { return "generic" }
-
-func (generic) Layout() layout.Rules { return layout.Rules{ComponentMax: 200} }
-
-// Tags are the true names; a single has no album.
-func (generic) Tags(t manifest.Track) mp3.TagSet {
-	if t.Status != manifest.Identified {
-		return mp3.TagSet{Extra: extras(t)}
-	}
-	return mp3.TagSet{
-		Title: t.Title, Artist: t.Artist, Album: t.Album,
-		Genre: t.Genre,
-		Track: t.TrackNumber, Total: t.TrackTotal,
-		Date:   t.Released,
-		Length: t.PlayingLength(),
-		Extra:  extras(t),
-	}
-}
-
-// Cover is kept as it was given, whatever it is; the file is named by its kind.
-func (generic) Cover(stored []byte) ([]byte, string, error) {
-	mime := coverimg.Sniff(stored)
-	if mime == "" {
-		return nil, "", errors.New("cover must be a JPEG or PNG image")
-	}
-	return stored, mime, nil
-}
-
-func (generic) CoverFile(storedMIME string) string {
-	if storedMIME == "image/png" {
-		return "cover.png"
-	}
-	return "cover.jpg"
-}
-
-// SingleCovers: a single has its cover in its tag, and no file of its own.
-func (generic) SingleCovers() bool { return false }
-
-// ReplayGain: the library is played by programs that can use it, so the files
-// carry how loud they are.
-func (generic) ReplayGain() bool { return true }
-
-func (g generic) PlaylistFile(p manifest.Playlist) string {
-	return layout.PlaylistPath(p.Name, ".m3u8", g.Layout())
-}
-
-func (g generic) Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (string, []byte) {
-	return g.PlaylistFile(p), genericPlaylist(p, tracks, paths)
-}
-
-type wolfgang struct{}
-
-func (wolfgang) Name() string { return "wolfgang-wmp01" }
-
-// Layout: the player stores 26 characters of a file name and shows 24; a name
-// that does not fit in them, ".mp3" included, scrolls when hovered. So the file
-// name is cut where all of it fits.
-func (wolfgang) Layout() layout.Rules {
-	return layout.Rules{Latin: true, Fold: translit.ToASCII, ComponentMax: 100, StemMax: WolfgangStemWidth}
-}
-
-// Tags keep the true title, which the player shows nowhere; the artist and
-// album are the ones it shows, in Latin letters of the width it keeps. The genre
-// is in Latin letters too.
-func (wolfgang) Tags(t manifest.Track) mp3.TagSet {
-	if t.Status != manifest.Identified {
-		return mp3.TagSet{Extra: extras(t)}
-	}
-	artist, album := PlayerTags(t)
-	return mp3.TagSet{
-		Title: t.Title, Artist: artist, Album: album,
-		Genre: t.LatinGenre(),
-		Track: t.TrackNumber, Total: t.TrackTotal,
-		Date:   t.Released,
-		Length: t.PlayingLength(),
-		Extra:  extras(t),
-	}
-}
-
-// The Wolfgang's Photos menu opens baseline JFIF files, 4:2:0, up to 480
-// pixels, and does not list PNG files: whatever was stored is turned into one.
-const (
-	coverMaxEdge = 480
-	coverQuality = 85
-)
-
-func (wolfgang) Cover(stored []byte) ([]byte, string, error) {
-	data, err := coverimg.Baseline(stored, coverMaxEdge, coverQuality)
-	return data, "image/jpeg", err
-}
-
-func (wolfgang) CoverFile(string) string { return "cover.jpg" }
-
-// SingleCovers: the player shows a photo named like the track, so a single gets
-// one beside its file.
-func (wolfgang) SingleCovers() bool { return true }
-
-// ReplayGain: the player has no volume setting to use it, and its tags are
-// counted to the byte.
-func (wolfgang) ReplayGain() bool { return false }
-
-func (w wolfgang) PlaylistFile(p manifest.Playlist) string {
-	return layout.PlaylistPath(p.LatinName(), ".m3u", w.Layout())
-}
-
-func (w wolfgang) Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (string, []byte) {
-	return w.PlaylistFile(p), wolfgangPlaylist(p, paths)
 }

@@ -1,0 +1,31 @@
+[[profile]]
+name = "generic"
+label = "Generic"
+latin_names = false
+component_max = 200
+stem_max = 0
+tag_width = 0
+latin_genre = false
+cover_format = "keep"
+cover_max_edge = 0
+cover_quality = 0
+single_covers = false
+replaygain = true
+playlist_ext = ".m3u8"
+playlist_style = "relative"
+
+[[profile]]
+name = "wolfgang-wmp01"
+label = "Wolfgang WMP01"
+latin_names = true
+component_max = 100
+stem_max = 20
+tag_width = 12
+latin_genre = true
+cover_format = "baseline-jpeg"
+cover_max_edge = 480
+cover_quality = 85
+single_covers = true
+replaygain = false
+playlist_ext = ".m3u"
+playlist_style = "root-backslash"
