@@ -101,6 +101,17 @@ describe('the store', () => {
     expect(store.getState().tab).toBe(0);
   });
 
+  it('starts from an empty expanded when what was stored is cut off, and writes a valid value over it', async () => {
+    const storage = memoryStorage({ 'mm.expanded': '["a' });
+
+    vi.stubGlobal('localStorage', storage);
+    const store = await freshStore();
+    expect([...store.getState().expanded]).toEqual([]);
+    store.setState({ expanded: new Set(['artist:a']) });
+
+    expect(storage.data.get('mm.expanded')).toBe('["artist:a"]');
+  });
+
   it('keeps only the strings of a stored list', async () => {
     vi.stubGlobal('localStorage', memoryStorage({ 'mm.expanded': '["artist:a",7,null,"album:b"]' }));
 
