@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"maps"
+	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -38,10 +41,20 @@ type document struct {
 	Profile []map[string]any `toml:"profile"`
 }
 
+var profileKeys = tomlKeysOf(reflect.TypeFor[Profile]())
+
+func tomlKeysOf(t reflect.Type) map[string]bool {
+	keys := make(map[string]bool, t.NumField())
+	for i := range t.NumField() {
+		keys[t.Field(i).Tag.Get("toml")] = true
+	}
+	return keys
+}
+
 func ParseProfiles(data []byte) ([]Profile, error) {
-	var doc document
-	if err := decodeStrictly(data, &doc); err != nil {
-		return nil, errors.New(describeDecodeError(err))
+	doc, err := decodeDocument(data)
+	if err != nil {
+		return nil, err
 	}
 	profiles := make([]Profile, 0, len(doc.Profile))
 	for position, table := range doc.Profile {
@@ -57,7 +70,30 @@ func ParseProfiles(data []byte) ([]Profile, error) {
 	return profiles, nil
 }
 
+func decodeDocument(data []byte) (document, error) {
+	var doc document
+	decoder := toml.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&doc)
+	var unknown *toml.StrictMissingError
+	if errors.As(err, &unknown) {
+		first := unknown.Errors[0]
+		row, _ := first.Position()
+		return document{}, fmt.Errorf("line %d: %s unknown key", row, strings.Join(first.Key(), "."))
+	}
+	var invalid *toml.DecodeError
+	if errors.As(err, &invalid) {
+		row, _ := invalid.Position()
+		return document{}, fmt.Errorf("line %d: %w", row, invalid)
+	}
+	return doc, err
+}
+
 func profileFromTable(position int, table map[string]any) (Profile, error) {
+	who := describeProfile(position, table)
+	if key, found := firstUnknownKey(table); found {
+		return Profile{}, fmt.Errorf("profile %s: %s unknown key", who, key)
+	}
 	p := Profile{
 		ComponentMax:  200,
 		CoverFormat:   "keep",
@@ -67,10 +103,10 @@ func profileFromTable(position int, table map[string]any) (Profile, error) {
 	}
 	text, err := toml.Marshal(table)
 	if err == nil {
-		err = decodeStrictly(text, &p)
+		err = toml.Unmarshal(text, &p)
 	}
 	if err != nil {
-		return Profile{}, fmt.Errorf("profile %s: %s", describeProfile(position, table), describeDecodeError(err))
+		return Profile{}, fmt.Errorf("profile %s: %s", who, describeValueError(err))
 	}
 	if p.Label == "" {
 		p.Label = p.Name
@@ -78,10 +114,13 @@ func profileFromTable(position int, table map[string]any) (Profile, error) {
 	return p, nil
 }
 
-func decodeStrictly(data []byte, target any) error {
-	decoder := toml.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	return decoder.Decode(target)
+func firstUnknownKey(table map[string]any) (string, bool) {
+	for _, key := range slices.Sorted(maps.Keys(table)) {
+		if !profileKeys[key] {
+			return key, true
+		}
+	}
+	return "", false
 }
 
 func describeProfile(position int, table map[string]any) string {
@@ -91,11 +130,7 @@ func describeProfile(position int, table map[string]any) string {
 	return fmt.Sprintf("#%d", position+1)
 }
 
-func describeDecodeError(err error) string {
-	var unknown *toml.StrictMissingError
-	if errors.As(err, &unknown) {
-		return strings.Join(unknown.Errors[0].Key(), ".") + " unknown key"
-	}
+func describeValueError(err error) string {
 	var invalid *toml.DecodeError
 	if errors.As(err, &invalid) && len(invalid.Key()) > 0 {
 		return strings.Join(invalid.Key(), ".") + " has a value of the wrong type"

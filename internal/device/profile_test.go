@@ -369,3 +369,86 @@ component_max = 5
 		}
 	}
 }
+
+func TestParseRejectsAKeyInTheWrongCase(t *testing.T) {
+	cases := []struct{ name, line, key string }{
+		{"a mixed-case key", "Latin_Names = true", "Latin_Names"},
+		{"an upper-case key", "COMPONENT_MAX = 50", "COMPONENT_MAX"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			document := "[[profile]]\nname = \"my-player\"\n" + c.line + "\n"
+			_, err := device.ParseProfiles([]byte(document))
+			if err == nil {
+				t.Fatal("ParseProfiles = nil error, want one")
+			}
+			for _, want := range []string{c.key + " unknown key", `profile "my-player"`} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not contain %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+func TestParseRejectsTheSameKeyInTwoCases(t *testing.T) {
+	document := `
+[[profile]]
+name = "a"
+Name = "b"
+`
+	_, err := device.ParseProfiles([]byte(document))
+	if err == nil {
+		t.Fatal("ParseProfiles = nil error, want one")
+	}
+	for _, want := range []string{"Name unknown key", `profile "a"`} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err, want)
+		}
+	}
+}
+
+func TestParseRejectsAKeyGivenTwice(t *testing.T) {
+	document := "[[profile]]\nname = \"a\"\nname = \"b\"\n"
+	_, err := device.ParseProfiles([]byte(document))
+	if err == nil {
+		t.Fatal("ParseProfiles = nil error, want one")
+	}
+	for _, want := range []string{"name", "already", "line 3"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err, want)
+		}
+	}
+	if strings.Contains(err.Error(), "wrong type") {
+		t.Errorf("error %q calls a duplicate a type error", err)
+	}
+}
+
+func TestParseRejectsTwoProfileTables(t *testing.T) {
+	document := "[profile]\nname = \"a\"\n[profile]\nname = \"b\"\n"
+	_, err := device.ParseProfiles([]byte(document))
+	if err == nil {
+		t.Fatal("ParseProfiles = nil error, want one")
+	}
+	for _, want := range []string{"profile", "already", "line 3"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err, want)
+		}
+	}
+	if strings.Contains(err.Error(), "wrong type") {
+		t.Errorf("error %q calls a duplicate a type error", err)
+	}
+}
+
+func TestParseCallsAWrongTypeByThatName(t *testing.T) {
+	document := "[[profile]]\nname = \"my-player\"\nreplaygain = \"yes\"\n"
+	_, err := device.ParseProfiles([]byte(document))
+	if err == nil {
+		t.Fatal("ParseProfiles = nil error, want one")
+	}
+	for _, want := range []string{`profile "my-player"`, "replaygain", "wrong type"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err, want)
+		}
+	}
+}
