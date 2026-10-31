@@ -1,0 +1,33 @@
+:root {
+  --font: system-ui, "Noto Sans Arabic", "Noto Naskh Arabic", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+}
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #282420;
+  --panel: #221e1a;
+  --fg: #e5c6a8;
+  --dim: #8f8372;
+  --rule: #4d443a;
+  --accent: #f5ae2e;
+  --sel: #3a3027;
+  --bad: #ff645a;
+  --warn: #e0d561;
+  --good: #98e036;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f6efe4;
+  --panel: #efe6d8;
+  --fg: #3a2f25;
+  --dim: #756857;
+  --rule: #cdbfa9;
+  --accent: #9a5b00;
+  --sel: #e6d6bb;
+  --bad: #b3261e;
+  --warn: #8a6d00;
+  --good: #2e7d32;
+}

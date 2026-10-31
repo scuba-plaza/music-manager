@@ -1,7 +1,8 @@
 import { get, query } from '../api/client';
 import { subscribe } from '../api/events';
 import type { InfoView, JobView, LibraryResponse } from '../api/types.gen';
-import { useApp, type AppState } from './store';
+import type { ActionName } from '../keys/keymap';
+import { useApp, type AppState, type Focus } from './store';
 
 export function setStatus(text: string, kind: AppState['status']['kind'] = ''): void {
   useApp.setState({ status: { text, kind } });
@@ -55,4 +56,29 @@ export function connect(onJob: (job: JobView) => void): () => void {
       }
     },
   });
+}
+
+function focusPane(focus: Focus): void {
+  useApp.setState({ focus });
+}
+
+export function run(action: ActionName): void {
+  const { focus, status } = useApp.getState();
+  if (status.text !== '') {
+    setStatus('');
+  }
+  switch (action) {
+    case 'open':
+      focusPane('inspector');
+      break;
+    case 'previousTabOrBack':
+    case 'escape':
+      focusPane('tree');
+      break;
+    case 'toggleFocus':
+      focusPane(focus === 'tree' ? 'inspector' : 'tree');
+      break;
+    default:
+      break;
+  }
 }

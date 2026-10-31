@@ -1,0 +1,252 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.45 var(--font);
+  overflow: hidden;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+bdi {
+  unicode-bidi: isolate;
+}
+
+kbd {
+  font: inherit;
+  color: var(--accent);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100dvh;
+  min-width: 0;
+}
+
+.header,
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  min-width: 0;
+  padding-block: 0.3rem;
+  padding-inline: 1rem;
+}
+
+.header {
+  border-block-end: 1px solid var(--rule);
+}
+
+.footer {
+  align-items: flex-start;
+  border-block-start: 1px solid var(--rule);
+}
+
+.head-start,
+.head-end {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.head-start {
+  flex: 1 1 12rem;
+}
+
+.head-end {
+  flex-wrap: wrap;
+}
+
+.brand {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.root {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary {
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.chip {
+  padding-block: 0;
+  padding-inline: 0.5rem;
+  border: 0;
+  border-block-end: 1px dotted var(--accent);
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.chip.plain {
+  border-block-end: 0;
+  color: var(--dim);
+}
+
+.chip.plain:hover {
+  color: var(--accent);
+}
+
+.status {
+  min-height: 1.45em;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.status.bad {
+  color: var(--bad);
+}
+
+.status.good {
+  color: var(--good);
+}
+
+.hints {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 1.5rem;
+  margin: 0;
+  padding: 0;
+  color: var(--dim);
+  list-style: none;
+}
+
+.hint {
+  white-space: nowrap;
+}
+
+.panes {
+  --divider: 6px;
+  display: grid;
+  grid-template-columns:
+    clamp(var(--left-min), var(--left, 26rem), calc(100% - var(--right-min) - var(--divider)))
+    var(--divider)
+    minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  padding-block: 0.6rem;
+  padding-inline: 1rem;
+}
+
+.pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin-block-start: 0.7rem;
+  border: 1px solid var(--rule);
+  background: var(--panel);
+}
+
+.pane.focus {
+  border-color: var(--accent);
+}
+
+.pane-title {
+  position: absolute;
+  inset-block-start: -0.85em;
+  inset-inline-start: 1rem;
+  margin: 0;
+  padding-inline: 0.5rem;
+  background: var(--bg);
+  color: var(--dim);
+  font-size: inherit;
+  font-weight: normal;
+  line-height: 1.5;
+}
+
+.pane.focus .pane-title {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.pane-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.divider {
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.divider::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.divider:hover::after,
+.divider:active::after {
+  background: var(--rule);
+}
+
+@media (width < 800px) {
+  body {
+    font-size: 14px;
+  }
+
+  .panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .panes[data-show='tree'] .pane-inspector,
+  .panes[data-show='inspector'] .pane-tree {
+    display: none;
+  }
+
+  .hints {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+}

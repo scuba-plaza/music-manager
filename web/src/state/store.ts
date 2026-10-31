@@ -37,7 +37,7 @@ export interface AppState {
 const expandedKey = 'mm.expanded';
 const tabKey = 'mm.tab';
 
-function recall(key: string): string | null {
+export function recall(key: string): string | null {
   try {
     return localStorage.getItem(key);
   } catch {
@@ -45,7 +45,7 @@ function recall(key: string): string | null {
   }
 }
 
-function remember(key: string, value: string): void {
+export function remember(key: string, value: string): void {
   try {
     localStorage.setItem(key, value);
   } catch {

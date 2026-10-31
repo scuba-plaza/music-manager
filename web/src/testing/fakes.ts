@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import type { InfoView, LibraryResponse } from '../api/types.gen';
 
 export function jsonResponse(body: unknown, status = 200): Response {
@@ -93,4 +94,12 @@ export class FakeEventSource {
       listener(event);
     }
   }
+}
+
+export function stubServer(info: InfoView = infoView(), library: LibraryResponse = libraryResponse()): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>((input) => Promise.resolve(jsonResponse(urlOf(input).startsWith('/api/info') ? info : library))),
+  );
+  vi.stubGlobal('EventSource', FakeEventSource);
 }

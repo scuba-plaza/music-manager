@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import { infoView, jsonResponse, libraryResponse, memoryStorage, requestOf } from '../testing/fakes';
-import { fail, loadInfo, loadLibrary, setStatus } from './actions';
+import { fail, loadInfo, loadLibrary, run, setStatus } from './actions';
 import { useApp } from './store';
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -120,5 +120,41 @@ describe('loadLibrary', () => {
 
     expect(useApp.getState().lib?.stamp).toBe('kept');
     expect(useApp.getState().status).toEqual({ text: 'the records are locked', kind: 'bad' });
+  });
+});
+
+describe('run', () => {
+  it('open goes into the fields and previousTabOrBack goes back to the tree', () => {
+    run('open');
+    expect(useApp.getState().focus).toBe('inspector');
+
+    run('previousTabOrBack');
+    expect(useApp.getState().focus).toBe('tree');
+  });
+
+  it('toggleFocus goes to the other pane', () => {
+    run('toggleFocus');
+    expect(useApp.getState().focus).toBe('inspector');
+
+    run('toggleFocus');
+    expect(useApp.getState().focus).toBe('tree');
+  });
+
+  it('escape goes back from the fields to the tree and leaves the tree as it is', () => {
+    useApp.setState({ focus: 'inspector' });
+
+    run('escape');
+    expect(useApp.getState().focus).toBe('tree');
+
+    run('escape');
+    expect(useApp.getState().focus).toBe('tree');
+  });
+
+  it('any key wipes the message in the status line', () => {
+    setStatus('Saved', 'good');
+
+    run('moveDown');
+
+    expect(useApp.getState().status).toEqual({ text: '', kind: '' });
   });
 });
