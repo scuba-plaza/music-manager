@@ -46,7 +46,6 @@ func (s Snapshot) tracksFor(ids []string) []manifest.Track {
 
 // Options say what the library view shows.
 type Options struct {
-	// Filter keeps the tracks matching it (the syntax of "mm ls").
 	Filter string
 	// Sort puts the tracks in one flat list in order of this key; empty is the tree.
 	Sort    app.SortKey

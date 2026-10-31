@@ -120,8 +120,8 @@ func TestUnknownFlagFails(t *testing.T) {
 
 func TestAnArgumentThatIsNoFlagFails(t *testing.T) {
 	p := &probe{}
-	code, _, errs := run(p, noEnv, "web")
-	if code != 2 || p.calls != 0 || !strings.Contains(errs, "web") {
+	code, _, errs := run(p, noEnv, "extra")
+	if code != 2 || p.calls != 0 || !strings.Contains(errs, `unexpected argument "extra"`) {
 		t.Errorf("code %d, calls %d, err %q", code, p.calls, errs)
 	}
 }

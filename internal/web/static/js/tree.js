@@ -88,7 +88,7 @@ export function renderTree() {
   const rows = visible();
   if (!S.lib) return;
   if (rows.length === 0) {
-    el.append(h('div', { class: 'empty' }, filtering() ? 'Nothing matches the filter.' : 'The library is empty. Add tracks with mm ingest, or press a to add from a link.'));
+    el.append(h('div', { class: 'empty' }, filtering() ? 'Nothing matches the filter.' : 'The library is empty. Press a to add from a link, or drop files on the page.'));
     S.cursor = null;
     return;
   }

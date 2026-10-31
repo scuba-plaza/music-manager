@@ -19,7 +19,7 @@ type Store interface {
 	Manifest() (*manifest.Manifest, error)
 	Candidates(ctx context.Context, id string, src app.MetadataSource, q *app.Query) ([]app.Candidate, error)
 	ApplyCandidate(ctx context.Context, id string, c app.Candidate, src app.MetadataSource) (manifest.Track, error)
-	Identify(ctx context.Context, ids []string, src app.MetadataSource, p app.Prompter, opts app.IdentifyOptions) ([]app.IdentifyResult, error)
+	Identify(ctx context.Context, ids []string, src app.MetadataSource, opts app.IdentifyOptions) ([]app.IdentifyResult, error)
 	Adopt(ids []string) ([]app.AdoptResult, error)
 	Fetch(ctx context.Context, req app.AddRequest, dl app.Downloader) (*app.Draft, error)
 	Finish(ctx context.Context, d *app.Draft, e app.Edit) (manifest.Track, error)

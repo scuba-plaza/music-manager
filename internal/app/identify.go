@@ -13,17 +13,12 @@ import (
 	"music-manager/internal/manifest"
 )
 
-// maxChoices is how many candidates an interactive choice lists.
 const maxChoices = 15
 
-// defaultMinScore is how well a candidate must match to be taken without asking.
 const defaultMinScore = 95
 
 // IdentifyOptions tunes Identify.
 type IdentifyOptions struct {
-	// Yes takes the best candidate without asking, if it scores at least
-	// MinScore, and skips the track otherwise.
-	Yes      bool
 	MinScore int // 95 if zero
 	// OnResult, if set, is called with each track's result as soon as it is known.
 	OnResult func(IdentifyResult)
@@ -41,10 +36,7 @@ type IdentifyResult struct {
 // no ids it takes every track that is not identified yet; named tracks are
 // looked up again even if identified. Each track is searched for with what
 // it is known by: its record, or for new files, the old tags and file name.
-func (a *App) Identify(ctx context.Context, ids []string, src MetadataSource, p Prompter, opts IdentifyOptions) ([]IdentifyResult, error) {
-	if !opts.Yes && p == nil {
-		return nil, errors.New("choosing a match needs a terminal; pass --yes to take confident matches automatically")
-	}
+func (a *App) Identify(ctx context.Context, ids []string, src MetadataSource, opts IdentifyOptions) ([]IdentifyResult, error) {
 	if opts.MinScore == 0 {
 		opts.MinScore = defaultMinScore
 	}
@@ -91,10 +83,7 @@ func (a *App) Identify(ctx context.Context, ids []string, src MetadataSource, p 
 			record(res)
 			continue
 		}
-		pick, reason, err := choose(t, cands, p, opts)
-		if err != nil {
-			return results, err
-		}
+		pick, reason := choose(t, cands, opts)
 		if pick == nil {
 			res.Reason = reason
 			record(res)
@@ -213,52 +202,21 @@ func albumKey(s string) string {
 }
 
 // choose picks one of cands, or returns nil and why not.
-func choose(t manifest.Track, cands []Candidate, p Prompter, opts IdentifyOptions) (*Candidate, string, error) {
+func choose(t manifest.Track, cands []Candidate, opts IdentifyOptions) (*Candidate, string) {
 	if len(cands) == 0 {
-		return nil, "no match found", nil
+		return nil, "no match found"
 	}
-	if opts.Yes {
-		if cands[0].Score < opts.MinScore {
-			return nil, fmt.Sprintf("best match scores only %d", cands[0].Score), nil
-		}
-		best := cands[0]
-		if h := t.Hint; h.Album != "" && albumKey(best.Album) != albumKey(h.Album) {
-			// No release of this recording is the album the file was filed
-			// under. Keep that album, so its tracks stay together, and take
-			// only the recording from the database.
-			best.Album, best.TrackNumber, best.TrackTotal, best.ReleaseID = h.Album, h.Track, h.Total, ""
-		}
-		return &best, "", nil
+	if cands[0].Score < opts.MinScore {
+		return nil, fmt.Sprintf("best match scores only %d", cands[0].Score)
 	}
-	cands = cands[:min(len(cands), maxChoices)]
-	options := make([]string, 0, len(cands)+1)
-	for _, c := range cands {
-		options = append(options, describe(c))
+	best := cands[0]
+	if h := t.Hint; h.Album != "" && albumKey(best.Album) != albumKey(h.Album) {
+		// No release of this recording is the album the file was filed
+		// under. Keep that album, so its tracks stay together, and take
+		// only the recording from the database.
+		best.Album, best.TrackNumber, best.TrackTotal, best.ReleaseID = h.Album, h.Track, h.Total, ""
 	}
-	options = append(options, "None of these, skip this track")
-	artist, title, _ := Display(t)
-	i, err := p.Choose(fmt.Sprintf("Which is %q?", strings.TrimLeft(artist+" - "+title, " -")), options)
-	if err != nil {
-		return nil, "", err
-	}
-	if i < 0 || i >= len(cands) {
-		return nil, "skipped", nil
-	}
-	return &cands[i], "", nil
-}
-
-func describe(c Candidate) string {
-	s := fmt.Sprintf("%s - %s", c.Artist, c.Title)
-	if c.Album != "" {
-		s += " · " + c.Album
-		if c.Date != "" {
-			s += " (" + c.Date + ")"
-		}
-	}
-	if c.TrackNumber > 0 {
-		s += fmt.Sprintf(" · %d/%d", c.TrackNumber, c.TrackTotal)
-	}
-	return fmt.Sprintf("%s · %d%%", s, c.Score)
+	return &best, ""
 }
 
 // applyCandidate identifies the track with this id as c, with a cover from src

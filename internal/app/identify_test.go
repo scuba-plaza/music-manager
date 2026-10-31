@@ -58,13 +58,13 @@ func hinted(t *testing.T, filename, title, artist string) (*app.App, manifest.Tr
 	return a, rep.Added[0]
 }
 
-func TestIdentifyYesTakesAConfidentTopMatch(t *testing.T) {
+func TestIdentifyTakesAConfidentTopMatch(t *testing.T) {
 	a, tr := hinted(t, "01 - dream three", "01 - Dream 3", "Max Richter")
 	src := &fakeSource{
 		results: map[string][]app.Candidate{"Dream 3|Max Richter": {dream3, dream3Voyager}},
 		covers:  map[string][]byte{"rel-1": testmp3.JPEG},
 	}
-	res, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+	res, err := a.Identify(context.Background(), nil, src, app.IdentifyOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,13 +87,13 @@ func TestIdentifyYesTakesAConfidentTopMatch(t *testing.T) {
 	}
 }
 
-func TestIdentifyYesSkipsWeakMatchesAndMisses(t *testing.T) {
+func TestIdentifySkipsWeakMatchesAndMisses(t *testing.T) {
 	a, _ := hinted(t, "x", "Dream 3", "Max Richter")
 	weak := dream3
 	weak.Score = 80
 	for name, results := range map[string][]app.Candidate{"weak": {weak}, "none": nil} {
 		src := &fakeSource{results: map[string][]app.Candidate{"Dream 3|Max Richter": results}}
-		res, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+		res, err := a.Identify(context.Background(), nil, src, app.IdentifyOptions{})
 		if err != nil || len(res) != 1 || res[0].Applied != nil || res[0].Reason == "" {
 			t.Errorf("%s: %+v, %v", name, res, err)
 		}
@@ -103,67 +103,22 @@ func TestIdentifyYesSkipsWeakMatchesAndMisses(t *testing.T) {
 	}
 }
 
-func TestIdentifyAsksWhichCandidateAndLetsYouSkip(t *testing.T) {
-	a, _ := hinted(t, "x", "Dream 3", "Max Richter")
-	src := &fakeSource{results: map[string][]app.Candidate{"Dream 3|Max Richter": {dream3, dream3Voyager}}}
-
-	p := &scriptedPrompter{choice: 1} // the second candidate
-	res, err := a.Identify(context.Background(), nil, src, p, app.IdentifyOptions{})
-	if err != nil || res[0].Applied == nil || res[0].Applied.ReleaseID != "rel-2" {
-		t.Fatalf("%+v, %v", res, err)
-	}
-	if len(p.options) != 3 { // two candidates and the way out
-		t.Errorf("options = %q", p.options)
-	}
-	for _, want := range []string{"Max Richter", "Dream 3", "From Sleep", "2015", "1/7"} {
-		if !strings.Contains(p.options[0], want) {
-			t.Errorf("option %q lacks %q", p.options[0], want)
-		}
-	}
-	if got := tracks(t, a)[0]; got.Album != "Voyager" || got.TrackNumber != 9 {
-		t.Errorf("track = %+v", got)
-	}
-
-	// Choosing the last option skips.
-	a2, _ := hinted(t, "y", "Dream 3", "Max Richter")
-	p2 := &scriptedPrompter{choice: 2}
-	res, err = a2.Identify(context.Background(), nil, src, p2, app.IdentifyOptions{})
-	if err != nil || res[0].Applied != nil || tracks(t, a2)[0].Status != manifest.Unidentified {
-		t.Errorf("skip: %+v, %v", res, err)
-	}
-	// Giving up stops everything.
-	if _, err := a2.Identify(context.Background(), nil, src, &scriptedPrompter{abort: true}, app.IdentifyOptions{}); !errors.Is(err, app.ErrAborted) {
-		t.Errorf("err = %v", err)
-	}
-}
-
-func TestIdentifyWithoutAnswersAvailableIsAnError(t *testing.T) {
-	a, _ := hinted(t, "x", "Dream 3", "Max Richter")
-	src := &fakeSource{}
-	if _, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{}); err == nil || !strings.Contains(err.Error(), "--yes") {
-		t.Errorf("err = %v, want a hint about --yes", err)
-	}
-	if len(src.queries) != 0 {
-		t.Error("searched before failing")
-	}
-}
-
 func TestIdentifyLeavesIdentifiedTracksAloneUnlessNamed(t *testing.T) {
 	a := libWithTracks(t, 10, 20)
 	ts := tracks(t, a)
 	identify(t, a, ts[0].ID, "Done", "Band", "", 0, 0)
 	src := &fakeSource{}
-	a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+	a.Identify(context.Background(), nil, src, app.IdentifyOptions{})
 	if len(src.queries) != 1 || src.queries[0].Title != "b" {
 		t.Errorf("queries = %+v; only the unidentified track should be searched", src.queries)
 	}
 
 	src = &fakeSource{results: map[string][]app.Candidate{"Done|Band": {dream3}}}
-	res, _ := a.Identify(context.Background(), []string{ts[0].ID}, src, nil, app.IdentifyOptions{Yes: true})
+	res, _ := a.Identify(context.Background(), []string{ts[0].ID}, src, app.IdentifyOptions{})
 	if len(src.queries) != 1 || src.queries[0] != (app.Query{Title: "Done", Artist: "Band"}) || res[0].Applied == nil {
 		t.Errorf("re-identifying a named track: queries %+v, results %+v", src.queries, res)
 	}
-	if _, err := a.Identify(context.Background(), []string{"nope"}, src, nil, app.IdentifyOptions{Yes: true}); err == nil {
+	if _, err := a.Identify(context.Background(), []string{"nope"}, src, app.IdentifyOptions{}); err == nil {
 		t.Error("an unknown id was accepted")
 	}
 }
@@ -174,7 +129,7 @@ func TestIdentifyOneFailureDoesNotStopTheRest(t *testing.T) {
 		errs:    map[string]error{"a|": errors.New("network down")},
 		results: map[string][]app.Candidate{"b|": {dream3}},
 	}
-	res, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+	res, err := a.Identify(context.Background(), nil, src, app.IdentifyOptions{})
 	if err != nil || len(res) != 2 {
 		t.Fatalf("%+v, %v", res, err)
 	}
@@ -189,7 +144,7 @@ func TestIdentifyCoverRules(t *testing.T) {
 		a.SetCover(tr.ID, testmp3.JPEG2)
 		before := tracks(t, a)[0].CoverSHA256
 		src := &fakeSource{results: map[string][]app.Candidate{"Dream 3|Max Richter": {dream3}}, covers: map[string][]byte{"rel-1": testmp3.JPEG}}
-		a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+		a.Identify(context.Background(), nil, src, app.IdentifyOptions{})
 		if len(src.coverAsks) != 0 || tracks(t, a)[0].CoverSHA256 != before {
 			t.Errorf("asked for covers %v; cover changed", src.coverAsks)
 		}
@@ -197,7 +152,7 @@ func TestIdentifyCoverRules(t *testing.T) {
 	t.Run("a failing cover download does not undo the identification", func(t *testing.T) {
 		a, _ := hinted(t, "x", "Dream 3", "Max Richter")
 		src := &fakeSource{results: map[string][]app.Candidate{"Dream 3|Max Richter": {dream3}}, coverErr: errors.New("archive down")}
-		res, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+		res, err := a.Identify(context.Background(), nil, src, app.IdentifyOptions{})
 		if err != nil || res[0].Applied == nil || tracks(t, a)[0].Status != manifest.Identified {
 			t.Errorf("%+v, %v", res, err)
 		}
@@ -208,7 +163,7 @@ func TestIdentifyKeepsTheNamesInTheirOwnScript(t *testing.T) {
 	a, _ := hinted(t, "x", "سأرجع", "Fairuz")
 	arabic := app.Candidate{RecordingID: "r", ReleaseID: "l", Title: "سأرجع", Artist: "فيروز", Album: "القدس في البال", Score: 100, TrackNumber: 3, TrackTotal: 9}
 	src := &fakeSource{results: map[string][]app.Candidate{"سأرجع|Fairuz": {arabic}}}
-	if _, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true}); err != nil {
+	if _, err := a.Identify(context.Background(), nil, src, app.IdentifyOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	got := tracks(t, a)[0]
@@ -223,7 +178,7 @@ func TestIdentifyNeedsSomethingToSearchFor(t *testing.T) {
 	writeFile(t, f, testmp3.Silent(5))
 	a.Ingest([]string{f})
 	src := &fakeSource{}
-	res, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+	res, err := a.Identify(context.Background(), nil, src, app.IdentifyOptions{})
 	if err != nil || len(res) != 1 || res[0].Applied != nil || res[0].Reason == "" {
 		t.Errorf("%+v, %v", res, err)
 	}
@@ -253,7 +208,7 @@ func TestIdentifyPrefersTheReleaseTheFileWasAlreadyFiledUnder(t *testing.T) {
 			// hinted() leaves the album empty; ingest a tagged file with one instead.
 			a = openLib(t)
 			ingestTagged(t, a, "x", "Flow", "Shawn James", c.album, "")
-			res, err := a.Identify(context.Background(), nil, &fakeSource{results: key}, nil, app.IdentifyOptions{Yes: true})
+			res, err := a.Identify(context.Background(), nil, &fakeSource{results: key}, app.IdentifyOptions{})
 			if err != nil || len(res) != 1 || res[0].Applied == nil || res[0].Applied.ReleaseID != c.want {
 				t.Fatalf("picked %+v, want release %q (%v)", res, c.want, err)
 			}
@@ -270,7 +225,7 @@ func TestIdentifyPrefersTheCandidateWithTheSameTrackNumber(t *testing.T) {
 	first := app.Candidate{RecordingID: "r", ReleaseID: "rel-1", Title: "Flow", Artist: "Shawn James", Album: "A", TrackNumber: 2, TrackTotal: 10, Score: 100}
 	second := app.Candidate{RecordingID: "r", ReleaseID: "rel-2", Title: "Flow", Artist: "Shawn James", Album: "B", TrackNumber: 5, TrackTotal: 12, Score: 100}
 	src := &fakeSource{results: map[string][]app.Candidate{"Flow|Shawn James": {first, second}}}
-	res, _ := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+	res, _ := a.Identify(context.Background(), nil, src, app.IdentifyOptions{})
 	if res[0].Applied == nil || res[0].Applied.ReleaseID != "rel-2" {
 		t.Errorf("picked %+v", res[0].Applied)
 	}
@@ -282,41 +237,20 @@ func TestIdentifyNeverLetsTheHintOutweighTheScore(t *testing.T) {
 	best := app.Candidate{RecordingID: "rec-best", ReleaseID: "rel-best", Title: "Flow", Artist: "Shawn James", Album: "Other", Score: 100}
 	worse := app.Candidate{RecordingID: "rec-worse", ReleaseID: "rel-worse", Title: "Flow", Artist: "Shawn James", Album: "Right Album", Score: 96}
 	src := &fakeSource{results: map[string][]app.Candidate{"Flow|Shawn James": {best, worse}}}
-	res, _ := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+	res, _ := a.Identify(context.Background(), nil, src, app.IdentifyOptions{})
 	if res[0].Applied == nil || res[0].Applied.RecordingID != "rec-best" {
 		t.Errorf("picked %+v", res[0].Applied)
 	}
 }
 
-func TestIdentifyOffersAtMostFifteenChoicesWithTheBestFitFirst(t *testing.T) {
-	a := openLib(t)
-	ingestTagged(t, a, "x", "Flow", "Shawn James", "Shadows", "")
-	var cands []app.Candidate
-	for i := 0; i < 30; i++ {
-		c := app.Candidate{ReleaseID: fmt.Sprint("rel-", i), Title: "Flow", Artist: "Shawn James", Album: fmt.Sprint("Album ", i), Score: 100}
-		if i == 25 {
-			c.Album = "Shadows" // far down the source's list
-		}
-		cands = append(cands, c)
-	}
-	p := &scriptedPrompter{choice: 0}
-	res, err := a.Identify(context.Background(), nil, &fakeSource{results: map[string][]app.Candidate{"Flow|Shawn James": cands}}, p, app.IdentifyOptions{})
-	if err != nil || res[0].Applied == nil || res[0].Applied.ReleaseID != "rel-25" {
-		t.Fatalf("%+v, %v", res, err)
-	}
-	if len(p.options) != 16 || !strings.Contains(p.options[0], "Shadows") {
-		t.Errorf("%d options, first %q; want 15 candidates and the way out, best fit first", len(p.options), p.options[0])
-	}
-}
-
-func TestIdentifyYesKeepsTheOldAlbumWhenNoReleaseMatchesIt(t *testing.T) {
+func TestIdentifyKeepsTheOldAlbumWhenNoReleaseMatchesIt(t *testing.T) {
 	compilation := app.Candidate{RecordingID: "rec-9", ReleaseID: "rel-9", Title: "Ahwak", Artist: "Abdel Halim Hafez", Album: "Anthology 1955-1959", TrackNumber: 1, TrackTotal: 7, Score: 100}
 	src := &fakeSource{results: map[string][]app.Candidate{"Ahwak|Abdel Halim Hafez": {compilation}}}
 
 	t.Run("automatic: the album the file was filed under stays", func(t *testing.T) {
 		a := openLib(t)
 		ingestTagged(t, a, "01 Ahwak", "Ahwak", "Abdel Halim Hafez", "Rawaeaa Abd El Halim 5", "1/7")
-		res, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+		res, err := a.Identify(context.Background(), nil, src, app.IdentifyOptions{})
 		if err != nil || res[0].Applied == nil {
 			t.Fatalf("%+v, %v", res, err)
 		}
@@ -332,18 +266,9 @@ func TestIdentifyYesKeepsTheOldAlbumWhenNoReleaseMatchesIt(t *testing.T) {
 	t.Run("a file with no album takes the candidate's", func(t *testing.T) {
 		a := openLib(t)
 		ingestTagged(t, a, "01 Ahwak", "Ahwak", "Abdel Halim Hafez", "", "")
-		a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true})
+		a.Identify(context.Background(), nil, src, app.IdentifyOptions{})
 		if got := tracks(t, a)[0]; got.Album != "Anthology 1955-1959" || got.MBReleaseID != "rel-9" {
 			t.Errorf("track = %+v", got)
-		}
-	})
-
-	t.Run("choosing by hand is taken as meant", func(t *testing.T) {
-		a := openLib(t)
-		ingestTagged(t, a, "01 Ahwak", "Ahwak", "Abdel Halim Hafez", "Rawaeaa Abd El Halim 5", "1/7")
-		a.Identify(context.Background(), nil, src, &scriptedPrompter{choice: 0}, app.IdentifyOptions{})
-		if got := tracks(t, a)[0]; got.Album != "Anthology 1955-1959" {
-			t.Errorf("album = %q, want the one the user picked", got.Album)
 		}
 	})
 }
@@ -425,7 +350,7 @@ func TestIdentifyReportsEachResultAsItHappens(t *testing.T) {
 	a := libWithTracks(t, 10, 20, 30)
 	src := &fakeSource{results: map[string][]app.Candidate{"b|": {dream3}}}
 	var seen []string
-	_, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true, OnResult: func(r app.IdentifyResult) {
+	_, err := a.Identify(context.Background(), nil, src, app.IdentifyOptions{OnResult: func(r app.IdentifyResult) {
 		seen = append(seen, r.TrackID)
 	}})
 	if err != nil {
@@ -443,7 +368,7 @@ func TestIdentifyReportsEachResultAsItHappens(t *testing.T) {
 func TestIdentifyTakesTheReleaseDateOfTheMatch(t *testing.T) {
 	a, tr := hinted(t, "dream", "Dream 3", "Max Richter")
 	src := &fakeSource{results: map[string][]app.Candidate{"Dream 3|Max Richter": {dream3}}}
-	if _, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true}); err != nil {
+	if _, err := a.Identify(context.Background(), nil, src, app.IdentifyOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := tracks(t, a)[0]; got.Released != "2015-09-04" {
@@ -473,7 +398,7 @@ func TestAMatchWithoutAUsableDateKeepsTheOneWeHave(t *testing.T) {
 func TestIdentifyAsksForTheFirstArtistOfSeveral(t *testing.T) {
 	a, _ := hinted(t, "dream", "Dream 3", "Max Richter feat. Clarice Jensen")
 	src := &fakeSource{results: map[string][]app.Candidate{}}
-	if _, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true}); err != nil {
+	if _, err := a.Identify(context.Background(), nil, src, app.IdentifyOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if len(src.queries) != 1 || src.queries[0] != (app.Query{Title: "Dream 3", Artist: "Max Richter"}) {
@@ -520,7 +445,7 @@ func TestIdentifyKeepsWhatAnotherMmChangedWhileTheLookupWaited(t *testing.T) {
 			}
 		},
 	}
-	if _, err := a.Identify(context.Background(), nil, src, nil, app.IdentifyOptions{Yes: true}); err != nil {
+	if _, err := a.Identify(context.Background(), nil, src, app.IdentifyOptions{}); err != nil {
 		t.Fatal(err)
 	}
 

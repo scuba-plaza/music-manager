@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
 	"music-manager/internal/manifest"
-	"music-manager/internal/timecode"
 )
 
 // Info is what the downloader learned about a download.
@@ -37,26 +35,6 @@ type Downloader interface {
 	Download(ctx context.Context, url, dir string) (Downloaded, error)
 }
 
-// Question is one thing to ask the user.
-type Question struct {
-	Key      string // stable name of the field: "title", "trim-start", ...
-	Label    string
-	Default  string // offered when the answer is left empty
-	Required bool
-	Validate func(answer string) error // never nil
-}
-
-// Prompter asks the user questions interactively.
-type Prompter interface {
-	// Ask asks for a piece of text.
-	Ask(Question) (string, error)
-	// Choose asks which of options is meant and returns its index.
-	Choose(title string, options []string) (int, error)
-}
-
-// ErrAborted is returned by a Prompter when the user gives up.
-var ErrAborted = errors.New("aborted")
-
 // DuplicateError says the audio is already in the library.
 type DuplicateError struct{ ID string }
 
@@ -64,8 +42,7 @@ func (e *DuplicateError) Error() string {
 	return fmt.Sprintf("this audio is already in the library as %s", e.ID)
 }
 
-// AddRequest describes a track to download. Fields set in Edit are taken as
-// given and never asked about.
+// AddRequest describes a track to download.
 type AddRequest struct {
 	URL   string
 	Edit  Edit
@@ -196,19 +173,13 @@ func (a *App) usable(m *manifest.Manifest, d *Draft) error {
 }
 
 // Add downloads the audio at req.URL into the library as an identified
-// track. Fields not given in req.Edit are asked with p, offering what the
-// download reported as the default; with a nil p they simply take that
-// default. Nothing is added if anything fails.
-func (a *App) Add(ctx context.Context, req AddRequest, dl Downloader, p Prompter) (manifest.Track, error) {
+// track. Nothing is added if anything fails.
+func (a *App) Add(ctx context.Context, req AddRequest, dl Downloader) (manifest.Track, error) {
 	d, err := a.Fetch(ctx, req, dl)
 	if err != nil {
 		return manifest.Track{}, err
 	}
-	e, err := collect(req.Edit, d.Info, p)
-	if err != nil {
-		return manifest.Track{}, err
-	}
-	return a.Finish(ctx, d, e)
+	return a.Finish(ctx, d, withDefaults(req.Edit, d.Info))
 }
 
 // lookup searches req.Source for what the download is, returning the best
@@ -252,139 +223,32 @@ func missingFields(t manifest.Track) error {
 	if t.Artist == "" {
 		missing = append(missing, "artist")
 	}
-	return fmt.Errorf("missing %s (pass --%s, or run in a terminal to be asked)",
-		strings.Join(missing, " and "), strings.Join(missing, " and --"))
+	return fmt.Errorf("missing %s", strings.Join(missing, " and "))
 }
 
-// collect completes e by asking p, or by taking the defaults if p is nil.
-func collect(given Edit, info Info, p Prompter) (Edit, error) {
+func withDefaults(given Edit, info Info) Edit {
 	e := given
-	ask := func(q Question) (string, error) {
-		if p == nil {
-			return q.Default, nil
-		}
-		return p.Ask(q)
-	}
-	// name fills one of title/artist/album.
-	name := func(key, label, def string, required bool, dst **string) error {
-		if *dst != nil {
-			return nil
-		}
-		v, err := ask(Question{Key: key, Label: label, Default: def, Required: required, Validate: nonEmptyIf(required)})
-		if err != nil {
-			return err
-		}
-		v = strings.TrimSpace(v)
-		*dst = &v
-		return nil
-	}
 	artist := info.Artist
 	if artist == "" {
 		artist = strings.TrimSuffix(info.Uploader, " - Topic")
 	}
-	if err := name("title", "Title", info.Title, true, &e.Title); err != nil {
-		return e, err
-	}
-	if err := name("artist", "Artist", artist, true, &e.Artist); err != nil {
-		return e, err
-	}
-	if err := name("album", "Album (empty for a single)", info.Album, false, &e.Album); err != nil {
-		return e, err
-	}
-
-	number := func(key, label, def string, dst **int) error {
-		if *dst != nil {
-			return nil
+	text := func(dst **string, v string) {
+		if *dst == nil {
+			v = strings.TrimSpace(v)
+			*dst = &v
 		}
-		v, err := ask(Question{Key: key, Label: label, Default: def, Validate: validCount})
-		if err != nil {
-			return err
-		}
-		if v = strings.TrimSpace(v); v != "" {
-			n, _ := strconv.Atoi(v)
+	}
+	count := func(dst **int, n int) {
+		if *dst == nil && n > 0 {
 			*dst = &n
 		}
-		return nil
 	}
-	if err := number("track", "Track number", positive(info.TrackNumber), &e.TrackNumber); err != nil {
-		return e, err
-	}
-	if err := number("of", "Tracks on the album", positive(info.TrackTotal), &e.TrackTotal); err != nil {
-		return e, err
-	}
-	if e.Released == nil {
-		v, err := ask(Question{Key: "released", Label: "Released (1999, 1999-05 or 1999-05-17, empty if unknown)", Default: info.Released, Validate: validDate})
-		if err != nil {
-			return e, err
-		}
-		v = strings.TrimSpace(v)
-		e.Released = &v
-	}
-	if e.Genre == nil {
-		v, err := ask(Question{Key: "genre", Label: "Genre (empty for none)"})
-		if err != nil {
-			return e, err
-		}
-		v = strings.TrimSpace(v)
-		e.Genre = &v
-	}
-
-	trim := func(key, label string, dst **time.Duration) error {
-		if *dst != nil {
-			return nil
-		}
-		v, err := ask(Question{Key: key, Label: label, Validate: validTimecode})
-		if err != nil {
-			return err
-		}
-		if v = strings.TrimSpace(v); v != "" {
-			d, _ := timecode.Parse(v)
-			*dst = &d
-		}
-		return nil
-	}
-	if err := trim("trim-start", "Cut off the start (e.g. 0:12, empty for none)", &e.TrimStart); err != nil {
-		return e, err
-	}
-	return e, trim("trim-end", "Cut off the end (e.g. 0:05, empty for none)", &e.TrimEnd)
-}
-
-// positive formats n, or gives "" if it is not known.
-func positive(n int) string {
-	if n > 0 {
-		return strconv.Itoa(n)
-	}
-	return ""
-}
-
-func nonEmptyIf(required bool) func(string) error {
-	return func(s string) error {
-		if required && strings.TrimSpace(s) == "" {
-			return errors.New("required")
-		}
-		return nil
-	}
-}
-
-func validCount(s string) error {
-	if s = strings.TrimSpace(s); s == "" {
-		return nil
-	}
-	if n, err := strconv.Atoi(s); err != nil || n < 0 {
-		return errors.New("enter a whole number, or leave empty")
-	}
-	return nil
-}
-
-func validTimecode(s string) error {
-	if s = strings.TrimSpace(s); s == "" {
-		return nil
-	}
-	_, err := timecode.Parse(s)
-	return err
-}
-
-func validDate(s string) error {
-	_, err := NormalizeDate(s)
-	return err
+	text(&e.Title, info.Title)
+	text(&e.Artist, artist)
+	text(&e.Album, info.Album)
+	count(&e.TrackNumber, info.TrackNumber)
+	count(&e.TrackTotal, info.TrackTotal)
+	text(&e.Released, info.Released)
+	text(&e.Genre, "")
+	return e
 }

@@ -23,7 +23,7 @@ buildGoModule {
     ];
   };
 
-  vendorHash = "sha256-rO9TGDpz2aPDK0mS/GwB9JOe/QppXwiOOEmdkdd8J+w=";
+  vendorHash = "sha256-nA2Evpdnm6UFiXDygjzJQFU+7OK3+cgw6ItumlwyPTI=";
 
   env.CGO_ENABLED = "0";
 
@@ -41,11 +41,6 @@ buildGoModule {
   # yt-dlp, is found first.
   postInstall = ''
     wrapProgram $out/bin/mm --suffix PATH : ${lib.makeBinPath [ yt-dlp ffmpeg xdg-utils ]}
-
-    mkdir -p $out/share/bash-completion/completions $out/share/zsh/site-functions $out/share/fish/vendor_completions.d
-    $out/bin/mm completion bash > $out/share/bash-completion/completions/mm
-    $out/bin/mm completion zsh > $out/share/zsh/site-functions/_mm
-    $out/bin/mm completion fish > $out/share/fish/vendor_completions.d/mm.fish
   '';
 
   meta = {
