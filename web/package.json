@@ -15,7 +15,7 @@
     "check": "tsc --noEmit && eslint . && vitest run --project unit",
     "test:unit": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
-    "test:e2e": "pnpm run build && playwright test --pass-with-no-tests",
+    "test:e2e": "pnpm run build && playwright test",
     "test": "pnpm run test:unit && pnpm run test:browser && pnpm run test:e2e",
     "gen:types": "cd .. && go run ./cmd/gentypes > web/src/api/types.gen.ts"
   },

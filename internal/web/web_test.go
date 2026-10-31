@@ -19,6 +19,7 @@ import (
 	"music-manager/internal/manifest"
 	"music-manager/internal/testmp3"
 	"music-manager/internal/version"
+	"music-manager/internal/web/webtest"
 )
 
 type seedTrack struct {
@@ -746,7 +747,7 @@ func answerStrictly(t *testing.T, base, method, path string, body, into any) int
 func TestEveryResponseDecodesIntoItsNamedType(t *testing.T) {
 	a, ts := seed(t, sample...)
 	drive := t.TempDir()
-	s := New(a, WithWolfgang(), WithSource(database{}))
+	s := New(a, WithWolfgang(), WithSource(webtest.FakeSource{}))
 	s.mounts = func() []string { return []string{drive} }
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)

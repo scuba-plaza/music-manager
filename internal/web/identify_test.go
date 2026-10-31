@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,12 +13,8 @@ import (
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
 	"music-manager/internal/manifest"
+	"music-manager/internal/web/webtest"
 )
-
-type database struct{ found []app.Candidate }
-
-func (d database) Search(context.Context, app.Query) ([]app.Candidate, error) { return d.found, nil }
-func (d database) CoverFront(context.Context, string) ([]byte, error)         { return nil, nil }
 
 type search struct {
 	Search     string `json:"search"`
@@ -35,7 +30,7 @@ var raw = sendInto
 
 func TestATrackIsLookedUpAndIdentifiedOverHTTP(t *testing.T) {
 	a, ts := seed(t, sample...)
-	srv := start(t, a, WithSource(database{[]app.Candidate{{Title: "Found", Artist: "Someone", Album: "Somewhere", TrackNumber: 3, TrackTotal: 9, Score: 99}}}))
+	srv := start(t, a, WithSource(webtest.FakeSource{Found: []app.Candidate{{Title: "Found", Artist: "Someone", Album: "Somewhere", TrackNumber: 3, TrackTotal: 9, Score: 99}}}))
 	unidentified := ts[3]
 	var s search
 	if code := raw(t, srv.URL, "POST", "/api/tracks/"+unidentified.ID+"/candidates", obj{}, &s); code != 200 || len(s.Candidates) != 1 || s.Search == "" {
@@ -88,7 +83,7 @@ func waitJob(t *testing.T, base, id string) JobView {
 
 func TestEveryTrackThatNeedsWorkIsIdentifiedAsAJob(t *testing.T) {
 	a, _ := seed(t, sample...) // one of the four is not identified
-	srv := start(t, a, WithSource(database{[]app.Candidate{{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 99}}}))
+	srv := start(t, a, WithSource(webtest.FakeSource{Found: []app.Candidate{{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 99}}}))
 
 	events := make(chan string, 20)
 	res, err := http.Get(srv.URL + "/api/events")
@@ -192,20 +187,6 @@ func TestOldTagsAreAdoptedOverHTTP(t *testing.T) {
 	_ = manifest.Identified
 }
 
-type lookups struct {
-	failFor string
-	found   []app.Candidate
-}
-
-func (l lookups) Search(_ context.Context, q app.Query) ([]app.Candidate, error) {
-	if q.Title == l.failFor {
-		return nil, errors.New("network down")
-	}
-	return l.found, nil
-}
-
-func (l lookups) CoverFront(context.Context, string) ([]byte, error) { return nil, nil }
-
 func identifiedEverything(t *testing.T, srv *httptest.Server) browse.IdentifyProgress {
 	t.Helper()
 	var v JobView
@@ -224,7 +205,7 @@ func identifiedEverything(t *testing.T, srv *httptest.Server) browse.IdentifyPro
 func TestIdentifyingEverythingLeavesTracksAloneWhoseBestMatchIsWeak(t *testing.T) {
 	a, _ := seed(t, seedTrack{}, seedTrack{})
 	weak := app.Candidate{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 60}
-	srv := start(t, a, WithSource(lookups{found: []app.Candidate{weak}}))
+	srv := start(t, a, WithSource(webtest.FakeSource{Found: []app.Candidate{weak}}))
 
 	p := identifiedEverything(t, srv)
 	if p.Total != 2 || p.Identified != 0 || p.Left != 2 || p.Failed != 0 {
@@ -241,7 +222,7 @@ func TestIdentifyingEverythingLeavesTracksAloneWhoseBestMatchIsWeak(t *testing.T
 func TestAFailedLookupIsReportedAndTheOtherTracksAreStillIdentified(t *testing.T) {
 	a, _ := seed(t, seedTrack{}, seedTrack{})
 	found := app.Candidate{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 99}
-	srv := start(t, a, WithSource(lookups{failFor: "a", found: []app.Candidate{found}}))
+	srv := start(t, a, WithSource(webtest.FakeSource{FailFor: "a", Found: []app.Candidate{found}}))
 
 	p := identifiedEverything(t, srv)
 	if p.Total != 2 || p.Identified != 1 || p.Failed != 1 || len(p.Failures) != 1 || !strings.Contains(p.Failures[0], "network down") {

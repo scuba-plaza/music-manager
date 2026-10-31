@@ -2,7 +2,6 @@ package web
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
@@ -15,26 +14,12 @@ import (
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
 	"music-manager/internal/testmp3"
+	"music-manager/internal/web/webtest"
 )
-
-type downloader struct {
-	audio []byte
-	info  app.Info
-	calls []string
-}
-
-func (d *downloader) Download(_ context.Context, url, dir string) (app.Downloaded, error) {
-	d.calls = append(d.calls, url)
-	path := filepath.Join(dir, "vid.mp3")
-	if err := os.WriteFile(path, d.audio, 0o644); err != nil {
-		return app.Downloaded{}, err
-	}
-	return app.Downloaded{Path: path, Info: d.info}, nil
-}
 
 func TestATrackIsFetchedFromALinkAndAdded(t *testing.T) {
 	a, ts := seed(t, sample...)
-	dl := &downloader{audio: testmp3.Silent(700), info: app.Info{Title: "A song", Uploader: "Some Band - Topic", TrackNumber: 2}}
+	dl := &webtest.FakeDownloader{Audio: testmp3.Silent(700), Info: app.Info{Title: "A song", Uploader: "Some Band - Topic", TrackNumber: 2}}
 	srv := start(t, a, WithDownloader(dl))
 
 	var v JobView
@@ -48,8 +33,8 @@ func TestATrackIsFetchedFromALinkAndAdded(t *testing.T) {
 	if done.State != jobDone || out.Draft == nil || out.Draft.Matched.Title != "A song" || out.Draft.Matched.Artist != "Some Band" || out.Draft.Matched.Track != "2" {
 		t.Fatalf("%+v %s", done, data)
 	}
-	if len(dl.calls) != 1 || dl.calls[0] != "https://example.org/watch?v=1" {
-		t.Errorf("the link is cleaned of what a paste brings: %v", dl.calls)
+	if len(dl.Calls()) != 1 || dl.Calls()[0] != "https://example.org/watch?v=1" {
+		t.Errorf("the link is cleaned of what a paste brings: %v", dl.Calls())
 	}
 	form := obj{"title": "A song", "artist": "Some Band", "album": "Record", "track": "2", "of": "9", "released": "", "genre": "", "cutStart": "", "cutEnd": ""}
 	var p struct{ Path string }
@@ -83,7 +68,7 @@ func TestAnAddedTrackThatIsThereAlreadyIsSaidSo(t *testing.T) {
 	m, _ := a.Manifest()
 	_ = m
 	// the audio of the first sample track is what the "download" brings
-	dl := &downloader{audio: testmp3.Silent(100)}
+	dl := &webtest.FakeDownloader{Audio: testmp3.Silent(100)}
 	srv := start(t, a, WithDownloader(dl))
 	var v JobView
 	raw(t, srv.URL, "POST", "/api/add/fetch", obj{"url": "https://example.org/x"}, &v)
@@ -101,7 +86,7 @@ func TestAddingNeedsADownloaderAndALink(t *testing.T) {
 	if code, r := send(t, start(t, a), "POST", "/api/add/fetch", obj{"url": "https://example.org"}); code != 422 || !strings.Contains(r.Error, "yt-dlp is not set up") {
 		t.Errorf("%d %+v", code, r)
 	}
-	srv := start(t, a, WithDownloader(&downloader{}))
+	srv := start(t, a, WithDownloader(&webtest.FakeDownloader{}))
 	if code, r := send(t, srv, "POST", "/api/add/fetch", obj{"url": "  "}); code != 422 || !strings.Contains(r.Error, "Paste a link") {
 		t.Errorf("%d %+v", code, r)
 	}
@@ -231,7 +216,7 @@ func addForm(released, genre string) obj {
 
 func TestATrackIsAddedWithItsReleaseDate(t *testing.T) {
 	a, _ := seed(t, sample...)
-	srv := start(t, a, WithDownloader(&downloader{audio: testmp3.Silent(700), info: app.Info{Title: "A song", Uploader: "Some Band - Topic"}}))
+	srv := start(t, a, WithDownloader(&webtest.FakeDownloader{Audio: testmp3.Silent(700), Info: app.Info{Title: "A song", Uploader: "Some Band - Topic"}}))
 	draft := fetched(t, srv, "https://example.org/watch?v=1").Draft.Draft
 
 	code, r := send(t, srv, "POST", "/api/add/finish", obj{"draft": draft, "form": addForm("2001", "")})
@@ -246,7 +231,7 @@ func TestATrackIsAddedWithItsReleaseDate(t *testing.T) {
 
 func TestATrackIsAddedWithItsGenre(t *testing.T) {
 	a, _ := seed(t, sample...)
-	srv := start(t, a, WithDownloader(&downloader{audio: testmp3.Silent(700), info: app.Info{Title: "A song", Uploader: "Some Band - Topic"}}))
+	srv := start(t, a, WithDownloader(&webtest.FakeDownloader{Audio: testmp3.Silent(700), Info: app.Info{Title: "A song", Uploader: "Some Band - Topic"}}))
 	draft := fetched(t, srv, "https://example.org/watch?v=1").Draft.Draft
 
 	code, r := send(t, srv, "POST", "/api/add/finish", obj{"draft": draft, "form": addForm("", "Folk")})
@@ -261,7 +246,7 @@ func TestATrackIsAddedWithItsGenre(t *testing.T) {
 
 func TestATrackIsNotAddedWithAReleaseDateThatIsNotADate(t *testing.T) {
 	a, ts := seed(t, sample...)
-	srv := start(t, a, WithDownloader(&downloader{audio: testmp3.Silent(700), info: app.Info{Title: "A song", Uploader: "Some Band - Topic"}}))
+	srv := start(t, a, WithDownloader(&webtest.FakeDownloader{Audio: testmp3.Silent(700), Info: app.Info{Title: "A song", Uploader: "Some Band - Topic"}}))
 	draft := fetched(t, srv, "https://example.org/watch?v=1").Draft.Draft
 
 	code, r := send(t, srv, "POST", "/api/add/finish", obj{"draft": draft, "form": addForm("soon", "")})

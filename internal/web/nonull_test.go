@@ -10,6 +10,7 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
+	"music-manager/internal/web/webtest"
 )
 
 func noNullCollections(t *testing.T, label string, body []byte, typ reflect.Type) {
@@ -140,7 +141,7 @@ func TestNoListInAnAnswerIsNull(t *testing.T) {
 	if err := full.CreatePlaylist("Road", ts[0].ID, ts[1].ID); err != nil {
 		t.Fatal(err)
 	}
-	source := WithSource(database{[]app.Candidate{{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 99}}})
+	source := WithSource(webtest.FakeSource{Found: []app.Candidate{{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 99}}})
 	for _, lib := range []struct {
 		name string
 		app  *app.App
