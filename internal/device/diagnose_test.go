@@ -206,6 +206,8 @@ func TestEachDiagnosticFollowsItsProfileField(t *testing.T) {
 		track("duo001", "Fairuz & Ziad Rahbani", "", "Song"),
 		track("cuta01", "Artist", "", "A Very Long Song Title Indeed Yes"),
 		track("cutb01", "Artist", "", "A Very Long Song Title Indeed No"),
+		track("istan1", "İstanbul", "", "Song"),
+		track("istan2", "Istanbul", "", "Song"),
 	}
 	for _, c := range []struct {
 		name   string
