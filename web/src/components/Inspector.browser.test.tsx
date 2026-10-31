@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { page, userEvent } from 'vitest/browser';
+import { commands, page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-react';
 import type { PeekView, RowView, TrackView } from '../api/types.gen';
 import { App } from '../App';
@@ -18,6 +18,12 @@ import {
   withDevice,
   type StubRoute,
 } from '../testing/fakes';
+
+declare module 'vitest/browser' {
+  interface BrowserCommands {
+    serveCovers: () => Promise<void>;
+  }
+}
 
 const sep = '\u001f';
 const keys = {
@@ -470,11 +476,13 @@ describe('what the pane shows', () => {
     serve(({ method, url }) =>
       method === 'GET' && url.pathname === '/api/tracks/sowhat' ? jsonResponse({ ...soWhat(), coverSha: 'cc1a610a49c5c3b87b956373c45d3339' }) : undefined,
     );
+    await commands.serveCovers();
     await showApp();
     await select(keys.soWhat);
 
     const cover = pane().getByRole('img', { name: 'Cover' });
     await expect.element(cover).toHaveAttribute('src', '/api/tracks/sowhat/cover?v=cc1a610a49c5c3b8');
+    await expect.poll(() => (cover.element() as HTMLImageElement).naturalWidth).toBe(1);
 
     await select(keys.watani);
     await expect.element(cover).not.toBeInTheDocument();

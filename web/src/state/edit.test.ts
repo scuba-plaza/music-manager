@@ -9,6 +9,7 @@ import {
   requestsTo,
   sampleLibrary,
   stubServer,
+  withDevice,
   type StubRoute,
 } from '../testing/fakes';
 import { loadDetail, run } from './actions';
@@ -568,5 +569,94 @@ describe('the device profiles', () => {
 
     expect(useApp.getState().profile).toBe('my-player');
     expect(requestsTo(fetchMock, 'GET', '/api/tracks/sowhat?profile=my-player')).toHaveLength(1);
+  });
+});
+
+function deferred(): { promise: Promise<Response>; resolve: (res: Response) => void } {
+  let resolve: (res: Response) => void = () => undefined;
+  const promise = new Promise<Response>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+describe('one change at a time', () => {
+  it('a second save while the first is on its way sends nothing', async () => {
+    const pending = deferred();
+    serve(({ method }) => (method === 'PATCH' ? pending.promise : undefined));
+    onTrack({ edit: { field: 0, text: 'So When' } });
+
+    const saves = Promise.all([saveEdit(), saveEdit()]);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(requestsTo(fetchMock, 'PATCH', '/api/tracks/sowhat')).toHaveLength(1);
+    pending.resolve(jsonResponse(changeResponse({ same: true })));
+    await saves;
+    expect(requestsTo(fetchMock, 'PATCH', '/api/tracks/sowhat')).toHaveLength(1);
+    expect(useApp.getState()).toMatchObject({ edit: null, busy: false });
+  });
+});
+
+describe('details answered out of order', () => {
+  const answers = new Map<string, ReturnType<typeof deferred>>();
+
+  function deviceOf(): string | undefined {
+    const d = useApp.getState().detail;
+    return d !== null && 'tabs' in d ? `${d.id} ${d.tabs.at(-1)?.device?.rows[0]?.value ?? ''}` : undefined;
+  }
+
+  function answerFor(path: string): ReturnType<typeof deferred> {
+    const found = answers.get(path);
+    if (found === undefined) {
+      throw new Error(`nothing asked for ${path}`);
+    }
+    return found;
+  }
+
+  beforeEach(() => {
+    answers.clear();
+    serve(({ method, url }) => {
+      if (method !== 'GET' || !url.pathname.startsWith('/api/tracks/')) {
+        return undefined;
+      }
+      const id = url.pathname.slice('/api/tracks/'.length);
+      const profile = url.searchParams.get('profile') ?? '';
+      const answer = deferred();
+      answers.set(url.pathname + url.search, answer);
+      const view = withDevice({ ...soWhat(), id, title: id }, profile);
+      return answer.promise.then(() => jsonResponse(view));
+    });
+  });
+
+  it('a cursor moved while the details for a new profile were coming wins', async () => {
+    onTrack({ focus: 'tree', profile: 'wolfgang-wmp01' });
+
+    const chosen = chooseProfile('my-player');
+    run('moveDown');
+    await vi.waitFor(() => {
+      expect(answers.has('/api/tracks/blue?profile=my-player')).toBe(true);
+    });
+    answerFor('/api/tracks/blue?profile=my-player').resolve(jsonResponse({}));
+    await vi.waitFor(() => {
+      expect(deviceOf()).toBe('blue my-player/Folder');
+    });
+    answerFor('/api/tracks/sowhat?profile=my-player').resolve(jsonResponse({}));
+    await chosen;
+
+    expect(deviceOf()).toBe('blue my-player/Folder');
+  });
+
+  it('the profile chosen last wins', async () => {
+    onTrack({ profile: 'wolfgang-wmp01' });
+
+    const first = chooseProfile('my-player');
+    const second = chooseProfile('generic');
+    answerFor('/api/tracks/sowhat?profile=generic').resolve(jsonResponse({}));
+    await second;
+    answerFor('/api/tracks/sowhat?profile=my-player').resolve(jsonResponse({}));
+    await first;
+
+    expect(useApp.getState().profile).toBe('generic');
+    expect(deviceOf()).toBe('sowhat generic/Folder');
   });
 });

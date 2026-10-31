@@ -287,7 +287,7 @@ export interface StubRequest {
   body: unknown;
 }
 
-export type StubRoute = (request: StubRequest) => Response | undefined;
+export type StubRoute = (request: StubRequest) => Response | Promise<Response> | undefined;
 
 export interface StubOptions {
   route?: StubRoute;
@@ -298,7 +298,7 @@ function bodyOf(init: RequestInit | undefined): unknown {
   return typeof init?.body === 'string' ? JSON.parse(init.body) : null;
 }
 
-function answer(request: StubRequest, info: InfoView, library: LibraryResponse, options: StubOptions): Response {
+function answer(request: StubRequest, info: InfoView, library: LibraryResponse, options: StubOptions): Response | Promise<Response> {
   const routed = options.route?.(request);
   if (routed !== undefined) {
     return routed;

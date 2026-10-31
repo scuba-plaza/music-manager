@@ -153,7 +153,7 @@ export const bindings: readonly Binding[] = [
     keys: ['Enter'],
     scope: 'inspector',
     action: 'startEdit',
-    hint: { label: (s) => (onCover(s) ? 'choose' : 'edit'), when: (s) => onCover(s) || canEdit(s) },
+    hint: { label: 'edit', when: (s) => !onCover(s) && canEdit(s) },
     help: { page: 'Editing', text: 'edit it; enter again saves (the cover: choose a file)' },
   },
   { keys: ['x'], scope: 'inspector', action: 'removeCover', hint: { label: 'remove', when: onCover }, help: { page: 'Editing', text: 'remove the cover' } },
