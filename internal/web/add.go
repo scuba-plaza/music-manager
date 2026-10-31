@@ -65,7 +65,7 @@ func (s *Server) addPath(w http.ResponseWriter, r *http.Request) {
 	if !read(w, r, &in) {
 		return
 	}
-	writeJSON(w, map[string]string{"path": browse.AddPath(in.Form)})
+	writeJSON(w, PathView{Path: browse.AddPath(in.Form)})
 }
 
 func (s *Server) addFinish(w http.ResponseWriter, r *http.Request) {

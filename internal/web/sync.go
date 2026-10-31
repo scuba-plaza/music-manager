@@ -86,10 +86,15 @@ func (s *Server) syncRoutes() {
 	s.mux.HandleFunc("DELETE /api/sync/{plan}", s.syncDrop)
 }
 
+type SyncTargetsView struct {
+	Targets  []browse.TargetView `json:"targets"`
+	Wolfgang bool                `json:"wolfgang"`
+}
+
 func (s *Server) syncTargets(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, map[string]any{
-		"targets":  browse.Targets(s.root(), s.mounts()),
-		"wolfgang": s.wolfgang,
+	writeJSON(w, SyncTargetsView{
+		Targets:  browse.Targets(s.root(), s.mounts()),
+		Wolfgang: s.wolfgang,
 	})
 }
 

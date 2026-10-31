@@ -161,6 +161,18 @@ func URL(ln net.Listener) string {
 	return "http://" + host + ":" + port + "/"
 }
 
+type InfoView struct {
+	CanAdd   bool   `json:"canAdd"`
+	Lookup   bool   `json:"lookup"`
+	Root     string `json:"root"`
+	Version  string `json:"version"`
+	Wolfgang bool   `json:"wolfgang"`
+}
+
+type ErrorView struct {
+	Error string `json:"error"`
+}
+
 // info is what does not change while the program runs.
 func (s *Server) info(w http.ResponseWriter, r *http.Request) {
 	root := s.root()
@@ -169,9 +181,12 @@ func (s *Server) info(w http.ResponseWriter, r *http.Request) {
 			root = filepath.Join("~", rel)
 		}
 	}
-	writeJSON(w, map[string]any{
-		"root": root, "version": version.String(), "wolfgang": s.wolfgang,
-		"canAdd": s.downloader != nil, "lookup": s.source != nil,
+	writeJSON(w, InfoView{
+		CanAdd:   s.downloader != nil,
+		Lookup:   s.source != nil,
+		Root:     root,
+		Version:  version.String(),
+		Wolfgang: s.wolfgang,
 	})
 }
 
@@ -186,7 +201,7 @@ func fail(w http.ResponseWriter, status int, err error) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": capitalize(err.Error())})
+	_ = json.NewEncoder(w).Encode(ErrorView{Error: capitalize(err.Error())})
 }
 
 func capitalize(s string) string {

@@ -2,6 +2,7 @@ package web
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -14,8 +15,10 @@ import (
 	"time"
 
 	"music-manager/internal/app"
+	"music-manager/internal/browse"
 	"music-manager/internal/manifest"
 	"music-manager/internal/testmp3"
+	"music-manager/internal/version"
 )
 
 type seedTrack struct {
@@ -709,5 +712,84 @@ func TestTheDeviceTabFollowsTheProfileParameter(t *testing.T) {
 	var r reply
 	if code := getJSON(t, srv.URL+"/api/tracks/"+ts[0].ID+"?profile=nobody", &r); code != 400 || !strings.Contains(r.Error, `"nobody"`) {
 		t.Errorf("unknown profile: %d %+v", code, r)
+	}
+}
+
+func answerStrictly(t *testing.T, base, method, path string, body, into any) int {
+	t.Helper()
+	var in io.Reader
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		in = bytes.NewReader(raw)
+	}
+	req, err := http.NewRequest(method, base+path, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-MM", "1")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	dec := json.NewDecoder(res.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(into); err != nil {
+		t.Fatalf("%s %s: %v", method, path, err)
+	}
+	return res.StatusCode
+}
+
+func TestEveryResponseDecodesIntoItsNamedType(t *testing.T) {
+	a, ts := seed(t, sample...)
+	drive := t.TempDir()
+	s := New(a, WithWolfgang(), WithSource(database{}))
+	s.mounts = func() []string { return []string{drive} }
+	srv := httptest.NewServer(s.Handler())
+	t.Cleanup(srv.Close)
+
+	var info InfoView
+	if code := answerStrictly(t, srv.URL, "GET", "/api/info", nil, &info); code != 200 || !strings.HasSuffix(info.Root, "lib") || info.Version != version.String() || !info.Wolfgang || info.CanAdd || !info.Lookup {
+		t.Errorf("info %d %+v", code, info)
+	}
+
+	if err := a.RecordSynced(); err != nil {
+		t.Fatal(err)
+	}
+	if code, r := send(t, srv, "PATCH", "/api/tracks/"+ts[0].ID, obj{"field": "title", "text": "Wanderer II"}); code != 200 {
+		t.Fatalf("%d %+v", code, r)
+	}
+	var lib LibraryResponse
+	if code := answerStrictly(t, srv.URL, "GET", "/api/library", nil, &lib); code != 200 || lib.Stamp == "" || lib.View.Tracks != 4 || lib.View.Shown != 4 || lib.Unsynced != (UnsyncedView{N: 1, Known: true}) || lib.History != (browse.History{Undo: "change of title"}) {
+		t.Errorf("library %d %+v", code, lib)
+	}
+
+	var targets SyncTargetsView
+	if code := answerStrictly(t, srv.URL, "GET", "/api/sync/targets", nil, &targets); code != 200 || !targets.Wolfgang || len(targets.Targets) != 2 || targets.Targets[0].Kind != "library" || targets.Targets[1].Kind != "drive" || targets.Targets[1].Path != drive {
+		t.Errorf("targets %d %+v", code, targets)
+	}
+
+	form := obj{"title": "A song", "artist": "Some Band", "album": "Record", "track": "2", "of": "9", "released": "", "genre": "", "cutStart": "", "cutEnd": ""}
+	var added PathView
+	if code := answerStrictly(t, srv.URL, "POST", "/api/add/path", obj{"form": form}, &added); code != 200 || added != (PathView{Path: "Some Band/Record/02 - A song.mp3"}) {
+		t.Errorf("add path %d %+v", code, added)
+	}
+
+	var typed PathView
+	if code := answerStrictly(t, srv.URL, "POST", "/api/tracks/"+ts[1].ID+"/path", obj{"field": "title", "text": "Flow II"}, &typed); code != 200 || typed != (PathView{Path: "Shawn James/Shadows/02 - Flow II.mp3"}) {
+		t.Errorf("track path %d %+v", code, typed)
+	}
+
+	var hint HintView
+	if code := answerStrictly(t, srv.URL, "POST", "/api/group/hint", obj{"key": "artist\x1fShawn James", "field": "artist", "text": "داود القَيسي"}, &hint); code != 200 || hint != (HintView{Hint: "joins the artist داود القَيسي (1 track)"}) {
+		t.Errorf("group hint %d %+v", code, hint)
+	}
+
+	var failed ErrorView
+	if code := answerStrictly(t, srv.URL, "GET", "/api/library?sort=nope", nil, &failed); code != 400 || !strings.HasPrefix(failed.Error, "Cannot sort by") {
+		t.Errorf("error %d %+v", code, failed)
 	}
 }

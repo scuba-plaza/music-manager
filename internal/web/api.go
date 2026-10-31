@@ -41,6 +41,18 @@ func libraryOptions(r *http.Request) (browse.Options, error) {
 	return o, nil
 }
 
+type UnsyncedView struct {
+	Known bool `json:"known"`
+	N     int  `json:"n"`
+}
+
+type LibraryResponse struct {
+	History  browse.History     `json:"history"`
+	Stamp    string             `json:"stamp"`
+	Unsynced UnsyncedView       `json:"unsynced"`
+	View     browse.LibraryView `json:"view"`
+}
+
 func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 	o, err := libraryOptions(r)
 	if err != nil {
@@ -54,11 +66,11 @@ func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	n, known := s.unsynced()
-	writeJSON(w, map[string]any{
-		"stamp":    stamp,
-		"view":     browse.Library(snap, o),
-		"unsynced": map[string]any{"n": n, "known": known},
-		"history":  s.ed.History(),
+	writeJSON(w, LibraryResponse{
+		History:  s.ed.History(),
+		Stamp:    stamp,
+		Unsynced: UnsyncedView{Known: known, N: n},
+		View:     browse.Library(snap, o),
 	})
 }
 

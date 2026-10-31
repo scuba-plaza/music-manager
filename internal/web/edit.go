@@ -54,6 +54,14 @@ func (s *Server) editRoutes() {
 	m.HandleFunc("POST /api/redo", s.redo)
 }
 
+type PathView struct {
+	Path string `json:"path"`
+}
+
+type HintView struct {
+	Hint string `json:"hint"`
+}
+
 // answer writes the outcome of a change.
 func (s *Server) answer(w http.ResponseWriter, r browse.Result, err error) {
 	if err != nil {
@@ -124,7 +132,7 @@ func (s *Server) pathPreview(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, errNotFound)
 		return
 	}
-	writeJSON(w, map[string]string{"path": path})
+	writeJSON(w, PathView{Path: path})
 }
 
 func (s *Server) copyable(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +242,7 @@ func (s *Server) groupHint(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, err)
 		return
 	}
-	writeJSON(w, map[string]string{"hint": browse.GroupHint(snap, in.Key, in.Field, in.Text)})
+	writeJSON(w, HintView{Hint: browse.GroupHint(snap, in.Key, in.Field, in.Text)})
 }
 
 type bulkRequest struct {
