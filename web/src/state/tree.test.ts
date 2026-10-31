@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RowView } from '../api/types.gen';
 import { sampleLibrary, sampleRows } from '../testing/fakes';
-import { ancestorKeys, idsOf, isFlat, isOpen, keysToOpenOneLevel, markStateOf, settledCursor, visibleRows } from './tree';
+import { ancestorKeys, idsOf, isFlat, isOpen, keysToOpenOneLevel, markedIds, markStateOf, settledCursor, visibleRows } from './tree';
 
 const sep = '\u001f';
 const milesKey = `artist${sep}Miles Davis`;
@@ -197,5 +197,15 @@ describe('ancestorKeys', () => {
     const sowhat = rows.find((row) => row.key === `track${sep}sowhat`);
 
     expect(sowhat && ancestorKeys(rows, sowhat)).toEqual([kindOfBlueKey, milesKey]);
+  });
+});
+
+describe('markedIds', () => {
+  it('lists the marked tracks once each, in the order of the rows', () => {
+    expect(markedIds(sampleRows(), new Set(['sowhat', 'giant', 'blue']))).toEqual(['blue', 'giant', 'sowhat']);
+  });
+
+  it('keeps a marked track the rows no longer show, after the others', () => {
+    expect(markedIds(sampleRows(), new Set(['gone', 'sowhat']))).toEqual(['sowhat', 'gone']);
   });
 });

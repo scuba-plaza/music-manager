@@ -776,7 +776,7 @@ describe('actions that belong to later work', () => {
     showSample(keys.miles, { marks: new Set(['blue']) });
   });
 
-  it.each(['sortMenu', 'help', 'bulkEdit', 'remove', 'addToPlaylist', 'undo', 'redo', 'sync', 'add', 'identify'] as const)(
+  it.each(['bulkEdit', 'remove', 'undo', 'redo', 'sync', 'add', 'identify'] as const)(
     '%s changes nothing yet',
     (action) => {
       const before = useApp.getState();
@@ -1044,5 +1044,43 @@ describe('the mouse actions', () => {
 
     foldRow(keys.miles);
     expect([...useApp.getState().expanded]).toEqual([]);
+  });
+});
+
+describe('actions that open a dialog', () => {
+  beforeEach(() => {
+    stubServer(infoView(), sampleLibrary());
+  });
+
+  it('help opens the help and sortMenu the sort menu', () => {
+    showSample(keys.miles);
+
+    run('help');
+    expect(useApp.getState().overlay).toEqual({ kind: 'help' });
+
+    useApp.setState({ overlay: null });
+    run('sortMenu');
+    expect(useApp.getState().overlay).toEqual({ kind: 'sort' });
+  });
+
+  it('addToPlaylist opens the picker for the marked tracks, or else for what the cursor is on', () => {
+    showSample(keys.miles, { marks: new Set(['blue']) });
+
+    run('addToPlaylist');
+    expect(useApp.getState().overlay).toEqual({ kind: 'playlist', ids: ['blue'] });
+
+    useApp.setState({ overlay: null, marks: new Set() });
+    run('addToPlaylist');
+    expect(useApp.getState().overlay).toEqual({ kind: 'playlist', ids: ['sowhat', 'blue'] });
+  });
+
+  it('copy in the fields changes nothing yet', () => {
+    showSample(keys.miles);
+    useApp.setState({ focus: 'inspector' });
+    const before = useApp.getState();
+
+    run('copy');
+
+    expect(useApp.getState()).toBe(before);
   });
 });

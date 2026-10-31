@@ -2,6 +2,7 @@ import { get, query } from '../api/client';
 import { subscribe } from '../api/events';
 import type { InfoView, JobView, LibraryResponse, PeekView, RowView, TrackView } from '../api/types.gen';
 import type { ActionName } from '../keys/keymap';
+import { opensOverlay } from '../overlay/open';
 import { runInspector, stopPlaying } from './edit';
 import { useApp, type AppState, type Focus } from './store';
 import {
@@ -460,7 +461,9 @@ export function run(action: ActionName): void {
       toggleFocus(focus);
       break;
     default:
-      runInspector(action);
+      if (!opensOverlay(action)) {
+        runInspector(action);
+      }
       break;
   }
 }

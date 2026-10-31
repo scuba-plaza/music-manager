@@ -5,6 +5,7 @@ import { Inspector } from './components/Inspector';
 import { Split } from './components/Split';
 import { Tree } from './components/Tree';
 import { installKeys } from './keys/dispatch';
+import { OverlayHost } from './overlay/OverlayHost';
 import { connect, loadInfo, loadLibrary, run } from './state/actions';
 import { isTrack } from './state/inspector';
 import { loadProfiles } from './state/profiles';
@@ -39,6 +40,7 @@ export function App() {
         right={<Inspector />}
       />
       <Footer />
+      <OverlayHost />
     </div>
   );
 }

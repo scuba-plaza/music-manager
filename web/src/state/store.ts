@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { InfoView, LibraryResponse, PeekView, ProfileView, TrackView } from '../api/types.gen';
+import type { CopyChoice, InfoView, LibraryResponse, PeekView, ProfileView, TrackView } from '../api/types.gen';
 
 export type Focus = 'tree' | 'inspector';
 
@@ -8,7 +8,7 @@ export type OverlayState =
   | { kind: 'help' }
   | { kind: 'sort' }
   | { kind: 'playlist'; ids: string[] }
-  | { kind: 'copy'; id: string; title: string }
+  | { kind: 'copy'; id: string; title: string; choices: CopyChoice[] }
   | { kind: 'bulk'; ids: string[] }
   | { kind: 'identify' }
   | { kind: 'add' }

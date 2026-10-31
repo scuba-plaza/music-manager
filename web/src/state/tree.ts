@@ -125,3 +125,13 @@ export function settledCursor(state: Rows & Pick<AppState, 'cursor'>): string | 
 export function trackRowKey(id: string): string {
   return `track\u001f${id}`;
 }
+
+export function markedIds(rows: readonly RowView[], marks: ReadonlySet<string>): string[] {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    if (row.trackId !== undefined && marks.has(row.trackId)) {
+      ids.add(row.trackId);
+    }
+  }
+  return [...ids, ...[...marks].filter((id) => !ids.has(id))];
+}
