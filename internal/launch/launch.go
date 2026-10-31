@@ -83,6 +83,7 @@ func Run(ctx context.Context, e Env) int {
 	})
 	if !explicit {
 		o.Config = device.ConfigPath(e.Getenv, e.Home)
+		explicit = e.Getenv("MM_CONFIG") != ""
 	}
 	profiles, err := loadProfiles(o.Config, explicit)
 	if err != nil {

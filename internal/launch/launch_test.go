@@ -39,7 +39,11 @@ func (p *probe) serve(ctx context.Context, o launch.Options) error {
 	return p.err
 }
 
-func run(p *probe, getenv func(string) string, args ...string) (code int, out, errs string) {
+func run(t *testing.T, p *probe, getenv func(string) string, args ...string) (code int, out, errs string) {
+	return runAt(t.TempDir(), p, getenv, args...)
+}
+
+func runAt(home string, p *probe, getenv func(string) string, args ...string) (code int, out, errs string) {
 	var o, e bytes.Buffer
 	code = launch.Run(context.Background(), launch.Env{
 		Args:   args,
@@ -63,18 +67,19 @@ func TestTheDefaultLibraryIsMusicLibrary(t *testing.T) {
 
 func TestNoArgumentsStartsTheServerOnTheDefaultAddress(t *testing.T) {
 	p := &probe{}
-	code, _, errs := run(p, noEnv)
+	dir := t.TempDir()
+	code, _, errs := runAt(dir, p, noEnv)
 	if code != 0 || p.calls != 1 {
 		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
 	}
-	if p.options.Library != "/home/me/Music/Library" || p.options.Addr != "127.0.0.1:7878" || p.options.AddrSet || p.options.NoOpen {
+	if p.options.Library != filepath.Join(dir, "Music", "Library") || p.options.Addr != "127.0.0.1:7878" || p.options.AddrSet || p.options.NoOpen {
 		t.Errorf("options %+v", p.options)
 	}
 }
 
 func TestAddrAndNoOpenFlagsArePassedOn(t *testing.T) {
 	p := &probe{}
-	code, _, errs := run(p, noEnv, "--addr", "127.0.0.1:9000", "--no-open")
+	code, _, errs := run(t, p, noEnv, "--addr", "127.0.0.1:9000", "--no-open")
 	if code != 0 || p.calls != 1 {
 		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
 	}
@@ -85,13 +90,13 @@ func TestAddrAndNoOpenFlagsArePassedOn(t *testing.T) {
 
 func TestLibraryFlagBeatsTheEnvironment(t *testing.T) {
 	p := &probe{}
-	if code, _, errs := run(p, libraryEnv("/from-env"), "--library", "/from-flag"); code != 0 {
+	if code, _, errs := run(t, p, libraryEnv("/from-env"), "--library", "/from-flag"); code != 0 {
 		t.Fatalf("code %d, err %q", code, errs)
 	}
 	if p.options.Library != "/from-flag" {
 		t.Errorf("library %q", p.options.Library)
 	}
-	if code, _, errs := run(p, libraryEnv("/from-env")); code != 0 {
+	if code, _, errs := run(t, p, libraryEnv("/from-env")); code != 0 {
 		t.Fatalf("code %d, err %q", code, errs)
 	}
 	if p.options.Library != "/from-env" {
@@ -101,7 +106,7 @@ func TestLibraryFlagBeatsTheEnvironment(t *testing.T) {
 
 func TestVersionFlagPrintsTheVersion(t *testing.T) {
 	p := &probe{}
-	code, out, errs := run(p, noEnv, "--version")
+	code, out, errs := run(t, p, noEnv, "--version")
 	if code != 0 || p.calls != 0 || errs != "" {
 		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
 	}
@@ -113,7 +118,7 @@ func TestVersionFlagPrintsTheVersion(t *testing.T) {
 func TestUnknownFlagFails(t *testing.T) {
 	for _, flagName := range []string{"wolfgang", "bogus"} {
 		p := &probe{}
-		code, _, errs := run(p, noEnv, "--"+flagName)
+		code, _, errs := run(t, p, noEnv, "--"+flagName)
 		if code != 2 || p.calls != 0 || !strings.Contains(errs, flagName) {
 			t.Errorf("--%s: code %d, calls %d, err %q", flagName, code, p.calls, errs)
 		}
@@ -122,7 +127,7 @@ func TestUnknownFlagFails(t *testing.T) {
 
 func TestAnArgumentThatIsNoFlagFails(t *testing.T) {
 	p := &probe{}
-	code, _, errs := run(p, noEnv, "extra")
+	code, _, errs := run(t, p, noEnv, "extra")
 	if code != 2 || p.calls != 0 || !strings.Contains(errs, `unexpected argument "extra"`) {
 		t.Errorf("code %d, calls %d, err %q", code, p.calls, errs)
 	}
@@ -130,7 +135,7 @@ func TestAnArgumentThatIsNoFlagFails(t *testing.T) {
 
 func TestHelpListsTheFlags(t *testing.T) {
 	p := &probe{}
-	code, _, errs := run(p, noEnv, "--help")
+	code, _, errs := run(t, p, noEnv, "--help")
 	if code != 0 || p.calls != 0 {
 		t.Fatalf("code %d, calls %d", code, p.calls)
 	}
@@ -143,7 +148,7 @@ func TestHelpListsTheFlags(t *testing.T) {
 
 func TestAServerErrorIsReported(t *testing.T) {
 	p := &probe{err: errors.New("address in use")}
-	code, _, errs := run(p, noEnv)
+	code, _, errs := run(t, p, noEnv)
 	if code != 1 || errs != "mm: address in use\n" {
 		t.Errorf("code %d, err %q", code, errs)
 	}
@@ -191,7 +196,7 @@ func profileNames(o launch.Options) []string {
 func TestTheConfigFileGivesTheServerItsProfiles(t *testing.T) {
 	p := &probe{}
 	path := writeConfig(t, userProfile)
-	code, _, errs := run(p, noEnv, "--config", path)
+	code, _, errs := run(t, p, noEnv, "--config", path)
 	if code != 0 || p.calls != 1 {
 		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
 	}
@@ -207,8 +212,8 @@ func TestAnInvalidConfigRefusesToStart(t *testing.T) {
 	path := writeConfig(t, typoProfile)
 	for name, args := range map[string][]string{"--config": {"--config", path}, "MM_CONFIG": nil} {
 		p := &probe{}
-		code, _, errs := run(p, configEnv("MM_CONFIG", path), args...)
-		if code != 1 || p.calls != 0 || !strings.Contains(errs, path) || !strings.Contains(errs, "latin_nmes") {
+		code, _, errs := run(t, p, configEnv("MM_CONFIG", path), args...)
+		if code != 1 || p.calls != 0 || !strings.Contains(errs, path) || !strings.Contains(errs, "latin_nmes") || !strings.Contains(errs, "my-player") {
 			t.Errorf("%s: code %d, calls %d, err %q", name, code, p.calls, errs)
 		}
 	}
@@ -216,7 +221,7 @@ func TestAnInvalidConfigRefusesToStart(t *testing.T) {
 
 func TestCheckConfigPrintsProfilesAndExits(t *testing.T) {
 	p := &probe{}
-	code, out, errs := run(p, noEnv, "--config", writeConfig(t, userProfile), "--check-config")
+	code, out, errs := run(t, p, noEnv, "--config", writeConfig(t, userProfile), "--check-config")
 	if code != 0 || p.calls != 0 || errs != "" {
 		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
 	}
@@ -224,7 +229,7 @@ func TestCheckConfigPrintsProfilesAndExits(t *testing.T) {
 		t.Errorf("output %q", out)
 	}
 	path := writeConfig(t, typoProfile)
-	code, out, errs = run(p, noEnv, "--config", path, "--check-config")
+	code, out, errs = run(t, p, noEnv, "--config", path, "--check-config")
 	if code != 1 || p.calls != 0 || out != "" || !strings.Contains(errs, path) {
 		t.Errorf("invalid: code %d, calls %d, out %q, err %q", code, p.calls, out, errs)
 	}
@@ -234,11 +239,10 @@ func TestAMissingDefaultConfigIsFine(t *testing.T) {
 	dir := t.TempDir()
 	for name, getenv := range map[string]func(string) string{
 		"home":            noEnv,
-		"MM_CONFIG":       configEnv("MM_CONFIG", filepath.Join(dir, "absent.toml")),
 		"XDG_CONFIG_HOME": configEnv("XDG_CONFIG_HOME", dir),
 	} {
 		p := &probe{}
-		code, _, errs := run(p, getenv)
+		code, _, errs := run(t, p, getenv)
 		if code != 0 || p.calls != 1 {
 			t.Fatalf("%s: code %d, calls %d, err %q", name, code, p.calls, errs)
 		}
@@ -247,7 +251,7 @@ func TestAMissingDefaultConfigIsFine(t *testing.T) {
 		}
 	}
 	p := &probe{}
-	code, out, errs := run(p, noEnv, "--check-config")
+	code, out, errs := run(t, p, noEnv, "--check-config")
 	if code != 0 || p.calls != 0 || out != "generic\nwolfgang-wmp01\n" {
 		t.Errorf("check: code %d, calls %d, out %q, err %q", code, p.calls, out, errs)
 	}
@@ -257,7 +261,18 @@ func TestAMissingExplicitConfigFails(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "absent.toml")
 	for _, args := range [][]string{{"--config", path}, {"--config", path, "--check-config"}} {
 		p := &probe{}
-		code, _, errs := run(p, noEnv, args...)
+		code, _, errs := run(t, p, noEnv, args...)
+		if code != 1 || p.calls != 0 || !strings.Contains(errs, path) {
+			t.Errorf("%v: code %d, calls %d, err %q", args, code, p.calls, errs)
+		}
+	}
+}
+
+func TestAMissingConfigNamedByTheEnvironmentFails(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "absent.toml")
+	for _, args := range [][]string{nil, {"--check-config"}} {
+		p := &probe{}
+		code, _, errs := run(t, p, configEnv("MM_CONFIG", path), args...)
 		if code != 1 || p.calls != 0 || !strings.Contains(errs, path) {
 			t.Errorf("%v: code %d, calls %d, err %q", args, code, p.calls, errs)
 		}
