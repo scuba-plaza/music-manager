@@ -62,16 +62,18 @@ type HintView struct {
 	Hint string `json:"hint"`
 }
 
+type ChangeResponse struct {
+	browse.Result
+	History browse.History `json:"history"`
+}
+
 // answer writes the outcome of a change.
 func (s *Server) answer(w http.ResponseWriter, r browse.Result, err error) {
 	if err != nil {
 		fail(w, http.StatusUnprocessableEntity, err)
 		return
 	}
-	writeJSON(w, struct {
-		browse.Result
-		History browse.History `json:"history"`
-	}{r, s.ed.History()})
+	writeJSON(w, ChangeResponse{r, s.ed.History()})
 }
 
 // read decodes the JSON body of a request.
