@@ -96,8 +96,7 @@ function onCut(s: AppState): boolean {
 }
 
 function canEdit(s: AppState): boolean {
-  const f = currentField(s);
-  return f !== undefined && f.editable && f.key !== 'wolfgang';
+  return currentField(s)?.editable === true;
 }
 
 const tabs = { label: 'tabs', when: onTrack };
@@ -151,18 +150,18 @@ export const bindings: readonly Binding[] = [
     keys: ['ArrowLeft', 'h'],
     scope: 'inspector',
     action: 'previousTabOrBack',
-    help: { page: 'Editing', text: "a track's tabs: details, audio, Latin forms; ← on the first goes back to the tree" },
+    help: { page: 'Editing', text: "a track's tabs: Details, Audio, Latin, Device; ← on the first goes back to the tree" },
   },
   {
     keys: ['ArrowRight', 'l'],
     scope: 'inspector',
     action: 'nextTab',
-    help: { page: 'Editing', text: "a track's tabs: details, audio, Latin forms; ← on the first goes back to the tree" },
+    help: { page: 'Editing', text: "a track's tabs: Details, Audio, Latin, Device; ← on the first goes back to the tree" },
   },
-  { keys: ['1'], scope: 'inspector', action: 'tab1', hint: tabs, help: { page: 'Editing', text: "a track's tab by its number (4: the Wolfgang, under --wolfgang)" } },
-  { keys: ['2'], scope: 'inspector', action: 'tab2', hint: tabs, help: { page: 'Editing', text: "a track's tab by its number (4: the Wolfgang, under --wolfgang)" } },
-  { keys: ['3'], scope: 'inspector', action: 'tab3', hint: tabs, help: { page: 'Editing', text: "a track's tab by its number (4: the Wolfgang, under --wolfgang)" } },
-  { keys: ['4'], scope: 'inspector', action: 'tab4', hint: tabs, help: { page: 'Editing', text: "a track's tab by its number (4: the Wolfgang, under --wolfgang)" } },
+  { keys: ['1'], scope: 'inspector', action: 'tab1', hint: tabs, help: { page: 'Editing', text: "a track's tab by its number (4: Device, when a device profile is chosen)" } },
+  { keys: ['2'], scope: 'inspector', action: 'tab2', hint: tabs, help: { page: 'Editing', text: "a track's tab by its number (4: Device, when a device profile is chosen)" } },
+  { keys: ['3'], scope: 'inspector', action: 'tab3', hint: tabs, help: { page: 'Editing', text: "a track's tab by its number (4: Device, when a device profile is chosen)" } },
+  { keys: ['4'], scope: 'inspector', action: 'tab4', hint: tabs, help: { page: 'Editing', text: "a track's tab by its number (4: Device, when a device profile is chosen)" } },
   {
     keys: ['Enter'],
     scope: 'inspector',

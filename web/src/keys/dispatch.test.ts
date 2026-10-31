@@ -132,6 +132,20 @@ describe('installKeys', () => {
     expect(left.map((p) => p.prevented())).toEqual([false, false, false, false]);
   });
 
+  it('the filter box ignores a key being composed, and meta or alt combinations', async () => {
+    const { ran, send, filterBox } = await setup();
+
+    const pressed = [
+      send(press('Enter', { composing: true }, filterBox)),
+      send(press('Enter', { meta: true }, filterBox)),
+      send(press('Enter', { alt: true }, filterBox)),
+      send(press('Escape', { composing: true }, filterBox)),
+    ];
+
+    expect(ran).toEqual([]);
+    expect(pressed.map((p) => p.prevented())).toEqual([false, false, false, false]);
+  });
+
   it('an input that is not the filter box does not take the filter keys', async () => {
     const { ran, send } = await setup();
 

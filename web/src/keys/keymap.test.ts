@@ -19,6 +19,13 @@ function press(key: string, mods: Partial<KeyEventLike> = {}): KeyEventLike {
   return { key, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, isComposing: false, ...mods };
 }
 
+function pressBinding(key: string): KeyEventLike {
+  if (key.startsWith('ctrl+')) {
+    return press(key.slice('ctrl+'.length), { ctrlKey: true });
+  }
+  return press(key === 'space' ? ' ' : key);
+}
+
 function state(overrides: Partial<AppState> = {}): AppState {
   return {
     info: null,
@@ -141,12 +148,13 @@ describe('resolve', () => {
   it('common bindings work in both scopes', () => {
     for (const b of bindings.filter((binding) => binding.scope === 'common')) {
       for (const key of b.keys) {
-        expect(resolve('tree', press(key === 'space' ? ' ' : key)), key).toBe(b.action);
-        expect(resolve('inspector', press(key === 'space' ? ' ' : key)), key).toBe(b.action);
+        expect(resolve('tree', pressBinding(key)), key).toBe(b.action);
+        expect(resolve('inspector', pressBinding(key)), key).toBe(b.action);
       }
     }
     expect(resolve('tree', press('?'))).toBe('help');
     expect(resolve('inspector', press('u'))).toBe('undo');
+    expect(resolve('inspector', press('r', { ctrlKey: true }))).toBe('redo');
   });
 
   it('a key of one pane does nothing in the other', () => {
@@ -307,11 +315,16 @@ describe('the footer hints', () => {
     expect(hints.map((h) => h.label)).not.toContain('nudge');
   });
 
-  it('enter edit shows only on a field that can be edited, and never on the Wolfgang', () => {
+  it('enter edit shows only on a field that can be edited', () => {
     const enter = (f: FieldView) => hintsFor(state({ focus: 'inspector', detail: track([f]) })).find((h) => h.keys === 'enter');
     expect(enter(field('title'))).toEqual({ keys: 'enter', label: 'edit' });
     expect(enter(field('titleLatin', false))).toBeUndefined();
-    expect(enter(field('wolfgang'))).toBeUndefined();
+  });
+
+  it('the Device tab, which has no fields, hints the tabs but nothing to edit', () => {
+    const hints = hintsFor(state({ focus: 'inspector', tab: 1, detail: track([field('title')], []) }));
+    expect(hints).toContainEqual({ keys: '1-4', label: 'tabs' });
+    expect(hints.find((h) => h.keys === 'enter')).toBeUndefined();
   });
 
   it('the tab shown is kept within the tabs the track has', () => {
@@ -348,6 +361,18 @@ describe('the help pages', () => {
     const editing = helpPages().find((p) => p.page === 'Editing')?.rows ?? [];
     expect(editing.find((r) => r.keys === '1-4')).toBeDefined();
   });
+
+  it("name the inspector's tabs, the fourth being Device", () => {
+    const editing = helpPages().find((p) => p.page === 'Editing')?.rows ?? [];
+    expect(editing).toContainEqual({ keys: '←→  h l', text: "a track's tabs: Details, Audio, Latin, Device; ← on the first goes back to the tree" });
+    expect(editing).toContainEqual({ keys: '1-4', text: "a track's tab by its number (4: Device, when a device profile is chosen)" });
+  });
+
+  it('no help line mentions the Wolfgang flag, which profiles replaced', () => {
+    for (const b of bindings) {
+      expect(b.help?.text ?? '', `${b.scope} ${b.action}`).not.toMatch(/wolfgang/i);
+    }
+  });
 });
 
 describe('the filter box', () => {
@@ -358,6 +383,13 @@ describe('the filter box', () => {
     expect(resolveFilter(press('j'))).toBeUndefined();
     expect(resolveFilter(press('ArrowUp'))).toBeUndefined();
     expect(resolveFilter(press('a', { ctrlKey: true }))).toBeUndefined();
+  });
+
+  it('takes nothing while a key is composed or with meta or alt held', () => {
+    expect(resolveFilter(press('Enter', { isComposing: true }))).toBeUndefined();
+    expect(resolveFilter(press('Enter', { metaKey: true }))).toBeUndefined();
+    expect(resolveFilter(press('Enter', { altKey: true }))).toBeUndefined();
+    expect(resolveFilter(press('Escape', { isComposing: true }))).toBeUndefined();
   });
 
   it('hints enter keep and esc clear', () => {
