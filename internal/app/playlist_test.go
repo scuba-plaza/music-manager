@@ -512,3 +512,47 @@ func TestReplacingThePlaylistsKeepsTheirLatinNames(t *testing.T) {
 		t.Errorf("playlists = %+v", m.Playlists)
 	}
 }
+
+func TestPlaylistNamesCollideOnAUserProfile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "devices.toml")
+	writeFile(t, path, []byte(`[[profile]]
+name = "my-player"
+latin_names = true
+playlist_ext = ".m3u"
+component_max = 20
+`))
+	registry, err := device.LoadRegistry(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plain := openLib(t)
+	for _, name := range []string{"Road Trip Songs Volume One", "Road Trip Songs Volume Two"} {
+		if err := plain.CreatePlaylist(name); err != nil {
+			t.Fatalf("without the profile the names are two files: %v", err)
+		}
+	}
+
+	a := openLib(t)
+	a.UseProfiles(registry)
+	if a.Profiles() != registry {
+		t.Fatal("the app does not use the registry it was given")
+	}
+	if err := a.CreatePlaylist("Road Trip Songs Volume One"); err != nil {
+		t.Fatal(err)
+	}
+	err = a.CreatePlaylist("Road Trip Songs Volume Two")
+	if err == nil || !strings.Contains(err.Error(), "same file") || !strings.Contains(err.Error(), "Road Trip Songs Volu.m3u") {
+		t.Errorf("err = %v, want a refusal: both are Road Trip Songs Volu.m3u on my-player", err)
+	}
+}
+
+func TestAnAppWithoutProfilesUsesTheBuiltinOnes(t *testing.T) {
+	var names []string
+	for _, p := range openLib(t).Profiles().Profiles() {
+		names = append(names, p.Name)
+	}
+	if !slices.Equal(names, []string{"generic", "wolfgang-wmp01"}) {
+		t.Errorf("profiles %v", names)
+	}
+}

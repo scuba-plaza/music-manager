@@ -146,6 +146,7 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 		Library  bool
 		Folder   string
 		Wolfgang bool
+		Profile  string
 	}
 	if !read(w, r, &in) {
 		return
@@ -155,9 +156,13 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnprocessableEntity, err)
 		return
 	}
-	var dev device.Target = device.Generic
-	if in.Wolfgang && !isLibrary { // the library folder is always written the standard way
-		dev, where = device.Wolfgang, where+" · Wolfgang WMP01"
+	dev, err := s.syncDevice(isLibrary, in.Profile, in.Wolfgang)
+	if err != nil {
+		fail(w, http.StatusBadRequest, err)
+		return
+	}
+	if dev.Name() != device.Generic.Name() {
+		where += " · " + dev.Profile().Label
 	}
 	v, err := s.jobs.start("sync", func(ctx context.Context, report func(any)) (any, error) {
 		type made struct {
@@ -203,6 +208,18 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, v)
+}
+
+func (s *Server) syncDevice(isLibrary bool, profile string, wolfgang bool) (device.Target, error) {
+	switch {
+	case isLibrary:
+		return device.Generic, nil
+	case profile != "":
+		return s.profile(profile)
+	case wolfgang:
+		return s.profile("wolfgang-wmp01")
+	}
+	return device.Generic, nil
 }
 
 func newID() (string, error) {

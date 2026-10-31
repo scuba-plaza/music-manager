@@ -6,18 +6,23 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"path/filepath"
 
+	"music-manager/internal/device"
 	"music-manager/internal/version"
 )
 
 const defaultAddr = "127.0.0.1:7878"
 
 type Options struct {
-	Library string
-	Addr    string
-	AddrSet bool
-	NoOpen  bool
+	Library     string
+	Addr        string
+	AddrSet     bool
+	NoOpen      bool
+	Config      string
+	CheckConfig bool
+	Profiles    *device.Registry
 }
 
 type Env struct {
@@ -48,6 +53,8 @@ func Run(ctx context.Context, e Env) int {
 	fs.StringVar(&o.Library, "library", DefaultLibrary(e.Getenv, e.Home), "library directory (env MM_LIBRARY)")
 	fs.StringVar(&o.Addr, "addr", defaultAddr, "address to listen on (only this computer: 127.0.0.1, localhost or ::1)")
 	fs.BoolVar(&o.NoOpen, "no-open", false, "do not open the page in a browser")
+	fs.StringVar(&o.Config, "config", "", "device profiles file (default $MM_CONFIG, else $XDG_CONFIG_HOME/mm/devices.toml, else ~/.config/mm/devices.toml)")
+	fs.BoolVar(&o.CheckConfig, "check-config", false, "check the device profiles file, list the profiles and exit")
 	fs.BoolVar(&showVersion, "version", false, "print the version and exit")
 
 	if err := fs.Parse(e.Args); err != nil {
@@ -65,14 +72,41 @@ func Run(ctx context.Context, e Env) int {
 		fmt.Fprintf(e.Out, "mm %s\n", version.String())
 		return 0
 	}
+	explicit := false
 	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "addr" {
+		switch f.Name {
+		case "addr":
 			o.AddrSet = true
+		case "config":
+			explicit = true
 		}
 	})
+	if !explicit {
+		o.Config = device.ConfigPath(e.Getenv, e.Home)
+	}
+	profiles, err := loadProfiles(o.Config, explicit)
+	if err != nil {
+		fmt.Fprintln(e.Err, "mm:", err)
+		return 1
+	}
+	o.Profiles = profiles
+	if o.CheckConfig {
+		for _, p := range profiles.Profiles() {
+			fmt.Fprintln(e.Out, p.Name)
+		}
+		return 0
+	}
 	if err := e.Serve(ctx, o); err != nil {
 		fmt.Fprintln(e.Err, "mm:", err)
 		return 1
 	}
 	return 0
+}
+
+func loadProfiles(path string, explicit bool) (*device.Registry, error) {
+	registry, err := device.LoadRegistry(path)
+	if errors.Is(err, fs.ErrNotExist) && !explicit {
+		return device.Builtin(), nil
+	}
+	return registry, err
 }

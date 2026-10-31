@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -634,5 +635,79 @@ func TestTheWolfgangTabSaysWhatThePlayerWillShowAndWhatItWillNotShowWell(t *test
 	}
 	if w := wolfgangTabOf(t, srv, ts[1].ID).Warnings; len(w) != 1 || !strings.Contains(w[0], "genre") {
 		t.Errorf("warnings %v, want one about the genre", w)
+	}
+}
+
+func TestProfilesEndpointListsBuiltinsThenUser(t *testing.T) {
+	a, _ := seed(t)
+	user := "[[profile]]\nname = \"my-player\"\nlabel = \"My Player\"\nlatin_names = true\n"
+	var got []ProfileView
+	if code := getJSON(t, start(t, a, WithProfiles(registryWith(t, user))).URL+"/api/profiles", &got); code != 200 {
+		t.Fatal(code)
+	}
+	want := []ProfileView{
+		{Name: "generic", Label: "Generic", Builtin: true},
+		{Name: "wolfgang-wmp01", Label: "Wolfgang WMP01", Builtin: true},
+		{Name: "my-player", Label: "My Player", Builtin: false},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("profiles %+v, want %+v", got, want)
+	}
+
+	a.UseProfiles(registryWith(t, user))
+	var fromApp []ProfileView
+	if getJSON(t, start(t, a).URL+"/api/profiles", &fromApp); !slices.Equal(fromApp, want) {
+		t.Errorf("a server without its own profiles does not use the app's: %+v", fromApp)
+	}
+	b, _ := seed(t)
+	var builtin []ProfileView
+	if getJSON(t, start(t, b).URL+"/api/profiles", &builtin); !slices.Equal(builtin, want[:2]) {
+		t.Errorf("profiles without a config %+v", builtin)
+	}
+}
+
+func TestTheDeviceTabFollowsTheProfileParameter(t *testing.T) {
+	a, ts := seed(t, seedTrack{"Bahlam Bek Ya Habibi Forever", "Abdel Halim Hafez", "Abd El Halim Hafez", 1})
+	srv := start(t, a, WithWolfgang(), WithProfiles(registryWith(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")))
+	type tab struct {
+		ID       string
+		Name     string
+		Wolfgang *wolfgangPreview
+		Device   *wolfgangPreview
+	}
+	tabsFor := func(query string) (int, []tab) {
+		var v struct{ Tabs []tab }
+		code := getJSON(t, srv.URL+"/api/tracks/"+ts[0].ID+query, &v)
+		return code, v.Tabs
+	}
+	rows := func(p *wolfgangPreview) map[string]string {
+		shown := map[string]string{}
+		for _, r := range p.Rows {
+			shown[r.Label] = r.Value
+		}
+		return shown
+	}
+
+	_, plain := tabsFor("")
+	if len(plain) != 4 || plain[3].ID != "wolfgang" || plain[3].Wolfgang == nil {
+		t.Fatalf("without a profile the old page's tabs change: %+v", plain)
+	}
+
+	_, wolfgang := tabsFor("?profile=wolfgang-wmp01")
+	if len(wolfgang) != 5 || wolfgang[4].ID != "device" || wolfgang[4].Device == nil {
+		t.Fatalf("tabs %+v", wolfgang)
+	}
+	if got := rows(wolfgang[4].Device); got["Artist"] != "A. H. Hafez" || got["Cut"] == "" {
+		t.Errorf("the Wolfgang preview %+v", got)
+	}
+
+	_, mine := tabsFor("?profile=my-player")
+	if got := rows(mine[4].Device); got["Artist"] != "Abdel Halim Hafez" || got["Cut"] != "" {
+		t.Errorf("the my-player preview %+v", got)
+	}
+
+	var r reply
+	if code := getJSON(t, srv.URL+"/api/tracks/"+ts[0].ID+"?profile=nobody", &r); code != 400 || !strings.Contains(r.Error, `"nobody"`) {
+		t.Errorf("unknown profile: %d %+v", code, r)
 	}
 }

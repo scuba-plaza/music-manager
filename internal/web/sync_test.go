@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
+	"music-manager/internal/device"
 )
 
 // syncServer is a server that offers the given drives, not the ones of the machine.
@@ -346,5 +350,83 @@ func TestAPlanForTheWolfgangNamesItAndWarnsAboutWhatItWillNotShowWell(t *testing
 	_, plain := planned(t, srv.URL, obj{"folder": target})
 	if strings.HasSuffix(plain.Plan.Where, "Wolfgang WMP01") || len(plain.Plan.Warnings) != 0 {
 		t.Errorf("a plan that is not for the Wolfgang talks about it: %q, %+v", plain.Plan.Where, plain.Plan.Warnings)
+	}
+}
+
+func registryWith(t *testing.T, content string) *device.Registry {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "devices.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, err := device.LoadRegistry(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+const shortStems = "[[profile]]\nname = \"short-stems\"\nlabel = \"Short Stems\"\nstem_max = 8\n"
+
+func profileSyncServer(t *testing.T, a *app.App, r *device.Registry) *httptest.Server {
+	t.Helper()
+	s := New(a, WithProfiles(r))
+	s.mounts = func() []string { return nil }
+	ts := httptest.NewServer(s.Handler())
+	t.Cleanup(ts.Close)
+	return ts
+}
+
+func TestSyncPlanWithAnUnknownProfileIs400(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := profileSyncServer(t, a, registryWith(t, shortStems))
+	var r reply
+	code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": t.TempDir(), "profile": "nobody"}, &r)
+	if code != 400 || !strings.Contains(r.Error, `"nobody"`) {
+		t.Errorf("%d %+v", code, r)
+	}
+}
+
+func TestSyncPlanForTheLibraryFolderIgnoresTheProfile(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := profileSyncServer(t, a, registryWith(t, shortStems))
+	for _, profile := range []string{"short-stems", "wolfgang-wmp01", "nobody"} {
+		_, d := planned(t, srv.URL, obj{"library": true, "profile": profile})
+		if d.Plan.Where != "Library folder" || len(d.Plan.Warnings) != 0 {
+			t.Fatalf("%s: %+v", profile, d.Plan)
+		}
+		if !slices.ContainsFunc(d.Plan.Ops, func(op browse.OpView) bool { return op.Path == "Shawn James/Shadows/01 - The Wanderer.mp3" }) {
+			t.Errorf("%s: the library folder is not written the generic way: %+v", profile, d.Plan.Ops)
+		}
+	}
+}
+
+func TestSyncPlanWithAProfileUsesItsRules(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := profileSyncServer(t, a, registryWith(t, shortStems))
+	_, d := planned(t, srv.URL, obj{"folder": t.TempDir(), "profile": "short-stems", "wolfgang": true})
+	if !strings.HasSuffix(d.Plan.Where, " · Short Stems") {
+		t.Errorf("the plan is for %q, want it to name the profile", d.Plan.Where)
+	}
+	var mp3s int
+	for _, op := range d.Plan.Ops {
+		if stem, ok := strings.CutSuffix(path.Base(op.Path), ".mp3"); ok {
+			mp3s++
+			if n := utf8.RuneCountInString(stem); n > 8 {
+				t.Errorf("%s: a name of %d characters, want it cut at 8", op.Path, n)
+			}
+		}
+	}
+	if mp3s != 4 {
+		t.Errorf("%d tracks planned: %+v", mp3s, d.Plan.Ops)
+	}
+
+	_, w := planned(t, srv.URL, obj{"folder": t.TempDir(), "wolfgang": true})
+	if !strings.HasSuffix(w.Plan.Where, " · Wolfgang WMP01") {
+		t.Errorf("the legacy flag plans for %q", w.Plan.Where)
+	}
+	_, g := planned(t, srv.URL, obj{"folder": t.TempDir()})
+	if strings.Contains(g.Plan.Where, "·") || !slices.ContainsFunc(g.Plan.Ops, func(op browse.OpView) bool { return op.Path == "Shawn James/Shadows/01 - The Wanderer.mp3" }) {
+		t.Errorf("without a profile the plan is not generic: %q %+v", g.Plan.Where, g.Plan.Ops)
 	}
 }

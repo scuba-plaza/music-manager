@@ -1,11 +1,15 @@
 package browse
 
 import (
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/manifest"
 )
 
@@ -197,5 +201,119 @@ func TestAPeekFollowsTheFilter(t *testing.T) {
 	artist, ok := Peek(snapshot(), artistKey("Shawn James"), "flow")
 	if !ok || len(artist.List) != 1 || !strings.HasPrefix(artist.Info[0], "1 track") {
 		t.Errorf("%+v", artist)
+	}
+}
+
+func tabWithID(v TrackView, id string) (TabView, int) {
+	for i, tab := range v.Tabs {
+		if tab.ID == id {
+			return tab, i
+		}
+	}
+	return TabView{}, -1
+}
+
+func rowLabels(v *DeviceView) []string {
+	var labels []string
+	for _, r := range v.Rows {
+		labels = append(labels, r.Label)
+	}
+	return labels
+}
+
+func longNamed() Snapshot {
+	s := snapshot()
+	s.Tracks = append(s.Tracks, trk("long", "A Title That Runs On Far Past Twenty", "Fairuz", "Jerusalem in My Heart", 2))
+	return s
+}
+
+func userRegistry(t *testing.T, content string) *device.Registry {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "devices.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, err := device.LoadRegistry(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func TestTheDeviceViewMatchesTheLegacyWolfgangViewForTheWolfgangProfile(t *testing.T) {
+	s := longNamed()
+	for _, id := range []string{"long", "t4", "u1"} {
+		v, _ := Track(s, id, TrackOptions{Wolfgang: true, Profile: "wolfgang-wmp01"})
+		legacy, at := tabWithID(v, "wolfgang")
+		if at != 3 || legacy.Name != "Wolfgang" || legacy.Wolfgang == nil {
+			t.Fatalf("%s: the legacy tab is not the fourth: %+v", id, v.Tabs)
+		}
+		dev, at := tabWithID(v, "device")
+		if at != 4 || dev.Name != "Device" || dev.Device == nil || dev.Wolfgang != nil {
+			t.Fatalf("%s: device tab %+v", id, v.Tabs)
+		}
+		if !reflect.DeepEqual(dev.Device, legacy.Wolfgang) {
+			t.Errorf("%s: device view %+v, legacy %+v", id, dev.Device, legacy.Wolfgang)
+		}
+	}
+	v, _ := Track(s, "long", TrackOptions{Profile: "wolfgang-wmp01"})
+	dev, _ := tabWithID(v, "device")
+	if got := strings.Join(rowLabels(dev.Device), ","); got != "Folder,File,Cut,Artist,Album,Genre,Title" {
+		t.Errorf("rows %s", got)
+	}
+	for _, r := range dev.Device.Rows {
+		if r.Label == "Cut" && (len([]rune(r.Value)) != 20 || !strings.Contains(r.Hint, "24 characters") || !strings.Contains(r.Hint, "cut at 20")) {
+			t.Errorf("cut row %+v", r)
+		}
+		if r.Label == "Album" && (r.Value != "Jerusalem" || r.Tail != "· 9 of 12") {
+			t.Errorf("album row %+v", r)
+		}
+	}
+}
+
+func TestTheDeviceTabIsThereOnlyWhenAProfileIsAsked(t *testing.T) {
+	v, _ := Track(snapshot(), "t1", TrackOptions{Wolfgang: true})
+	if _, at := tabWithID(v, "device"); at != -1 || len(v.Tabs) != 4 {
+		t.Errorf("tabs %+v", v.Tabs)
+	}
+	ids := []string{}
+	w, _ := Track(snapshot(), "t1", TrackOptions{Profile: "generic"})
+	for _, tab := range w.Tabs {
+		ids = append(ids, tab.ID)
+	}
+	if strings.Join(ids, ",") != "details,audio,latin,device" {
+		t.Errorf("tab ids %v", ids)
+	}
+	r := userRegistry(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")
+	if _, ok := Track(snapshot(), "t1", TrackOptions{Profile: "nobody", Profiles: r}); ok {
+		t.Error("an unknown profile previews something")
+	}
+}
+
+func TestTheDevicePreviewOfAProfileWithoutAStemMaxHasNoCutRow(t *testing.T) {
+	r := userRegistry(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")
+	v, _ := Track(longNamed(), "long", TrackOptions{Profile: "my-player", Profiles: r})
+	dev, _ := tabWithID(v, "device")
+	if got := strings.Join(rowLabels(dev.Device), ","); got != "Folder,File,Artist,Album,Genre,Title" {
+		t.Errorf("rows %s", got)
+	}
+	for _, row := range dev.Device.Rows {
+		if row.Label == "Title" && row.Hint != "" {
+			t.Errorf("a name that is not cut has nothing to say about the title: %+v", row)
+		}
+	}
+}
+
+func TestTheDevicePreviewOfAProfileWithoutATagWidthCountsNothing(t *testing.T) {
+	r := userRegistry(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")
+	v, _ := Track(longNamed(), "t4", TrackOptions{Profile: "my-player", Profiles: r})
+	dev, _ := tabWithID(v, "device")
+	for _, row := range dev.Device.Rows {
+		if row.Tail != "" {
+			t.Errorf("row %+v has a tail without a tag width", row)
+		}
+		if row.Label == "Album" && row.Value != "Caught a Black Rabbit" {
+			t.Errorf("album %+v, want it whole", row)
+		}
 	}
 }

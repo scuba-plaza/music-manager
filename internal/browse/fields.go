@@ -40,19 +40,22 @@ const (
 	fAlbumOf  // the number of tracks on an album, of all its tracks
 	fPlaylistName
 	fPlaylistLatin
+	fDevice
 )
 
 // An inspectorTab is a page of the inspector: some of the fields, under a name.
 type inspectorTab struct {
+	id     string
 	name   string
 	fields []fieldKind
 }
 
 var inspectorTabs = []inspectorTab{
-	{"Details", []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fGenre, fCover}},
-	{"Audio", []fieldKind{fCutStart, fCutEnd, fVolume, fFadeIn, fFadeOut}},
-	{"Latin", []fieldKind{fLatinTitle, fLatinArtist, fLatinAlbum, fLatinGenre}},
-	{"Wolfgang", []fieldKind{fWolfgang}},
+	{"details", "Details", []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fGenre, fCover}},
+	{"audio", "Audio", []fieldKind{fCutStart, fCutEnd, fVolume, fFadeIn, fFadeOut}},
+	{"latin", "Latin", []fieldKind{fLatinTitle, fLatinArtist, fLatinAlbum, fLatinGenre}},
+	{"wolfgang", "Wolfgang", []fieldKind{fWolfgang}},
+	{"device", "Device", []fieldKind{fDevice}},
 }
 
 // trackFields is every field, tab by tab, in the order the cursor goes through
@@ -76,7 +79,7 @@ func tabOf(f fieldKind) int {
 }
 
 func (f fieldKind) label() string {
-	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Volume", "Fade in", "Fade out", "Title", "Artist", "Album", "Genre", "Wolfgang", "Tracks on album", "Name", "Latin name"}[f]
+	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Volume", "Fade in", "Fade out", "Title", "Artist", "Album", "Genre", "Wolfgang", "Tracks on album", "Name", "Latin name", "Device"}[f]
 }
 
 // what is the field as a change of it is named: "title", or "Latin title" for

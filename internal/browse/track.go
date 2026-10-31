@@ -48,8 +48,7 @@ type BarView struct {
 	Level []float64 `json:"level,omitempty"`
 }
 
-// WolfgangRow is a line of the preview of what a sync for the Wolfgang writes.
-type WolfgangRow struct {
+type DeviceRow struct {
 	Label string `json:"label"`
 	Value string `json:"value"`
 	// Tail is dim text after the value: how much of a width it uses, or the
@@ -59,22 +58,23 @@ type WolfgangRow struct {
 	Cut  bool   `json:"cut,omitempty"`
 }
 
-// WolfgangView is the read-only preview tab.
-type WolfgangView struct {
-	Notice   string        `json:"notice,omitempty"`
-	Rows     []WolfgangRow `json:"rows"`
-	Warnings []string      `json:"warnings,omitempty"`
-	Footnote string        `json:"footnote"`
+type DeviceView struct {
+	Notice   string      `json:"notice,omitempty"`
+	Rows     []DeviceRow `json:"rows"`
+	Warnings []string    `json:"warnings,omitempty"`
+	Footnote string      `json:"footnote"`
 }
 
 // TabView is a page of the inspector.
 type TabView struct {
-	Name     string        `json:"name"`
-	Notes    []string      `json:"notes,omitempty"`
-	Warn     bool          `json:"warn,omitempty"` // the notes are a warning
-	Fields   []FieldView   `json:"fields"`
-	Bar      *BarView      `json:"bar,omitempty"`
-	Wolfgang *WolfgangView `json:"wolfgang,omitempty"`
+	ID       string      `json:"id"`
+	Name     string      `json:"name"`
+	Notes    []string    `json:"notes,omitempty"`
+	Warn     bool        `json:"warn,omitempty"`
+	Fields   []FieldView `json:"fields"`
+	Bar      *BarView    `json:"bar,omitempty"`
+	Wolfgang *DeviceView `json:"wolfgang,omitempty"`
+	Device   *DeviceView `json:"device,omitempty"`
 }
 
 // TrackView is the inspector for one track.
@@ -98,6 +98,8 @@ type TrackOptions struct {
 	Wolfgang bool
 	// CoverInfo describes a stored cover image, for example "500×500 JPEG".
 	CoverInfo func(sha string) string
+	Profile   string
+	Profiles  *device.Registry
 }
 
 // Track makes the inspector of the track with the given ID.
@@ -115,11 +117,19 @@ func Track(s Snapshot, id string, o TrackOptions) (TrackView, bool) {
 	if t.CoverSHA256 != "" && o.CoverInfo != nil {
 		v.CoverInfo = o.CoverInfo(t.CoverSHA256)
 	}
+	profiles := o.Profiles
+	if profiles == nil {
+		profiles = device.Builtin()
+	}
+	previewed, ok := profiles.Get(o.Profile)
+	if o.Profile != "" && !ok {
+		return TrackView{}, false
+	}
 	for i, tab := range inspectorTabs {
-		if tab.name == "Wolfgang" && !o.Wolfgang {
+		if tab.id == "wolfgang" && !o.Wolfgang || tab.id == "device" && o.Profile == "" {
 			continue
 		}
-		tv := TabView{Name: tab.name}
+		tv := TabView{ID: tab.id, Name: tab.name}
 		switch {
 		case i == 0 && t.Status != manifest.Identified:
 			tv.Notes, tv.Warn = []string{"Not identified yet. Dim values are from the file's old tags."}, true
@@ -128,7 +138,12 @@ func Track(s Snapshot, id string, o TrackOptions) (TrackView, bool) {
 		}
 		for _, f := range tab.fields {
 			if f == fWolfgang {
-				tv.Wolfgang = wolfgangView(s, t)
+				wolfgang, _ := profiles.Get("wolfgang-wmp01")
+				tv.Wolfgang = deviceView(s, t, wolfgang)
+				continue
+			}
+			if f == fDevice {
+				tv.Device = deviceView(s, t, previewed)
 				continue
 			}
 			fv := fieldView(t, f, v.CoverInfo)
@@ -180,7 +195,7 @@ func (f fieldKind) key() string {
 	return [...]string{
 		"title", "artist", "album", "track", "released", "genre", "cutStart", "cutEnd", "cover",
 		"volume", "fadeIn", "fadeOut", "latinTitle", "latinArtist", "latinAlbum", "latinGenre",
-		"wolfgang", "albumOf", "playlistName", "playlistLatin",
+		"wolfgang", "albumOf", "playlistName", "playlistLatin", "device",
 	}[f]
 }
 
@@ -274,37 +289,38 @@ func aboutText(t manifest.Track) string {
 	return about
 }
 
-// wolfgangView previews what a sync for the Wolfgang WMP01 writes for the
-// track. The names are the ones a sync derives; none is stored.
-func wolfgangView(s Snapshot, t manifest.Track) *WolfgangView {
-	dev := device.Wolfgang
-	v := &WolfgangView{Footnote: "A preview: nothing of it is stored."}
+func deviceView(s Snapshot, t manifest.Track, dev device.Target) *DeviceView {
+	v := &DeviceView{Footnote: "A preview: nothing of it is stored."}
 	p := layout.Assign(s.Tracks, dev.Layout())[t.ID]
 	if t.Status != manifest.Identified {
 		v.Notice = "Not identified yet: it goes to the _Inbox folder."
 	}
 	v.Rows = append(v.Rows,
-		WolfgangRow{Label: "Folder", Value: path.Dir(p)},
-		WolfgangRow{Label: "File", Value: path.Base(p)},
+		DeviceRow{Label: "Folder", Value: path.Dir(p)},
+		DeviceRow{Label: "File", Value: path.Base(p)},
 	)
 	stem, width := dev.Profile().StemMax, dev.Profile().TagWidth
 	uncut := dev.Layout()
 	uncut.StemMax = 0
 	whole := strings.TrimSuffix(path.Base(layout.PathFor(t, uncut)), ".mp3")
-	if n := utf8.RuneCountInString(whole); n > stem {
+	if n := utf8.RuneCountInString(whole); stem > 0 && n > stem {
 		runes := []rune(whole)
-		v.Rows = append(v.Rows, WolfgangRow{
+		v.Rows = append(v.Rows, DeviceRow{
 			Label: "Cut", Value: string(runes[:stem]), Tail: string(runes[stem:]), Cut: true,
-			Hint: "The player shows 24 characters of a name, the .mp3 included, and scrolls a longer one: the name is cut at " + strconv.Itoa(stem) + ", the dim part is cut off.",
+			Hint: "The player shows " + strconv.Itoa(stem+len(".mp3")) + " characters of a name, the .mp3 included, and scrolls a longer one: the name is cut at " + strconv.Itoa(stem) + ", the dim part is cut off.",
 		})
 	}
 	if t.Status == manifest.Identified {
 		tags := dev.Tags(t)
+		title := DeviceRow{Label: "Title", Value: tags.Title}
+		if stem > 0 {
+			title.Hint = "The title is kept whole: the player shows file names, not titles."
+		}
 		v.Rows = append(v.Rows,
-			WolfgangRow{Label: "Artist", Value: tags.Artist, Tail: counted(tags.Artist, width)},
-			WolfgangRow{Label: "Album", Value: tags.Album, Tail: counted(tags.Album, width)},
-			WolfgangRow{Label: "Genre", Value: tags.Genre, Tail: counted(tags.Genre, width)},
-			WolfgangRow{Label: "Title", Value: tags.Title, Hint: "The title is kept whole: the player shows file names, not titles."},
+			DeviceRow{Label: "Artist", Value: tags.Artist, Tail: counted(tags.Artist, width)},
+			DeviceRow{Label: "Album", Value: tags.Album, Tail: counted(tags.Album, width)},
+			DeviceRow{Label: "Genre", Value: tags.Genre, Tail: counted(tags.Genre, width)},
+			title,
 		)
 		for _, w := range dev.Diagnose(s.Tracks) {
 			if w.TrackID == t.ID {
@@ -317,7 +333,7 @@ func wolfgangView(s Snapshot, t manifest.Track) *WolfgangView {
 
 // counted says how much of a width a name uses.
 func counted(s string, width int) string {
-	if s == "" {
+	if s == "" || width <= 0 {
 		return ""
 	}
 	return "· " + strconv.Itoa(utf8.RuneCountInString(s)) + " of " + strconv.Itoa(width)

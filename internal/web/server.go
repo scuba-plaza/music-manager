@@ -22,6 +22,7 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
+	"music-manager/internal/device"
 	"music-manager/internal/version"
 )
 
@@ -34,6 +35,7 @@ type Server struct {
 	source     app.MetadataSource
 	downloader app.Downloader
 	wolfgang   bool
+	profiles   *device.Registry
 
 	hub  *hub
 	jobs *jobs
@@ -60,12 +62,17 @@ func WithDownloader(d app.Downloader) Option { return func(v *Server) { v.downlo
 // WithWolfgang shows what a sync for the Wolfgang WMP01 writes.
 func WithWolfgang() Option { return func(v *Server) { v.wolfgang = true } }
 
+func WithProfiles(r *device.Registry) Option { return func(v *Server) { v.profiles = r } }
+
 // New returns the server for a library.
 func New(a *app.App, opts ...Option) *Server {
 	s := &Server{app: a, hub: newHub(), mux: http.NewServeMux(), coverInfo: map[string]string{}, mounts: browse.DetectMounts}
 	s.jobs = newJobs(s.hub)
 	for _, o := range opts {
 		o(s)
+	}
+	if s.profiles == nil {
+		s.profiles = a.Profiles()
 	}
 	s.ed = browse.NewEditor(a, browse.WithSource(s.source), browse.WithDownloader(s.downloader))
 	s.routes()
@@ -84,6 +91,7 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /", noCache(files))
 
 	s.mux.HandleFunc("GET /api/info", s.info)
+	s.mux.HandleFunc("GET /api/profiles", s.listProfiles)
 	s.mux.HandleFunc("GET /api/doctor", s.doctor)
 	s.mux.HandleFunc("GET /api/library", s.library)
 	s.mux.HandleFunc("GET /api/tracks/{id}", s.track)
