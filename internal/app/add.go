@@ -42,7 +42,6 @@ func (e *DuplicateError) Error() string {
 	return fmt.Sprintf("this audio is already in the library as %s", e.ID)
 }
 
-// AddRequest describes a track to download.
 type AddRequest struct {
 	URL   string
 	Edit  Edit
@@ -172,8 +171,6 @@ func (a *App) usable(m *manifest.Manifest, d *Draft) error {
 	return nil
 }
 
-// Add downloads the audio at req.URL into the library as an identified
-// track. Nothing is added if anything fails.
 func (a *App) Add(ctx context.Context, req AddRequest, dl Downloader) (manifest.Track, error) {
 	d, err := a.Fetch(ctx, req, dl)
 	if err != nil {

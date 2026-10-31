@@ -247,7 +247,7 @@ func TestIdentifyKeepsTheOldAlbumWhenNoReleaseMatchesIt(t *testing.T) {
 	compilation := app.Candidate{RecordingID: "rec-9", ReleaseID: "rel-9", Title: "Ahwak", Artist: "Abdel Halim Hafez", Album: "Anthology 1955-1959", TrackNumber: 1, TrackTotal: 7, Score: 100}
 	src := &fakeSource{results: map[string][]app.Candidate{"Ahwak|Abdel Halim Hafez": {compilation}}}
 
-	t.Run("automatic: the album the file was filed under stays", func(t *testing.T) {
+	t.Run("the album the file was filed under stays", func(t *testing.T) {
 		a := openLib(t)
 		ingestTagged(t, a, "01 Ahwak", "Ahwak", "Abdel Halim Hafez", "Rawaeaa Abd El Halim 5", "1/7")
 		res, err := a.Identify(context.Background(), nil, src, app.IdentifyOptions{})
