@@ -117,14 +117,14 @@ export interface Draft {
 }
 
 export interface Shelf {
-  names: string[] | null;
+  names: string[];
   tags?: string[];
   pair: number[];
-  grid?: (number[] | null)[];
-  raw: string | null;
-  counts: Record<string, number> | null;
+  grid?: number[][];
+  raw: string;
+  counts: Record<string, number>;
   moves?: Record<string, string>;
-  drafts?: Record<string, Draft[] | null>;
+  drafts?: Record<string, Draft[]>;
   byKind?: Record<string, string>;
 }
 `)
@@ -206,7 +206,7 @@ export interface Loose {
   raw: unknown;
   fault: unknown;
   company: string;
-  anyway: unknown[] | null;
+  anyway: unknown[];
 }
 `)
 }

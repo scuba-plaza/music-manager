@@ -106,6 +106,7 @@ func lengthOf(ts []manifest.Track) time.Duration {
 }
 
 func artistPeek(s Snapshot, r Row) (info []string, list []ListRow) {
+	list = []ListRow{}
 	ts := s.tracksFor(r.IDs)
 	type group struct {
 		name   string
@@ -148,6 +149,7 @@ func artistPeek(s Snapshot, r Row) (info []string, list []ListRow) {
 }
 
 func albumPeek(s Snapshot, r Row) (info []string, list []ListRow) {
+	list = []ListRow{}
 	ts := s.tracksFor(r.IDs)
 	artist := ""
 	if len(ts) > 0 {
@@ -170,6 +172,7 @@ func albumPeek(s Snapshot, r Row) (info []string, list []ListRow) {
 }
 
 func playlistPeek(s Snapshot, r Row) (info []string, list []ListRow) {
+	list = []ListRow{}
 	ts := s.tracksFor(r.IDs)
 	info = []string{plural(r.Count, "track") + " · " + timecode.Clock(lengthOf(ts)) + " plays"}
 	numberWidth := len(fmt.Sprint(len(ts)))
@@ -185,7 +188,7 @@ func playlistPeek(s Snapshot, r Row) (info []string, list []ListRow) {
 }
 
 func playlistsList(s Snapshot) []ListRow {
-	var list []ListRow
+	list := []ListRow{}
 	for _, p := range s.Playlists {
 		list = append(list, ListRow{
 			Key: playlistRowKey(p.Name), Left: p.Name,
@@ -196,7 +199,7 @@ func playlistsList(s Snapshot) []ListRow {
 }
 
 func needsList(s Snapshot, r Row) []ListRow {
-	var list []ListRow
+	list := []ListRow{}
 	for _, t := range s.tracksFor(r.IDs) {
 		var lacking []string
 		if t.Title == "" {

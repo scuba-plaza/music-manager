@@ -109,7 +109,7 @@ type LibraryView struct {
 
 // Library lays out the library for the given options.
 func Library(s Snapshot, o Options) LibraryView {
-	v := LibraryView{Tracks: len(s.Tracks), Sort: sortView(o.Sort, o.Reverse), Rows: []RowView{}}
+	v := LibraryView{Tracks: len(s.Tracks), Sort: sortView(o.Sort, o.Reverse), Rows: []RowView{}, Playlists: []PlaylistView{}}
 	for _, t := range s.Tracks {
 		if t.Status != manifest.Identified {
 			v.NeedWork++

@@ -28,7 +28,7 @@ export interface BulkPreview {
 
 export interface CandidateView {
   text: string;
-  diff: DiffLine[] | null;
+  diff: DiffLine[];
 }
 
 export interface ChangeResponse {
@@ -56,7 +56,7 @@ export interface DeviceRow {
 
 export interface DeviceView {
   notice?: string;
-  rows: DeviceRow[] | null;
+  rows: DeviceRow[];
   warnings?: string[];
   footnote: string;
 }
@@ -69,7 +69,7 @@ export interface DiffLine {
 }
 
 export interface DoctorView {
-  problems: ProblemView[] | null;
+  problems: ProblemView[];
   errors: number;
   warnings: number;
 }
@@ -127,7 +127,7 @@ export interface IdentifyProgress {
   identified: number;
   left: number;
   failed: number;
-  failures: string[] | null;
+  failures: string[];
 }
 
 export interface InfoView {
@@ -154,12 +154,12 @@ export interface LibraryResponse {
 }
 
 export interface LibraryView {
-  rows: RowView[] | null;
+  rows: RowView[];
   tracks: number;
   needWork: number;
   shown: number;
   sort: SortView;
-  playlists: PlaylistView[] | null;
+  playlists: PlaylistView[];
 }
 
 export interface ListRow {
@@ -196,23 +196,23 @@ export interface PeekView {
   title: string;
   label: string;
   editable: boolean;
-  info: string[] | null;
+  info: string[];
   fields?: FieldView[];
   note?: string;
   path?: string;
   coverTrack?: string;
   coverSha?: string;
-  list: ListRow[] | null;
+  list: ListRow[];
 }
 
 export interface PlanView {
   plan: string;
   where: string;
   prune: boolean;
-  ops: OpView[] | null;
+  ops: OpView[];
   counts: OpCounts;
   text: string;
-  warnings: WarningView[] | null;
+  warnings: WarningView[];
 }
 
 export interface PlaylistView {
@@ -256,7 +256,7 @@ export interface SearchView {
   search: string;
   title: string;
   artist: string;
-  candidates: CandidateView[] | null;
+  candidates: CandidateView[];
 }
 
 export interface ServerEvents {
@@ -277,7 +277,7 @@ export interface SortView {
   reverse: boolean;
   descending: boolean;
   title: string;
-  choices: SortChoice[] | null;
+  choices: SortChoice[];
 }
 
 export interface SyncData {
@@ -290,7 +290,7 @@ export interface SyncData {
 }
 
 export interface SyncTargetsView {
-  targets: TargetView[] | null;
+  targets: TargetView[];
   wolfgang: boolean;
 }
 
@@ -299,7 +299,7 @@ export interface TabView {
   name: string;
   notes?: string[];
   warn?: boolean;
-  fields: FieldView[] | null;
+  fields: FieldView[];
   bar?: BarView;
   wolfgang?: DeviceView;
   device?: DeviceView;
@@ -315,13 +315,13 @@ export interface TrackView {
   id: string;
   title: string;
   identified: boolean;
-  tabs: TabView[] | null;
+  tabs: TabView[];
   coverSha?: string;
   coverInfo?: string;
   path: string;
   dates: string;
   about: string;
-  reveal: string[] | null;
+  reveal: string[];
 }
 
 export interface UnsyncedView {

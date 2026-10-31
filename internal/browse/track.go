@@ -129,7 +129,7 @@ func Track(s Snapshot, id string, o TrackOptions) (TrackView, bool) {
 		if tab.id == "wolfgang" && !o.Wolfgang || tab.id == "device" && o.Profile == "" {
 			continue
 		}
-		tv := TabView{ID: tab.id, Name: tab.name}
+		tv := TabView{ID: tab.id, Name: tab.name, Fields: []FieldView{}}
 		switch {
 		case i == 0 && t.Status != manifest.Identified:
 			tv.Notes, tv.Warn = []string{"Not identified yet. Dim values are from the file's old tags."}, true
@@ -290,7 +290,7 @@ func aboutText(t manifest.Track) string {
 }
 
 func deviceView(s Snapshot, t manifest.Track, dev device.Target) *DeviceView {
-	v := &DeviceView{Footnote: "A preview: nothing of it is stored."}
+	v := &DeviceView{Footnote: "A preview: nothing of it is stored.", Rows: []DeviceRow{}}
 	p := layout.Assign(s.Tracks, dev.Layout())[t.ID]
 	if t.Status != manifest.Identified {
 		v.Notice = "Not identified yet: it goes to the _Inbox folder."

@@ -176,13 +176,10 @@ func (g *generator) expr(t reflect.Type) (string, bool, error) {
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
 		reflect.Float32, reflect.Float64:
 		return "number", false, nil
-	case reflect.Slice:
-		if t.Elem().Kind() == reflect.Uint8 {
-			return "string", true, nil
+	case reflect.Slice, reflect.Array:
+		if t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.Uint8 {
+			return "string", false, nil
 		}
-		elem, err := g.element(t.Elem())
-		return elem + "[]", true, err
-	case reflect.Array:
 		elem, err := g.element(t.Elem())
 		return elem + "[]", false, err
 	case reflect.Map:
@@ -193,7 +190,7 @@ func (g *generator) expr(t reflect.Type) (string, bool, error) {
 		if nullable {
 			value += " | null"
 		}
-		return "Record<string, " + value + ">", true, err
+		return "Record<string, " + value + ">", false, err
 	case reflect.Struct:
 		return t.Name(), false, g.declare(t)
 	}
