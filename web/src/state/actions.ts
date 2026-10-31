@@ -4,6 +4,7 @@ import type { InfoView, JobView, LibraryResponse, PeekView, RowView, TrackView }
 import type { ActionName } from '../keys/keymap';
 import { opensOverlay } from '../overlay/open';
 import { runInspector, stopPlaying } from './edit';
+import { runOps } from './ops';
 import { useApp, type AppState, type Focus } from './store';
 import {
   ancestorKeys,
@@ -41,21 +42,33 @@ export async function loadInfo(): Promise<void> {
 
 let detailSeq = 0;
 let detailTimer: ReturnType<typeof setTimeout> | undefined;
+let detailAwaited = false;
 
 function scheduleDetail(): void {
   clearTimeout(detailTimer);
+  detailAwaited = true;
   detailTimer = setTimeout(() => {
     void loadDetail();
   }, detailPause);
+}
+
+export function dropDetail(): boolean {
+  clearTimeout(detailTimer);
+  detailSeq += 1;
+  const awaited = detailAwaited;
+  detailAwaited = false;
+  return awaited;
 }
 
 export async function loadDetail(): Promise<void> {
   clearTimeout(detailTimer);
   detailSeq += 1;
   const seq = detailSeq;
+  detailAwaited = true;
   const { lib, cursor, filter, profile } = useApp.getState();
   const row = rowByKey(lib, cursor);
   if (row === undefined) {
+    detailAwaited = false;
     useApp.setState({ detail: null, detailError: '' });
     return;
   }
@@ -65,10 +78,12 @@ export async function loadDetail(): Promise<void> {
         ? await get<TrackView>(`/api/tracks/${encodeURIComponent(row.trackId ?? '')}` + query({ profile }))
         : await get<PeekView>('/api/peek' + query({ key: row.key, q: filter.trim() }));
     if (seq === detailSeq) {
+      detailAwaited = false;
       useApp.setState({ detail, detailError: '' });
     }
   } catch (err) {
     if (seq === detailSeq) {
+      detailAwaited = false;
       useApp.setState({ detail: null, detailError: err instanceof Error ? err.message : String(err) });
       fail(err);
     }
@@ -218,7 +233,7 @@ function fold(row: RowView, open: boolean): void {
   change({ expanded });
 }
 
-function enterFields(row: RowView): boolean {
+export function enterFields(row: RowView): boolean {
   if (row.kind !== 'track' && row.editable !== true) {
     return false;
   }
@@ -461,7 +476,7 @@ export function run(action: ActionName): void {
       toggleFocus(focus);
       break;
     default:
-      if (!opensOverlay(action)) {
+      if (!opensOverlay(action) && !runOps(action)) {
         runInspector(action);
       }
       break;

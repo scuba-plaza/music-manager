@@ -343,6 +343,23 @@ describe('the copy list', () => {
     expect(requestsTo(fetchMock, 'POST', '/api/copy')).toEqual([{ id: 'sowhat', attrs: ['album'] }]);
   });
 
+  test('a row sets its words apart in their own direction, and a row that cannot be chosen says so', async () => {
+    await openApp(library([{ name: 'ليل', count: 1, length: '0:03' }]));
+    await onRow(soWhat);
+
+    await userEvent.keyboard('c');
+    const cover = dialog().getByRole('option').first();
+    await expect.element(cover).toHaveAttribute('aria-disabled', 'true');
+    await expect.element(dialog().getByRole('option').nth(1)).not.toHaveAttribute('aria-disabled');
+    await userEvent.keyboard('{Escape}');
+
+    await userEvent.keyboard('p');
+    const name = dialog().getByRole('option').first().element().querySelector('.label bdi');
+    expect([name?.textContent, name?.getAttribute('dir')]).toEqual(['ليل', 'auto']);
+    const detail = dialog().getByRole('option').first().element().querySelector('.detail bdi');
+    expect(detail?.getAttribute('dir')).toBe('auto');
+  });
+
   test('the copy list asks for a tick before it copies nothing', async () => {
     await openApp();
     await onRow(soWhat);
@@ -489,5 +506,128 @@ describe('the playlist picker', () => {
 
     await expect.element(page.getByRole('status')).toHaveTextContent('Select tracks to add to a playlist');
     expect(dialog().query()).toBeNull();
+  });
+});
+
+describe('the bulk form', () => {
+  const names = ['Artist', 'Artist (Latin)', 'Album', 'Album (Latin)', 'Tracks on album', 'Released', 'Genre', 'Genre (Latin)', 'Cut start', 'Cut end'];
+
+  const bulk: StubRoute = ({ method, url, body }) => {
+    if (method === 'POST' && url.pathname === '/api/bulk/preview') {
+      const values = (body as { values: Record<string, string> }).values;
+      return jsonResponse({ summary: values.album === '' ? '' : `Album → ${values.album ?? ''}`, changed: 2 });
+    }
+    if (method === 'POST' && url.pathname === '/api/bulk') {
+      return jsonResponse(changeResponse({ message: 'Changed 2 tracks' }));
+    }
+    return undefined;
+  };
+
+  async function openForm(route: StubRoute = bulk): Promise<void> {
+    await openApp(library(), route);
+    await onRow(soWhat);
+    await userEvent.keyboard(' ');
+    await userEvent.keyboard(' ');
+    await expect.poll(() => useApp.getState().marks.size).toBe(2);
+    await userEvent.keyboard('e');
+    await expect.element(dialog()).toBeVisible();
+  }
+
+  function field(name: string) {
+    return dialog().getByRole('textbox', { name, exact: true });
+  }
+
+  function summary() {
+    return dialog().getByTestId('bulk-summary');
+  }
+
+  test('e with tracks marked opens one form with a row for each value, the Latin forms among them', async () => {
+    await openForm();
+
+    await expect.element(dialog()).toHaveAccessibleName('Edit 2 marked tracks');
+    await expect.element(dialog().getByText('Applies to 2 tracks. Blank keeps what they have; - clears.')).toBeVisible();
+    expect(
+      dialog()
+        .getByRole('textbox')
+        .elements()
+        .map((input) => input.getAttribute('aria-label')),
+    ).toEqual(names);
+    for (const input of dialog().getByRole('textbox').elements()) {
+      expect([input.getAttribute('dir'), input.getAttribute('placeholder')]).toEqual(['auto', '(keep)']);
+    }
+    await expect.element(field('Artist')).toHaveFocus();
+    await expect.element(summary()).toHaveTextContent('Type what the tracks should have.');
+    await expect.poll(hints).toEqual(['enter apply', 'tab next field', 'esc close']);
+  });
+
+  test('typing shows what would change, in its own direction', async () => {
+    await openForm();
+
+    await userEvent.click(field('Album'));
+    await userEvent.keyboard('ليل');
+
+    await expect.element(summary()).toHaveTextContent('Album → ليل');
+    const line = summary().element().querySelector('bdi');
+    expect(line?.getAttribute('dir')).toBe('auto');
+    expect(line?.textContent).toBe('Album → ليل');
+    expect(summary().element().classList.contains('bad')).toBe(false);
+    expect(requestsTo(fetchMock, 'POST', '/api/bulk/preview').at(-1)).toEqual({
+      ids: ['blue', 'sowhat'],
+      values: { artist: '', artistLatin: '', album: 'ليل', albumLatin: '', of: '', released: '', genre: '', genreLatin: '', cutStart: '', cutEnd: '' },
+    });
+  });
+
+  test('tab and the arrows move from row to row, round from the last to the first', async () => {
+    await openForm();
+
+    await userEvent.keyboard('{Tab}');
+    await expect.element(field('Artist (Latin)')).toHaveFocus();
+    await userEvent.keyboard('{ArrowDown}');
+    await expect.element(field('Album')).toHaveFocus();
+    await userEvent.keyboard('{ArrowUp}');
+    await userEvent.keyboard('{Shift>}{Tab}{/Shift}');
+    await expect.element(field('Artist')).toHaveFocus();
+    await userEvent.keyboard('{ArrowUp}');
+    await expect.element(field('Cut end')).toHaveFocus();
+    await userEvent.keyboard('{Tab}');
+    await expect.element(field('Artist')).toHaveFocus();
+  });
+
+  test('enter applies what was typed, blank or -, and the form closes', async () => {
+    await openForm();
+
+    await userEvent.click(field('Genre'));
+    await userEvent.keyboard('-');
+    await userEvent.keyboard('{Enter}');
+
+    await expect.element(dialog()).not.toBeInTheDocument();
+    expect(requestsTo(fetchMock, 'POST', '/api/bulk')).toEqual([
+      {
+        ids: ['blue', 'sowhat'],
+        values: { artist: '', artistLatin: '', album: '', albumLatin: '', of: '', released: '', genre: '-', genreLatin: '', cutStart: '', cutEnd: '' },
+      },
+    ]);
+    await expect.element(page.getByRole('status')).toHaveTextContent('Changed 2 tracks');
+    await expect.poll(() => useApp.getState().busy).toBe(false);
+  });
+
+  test("the server's refusal is said in the form, which stays open", async () => {
+    await openForm(({ method, url }) => (method === 'POST' && url.pathname === '/api/bulk' ? jsonResponse({ error: 'Nothing to change' }, 422) : undefined));
+
+    await userEvent.keyboard('{Enter}');
+
+    await expect.element(summary()).toHaveTextContent('Nothing to change');
+    expect(summary().element().classList.contains('bad')).toBe(true);
+    await expect.element(dialog()).toBeVisible();
+  });
+
+  test('escape closes the form and changes nothing', async () => {
+    await openForm();
+
+    await userEvent.keyboard('Blue');
+    await userEvent.keyboard('{Escape}');
+
+    await expect.element(dialog()).not.toBeInTheDocument();
+    expect(requestsTo(fetchMock, 'POST', '/api/bulk')).toEqual([]);
   });
 });

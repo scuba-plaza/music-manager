@@ -473,49 +473,6 @@ describe('hearing a cut', () => {
   });
 });
 
-describe('removing a cover', () => {
-  beforeEach(() => {
-    serve(({ method, url }) => (method === 'DELETE' && url.pathname === '/api/cover' ? jsonResponse(changeResponse({ message: 'Cover removed' })) : undefined));
-  });
-
-  it('x on the Cover field of a track removes its cover at once', async () => {
-    onTrack({ field: 3 });
-
-    run('removeCover');
-
-    await vi.waitFor(() => {
-      expect(requestsTo(fetchMock, 'DELETE', '/api/cover?ids=sowhat')).toHaveLength(1);
-    });
-  });
-
-  it('x on the Cover field of an album removes the covers of its tracks', async () => {
-    onAlbum({ field: 2 });
-
-    run('removeCover');
-
-    await vi.waitFor(() => {
-      expect(requestsTo(fetchMock, 'DELETE', `/api/cover?${new URLSearchParams({ group: keys.kindOfBlue }).toString()}`)).toHaveLength(1);
-    });
-  });
-
-  it('x says so when there is no cover to remove', () => {
-    onTrack({ field: 3, detail: soWhat({ coverSha: '' }) });
-
-    run('removeCover');
-
-    expect(useApp.getState().status.text).toBe('There is no cover to remove');
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('x leaves any other field alone', () => {
-    onTrack({ field: 0 });
-
-    run('removeCover');
-
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-});
-
 describe('the details of what the cursor is on', () => {
   it('a track is asked for with the device profile chosen', async () => {
     onTrack({ profile: 'my-player' });

@@ -530,3 +530,95 @@ describe('what the pane shows', () => {
     await expect.element(pane().getByText('the track is gone')).toBeVisible();
   });
 });
+
+describe('setting a cover', () => {
+  const setCover: StubRoute = ({ method, url }) => (method === 'PUT' && url.pathname === '/api/cover' ? jsonResponse(changeResponse({ message: 'Set the cover' })) : undefined);
+
+  function picture(name: string, type: string): File {
+    return new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], name, { type });
+  }
+
+  function paste(file: File): boolean {
+    const data = new DataTransfer();
+    data.items.add(file);
+    return document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  }
+
+  test('enter on the Cover field opens a chooser of JPEG and PNG files, and the file chosen becomes the cover', async () => {
+    serve(setCover);
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => undefined);
+    await showApp();
+    await intoFields(keys.soWhat);
+    for (let i = 0; i < 4; i += 1) {
+      await userEvent.keyboard('{ArrowDown}');
+    }
+    await expect.poll(hints).toContain('enter choose');
+
+    await userEvent.keyboard('{Enter}');
+
+    const chooser = click.mock.contexts[0];
+    if (!(chooser instanceof HTMLInputElement)) {
+      throw new Error('no file chooser was opened');
+    }
+    expect(chooser.type).toBe('file');
+    expect(chooser.accept).toBe('image/jpeg,image/png');
+    expect(useApp.getState().edit).toBeNull();
+    const file = picture('front.png', 'image/png');
+    const files = new DataTransfer();
+    files.items.add(file);
+    chooser.files = files.files;
+    chooser.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await expect.poll(() => requestsTo(fetchMock, 'PUT', '/api/cover?ids=sowhat')).toEqual([file]);
+    await expect.element(page.getByRole('status')).toHaveTextContent('Set the cover');
+    await expect.poll(() => useApp.getState().busy).toBe(false);
+  });
+
+  test('a picture pasted with ctrl+v becomes the cover of the track under the cursor', async () => {
+    serve(setCover);
+    await showApp();
+    await select(keys.soWhat);
+    const file = picture('front.png', 'image/png');
+
+    expect(paste(file)).toBe(false);
+
+    await expect.poll(() => requestsTo(fetchMock, 'PUT', '/api/cover?paste=1&name=front.png&ids=sowhat')).toEqual([file]);
+    await expect.poll(() => useApp.getState().busy).toBe(false);
+  });
+
+  test('a pasted file that is not a JPEG or a PNG is refused with a message', async () => {
+    serve(setCover);
+    await showApp();
+    await select(keys.soWhat);
+
+    paste(picture('front.webp', 'image/webp'));
+
+    await expect.element(page.getByRole('status')).toHaveTextContent('A cover must be a JPEG or PNG image');
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT')).toEqual([]);
+  });
+
+  test('a picture pasted while a dialog is open is left alone', async () => {
+    serve(setCover);
+    await showApp();
+    await select(keys.soWhat);
+    useApp.setState({ overlay: { kind: 'help' } });
+    await expect.element(page.getByRole('dialog')).toBeVisible();
+
+    expect(paste(picture('front.png', 'image/png'))).toBe(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT')).toEqual([]);
+  });
+
+  test('a picture pasted while typing in a box is left to the box', async () => {
+    serve(setCover);
+    await showApp();
+    await select(keys.soWhat);
+    page.getByRole('textbox', { name: 'Filter' }).element().focus();
+
+    expect(paste(picture('front.png', 'image/png'))).toBe(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT')).toEqual([]);
+  });
+});

@@ -9,7 +9,7 @@ export type OverlayState =
   | { kind: 'sort' }
   | { kind: 'playlist'; ids: string[] }
   | { kind: 'copy'; id: string; title: string; choices: CopyChoice[] }
-  | { kind: 'bulk'; ids: string[] }
+  | { kind: 'bulk'; ids: string[]; head: string }
   | { kind: 'identify' }
   | { kind: 'add' }
   | { kind: 'doctor' }

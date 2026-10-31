@@ -295,6 +295,9 @@ export interface StubOptions {
 }
 
 function bodyOf(init: RequestInit | undefined): unknown {
+  if (init?.body instanceof Blob) {
+    return init.body;
+  }
   return typeof init?.body === 'string' ? JSON.parse(init.body) : null;
 }
 

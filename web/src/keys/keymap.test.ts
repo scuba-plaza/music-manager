@@ -312,12 +312,19 @@ describe('the footer hints', () => {
     expect(hintsFor(s)).toContainEqual({ keys: 'p', label: 'stop' });
   });
 
-  it('the cover field offers x to remove it and no enter until a file can be chosen', () => {
+  it('the cover field offers enter to choose a file and x to remove it', () => {
     const hints = hintsFor(state({ focus: 'inspector', detail: track([field('cover')]) }));
-    expect(hints.map((h) => h.keys)).not.toContain('enter');
-    expect(hints).toContainEqual({ keys: 'x', label: 'remove' });
+    expect(hints.slice(2, 4)).toEqual([
+      { keys: 'enter', label: 'choose' },
+      { keys: 'x', label: 'remove' },
+    ]);
     expect(hints).not.toContainEqual({ keys: 'enter', label: 'edit' });
     expect(hints.map((h) => h.label)).not.toContain('nudge');
+  });
+
+  it('the cover of an album offers enter to choose a file too', () => {
+    const hints = hintsFor(state({ focus: 'inspector', detail: artist([field('album'), field('cover')]), field: 1 }));
+    expect(hints).toContainEqual({ keys: 'enter', label: 'choose' });
   });
 
   it('enter edit shows only on a field that can be edited', () => {

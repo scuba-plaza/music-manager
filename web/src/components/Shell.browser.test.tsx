@@ -153,6 +153,21 @@ describe('the application', () => {
     expect(FakeEventSource.instances).toHaveLength(1);
   });
 
+  test('the page says it is busy while a change is on its way', async () => {
+    await render(<App />);
+    await expect.element(page.getByRole('banner')).toHaveTextContent('/music/library');
+    await expect.poll(() => useApp.getState().detail).not.toBeNull();
+    await expect.poll(() => useApp.getState().profiles).not.toEqual([]);
+    const app = page.getByTestId('app');
+    await expect.element(app).not.toHaveAttribute('aria-busy');
+
+    useApp.setState({ busy: true });
+    await expect.element(app).toHaveAttribute('aria-busy', 'true');
+
+    useApp.setState({ busy: false });
+    await expect.element(app).not.toHaveAttribute('aria-busy');
+  });
+
   test('the arrow keys switch between the panes in a window narrower than 800px', async () => {
     await page.viewport(500, 700);
     await render(<App />);

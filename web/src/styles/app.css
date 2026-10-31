@@ -841,3 +841,46 @@ input.edit.short {
 .dialog input.edit {
   margin-block: 0.3rem;
 }
+
+.form {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.15rem 1rem;
+  margin-block: 0.6rem;
+}
+
+.form .label {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: baseline;
+  color: var(--dim);
+}
+
+.form .label:focus-within {
+  color: var(--accent);
+}
+
+.form input.edit {
+  margin-block: 0;
+  border-color: var(--rule);
+}
+
+.form input.edit:focus {
+  border-color: var(--accent);
+}
+
+.bulk-summary {
+  min-height: 1.45em;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.bulk-summary.bad {
+  color: var(--bad);
+}
+
+body.dropping .app {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+}

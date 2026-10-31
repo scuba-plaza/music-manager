@@ -1,7 +1,8 @@
 import { getBlob, query, send } from '../api/client';
 import type { ChangeResponse, FieldView, HintView, PathView } from '../api/types.gen';
 import type { ActionName } from '../keys/keymap';
-import { fail, loadLibrary, pointRow, setStatus } from './actions';
+import { dropDetail, fail, loadDetail, loadLibrary, pointRow, setStatus } from './actions';
+import { chooseCover, removeCover } from './cover';
 import { chooseTab, currentField, fieldIndex, fieldList, isTrack, moveField, nextTab, nudgeable, previousTabOrBack } from './inspector';
 import { useApp, type EditState } from './store';
 import { ancestorKeys, rowByKey } from './tree';
@@ -16,21 +17,27 @@ export async function applyChange(call: () => Promise<ChangeResponse>): Promise<
     throw new Error('');
   }
   useApp.setState({ busy: true });
+  const dropped = dropDetail();
+  let reloaded = false;
   try {
     const res = await call();
     if (res.message !== undefined && res.message !== '') {
       setStatus(res.message);
     }
     if (res.same !== true && (res.message !== undefined || res.reveal !== undefined)) {
+      reloaded = true;
       await loadLibrary({ moves: res.moves, reveal: res.reveal });
     }
     return res;
   } finally {
     useApp.setState({ busy: false });
+    if (dropped && !reloaded) {
+      void loadDetail();
+    }
   }
 }
 
-async function attempt(call: () => Promise<ChangeResponse>): Promise<void> {
+export async function attempt(call: () => Promise<ChangeResponse>): Promise<void> {
   try {
     await applyChange(call);
   } catch (err) {
@@ -84,11 +91,15 @@ async function showNote(): Promise<void> {
 export function startEdit(): void {
   const s = useApp.getState();
   const f = currentField(s);
-  if (f === undefined || s.edit !== null || f.key === 'cover') {
+  if (f === undefined || s.edit !== null) {
     return;
   }
   if (!f.editable) {
     setStatus(`There is no ${f.label.toLowerCase()} to write in Latin letters`);
+    return;
+  }
+  if (f.key === 'cover') {
+    chooseCover();
     return;
   }
   useApp.setState({ edit: { field: fieldIndex(s), text: f.edit, second: f.second ?? '' } });
@@ -202,21 +213,6 @@ async function hear(): Promise<void> {
       fail(err);
     }
   }
-}
-
-function removeCover(): void {
-  const s = useApp.getState();
-  const d = s.detail;
-  if (currentField(s)?.key !== 'cover' || d === null) {
-    return;
-  }
-  const had = isTrack(d) ? (d.coverSha ?? '') !== '' : (d.coverTrack ?? '') !== '';
-  if (!had) {
-    setStatus('There is no cover to remove');
-    return;
-  }
-  const target = isTrack(d) ? { ids: d.id } : { group: s.cursor };
-  void attempt(() => send<ChangeResponse>('DELETE', '/api/cover' + query(target)));
 }
 
 export function goToRow(key: string): void {

@@ -17,6 +17,10 @@ export function isFolder(row: RowView): boolean {
   return row.kind !== 'track';
 }
 
+export function isAlbum(row: RowView): boolean {
+  return row.kind === 'album' && !row.key.startsWith('singles');
+}
+
 export function canFold(state: Rows): boolean {
   return !isFiltering(state.filter) && !isFlat(state.lib);
 }

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import type { DeviceView, PeekView, TrackView } from '../api/types.gen';
 import { fail } from '../state/actions';
+import { coverChooserAttribute, coverChosen } from '../state/cover';
 import { goToRow, stopPlaying } from '../state/edit';
 import { chooseTab, isTrack, tabIndex } from '../state/inspector';
 import { chooseProfile } from '../state/profiles';
@@ -171,6 +172,25 @@ function PeekPane({ view }: { view: PeekView }) {
   );
 }
 
+function CoverChooser() {
+  const attribute = { [coverChooserAttribute]: '' };
+  return (
+    <input
+      {...attribute}
+      type="file"
+      accept="image/jpeg,image/png"
+      hidden
+      tabIndex={-1}
+      aria-label="Cover file"
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        coverChosen(file);
+      }}
+    />
+  );
+}
+
 function Preview({ src }: { src: string }) {
   const audio = useRef<HTMLAudioElement>(null);
   useEffect(() => {
@@ -213,6 +233,7 @@ export function Inspector() {
     <div className="pane-body inspector" data-testid="inspector-pane">
       {body}
       {src !== undefined && <Preview src={src} />}
+      <CoverChooser />
     </div>
   );
 }

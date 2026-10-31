@@ -7,6 +7,7 @@ import { Tree } from './components/Tree';
 import { installKeys } from './keys/dispatch';
 import { OverlayHost } from './overlay/OverlayHost';
 import { connect, loadInfo, loadLibrary, run } from './state/actions';
+import { installPictures } from './state/cover';
 import { isTrack } from './state/inspector';
 import { loadProfiles } from './state/profiles';
 import { useApp } from './state/store';
@@ -20,6 +21,7 @@ function ignoreJob(): void {
 export function App() {
   const title = useApp((s) => s.lib?.view.sort.title ?? 'Library');
   const detailTitle = useApp((s) => (s.detail === null || isTrack(s.detail) ? 'Details' : s.detail.title));
+  const busy = useApp((s) => s.busy);
 
   useEffect(() => {
     void loadInfo();
@@ -30,8 +32,10 @@ export function App() {
 
   useEffect(() => installKeys(document, run), []);
 
+  useEffect(() => installPictures(document), []);
+
   return (
-    <div className="app">
+    <div className="app" data-testid="app" aria-busy={busy || undefined}>
       <Header />
       <Split
         leftTitle={title}
