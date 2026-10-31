@@ -1,0 +1,43 @@
+{
+  "name": "mm-web",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "rm -rf ../internal/web/dist/assets ../internal/web/dist/index.html && tsc -b && vite build --outDir ../internal/web/dist --emptyOutDir false",
+    "build:nix": "tsc -b && vite build --outDir dist",
+    "check": "tsc --noEmit && eslint . && vitest run --project unit",
+    "test:unit": "vitest run --project unit",
+    "test:browser": "vitest run --project browser",
+    "test:e2e": "pnpm run build && playwright test --pass-with-no-tests",
+    "test": "pnpm run test:unit && pnpm run test:browser && pnpm run test:e2e",
+    "gen:types": "cd .. && go run ./cmd/gentypes > web/src/api/types.gen.ts"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/browser-playwright": "^4.1.12",
+    "eslint": "^10.14.0",
+    "globals": "^17.13.0",
+    "playwright": "1.63.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.5",
+    "vitest": "^4.1.12",
+    "vitest-browser-react": "^2.3.0"
+  }
+}

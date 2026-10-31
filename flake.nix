@@ -32,9 +32,14 @@
         default = pkgs.mkShell {
           packages = with pkgs; [
             go
+            nodejs
+            pnpm_10
             yt-dlp
             ffmpeg
+            playwright-driver.browsers
           ];
+          PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
+          PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
         };
       });
 

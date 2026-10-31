@@ -36,6 +36,7 @@ type Server struct {
 	downloader app.Downloader
 	wolfgang   bool
 	profiles   *device.Registry
+	frontend   fs.FS
 
 	hub  *hub
 	jobs *jobs
@@ -83,12 +84,15 @@ func New(a *app.App, opts ...Option) *Server {
 func (s *Server) Handler() http.Handler { return guard(s.mux) }
 
 func (s *Server) routes() {
-	static, err := fs.Sub(staticFiles, "static")
-	if err != nil {
-		panic(err)
+	if s.frontend != nil {
+		s.mux.Handle("GET /", frontendHandler(s.frontend))
+	} else {
+		static, err := fs.Sub(staticFiles, "static")
+		if err != nil {
+			panic(err)
+		}
+		s.mux.Handle("GET /", noCache(http.FileServerFS(static)))
 	}
-	files := http.FileServerFS(static)
-	s.mux.Handle("GET /", noCache(files))
 
 	s.mux.HandleFunc("GET /api/info", s.info)
 	s.mux.HandleFunc("GET /api/profiles", s.listProfiles)
