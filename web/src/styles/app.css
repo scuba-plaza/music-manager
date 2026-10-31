@@ -376,6 +376,264 @@ kbd {
   color: var(--dim);
 }
 
+.inspector {
+  padding-block: 0.4rem 1rem;
+  padding-inline: 1rem;
+  scrollbar-color: var(--rule) transparent;
+  scrollbar-width: thin;
+}
+
+.inspector .rule {
+  margin-block: 0.4rem;
+  margin-inline: 0;
+  border: 0;
+  border-block-start: 1px solid var(--rule);
+}
+
+.dim {
+  color: var(--dim);
+}
+
+.bad {
+  color: var(--bad);
+}
+
+.warn {
+  color: var(--warn);
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-block-end: 0.4rem;
+}
+
+.tab {
+  padding-block: 0;
+  padding-inline: 0.5rem;
+  border: 0;
+  background: none;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+.tab.on {
+  background: var(--sel);
+  color: var(--fg);
+  font-weight: bold;
+}
+
+.tab.on::before {
+  content: '▌';
+  color: var(--accent);
+}
+
+.inspector .title {
+  margin: 0;
+  font-size: 1.1em;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin-block: 0.2rem 0.5rem;
+  margin-inline: 0;
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
+
+.note.warn {
+  color: var(--warn);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+}
+
+.fields .label {
+  position: relative;
+  padding-inline-start: 1rem;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.fields .value {
+  min-width: 0;
+  padding-inline-start: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.fields .value.dim {
+  color: var(--dim);
+}
+
+.fields .cur {
+  background: var(--sel);
+}
+
+.fields .label.cur {
+  color: var(--accent);
+}
+
+.fields .label.cur::before {
+  content: '▌';
+  position: absolute;
+  inset-inline-start: 0;
+  color: var(--accent);
+}
+
+.fields .span {
+  grid-column: 2;
+  padding-inline-start: 0.75rem;
+}
+
+.fields .value.editing {
+  padding-inline-end: 0.4rem;
+}
+
+.fields.device {
+  margin-block-start: 0.4rem;
+}
+
+.hintline {
+  color: var(--dim);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+}
+
+.note-live {
+  color: var(--accent);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+}
+
+input.edit {
+  width: 100%;
+  min-width: 0;
+  padding-block: 0;
+  padding-inline: 0.5rem;
+  border: 1px solid var(--accent);
+  outline: 0;
+  background: var(--bg);
+  caret-color: var(--accent);
+}
+
+input.edit::placeholder {
+  color: var(--dim);
+}
+
+input.edit.short {
+  width: 5rem;
+}
+
+.pair {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.pair input.edit:first-child {
+  flex: 1;
+}
+
+.profile {
+  max-width: 100%;
+  border: 1px solid var(--rule);
+  background: var(--bg);
+}
+
+.cover-box {
+  margin-block: 0.8rem 0.4rem;
+  margin-inline: 11rem 0;
+}
+
+.cover-box img {
+  display: block;
+  max-width: min(100%, 22rem);
+  max-height: 22rem;
+  border: 1px solid var(--rule);
+  background: var(--bg);
+}
+
+.pathline {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.pathline::before {
+  content: '→ ';
+}
+
+.foot {
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
+
+.bar {
+  display: flex;
+  align-items: stretch;
+  height: 1.1em;
+  margin-block: 0.15rem;
+}
+
+.bar i {
+  display: block;
+}
+
+.bar .kept {
+  background: var(--accent);
+}
+
+.bar .cut {
+  background: repeating-linear-gradient(45deg, var(--rule) 0 2px, transparent 2px 5px);
+}
+
+.level {
+  display: block;
+  width: 100%;
+  height: 1.6em;
+}
+
+.level path {
+  fill: var(--accent);
+}
+
+.listrows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: 1.5rem;
+  margin-block-start: 0.5rem;
+}
+
+.listrows .lr {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  cursor: pointer;
+}
+
+.listrows .lr > div {
+  padding-inline: 0.4rem;
+}
+
+.listrows .lr:hover {
+  background: var(--sel);
+}
+
+.listrows .l {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listrows .c {
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
 @media (width < 800px) {
   body {
     font-size: 14px;
@@ -396,6 +654,14 @@ kbd {
 
   .hints {
     justify-content: flex-start;
+  }
+
+  .fields {
+    grid-template-columns: 8rem minmax(0, 1fr);
+  }
+
+  .cover-box {
+    margin-inline: 0;
   }
 }
 

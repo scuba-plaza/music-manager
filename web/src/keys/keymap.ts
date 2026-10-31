@@ -1,4 +1,4 @@
-import type { FieldView } from '../api/types.gen';
+import { currentField, isTrack, nudgeable } from '../state/inspector';
 import type { AppState } from '../state/store';
 
 export type Scope = 'common' | 'tree' | 'inspector';
@@ -70,21 +70,8 @@ export interface Binding {
   help?: { page: HelpPage; text: string };
 }
 
-const cutFields = ['cutStart', 'cutEnd', 'volume', 'fadeIn', 'fadeOut'];
-
 function onTrack(s: AppState): boolean {
-  return s.detail !== null && 'tabs' in s.detail;
-}
-
-function currentField(s: AppState): FieldView | undefined {
-  const d = s.detail;
-  if (s.focus !== 'inspector' || d === null) {
-    return undefined;
-  }
-  if ('tabs' in d) {
-    return d.tabs[Math.min(s.tab, d.tabs.length - 1)]?.fields[s.field];
-  }
-  return d.fields?.[s.field];
+  return isTrack(s.detail);
 }
 
 function onCover(s: AppState): boolean {
@@ -92,7 +79,7 @@ function onCover(s: AppState): boolean {
 }
 
 function onCut(s: AppState): boolean {
-  return cutFields.includes(currentField(s)?.key ?? '');
+  return nudgeable.includes(currentField(s)?.key ?? '');
 }
 
 function canEdit(s: AppState): boolean {
@@ -277,6 +264,16 @@ export function resolveFilter(e: KeyEventLike): ActionName | undefined {
   }
   const name = keyName(e);
   return filterBindings.find((b) => b.key === name)?.action;
+}
+
+const editBindings: readonly { key: string; hint: string; second?: boolean }[] = [
+  { key: 'Enter', hint: 'save' },
+  { key: 'Tab', hint: 'next', second: true },
+  { key: 'Escape', hint: 'cancel' },
+];
+
+export function editHints(second: boolean): readonly { keys: string; label: string }[] {
+  return editBindings.flatMap((b) => (b.second === true && !second ? [] : [{ keys: keyLabel(b.key), label: b.hint }]));
 }
 
 export function filterHints(): readonly { keys: string; label: string }[] {

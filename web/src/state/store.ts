@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { InfoView, LibraryResponse, PeekView, TrackView } from '../api/types.gen';
+import type { InfoView, LibraryResponse, PeekView, ProfileView, TrackView } from '../api/types.gen';
 
 export type Focus = 'tree' | 'inspector';
 
@@ -15,6 +15,14 @@ export type OverlayState =
   | { kind: 'doctor' }
   | { kind: 'sync' };
 
+export interface EditState {
+  field: number;
+  text: string;
+  second?: string;
+  note?: string;
+  error?: string;
+}
+
 export interface AppState {
   info: InfoView | null;
   lib: LibraryResponse | null;
@@ -28,8 +36,11 @@ export interface AppState {
   field: number;
   tab: number;
   detail: TrackView | PeekView | null;
-  edit: { field: number; text: string } | null;
-  playing: { id: string; field: string } | null;
+  detailError: string;
+  edit: EditState | null;
+  playing: { id: string; field: string; src?: string } | null;
+  profiles: ProfileView[];
+  profile: string;
   status: { text: string; kind: '' | 'bad' | 'good' };
   overlay: OverlayState | null;
   busy: boolean;
@@ -81,8 +92,11 @@ export const useApp = create<AppState>()(() => ({
   field: 0,
   tab: recallTab(),
   detail: null,
+  detailError: '',
   edit: null,
   playing: null,
+  profiles: [],
+  profile: '',
   status: { text: '', kind: '' },
   overlay: null,
   busy: false,

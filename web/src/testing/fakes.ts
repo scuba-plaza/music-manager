@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { InfoView, LibraryResponse, PeekView, RowView, TrackView } from '../api/types.gen';
+import type { ChangeResponse, FieldView, InfoView, LibraryResponse, PeekView, ProfileView, RowView, TrackView } from '../api/types.gen';
 
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -247,32 +247,109 @@ export function peekViewFor(row: RowView): PeekView {
   return { kind: row.kind, title: row.kind, label: row.label, editable: row.editable === true, info: [], list: [] };
 }
 
-function answer(url: string, info: InfoView, library: LibraryResponse): Response {
-  const target = new URL(url, 'http://stub.invalid');
+
+export function sampleProfiles(): ProfileView[] {
+  return [
+    { name: 'generic', label: 'Generic', builtin: true },
+    { name: 'wolfgang-wmp01', label: 'Wolfgang WMP01', builtin: true },
+    { name: 'my-player', label: 'My Player', builtin: false },
+  ];
+}
+
+export function fieldView(key: string, overrides: Partial<FieldView> = {}): FieldView {
+  return { key, label: key, text: '', empty: '—', editable: true, edit: '', ...overrides };
+}
+
+export function changeResponse(overrides: Partial<ChangeResponse> = {}): ChangeResponse {
+  return { history: {}, ...overrides };
+}
+
+export function withDevice(view: TrackView, profile: string): TrackView {
+  const device = {
+    id: 'device',
+    name: 'Device',
+    fields: [],
+    device: {
+      rows: [
+        { label: 'Folder', value: `${profile}/Folder` },
+        { label: 'File', value: `01 - ${view.title}.mp3` },
+      ],
+      warnings: [`a warning for ${profile}`],
+      footnote: 'A preview: nothing of it is stored.',
+    },
+  };
+  return { ...view, tabs: [...view.tabs, device] };
+}
+
+export interface StubRequest {
+  method: string;
+  url: URL;
+  body: unknown;
+}
+
+export type StubRoute = (request: StubRequest) => Response | undefined;
+
+export interface StubOptions {
+  route?: StubRoute;
+  profiles?: ProfileView[];
+}
+
+function bodyOf(init: RequestInit | undefined): unknown {
+  return typeof init?.body === 'string' ? JSON.parse(init.body) : null;
+}
+
+function answer(request: StubRequest, info: InfoView, library: LibraryResponse, options: StubOptions): Response {
+  const routed = options.route?.(request);
+  if (routed !== undefined) {
+    return routed;
+  }
+  const target = request.url;
   const rows = library.view.rows;
-  if (target.pathname === '/api/info') {
+  const reading = request.method === 'GET';
+  if (reading && target.pathname === '/api/info') {
     return jsonResponse(info);
   }
-  if (target.pathname === '/api/library') {
+  if (reading && target.pathname === '/api/profiles') {
+    return jsonResponse(options.profiles ?? sampleProfiles());
+  }
+  if (reading && target.pathname === '/api/library') {
     const narrowed = narrowRows(rows, target.searchParams.get('q') ?? '');
     const shown = narrowed.filter((row) => row.trackId !== undefined).length;
     return jsonResponse({ ...library, view: { ...library.view, rows: narrowed, shown } });
   }
   const track = /^\/api\/tracks\/([^/]+)$/.exec(target.pathname);
-  if (track) {
+  if (reading && track) {
     const found = rows.find((row) => row.trackId === decodeURIComponent(track[1] ?? ''));
-    return found ? jsonResponse(trackViewFor(found)) : jsonResponse({ error: 'not found' }, 404);
+    const profile = target.searchParams.get('profile');
+    if (profile !== null && !(options.profiles ?? sampleProfiles()).some((p) => p.name === profile)) {
+      return jsonResponse({ error: `there is no device profile named "${profile}"` }, 400);
+    }
+    if (!found) {
+      return jsonResponse({ error: 'not found' }, 404);
+    }
+    return jsonResponse(profile === null ? trackViewFor(found) : withDevice(trackViewFor(found), profile));
   }
-  if (target.pathname === '/api/peek') {
+  if (reading && target.pathname === '/api/peek') {
     const found = rows.find((row) => row.key === target.searchParams.get('key'));
     return found ? jsonResponse(peekViewFor(found)) : jsonResponse({ error: 'not found' }, 404);
   }
-  return jsonResponse({ error: `the stub server has no answer for ${target.pathname}` }, 404);
+  return jsonResponse({ error: `the stub server has no answer for ${request.method} ${target.pathname}` }, 404);
 }
 
-export function stubServer(info: InfoView = infoView(), library: LibraryResponse = libraryResponse()) {
-  const fetchMock = vi.fn<typeof fetch>((input) => Promise.resolve(answer(urlOf(input), info, library)));
+export function stubServer(info: InfoView = infoView(), library: LibraryResponse = libraryResponse(), options: StubOptions = {}) {
+  const fetchMock = vi.fn<typeof fetch>((input, init) => {
+    const request = { method: init?.method ?? 'GET', url: new URL(urlOf(input), 'http://stub.invalid'), body: bodyOf(init) };
+    return Promise.resolve(answer(request, info, library, options));
+  });
   vi.stubGlobal('fetch', fetchMock);
   vi.stubGlobal('EventSource', FakeEventSource);
   return fetchMock;
+}
+
+export function requestsTo(fetchMock: { mock: { calls: Parameters<typeof fetch>[] } }, method: string, path: string): unknown[] {
+  return fetchMock.mock.calls.flatMap(([input, init]) => {
+    const url = new URL(urlOf(input), 'http://stub.invalid');
+    const sent = init?.method ?? 'GET';
+    return sent === method && url.pathname + url.search === path ? [bodyOf(init)] : [];
+  });
 }

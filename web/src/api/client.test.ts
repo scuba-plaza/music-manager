@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { headerOf, jsonResponse, requestOf } from '../testing/fakes';
-import { ApiError, get, query, send } from './client';
+import { ApiError, get, getBlob, query, send } from './client';
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -123,6 +123,30 @@ describe('the client', () => {
     await get('/api/library', { signal: controller.signal });
 
     expect(requestOf(fetchMock).init.signal).toBe(controller.signal);
+  });
+});
+
+describe('getBlob', () => {
+  it('returns the bytes of the answer', async () => {
+    fetchMock.mockResolvedValue(new Response(new Blob([new Uint8Array([1, 2, 3])]), { headers: { 'Content-Type': 'audio/mpeg' } }));
+
+    const blob = await getBlob('/api/tracks/a/preview?field=cutStart');
+
+    expect(requestOf(fetchMock).url).toBe('/api/tracks/a/preview?field=cutStart');
+    expect(headerOf(requestOf(fetchMock).init, 'X-MM')).toBe('1');
+    expect([...new Uint8Array(await blob.arrayBuffer())]).toEqual([1, 2, 3]);
+  });
+
+  it('turns an error body into the message', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ error: 'ffmpeg is not installed' }, 500));
+
+    await expect(getBlob('/api/tracks/a/preview')).rejects.toEqual(new ApiError('ffmpeg is not installed', 500));
+  });
+
+  it('turns a failed fetch into the unreachable message', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await expect(getBlob('/api/tracks/a/preview')).rejects.toThrow('Cannot reach mm. Is it still running?');
   });
 });
 

@@ -48,7 +48,7 @@ async function failure(res: Response): Promise<ApiError> {
   return new ApiError(text, res.status);
 }
 
-async function call<T>(method: Method, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+async function request(method: Method, path: string, body?: unknown, signal?: AbortSignal): Promise<Response> {
   const headers: Record<string, string> = { 'X-MM': '1' };
   const init: RequestInit = { method, headers };
   if (signal) {
@@ -72,7 +72,15 @@ async function call<T>(method: Method, path: string, body?: unknown, signal?: Ab
   if (!res.ok) {
     throw await failure(res);
   }
-  return (await readBody(res)) as T;
+  return res;
+}
+
+async function call<T>(method: Method, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  return (await readBody(await request(method, path, body, signal))) as T;
+}
+
+export async function getBlob(path: string): Promise<Blob> {
+  return (await request('GET', path)).blob();
 }
 
 export function get<T>(path: string, init?: { signal?: AbortSignal }): Promise<T> {

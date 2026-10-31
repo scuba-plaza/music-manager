@@ -2,6 +2,7 @@ import { get, query } from '../api/client';
 import { subscribe } from '../api/events';
 import type { InfoView, JobView, LibraryResponse, PeekView, RowView, TrackView } from '../api/types.gen';
 import type { ActionName } from '../keys/keymap';
+import { runInspector, stopPlaying } from './edit';
 import { useApp, type AppState, type Focus } from './store';
 import {
   ancestorKeys,
@@ -51,23 +52,23 @@ export async function loadDetail(): Promise<void> {
   clearTimeout(detailTimer);
   detailSeq += 1;
   const seq = detailSeq;
-  const { lib, cursor, filter } = useApp.getState();
+  const { lib, cursor, filter, profile } = useApp.getState();
   const row = rowByKey(lib, cursor);
   if (row === undefined) {
-    useApp.setState({ detail: null });
+    useApp.setState({ detail: null, detailError: '' });
     return;
   }
   try {
     const detail =
       row.kind === 'track'
-        ? await get<TrackView>(`/api/tracks/${encodeURIComponent(row.trackId ?? '')}`)
+        ? await get<TrackView>(`/api/tracks/${encodeURIComponent(row.trackId ?? '')}` + query({ profile }))
         : await get<PeekView>('/api/peek' + query({ key: row.key, q: filter.trim() }));
     if (seq === detailSeq) {
-      useApp.setState({ detail });
+      useApp.setState({ detail, detailError: '' });
     }
   } catch (err) {
     if (seq === detailSeq) {
-      useApp.setState({ detail: null });
+      useApp.setState({ detail: null, detailError: err instanceof Error ? err.message : String(err) });
       fail(err);
     }
   }
@@ -77,7 +78,7 @@ function change(patch: Partial<AppState>): void {
   const before = useApp.getState();
   const cursor = settledCursor({ ...before, ...patch });
   const moved = cursor !== before.cursor;
-  useApp.setState(moved ? { ...patch, cursor, edit: null } : { ...patch, cursor });
+  useApp.setState(moved ? { ...patch, cursor, edit: null, playing: null } : { ...patch, cursor });
   if (moved) {
     scheduleDetail();
   }
@@ -371,8 +372,20 @@ export function markRow(key: string): void {
   toggleMark();
 }
 
+function toggleFocus(focus: Focus): void {
+  const row = cursorRow();
+  if (focus === 'inspector') {
+    focusPane('tree');
+  } else if (row !== undefined) {
+    enterFields(row);
+  }
+}
+
 function escape(): void {
   const { focus, filter, marks } = useApp.getState();
+  if (stopPlaying()) {
+    return;
+  }
   if (focus === 'inspector') {
     focusPane('tree');
   } else if (filter !== '') {
@@ -443,13 +456,11 @@ export function run(action: ActionName): void {
     case 'escape':
       escape();
       break;
-    case 'previousTabOrBack':
-      focusPane('tree');
-      break;
     case 'toggleFocus':
-      focusPane(focus === 'tree' ? 'inspector' : 'tree');
+      toggleFocus(focus);
       break;
     default:
+      runInspector(action);
       break;
   }
 }

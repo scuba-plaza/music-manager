@@ -4,6 +4,7 @@ import type { AppState } from '../state/store';
 import { libraryResponse } from '../testing/fakes';
 import {
   bindings,
+  editHints,
   filterHints,
   helpPages,
   hintsFor,
@@ -40,8 +41,11 @@ function state(overrides: Partial<AppState> = {}): AppState {
     field: 0,
     tab: 0,
     detail: null,
+    detailError: '',
     edit: null,
     playing: null,
+    profiles: [],
+    profile: '',
     status: { text: '', kind: '' },
     overlay: null,
     busy: false,
@@ -397,6 +401,23 @@ describe('the filter box', () => {
     expect(filterHints()).toEqual([
       { keys: 'enter', label: 'keep' },
       { keys: 'esc', label: 'clear' },
+    ]);
+  });
+});
+
+describe('the keys of a field being typed in', () => {
+  it('hints enter save and esc cancel', () => {
+    expect(editHints(false)).toEqual([
+      { keys: 'enter', label: 'save' },
+      { keys: 'esc', label: 'cancel' },
+    ]);
+  });
+
+  it('hints tab next between them for the two numbers of a track', () => {
+    expect(editHints(true)).toEqual([
+      { keys: 'enter', label: 'save' },
+      { keys: 'tab', label: 'next' },
+      { keys: 'esc', label: 'cancel' },
     ]);
   });
 });

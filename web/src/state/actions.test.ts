@@ -204,6 +204,8 @@ describe('run', () => {
   });
 
   it('toggleFocus goes to the other pane', () => {
+    showSample(keys.rough, { expanded: new Set([keys.needs]) });
+
     run('toggleFocus');
     expect(useApp.getState().focus).toBe('inspector');
 
