@@ -49,9 +49,6 @@ func (target profileTarget) Diagnose(tracks []manifest.Track) []Warning {
 		key := strings.ToLower(layout.PathFor(t, cut))
 		byName[key] = append(byName[key], t)
 	}
-	if p.StemMax == 0 {
-		return out
-	}
 	for _, key := range slices.Sorted(maps.Keys(byName)) {
 		same := byName[key]
 		for _, t := range same {

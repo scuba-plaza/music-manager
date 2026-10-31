@@ -182,3 +182,52 @@ func TestTheWarningsComeInTheSameOrderEveryTime(t *testing.T) {
 		}
 	}
 }
+
+func warningKinds(ws []device.Warning) []string {
+	kinds := map[string]string{"genre": "the genre", "no-latin": "no Latin letters", "several": "looks like several", "cut": "is cut at"}
+	var out []string
+	for _, kind := range []string{"genre", "no-latin", "several", "cut"} {
+		for _, w := range ws {
+			if strings.Contains(w.Message, kinds[kind]) {
+				out = append(out, kind)
+				break
+			}
+		}
+	}
+	return out
+}
+
+func TestEachDiagnosticFollowsItsProfileField(t *testing.T) {
+	genre := track("genre1", "Rock Band", "", "Loud")
+	genre.Genre = "Alternative Rock Pop"
+	tracks := []manifest.Track{
+		genre,
+		track("emoji1", "🎵🎶", "", "Song"),
+		track("duo001", "Fairuz & Ziad Rahbani", "", "Song"),
+		track("cuta01", "Artist", "", "A Very Long Song Title Indeed Yes"),
+		track("cutb01", "Artist", "", "A Very Long Song Title Indeed No"),
+	}
+	for _, c := range []struct {
+		name   string
+		fields string
+		want   []string
+	}{
+		{"nothing set", ``, nil},
+		{"latin_names only", `latin_names = true`, []string{"no-latin"}},
+		{"stem_max only", `stem_max = 20`, []string{"cut"}},
+		{"latin_names and tag_width without latin_genre", "latin_names = true\ntag_width = 12", []string{"no-latin", "several"}},
+		{"latin_genre without tag_width", `latin_genre = true`, nil},
+		{"every check on", "latin_names = true\ntag_width = 12\nlatin_genre = true\nstem_max = 20", []string{"genre", "no-latin", "several", "cut"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			profiles, err := device.ParseProfiles([]byte("[[profile]]\nname = \"my-player\"\n" + c.fields + "\n"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			ws := profiles[0].Target().Diagnose(tracks)
+			if got := warningKinds(ws); !reflect.DeepEqual(got, c.want) {
+				t.Errorf("warnings %v, want %v: %+v", got, c.want, ws)
+			}
+		})
+	}
+}

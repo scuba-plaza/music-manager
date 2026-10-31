@@ -12,7 +12,6 @@ import (
 
 // Target is a kind of place the library is written to.
 type Target interface {
-	// Name is the name of the profile the target is made from, as messages give it.
 	Name() string
 	// Layout says how paths are made.
 	Layout() layout.Rules

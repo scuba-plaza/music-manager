@@ -61,13 +61,6 @@ var particles = map[string]bool{
 	"de": true, "di": true, "da": true, "van": true, "von": true, "der": true, "le": true, "la": true,
 }
 
-// ArtistName is the artist as the Wolfgang shows it: the name in Latin
-// letters, in width characters. The first of these that fits
-// wins: the name; without a leading "The" and what is in parentheses;
-// "Various Artists" as "Various"; for two words or more, the initials of the
-// given names and the surname ("M. A. Wahab"), the first initial and the
-// surname, the surname alone, the last word alone; the name shortened at a
-// word; the name cut.
 func ArtistName(name string, width int) string {
 	name = latinName(name)
 	if fits(name, width) {
@@ -115,12 +108,6 @@ func initial(word string) string {
 	return ""
 }
 
-// AlbumName is the album as the Wolfgang shows it, in the same way: the name
-// in Latin letters, in width characters. The first of these that
-// fits wins: the name; without a leading "The", what is in parentheses and a
-// trailing "- EP" or "- Single"; without the artist's name, or a word of
-// four letters or more from it, at the start; the name shortened at a word;
-// the name cut.
 func AlbumName(name, artist string, width int) string {
 	name, artist = latinName(name), latinName(artist)
 	if fits(name, width) {
