@@ -279,7 +279,7 @@ function openOneLevel(): void {
 
 function closeEverything(): void {
   const state = useApp.getState();
-  if (canFold(state)) {
+  if (canFold(state) && state.expanded.size > 0) {
     change({ expanded: new Set() });
   }
 }
@@ -314,7 +314,9 @@ function toggleMark(): void {
 function markAll(): void {
   const state = useApp.getState();
   const ids = new Set(visibleRows(state).flatMap((row) => (row.trackId === undefined ? [] : [row.trackId])));
-  useApp.setState({ marks: toggledMarks(state.marks, [...ids]) });
+  if (ids.size > 0) {
+    useApp.setState({ marks: toggledMarks(state.marks, [...ids]) });
+  }
 }
 
 let filterTimer: ReturnType<typeof setTimeout> | undefined;

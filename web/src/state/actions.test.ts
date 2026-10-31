@@ -7,6 +7,7 @@ import {
   libraryResponse,
   memoryStorage,
   narrowRows,
+  peekViewFor,
   requestOf,
   sampleLibrary,
   stubServer,
@@ -295,24 +296,30 @@ describe('the cursor', () => {
     expect(cursorLabel()).toBe('Needs work');
   });
 
-  it('does nothing before the library has loaded', () => {
+  it('does nothing before the library has loaded: not even a new state', () => {
     useApp.setState({ lib: null, cursor: null });
+    const before = useApp.getState();
 
     run('moveDown');
+    run('moveToBottom');
     run('markToggle');
     run('markAll');
     run('enterRow');
+    run('open');
+    run('close');
+    run('openLevel');
+    run('closeAll');
 
-    expect(useApp.getState().cursor).toBeNull();
-    expect(useApp.getState().marks.size).toBe(0);
+    expect(useApp.getState()).toBe(before);
   });
 
   it('loads the peek of a group and the track of a track row once the cursor rests', async () => {
     const fetchSpy = vi.mocked(fetch);
 
     run('moveDown');
+    await vi.advanceTimersByTimeAsync(39);
     expect(fetchSpy).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(40);
+    await vi.advanceTimersByTimeAsync(1);
 
     expect(requestOf(fetchSpy, 0).url).toBe('/api/peek?key=needs');
     expect(useApp.getState().detail).toMatchObject({ kind: 'group', label: 'Needs work' });
@@ -347,6 +354,15 @@ describe('the cursor', () => {
     await vi.advanceTimersByTimeAsync(40);
 
     expect(requestOf(vi.mocked(fetch)).url).toBe(peekUrl(keys.kindOfBlue, 'miles'));
+  });
+
+  it('pointing at the row the cursor is on drops a field that was being typed in too', () => {
+    showSample(keys.miles);
+    useApp.setState({ edit: { field: 1, text: 'draft' } });
+
+    pointRow(keys.miles);
+
+    expect(useApp.getState().edit).toBeNull();
   });
 
   it('moving drops a field that was being typed in', () => {
@@ -474,6 +490,16 @@ describe('opening and closing', () => {
     expect(cursorLabel()).toBe('Kind of Blue');
   });
 
+  it('close goes nowhere in a sorted list, where rows have no parents', () => {
+    const sorted = sampleLibrary();
+    sorted.view.sort = { ...sorted.view.sort, key: 'title' };
+    useApp.setState({ lib: sorted, cursor: keys.soWhat });
+
+    run('close');
+
+    expect(useApp.getState().cursor).toBe(keys.soWhat);
+  });
+
   it('close folds nothing while a filter is typed, but still goes up', () => {
     showSample(keys.kindOfBlue, { filter: 'miles' });
 
@@ -553,7 +579,10 @@ describe('marks', () => {
 
   it('markToggle on a row with no tracks marks nothing and stays', () => {
     const empty = sampleLibrary();
-    empty.view.rows = [{ kind: 'playlist', depth: 0, key: 'playlist\u001fEmpty', label: 'Empty' }];
+    empty.view.rows = [
+      { kind: 'playlist', depth: 0, key: 'playlist\u001fEmpty', label: 'Empty' },
+      { kind: 'playlist', depth: 0, key: 'playlist\u001fOther', label: 'Other' },
+    ];
     useApp.setState({ lib: empty, cursor: 'playlist\u001fEmpty' });
 
     run('markToggle');
@@ -726,12 +755,16 @@ describe('the filter', () => {
     expect(libraryUrls()).toEqual(['/api/library']);
   });
 
-  it('opening a row while a filter is typed is not remembered', () => {
-    useApp.setState({ filter: 'miles' });
+  it('opening and closing is not remembered while a filter is typed', () => {
+    showSample(keys.miles, { filter: 'miles', expanded: new Set([keys.miles]) });
+    const before = useApp.getState().expanded;
 
     run('enterRow');
+    run('closeAll');
+    run('openLevel');
 
-    expect([...useApp.getState().expanded]).toEqual([]);
+    expect(useApp.getState().expanded).toBe(before);
+    expect([...before]).toEqual([keys.miles]);
   });
 });
 
@@ -794,7 +827,10 @@ describe('loadLibrary for the tree', () => {
 
   it('has no cursor and no details for an empty library', async () => {
     serve(libraryResponse());
-    useApp.setState({ cursor: keys.miles });
+    useApp.setState({
+      cursor: keys.miles,
+      detail: { kind: 'artist', title: 'Artist', label: 'Miles Davis', editable: true, info: [], list: [] },
+    });
 
     await loadLibrary();
 
@@ -816,6 +852,18 @@ describe('loadLibrary for the tree', () => {
   it('forgets the marks of tracks that are no longer in the library', async () => {
     serve(sampleLibrary());
     useApp.setState({ marks: new Set(['blue', 'gone']) });
+
+    await loadLibrary();
+
+    expect([...useApp.getState().marks]).toEqual(['blue']);
+  });
+
+  it('forgets the marks of tracks that are gone from a sorted list too', async () => {
+    const sorted = sampleLibrary();
+    sorted.view.rows = sorted.view.rows.filter((row) => row.kind === 'track').map((row) => ({ ...row, depth: 0 }));
+    sorted.view.sort = { ...sorted.view.sort, key: 'title' };
+    serve(sorted);
+    useApp.setState({ sort: { key: 'title', reverse: false }, marks: new Set(['blue', 'gone']) });
 
     await loadLibrary();
 
@@ -882,6 +930,88 @@ describe('loadLibrary for the tree', () => {
     await loadLibrary();
 
     expect(cursorLabel()).toBe('Miles Davis');
+  });
+});
+
+describe('details that arrive late', () => {
+  let answers: ((response: Response) => void)[];
+
+  async function settle(): Promise<void> {
+    for (let turn = 0; turn < 10; turn += 1) {
+      await new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      });
+    }
+  }
+
+  function peekAnswer(key: string): Response {
+    const row = rowByKey(sampleLibrary(), key);
+    if (!row) {
+      throw new Error(`the sample has no row ${key}`);
+    }
+    return jsonResponse(peekViewFor(row));
+  }
+
+  async function moveTwice(): Promise<void> {
+    run('moveDown');
+    await vi.advanceTimersByTimeAsync(40);
+    run('moveDown');
+    await vi.advanceTimersByTimeAsync(40);
+    expect(answers).toHaveLength(2);
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers(timers);
+    answers = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(
+        () =>
+          new Promise<Response>((resolve) => {
+            answers.push(resolve);
+          }),
+      ),
+    );
+    showSample();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('an answer for a row the cursor has left does not replace the answer for the row it is on', async () => {
+    await moveTwice();
+
+    answers[1]?.(peekAnswer(keys.fairuz));
+    await settle();
+    expect(useApp.getState().detail).toMatchObject({ label: 'فيروز' });
+
+    answers[0]?.(peekAnswer(keys.needs));
+    await settle();
+
+    expect(useApp.getState().detail).toMatchObject({ label: 'فيروز' });
+  });
+
+  it('a failure for a row the cursor has left neither clears the details nor shows an error', async () => {
+    await moveTwice();
+    answers[1]?.(peekAnswer(keys.fairuz));
+    await settle();
+
+    answers[0]?.(jsonResponse({ error: 'the group is gone' }, 500));
+    await settle();
+
+    expect(useApp.getState().detail).toMatchObject({ label: 'فيروز' });
+    expect(useApp.getState().status).toEqual({ text: '', kind: '' });
+  });
+
+  it('a failure for the row the cursor is on does show', async () => {
+    await moveTwice();
+
+    answers[1]?.(jsonResponse({ error: 'the group is gone' }, 500));
+    await settle();
+
+    expect(useApp.getState().detail).toBeNull();
+    expect(useApp.getState().status).toEqual({ text: 'the group is gone', kind: 'bad' });
   });
 });
 

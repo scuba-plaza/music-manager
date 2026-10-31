@@ -150,6 +150,16 @@ describe('keysToOpenOneLevel', () => {
     ]);
   });
 
+  it('leaves the closed rows below an open row alone until the level above is open', () => {
+    expect(keysToOpenOneLevel(view({ expanded: [milesKey] }))).toEqual([
+      'playlists',
+      'needs',
+      `artist${sep}فيروز`,
+      `artist${sep}John Coltrane`,
+      `artist${sep}Nina Simone`,
+    ]);
+  });
+
   it('opens nothing when everything is open, while filtering and in a sorted list', () => {
     const everything = sampleRows()
       .filter((row) => row.kind !== 'track')

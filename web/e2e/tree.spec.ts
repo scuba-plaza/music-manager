@@ -98,9 +98,11 @@ test('enter opens an artist and its albums, and again closes them', async ({ pag
 test('+ opens a level and - closes all of it', async ({ page, press }) => {
   await openPage(page);
   await row(page, 'Miles Davis').click();
+  await press('Enter');
+  await expect(row(page, 'Kind of Blue')).toBeVisible();
+  await expect(row(page, 'Songs')).toHaveCount(0);
 
   await press('+');
-  await expect(row(page, 'Kind of Blue')).toBeVisible();
   await expect(row(page, 'Songs')).toBeVisible();
   await expect(row(page, 'Rough Mix')).toBeVisible();
   await expect(row(page, 'So What')).toHaveCount(0);

@@ -349,6 +349,7 @@ describe('the cursor', () => {
 
     await userEvent.keyboard('j');
 
+    await expect.poll(cursorLabel).toBe('Needs work');
     await expect.poll(() => useApp.getState().detail).toMatchObject({ label: 'Needs work' });
   });
 });
@@ -390,11 +391,14 @@ describe('opening and closing', () => {
 
   test('+ and = open one level more, - closes everything', async () => {
     await showTree();
+    await userEvent.keyboard('{Enter}');
+    await expect.poll(labels).toContain('Late night');
 
     await userEvent.keyboard('+');
     await expect.poll(() => rows().length).toBe(12);
     expect(labels()).toContain('Songs');
     expect(labels()).not.toContain('وطني');
+    expect(labels()).not.toContain('Blue in Green');
 
     await userEvent.keyboard('=');
     await expect.poll(labels).toContain('وطني');
@@ -548,12 +552,14 @@ describe('marks', () => {
   });
 
   test('escape clears the marks when there is no filter', async () => {
-    useApp.setState({ expanded: new Set([milesKey]), marks: new Set(['blue']) });
+    useApp.setState({ expanded: new Set([milesKey, kindOfBlueKey]), marks: new Set(['sowhat']) });
     await showTree();
+    await expect.poll(() => markOf('So What')).toBe('●');
 
     await userEvent.keyboard('{Escape}');
 
-    await expect.poll(() => useApp.getState().marks.size).toBe(0);
+    await expect.poll(() => markOf('So What')).toBe('');
+    expect(useApp.getState().marks.size).toBe(0);
   });
 });
 
@@ -697,5 +703,110 @@ describe('the filter', () => {
 
     await userEvent.click(page.getByRole('treeitem', { name: /Nina Simone/ }));
     await expect.poll(hints).toContain('/ filter');
+  });
+});
+
+describe('what the pane says when it has no rows', () => {
+  test('it says it is loading until the first answer arrives', async () => {
+    await render(
+      <Sized height={280}>
+        <Tree />
+      </Sized>,
+    );
+
+    await expect.element(page.getByText('Loading…')).toBeVisible();
+    expect(rows()).toHaveLength(0);
+
+    fetchMock = stubServer(infoView(), sampleLibrary());
+    await loadLibrary();
+
+    await expect.poll(labels).toEqual(topLevel);
+    await expect.element(page.getByText('Loading…')).not.toBeInTheDocument();
+  });
+
+  test('it says why the library did not load, and goes on saying it after a key press cleared the status line', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+    await render(
+      <Sized height={280}>
+        <Tree />
+      </Sized>,
+    );
+
+    await loadLibrary();
+
+    const pane = page.getByTestId('tree-pane');
+    await expect.element(pane).toHaveTextContent('Cannot reach mm. Is it still running?');
+    await expect.element(page.getByText('Loading…')).not.toBeInTheDocument();
+
+    await userEvent.keyboard('j');
+
+    expect(useApp.getState().status.text).toBe('');
+    await expect.element(pane).toHaveTextContent('Cannot reach mm. Is it still running?');
+  });
+
+  test('an empty library says so even while a filter is typed', async () => {
+    await showTree(libraryResponse());
+
+    await userEvent.fill(filterBox(), 'zzzz');
+
+    await expect.poll(() => libraryRequests().at(-1)).toBe('/api/library?q=zzzz');
+    await expect.element(page.getByText('The library is empty.', { exact: false })).toBeVisible();
+    await expect.element(page.getByText('Nothing matches the filter.')).not.toBeInTheDocument();
+  });
+
+  test('escape after a filter that matched nothing does not say the library is empty while the server is asked again', async () => {
+    await showTree();
+    await userEvent.fill(filterBox(), 'zzzz');
+    await expect.element(page.getByText('Nothing matches the filter.')).toBeVisible();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(
+        () =>
+          new Promise<Response>(() => {
+            return;
+          }),
+      ),
+    );
+
+    await userEvent.keyboard('{Escape}');
+
+    await expect.element(filterBox()).toHaveValue('');
+    await pause(250);
+    expect(page.getByText('The library is empty.', { exact: false }).elements()).toHaveLength(0);
+    await expect.element(page.getByText('Nothing matches the filter.')).toBeVisible();
+  });
+});
+
+describe('giving the keys back to the tree', () => {
+  test('enter in the filter box gives the keys to the tree even when they were in the fields', async () => {
+    await showTree();
+    useApp.setState({ focus: 'inspector' });
+    await userEvent.click(filterBox());
+    expect(useApp.getState().filterFocused).toBe(true);
+    expect(useApp.getState().focus).toBe('inspector');
+
+    await userEvent.keyboard('{Enter}');
+
+    await expect.poll(() => useApp.getState().filterFocused).toBe(false);
+    expect(useApp.getState().focus).toBe('tree');
+    await userEvent.keyboard('j');
+    await expect.poll(cursorLabel).toBe('Needs work');
+  });
+
+  test('a click on the empty part of the tree after leaving the filter box gives it the keys', async () => {
+    await showTree();
+    useApp.setState({ focus: 'inspector' });
+    await userEvent.click(filterBox());
+    expect(useApp.getState().filterFocused).toBe(true);
+
+    await page.getByRole('tree').click({ position: { x: 20, y: 200 } });
+
+    await expect.poll(() => useApp.getState().filterFocused).toBe(false);
+    expect(useApp.getState().focus).toBe('tree');
+    await userEvent.keyboard('j');
+    await expect.poll(cursorLabel).toBe('Needs work');
   });
 });

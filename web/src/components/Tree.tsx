@@ -1,4 +1,4 @@
-import { memo, useId, useLayoutEffect, useMemo, type MouseEvent } from 'react';
+import { memo, useEffect, useId, useLayoutEffect, useMemo, useState, type MouseEvent } from 'react';
 import type { RowView } from '../api/types.gen';
 import { filterBoxAttribute } from '../keys/dispatch';
 import {
@@ -14,6 +14,8 @@ import {
 import { useApp } from '../state/store';
 import { isFiltering, isFlat, isFolder, isOpen, markStateOf, visibleRows, type MarkState } from '../state/tree';
 import { scrollCursorIntoView } from '../state/treeDom';
+
+const emptyLibrary = 'The library is empty. Press a to add from a link, or drop files on the page.';
 
 const markGlyphs: Record<MarkState, string> = { none: '', some: '◐', all: '●' };
 
@@ -140,6 +142,8 @@ export function Tree() {
   const expanded = useApp((s) => s.expanded);
   const cursor = useApp((s) => s.cursor);
   const marks = useApp((s) => s.marks);
+  const status = useApp((s) => s.status);
+  const [failure, setFailure] = useState('');
   const shown = useMemo(() => visibleRows({ lib, filter, expanded }), [lib, filter, expanded]);
   const flat = isFlat(lib);
   const filtering = isFiltering(filter);
@@ -148,9 +152,19 @@ export function Tree() {
     scrollCursorIntoView();
   }, [shown, cursor]);
 
-  let empty = '';
-  if (lib !== null && shown.length === 0) {
-    empty = filtering ? 'Nothing matches the filter.' : 'The library is empty. Press a to add from a link, or drop files on the page.';
+  useEffect(() => {
+    if (lib !== null) {
+      setFailure('');
+    } else if (status.kind === 'bad') {
+      setFailure(status.text);
+    }
+  }, [lib, status]);
+
+  let notice = '';
+  if (lib === null) {
+    notice = failure === '' ? 'Loading…' : failure;
+  } else if (shown.length === 0) {
+    notice = lib.view.tracks === 0 ? emptyLibrary : 'Nothing matches the filter.';
   }
 
   return (
@@ -169,7 +183,7 @@ export function Tree() {
           />
         ))}
       </div>
-      {empty !== '' && <div className="empty">{empty}</div>}
+      {notice !== '' && <div className="empty">{notice}</div>}
     </div>
   );
 }
