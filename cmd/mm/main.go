@@ -8,13 +8,10 @@ import (
 	"strings"
 	"syscall"
 
-	"golang.org/x/term"
-
 	"music-manager/internal/app"
-	"music-manager/internal/cli"
+	"music-manager/internal/launch"
 	"music-manager/internal/loudness"
 	"music-manager/internal/musicbrainz"
-	"music-manager/internal/prompt"
 	"music-manager/internal/version"
 	"music-manager/internal/web"
 	"music-manager/internal/ytdlp"
@@ -24,40 +21,45 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	lookup := musicbrainz.New(userAgent())
-	if url := os.Getenv("MM_MUSICBRAINZ_URL"); url != "" { // a mirror, or a stand-in for tests
-		lookup.BaseURL = strings.TrimRight(url, "/")
-	}
-	if url := os.Getenv("MM_COVERART_URL"); url != "" { // likewise for cover art
-		lookup.CoverURL = strings.TrimRight(url, "/")
-	}
-	deps := cli.Deps{Downloader: ytdlp.New(), Metadata: lookup, Loudness: loudness.NewFFmpeg()}
-	deps.RunWeb = func(ctx context.Context, a *app.App, o cli.WebOptions) error {
-		opts := []web.Option{web.WithSource(lookup), web.WithDownloader(deps.Downloader)}
-		if o.Wolfgang {
-			opts = append(opts, web.WithWolfgang())
-		}
-		ln, err := web.Listen(o.Addr, !o.AddrSet)
-		if err != nil {
-			return err
-		}
-		url := web.URL(ln)
-		fmt.Fprintf(o.Out, "mm is at %s  (Ctrl+C stops it)\n", url)
-		if !o.NoOpen {
-			if err := web.OpenBrowser(url); err != nil {
-				fmt.Fprintln(o.Out, "mm: cannot open a browser:", err)
-			}
-		}
-		return web.New(a, opts...).Serve(ctx, ln)
-	}
-	if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
-		deps.Prompter = prompt.New(os.Stdin, os.Stderr)
-	}
-	os.Exit(cli.Run(ctx, os.Args[1:], cli.IO{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}, deps))
+	home, _ := os.UserHomeDir()
+	os.Exit(launch.Run(ctx, launch.Env{
+		Args:   os.Args[1:],
+		Getenv: os.Getenv,
+		Home:   home,
+		Out:    os.Stdout,
+		Err:    os.Stderr,
+		Serve:  serve,
+	}))
 }
 
-// userAgent identifies this program to MusicBrainz. MusicBrainz asks for a
-// contact address; set MM_CONTACT to an email or URL to include one.
+func serve(ctx context.Context, o launch.Options) error {
+	lookup := musicbrainz.New(userAgent())
+	if url := os.Getenv("MM_MUSICBRAINZ_URL"); url != "" {
+		lookup.BaseURL = strings.TrimRight(url, "/")
+	}
+	if url := os.Getenv("MM_COVERART_URL"); url != "" {
+		lookup.CoverURL = strings.TrimRight(url, "/")
+	}
+	a, err := app.Open(o.Library)
+	if err != nil {
+		return err
+	}
+	a.UseLoudness(loudness.NewFFmpeg())
+	ln, err := web.Listen(o.Addr, !o.AddrSet)
+	if err != nil {
+		return err
+	}
+	url := web.URL(ln)
+	fmt.Fprintf(os.Stdout, "mm is at %s  (Ctrl+C stops it)\n", url)
+	if !o.NoOpen {
+		if err := web.OpenBrowser(url); err != nil {
+			fmt.Fprintln(os.Stdout, "mm: cannot open a browser:", err)
+		}
+	}
+	server := web.New(a, web.WithSource(lookup), web.WithDownloader(ytdlp.New()), web.WithWolfgang())
+	return server.Serve(ctx, ln)
+}
+
 func userAgent() string {
 	ua := "music-manager/" + version.String()
 	if contact := os.Getenv("MM_CONTACT"); contact != "" {
