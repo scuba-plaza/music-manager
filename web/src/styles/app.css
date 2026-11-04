@@ -871,7 +871,7 @@ input.edit.short {
 }
 
 .bulk-summary {
-  min-height: 1.45em;
+  min-block-size: 1.45em;
   color: var(--accent);
   overflow-wrap: anywhere;
 }

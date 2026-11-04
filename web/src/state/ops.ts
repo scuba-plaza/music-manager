@@ -3,17 +3,12 @@ import type { ChangeResponse, LibraryResponse, RowView } from '../api/types.gen'
 import type { ActionName } from '../keys/keymap';
 import { enterFields, setStatus } from './actions';
 import { openBulk } from './bulk';
-import { pastePicture } from './cover';
+import { clipboardPicture, pastePicture } from './cover';
 import { attempt } from './edit';
 import { currentField, isTrack } from './inspector';
 import { useApp } from './store';
+import { plural } from './text';
 import { idsOf, isAlbum, isFiltering, isFlat, markedIds, rowByKey } from './tree';
-
-const pictureType = /^image\/(jpeg|png)$/;
-
-function plural(n: number, word: string): string {
-  return n === 1 ? `1 ${word}` : `${String(n)} ${word}s`;
-}
 
 function refuse(text: string): void {
   setStatus(text, 'bad');
@@ -205,20 +200,6 @@ function history(which: 'undo' | 'redo'): void {
     return;
   }
   change(`/api/${which}`);
-}
-
-async function clipboardPicture(): Promise<File | undefined> {
-  try {
-    for (const item of await navigator.clipboard.read()) {
-      const type = item.types.find((t) => pictureType.test(t));
-      if (type !== undefined) {
-        return new File([await item.getType(type)], `clipboard.${type.slice('image/'.length)}`, { type });
-      }
-    }
-  } catch {
-    return undefined;
-  }
-  return undefined;
 }
 
 async function paste(): Promise<void> {

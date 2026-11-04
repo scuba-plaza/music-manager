@@ -289,7 +289,7 @@ describe('the bulk form', () => {
     expect(useBulk.getState().summary).toEqual({ text: 'Type what the tracks should have.', bad: false });
   });
 
-  it('closing the form drops the summary that was on its way', async () => {
+  it('closing the form before the pause is over sends no preview request', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     show(keys.kindOfBlue, { marks: new Set(['sowhat']) });
     run('bulkEdit');
@@ -299,6 +299,23 @@ describe('the bulk form', () => {
     await vi.advanceTimersByTimeAsync(300);
 
     expect(requestsTo(fetchMock, 'POST', '/api/bulk/preview')).toEqual([]);
+  });
+
+  it('an answer that arrives after the form was closed changes nothing', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const pending = deferred();
+    serve(({ method, url }) => (method === 'POST' && url.pathname === '/api/bulk/preview' ? pending.promise : undefined));
+    show(keys.kindOfBlue, { marks: new Set(['sowhat']) });
+    run('bulkEdit');
+    typeBulk('album', 'Blue');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(requestsTo(fetchMock, 'POST', '/api/bulk/preview')).toHaveLength(1);
+
+    useApp.setState({ overlay: null });
+    pending.resolve(jsonResponse({ summary: 'Album → Blue', changed: 1 }));
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(useBulk.getState().summary).toEqual({ text: 'Type what the tracks should have.', bad: false });
   });
 
   it('enter applies what was typed to the tracks as one change, and the form closes', async () => {

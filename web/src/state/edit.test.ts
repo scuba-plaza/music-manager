@@ -303,6 +303,28 @@ describe('the note while typing', () => {
     expect(requestsTo(fetchMock, 'POST', '/api/group/hint').at(-1)).toEqual({ key: keys.kindOfBlue, field: 'album', text: 'Blue' });
     expect(useApp.getState().edit?.note).toBe('joins the album Blue (3 tracks)');
   });
+
+  it('shows only the latest answer when the answers arrive out of order', async () => {
+    const pending = [deferred(), deferred()];
+    serve(({ method, url }) =>
+      method === 'POST' && url.pathname === '/api/group/hint' ? pending[requestsTo(fetchMock, 'POST', '/api/group/hint').length - 1]?.promise : undefined,
+    );
+    onAlbum();
+    startEdit();
+    typeEdit('text', 'Blue');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(requestsTo(fetchMock, 'POST', '/api/group/hint')).toHaveLength(2);
+
+    pending[1]?.resolve(jsonResponse({ hint: 'joins the album Blue (3 tracks)' }));
+    await vi.waitFor(() => {
+      expect(useApp.getState().edit?.note).toBe('joins the album Blue (3 tracks)');
+    });
+    pending[0]?.resolve(jsonResponse({ hint: 'joins the album Kind of Blue (2 tracks)' }));
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(useApp.getState().edit?.note).toBe('joins the album Blue (3 tracks)');
+  });
+
 });
 
 describe('cuts, gains and fades', () => {

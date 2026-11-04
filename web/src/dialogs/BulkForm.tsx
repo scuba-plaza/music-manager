@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
 import { applyBulk, bulkFields, typeBulk, useBulk } from '../state/bulk';
+import { plural } from '../state/text';
 
 interface BulkFormProps {
   ids: readonly string[];
@@ -13,10 +14,6 @@ const hints = [
   { keys: 'tab', label: 'next field' },
   { keys: 'esc', label: 'close' },
 ];
-
-function tracks(n: number): string {
-  return n === 1 ? '1 track' : `${String(n)} tracks`;
-}
 
 export function BulkForm({ ids, head }: BulkFormProps) {
   const values = useBulk((s) => s.values);
@@ -53,7 +50,7 @@ export function BulkForm({ ids, head }: BulkFormProps) {
 
   return (
     <Dialog title={head} hints={hints} onKey={onKey}>
-      <div className="ask-body">{`Applies to ${tracks(ids.length)}. Blank keeps what they have; - clears.`}</div>
+      <div className="ask-body">{`Applies to ${plural(ids.length, 'track')}. Blank keeps what they have; - clears.`}</div>
       <div className="form">
         {bulkFields.map((f, i) => (
           <label key={f.key} className="label">

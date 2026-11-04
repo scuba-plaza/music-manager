@@ -4,14 +4,11 @@ import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList, moveIn } from '../overlay/MenuList';
 import { addToPlaylist, closeOverlay } from '../overlay/open';
+import { plural } from '../state/text';
 
 interface PlaylistPickerProps {
   ids: readonly string[];
   lists: readonly PlaylistView[];
-}
-
-function tracks(n: number): string {
-  return n === 1 ? '1 track' : `${String(n)} tracks`;
 }
 
 export function PlaylistPicker({ ids, lists }: PlaylistPickerProps) {
@@ -89,7 +86,7 @@ export function PlaylistPicker({ ids, lists }: PlaylistPickerProps) {
 
   return (
     <Dialog title="Add to a playlist" hints={hints} onKey={onKey}>
-      <div className="ask-body">{`Adding ${tracks(ids.length)}`}</div>
+      <div className="ask-body">{`Adding ${plural(ids.length, 'track')}`}</div>
       {naming ? (
         <input
           ref={input}

@@ -77,6 +77,20 @@ function pictureIn(files: readonly File[]): File | undefined {
   return files.find((f) => pictureType.test(f.type));
 }
 
+export async function clipboardPicture(): Promise<File | undefined> {
+  try {
+    for (const item of await navigator.clipboard.read()) {
+      const type = item.types.find((t) => pictureType.test(t));
+      if (type !== undefined) {
+        return new File([await item.getType(type)], `clipboard.${type.slice('image/'.length)}`, { type });
+      }
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
 export async function pastePicture(file: File): Promise<void> {
   await setCover(file, coverTarget(false), true);
 }

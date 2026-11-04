@@ -572,6 +572,7 @@ describe('setting a cover', () => {
     await expect.poll(() => requestsTo(fetchMock, 'PUT', '/api/cover?ids=sowhat')).toEqual([file]);
     await expect.element(page.getByRole('status')).toHaveTextContent('Set the cover');
     await expect.poll(() => useApp.getState().busy).toBe(false);
+    expect(chooser.value).toBe('');
   });
 
   test('a picture pasted with ctrl+v becomes the cover of the track under the cursor', async () => {

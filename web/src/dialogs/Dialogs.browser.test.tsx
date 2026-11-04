@@ -621,6 +621,16 @@ describe('the bulk form', () => {
     await expect.element(dialog()).toBeVisible();
   });
 
+  test('enter while a word is being composed applies nothing', async () => {
+    await openForm();
+    await userEvent.keyboard('Blue');
+
+    field('Album').element().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true }));
+
+    expect(requestsTo(fetchMock, 'POST', '/api/bulk')).toEqual([]);
+    await expect.element(dialog()).toBeVisible();
+  });
+
   test('escape closes the form and changes nothing', async () => {
     await openForm();
 
