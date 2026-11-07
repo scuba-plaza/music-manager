@@ -4,6 +4,7 @@ import type { ActionName } from '../keys/keymap';
 import { fail, loadLibrary, setStatus } from '../state/actions';
 import { applyChange } from '../state/edit';
 import { useApp, type AppState } from '../state/store';
+import { openSync } from '../state/sync';
 import { idsOf, markedIds, rowByKey, trackRowKey } from '../state/tree';
 
 export function closeOverlay(): void {
@@ -96,6 +97,9 @@ export function opensOverlay(action: ActionName): boolean {
         return false;
       }
       void openCopyList();
+      return true;
+    case 'sync':
+      void openSync();
       return true;
     default:
       return false;

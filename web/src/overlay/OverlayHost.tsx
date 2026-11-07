@@ -8,6 +8,7 @@ import { Identify } from '../dialogs/Identify';
 import { IdentifyAll } from '../dialogs/IdentifyAll';
 import { PlaylistPicker } from '../dialogs/PlaylistPicker';
 import { SortMenu } from '../dialogs/SortMenu';
+import { Sync } from '../dialogs/Sync';
 import { useApp } from '../state/store';
 
 export function OverlayHost() {
@@ -37,7 +38,7 @@ export function OverlayHost() {
       return <Add />;
     case 'doctor':
       return <Doctor />;
-    default:
-      return null;
+    case 'sync':
+      return <Sync />;
   }
 }

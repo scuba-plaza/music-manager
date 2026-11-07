@@ -8,6 +8,7 @@ import { useAdd } from '../state/add';
 import { useDoctor } from '../state/doctor';
 import { useIdentify } from '../state/identify';
 import { useIdentifyAll } from '../state/identifyAll';
+import { jobEvent } from '../state/jobs';
 import { useApp } from '../state/store';
 import { changeResponse, FakeEventSource, infoView, jsonResponse, requestsTo, sampleLibrary, stubServer, urlOf, type StubRoute } from '../testing/fakes';
 
@@ -61,6 +62,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   useApp.setState({ overlay: null });
+  jobEvent({ id: 'a1', kind: 'add', state: 'stopped' });
+  jobEvent({ id: 'j1', kind: 'identify-all', state: 'stopped' });
   await new Promise((done) => setTimeout(done, 80));
   vi.useRealTimers();
   vi.unstubAllGlobals();

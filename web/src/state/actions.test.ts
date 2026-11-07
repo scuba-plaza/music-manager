@@ -770,24 +770,6 @@ describe('the filter', () => {
   });
 });
 
-describe('actions that belong to later work', () => {
-  beforeEach(() => {
-    stubServer(infoView(), sampleLibrary());
-    showSample(keys.miles, { marks: new Set(['blue']) });
-  });
-
-  it.each(['sync'] as const)(
-    '%s changes nothing yet',
-    (action) => {
-      const before = useApp.getState();
-
-      run(action);
-
-      expect(useApp.getState()).toBe(before);
-    },
-  );
-});
-
 describe('loadLibrary for the tree', () => {
   beforeEach(() => {
     vi.useFakeTimers(timers);

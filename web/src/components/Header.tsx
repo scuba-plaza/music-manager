@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { recall, remember, useApp } from '../state/store';
+import { openSync } from '../state/sync';
 
 type Theme = 'dark' | 'light';
 
@@ -55,7 +56,13 @@ export function Header() {
       <div className="head-end">
         {lib && <span className="summary">{parts.join(' · ')}</span>}
         {waiting > 0 && (
-          <button type="button" className="chip">
+          <button
+            type="button"
+            className="chip"
+            onClick={() => {
+              void openSync();
+            }}
+          >
             {`${String(waiting)} to sync · press s`}
           </button>
         )}
