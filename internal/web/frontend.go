@@ -2,6 +2,7 @@ package web
 
 import (
 	"embed"
+	"errors"
 	"io/fs"
 	"net/http"
 	"path"
@@ -37,15 +38,27 @@ const notBuiltPage = `<!doctype html>
 func frontendHandler(fsys fs.FS) http.Handler {
 	files := http.FileServerFS(fsys)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+		if name == "api" || strings.HasPrefix(name, "api/") {
+			fail(w, http.StatusNotFound, errors.New("not found"))
+			return
+		}
 		if _, err := fs.Stat(fsys, "index.html"); err != nil {
+			if name != "" {
+				http.NotFound(w, r)
+				return
+			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Header().Set("Cache-Control", "no-store")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_, _ = w.Write([]byte(notBuiltPage))
 			return
 		}
+		if info, err := fs.Stat(fsys, name); name != "" && err == nil && info.IsDir() {
+			http.NotFound(w, r)
+			return
+		}
 		cache := cacheRevalidate
-		name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
 		if strings.HasPrefix(name, "assets/") {
 			if info, err := fs.Stat(fsys, name); err == nil && !info.IsDir() {
 				cache = cacheForever

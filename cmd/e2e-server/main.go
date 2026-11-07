@@ -108,7 +108,7 @@ func (l *seededServers) reset() error {
 	a.UseProfiles(l.profiles)
 	server := web.New(a,
 		web.WithProfiles(l.profiles),
-		web.WithSource(webtest.FakeSource{}),
+		web.WithSource(webtest.FakeSource{Found: webtest.SoWhat()}),
 		web.WithDownloader(&webtest.FakeDownloader{}),
 		web.WithFrontend(l.frontend),
 	)
@@ -157,6 +157,12 @@ func (l *seededServers) serveReset(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("X-MM") == "" {
 		http.Error(w, "the X-MM header is missing", http.StatusForbidden)
 		return
+	}
+	if origin := r.Header.Get("Origin"); origin != "" {
+		if u, err := url.Parse(origin); err != nil || u.Host != r.Host {
+			http.Error(w, "the reset must come from this server's own origin", http.StatusForbidden)
+			return
+		}
 	}
 	if err := l.reset(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

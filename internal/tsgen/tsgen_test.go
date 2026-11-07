@@ -134,10 +134,29 @@ type IntKeys struct {
 	ByNumber map[int]string `json:"byNumber"`
 }
 
-func TestAMapWithKeysThatAreNotStringsIsAnError(t *testing.T) {
-	_, err := Generate(IntKeys{})
-	if err == nil || !strings.Contains(err.Error(), "IntKeys.ByNumber") {
-		t.Fatalf("want an error naming IntKeys.ByNumber, got %v", err)
+func TestAMapWithIntegerKeysIsARecordBecauseJSONWritesTheKeysAsStrings(t *testing.T) {
+	check(t, generate(t, IntKeys{}), generated+`
+export interface IntKeys {
+  byNumber: Record<string, string>;
+}
+`)
+	raw, err := json.Marshal(IntKeys{ByNumber: map[int]string{3: "c"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"byNumber":{"3":"c"}}`; string(raw) != want {
+		t.Errorf("encoding/json writes %s, want %s", raw, want)
+	}
+}
+
+type FloatKeys struct {
+	ByWeight map[float64]string `json:"byWeight"`
+}
+
+func TestAMapWithKeysJSONCannotWriteIsAnError(t *testing.T) {
+	_, err := Generate(FloatKeys{})
+	if err == nil || !strings.Contains(err.Error(), "FloatKeys.ByWeight") {
+		t.Fatalf("want an error naming FloatKeys.ByWeight, got %v", err)
 	}
 }
 
@@ -317,4 +336,73 @@ export interface Odd {
   count: string;
 }
 `)
+}
+
+type Required struct {
+	Code string `json:"code"`
+}
+
+type Holder struct {
+	*Required
+	Name string `json:"name"`
+}
+
+func TestFieldsOfAnEmbeddedPointerAreOptionalBecauseANilOneWritesNone(t *testing.T) {
+	check(t, generate(t, Holder{}), generated+`
+export interface Holder {
+  code?: string;
+  name: string;
+}
+`)
+	raw, err := json.Marshal(Holder{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"name":""}`; string(raw) != want {
+		t.Errorf("encoding/json writes %s, want %s", raw, want)
+	}
+}
+
+type Counted struct {
+	Plays *int  `json:"plays,string"`
+	Flag  *bool `json:"flag,string,omitempty"`
+}
+
+func TestAQuotedPointerIsAStringBecauseJSONQuotesWhatItPointsAt(t *testing.T) {
+	check(t, generate(t, Counted{}), generated+`
+export interface Counted {
+  plays: string | null;
+  flag?: string;
+}
+`)
+	n := 5
+	raw, err := json.Marshal(Counted{Plays: &n})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"plays":"5"}`; string(raw) != want {
+		t.Errorf("encoding/json writes %s, want %s", raw, want)
+	}
+}
+
+type Nested struct {
+	Inner Song      `json:"inner,omitempty"`
+	When  time.Time `json:"when,omitempty"`
+	Zero  Song      `json:"zero,omitzero"`
+}
+
+func TestOmitemptyOfAStructIsNotOptionalButOmitzeroIs(t *testing.T) {
+	out := generate(t, Nested{})
+	for _, want := range []string{"  inner: Song;\n", "  when: string;\n", "  zero?: Song;\n"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the output lacks %q:\n%s", want, out)
+		}
+	}
+	raw, err := json.Marshal(Nested{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"inner"`) || !strings.Contains(string(raw), `"when"`) || strings.Contains(string(raw), `"zero"`) {
+		t.Errorf("encoding/json writes %s", raw)
+	}
 }

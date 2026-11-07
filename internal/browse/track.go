@@ -282,7 +282,7 @@ func aboutText(t manifest.Track) string {
 }
 
 func deviceView(s Snapshot, t manifest.Track, dev device.Target) *DeviceView {
-	v := &DeviceView{Footnote: "A preview: nothing of it is stored.", Rows: []DeviceRow{}}
+	v := &DeviceView{Footnote: "A preview: nothing of it is stored."}
 	p := layout.Assign(s.Tracks, dev.Layout())[t.ID]
 	if t.Status != manifest.Identified {
 		v.Notice = "Not identified yet: it goes to the _Inbox folder."

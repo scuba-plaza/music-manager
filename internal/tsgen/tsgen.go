@@ -97,7 +97,7 @@ func (g *generator) declare(t reflect.Type) error {
 }
 
 func (g *generator) declaration(t reflect.Type) (string, error) {
-	fields := collect(t, nil, map[reflect.Type]bool{})
+	fields := collect(t, nil, false, map[reflect.Type]bool{})
 	if len(fields) == 0 {
 		return "export type " + t.Name() + " = Record<string, never>;\n", nil
 	}
@@ -123,10 +123,17 @@ func (g *generator) declaration(t reflect.Type) (string, error) {
 
 func (g *generator) fieldType(f field) (string, error) {
 	if f.quoted {
-		switch f.typ.Kind() {
+		scalar := f.typ
+		if scalar.Kind() == reflect.Pointer {
+			scalar = scalar.Elem()
+		}
+		switch scalar.Kind() {
 		case reflect.Bool, reflect.String, reflect.Float32, reflect.Float64,
 			reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+			if f.typ.Kind() == reflect.Pointer && !f.optional {
+				return "string | null", nil
+			}
 			return "string", nil
 		}
 	}
@@ -183,7 +190,10 @@ func (g *generator) expr(t reflect.Type) (string, bool, error) {
 		elem, err := g.element(t.Elem())
 		return elem + "[]", false, err
 	case reflect.Map:
-		if t.Key().Kind() != reflect.String {
+		switch t.Key().Kind() {
+		case reflect.String, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		default:
 			return "", false, fmt.Errorf("a map with %v keys cannot become a Record", t.Key())
 		}
 		value, nullable, err := g.expr(t.Elem())
@@ -197,7 +207,7 @@ func (g *generator) expr(t reflect.Type) (string, bool, error) {
 	return "", false, fmt.Errorf("a %v cannot be sent as JSON", t.Kind())
 }
 
-func collect(t reflect.Type, index []int, visiting map[reflect.Type]bool) []field {
+func collect(t reflect.Type, index []int, viaPointer bool, visiting map[reflect.Type]bool) []field {
 	if visiting[t] {
 		return nil
 	}
@@ -214,20 +224,23 @@ func collect(t reflect.Type, index []int, visiting map[reflect.Type]bool) []fiel
 		path := append(slices.Clone(index), i)
 		if f.Anonymous {
 			ft := f.Type
+			pointer := viaPointer
 			if ft.Kind() == reflect.Pointer {
 				ft = ft.Elem()
+				pointer = true
 			}
 			if !f.IsExported() && ft.Kind() != reflect.Struct {
 				continue
 			}
 			if name == "" && ft.Kind() == reflect.Struct {
-				all = append(all, collect(ft, path, visiting)...)
+				all = append(all, collect(ft, path, pointer, visiting)...)
 				continue
 			}
 		} else if !f.IsExported() {
 			continue
 		}
 		options := strings.Split(opts, ",")
+		omitted := slices.Contains(options, "omitzero") || slices.Contains(options, "omitempty") && !neverEmpty(f.Type)
 		all = append(all, field{
 			name:     cmp.Or(name, f.Name),
 			index:    path,
@@ -235,7 +248,7 @@ func collect(t reflect.Type, index []int, visiting map[reflect.Type]bool) []fiel
 			typ:      f.Type,
 			owner:    t,
 			goName:   f.Name,
-			optional: slices.Contains(options, "omitempty") || slices.Contains(options, "omitzero"),
+			optional: viaPointer || omitted,
 			quoted:   slices.Contains(options, "string"),
 		})
 	}
@@ -243,6 +256,10 @@ func collect(t reflect.Type, index []int, visiting map[reflect.Type]bool) []fiel
 		return all
 	}
 	return dominant(all)
+}
+
+func neverEmpty(t reflect.Type) bool {
+	return t.Kind() == reflect.Struct || t.Kind() == reflect.Array && t.Len() > 0
 }
 
 func dominant(all []field) []field {

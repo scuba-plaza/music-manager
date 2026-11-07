@@ -47,7 +47,7 @@ type UnsyncedView struct {
 }
 
 type LibraryResponse struct {
-	History  browse.History     `json:"history"`
+	History  browse.HistoryView `json:"history"`
 	Stamp    string             `json:"stamp"`
 	Unsynced UnsyncedView       `json:"unsynced"`
 	View     browse.LibraryView `json:"view"`

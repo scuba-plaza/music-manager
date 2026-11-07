@@ -26,6 +26,8 @@ var soWhatCandidates = []app.Candidate{
 	},
 }
 
+func SoWhat() []app.Candidate { return slices.Clone(soWhatCandidates) }
+
 type FakeSource struct {
 	Found   []app.Candidate
 	FailFor string
@@ -35,10 +37,7 @@ func (s FakeSource) Search(_ context.Context, q app.Query) ([]app.Candidate, err
 	if s.FailFor != "" && q.Title == s.FailFor {
 		return nil, errors.New("network down")
 	}
-	if s.Found != nil {
-		return slices.Clone(s.Found), nil
-	}
-	return slices.Clone(soWhatCandidates), nil
+	return append([]app.Candidate{}, s.Found...), nil
 }
 
 func (FakeSource) CoverFront(context.Context, string) ([]byte, error) { return nil, nil }

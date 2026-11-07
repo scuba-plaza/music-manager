@@ -36,7 +36,7 @@ export interface ChangeResponse {
   reveal?: string;
   moves?: Record<string, string>;
   same?: boolean;
-  history: History;
+  history: HistoryView;
 }
 
 export interface CopyChoice {
@@ -115,7 +115,7 @@ export interface HintView {
   hint: string;
 }
 
-export interface History {
+export interface HistoryView {
   undo?: string;
   redo?: string;
   clip?: string;
@@ -146,7 +146,7 @@ export interface JobView {
 }
 
 export interface LibraryResponse {
-  history: History;
+  history: HistoryView;
   stamp: string;
   unsynced: UnsyncedView;
   view: LibraryView;

@@ -64,7 +64,7 @@ type HintView struct {
 
 type ChangeResponse struct {
 	browse.Result
-	History browse.History `json:"history"`
+	History browse.HistoryView `json:"history"`
 }
 
 // answer writes the outcome of a change.

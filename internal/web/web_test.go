@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -722,7 +723,7 @@ func answerStrictly(t *testing.T, base, method, path string, body, into any) int
 func TestEveryResponseDecodesIntoItsNamedType(t *testing.T) {
 	a, ts := seed(t, sample...)
 	drive := t.TempDir()
-	s := New(a, WithSource(webtest.FakeSource{}))
+	s := New(a, WithSource(webtest.FakeSource{Found: webtest.SoWhat()}))
 	s.mounts = func() []string { return []string{drive} }
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
@@ -739,7 +740,7 @@ func TestEveryResponseDecodesIntoItsNamedType(t *testing.T) {
 		t.Fatalf("%d %+v", code, r)
 	}
 	var lib LibraryResponse
-	if code := answerStrictly(t, srv.URL, "GET", "/api/library", nil, &lib); code != 200 || lib.Stamp == "" || lib.View.Tracks != 4 || lib.View.Shown != 4 || lib.Unsynced != (UnsyncedView{N: 1, Known: true}) || lib.History != (browse.History{Undo: "change of title"}) {
+	if code := answerStrictly(t, srv.URL, "GET", "/api/library", nil, &lib); code != 200 || lib.Stamp == "" || lib.View.Tracks != 4 || lib.View.Shown != 4 || lib.Unsynced != (UnsyncedView{N: 1, Known: true}) || lib.History != (browse.HistoryView{Undo: "change of title"}) {
 		t.Errorf("library %d %+v", code, lib)
 	}
 
@@ -767,5 +768,13 @@ func TestEveryResponseDecodesIntoItsNamedType(t *testing.T) {
 	var failed ErrorView
 	if code := answerStrictly(t, srv.URL, "GET", "/api/library?sort=nope", nil, &failed); code != 400 || !strings.HasPrefix(failed.Error, "Cannot sort by") {
 		t.Errorf("error %d %+v", code, failed)
+	}
+}
+
+func TestTheInfoAnswerHasItsFourKeysInOrder(t *testing.T) {
+	a, _ := seed(t, sample...)
+	body := readRaw(t, start(t, a).URL, "GET", "/api/info", nil)
+	if !regexp.MustCompile(`^\{"canAdd":(true|false),"lookup":(true|false),"root":"[^"]+","version":"[^"]+"\}\s*$`).Match(body) {
+		t.Errorf("the info answer is %s", body)
 	}
 }

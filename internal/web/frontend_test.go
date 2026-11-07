@@ -102,3 +102,40 @@ func TestWithoutOptionsTheServerServesTheEmbeddedDist(t *testing.T) {
 		}
 	}
 }
+
+func TestADirectoryOfTheFrontendIsNotListed(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a, WithFrontend(fstest.MapFS{
+		"index.html":      {Data: []byte("<title>new</title>")},
+		"assets/app-1.js": {Data: []byte("export {}")},
+	}))
+	for _, path := range []string{"/assets/", "/assets"} {
+		res, body := fetch(t, srv.URL+path)
+		if res.StatusCode != http.StatusNotFound || strings.Contains(body, "app-1.js") {
+			t.Errorf("%s: status %d, body %q", path, res.StatusCode, body)
+		}
+	}
+}
+
+func TestAnUnknownAPIPathIsAJSON404BuiltOrNot(t *testing.T) {
+	a, _ := seed(t, sample...)
+	for name, fsys := range map[string]fstest.MapFS{
+		"built":     {"index.html": {Data: []byte("<title>new</title>")}},
+		"not built": {},
+	} {
+		srv := start(t, a, WithFrontend(fsys))
+		var e ErrorView
+		if code := getJSON(t, srv.URL+"/api/typo", &e); code != http.StatusNotFound || e.Error == "" {
+			t.Errorf("%s: status %d, %+v", name, code, e)
+		}
+	}
+}
+
+func TestWithoutAFrontendOnlyTheRootSaysItIsNotBuilt(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a, WithFrontend(fstest.MapFS{}))
+	res, body := fetch(t, srv.URL+"/favicon.svg")
+	if res.StatusCode != http.StatusNotFound || strings.Contains(body, "pnpm") {
+		t.Errorf("status %d, body %q", res.StatusCode, body)
+	}
+}

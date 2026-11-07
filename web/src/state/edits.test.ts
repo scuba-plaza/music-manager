@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ChangeResponse, History, LibraryResponse, PeekView, TrackView } from '../api/types.gen';
+import type { ChangeResponse, HistoryView, LibraryResponse, PeekView, TrackView } from '../api/types.gen';
 import { installKeys } from '../keys/dispatch';
 import {
   changeResponse,
@@ -56,7 +56,7 @@ const blankValues = {
   cutEnd: '',
 };
 
-function library(history: History = {}, sortKey = ''): LibraryResponse {
+function library(history: HistoryView = {}, sortKey = ''): LibraryResponse {
   const base = sampleLibrary();
   return { ...base, history, view: { ...base.view, sort: { ...base.view.sort, key: sortKey } } };
 }

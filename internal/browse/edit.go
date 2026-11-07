@@ -69,8 +69,8 @@ type change struct {
 // maxHistory is how many changes can be undone.
 const maxHistory = 200
 
-// History says what undo and redo would do now, and what is copied.
-type History struct {
+// HistoryView says what undo and redo would do now, and what is copied.
+type HistoryView struct {
 	Undo string `json:"undo,omitempty"`
 	Redo string `json:"redo,omitempty"`
 	Clip string `json:"clip,omitempty"`
@@ -122,10 +122,10 @@ func (e *Editor) snapshot() (Snapshot, error) {
 }
 
 // History is what undo, redo and paste would do now.
-func (e *Editor) History() History {
+func (e *Editor) History() HistoryView {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	var h History
+	var h HistoryView
 	if n := len(e.undoes); n > 0 {
 		h.Undo = e.undoes[n-1].label
 	}
