@@ -37,7 +37,7 @@ func hasMessage(msgs []string, part string) bool {
 func TestTheWolfgangWarnsAboutAGenreItCannotShow(t *testing.T) {
 	long, short := track("long", "A", "", "S"), track("short", "A", "", "T")
 	long.Genre, short.Genre = "Alternative Rock", "Rock"
-	ws := device.Wolfgang.Diagnose([]manifest.Track{long, short})
+	ws := wolfgang.Diagnose([]manifest.Track{long, short})
 	if got := warned(ws, "long"); !hasMessage(got, "genre") || !hasMessage(got, "12") {
 		t.Errorf("long genre: %q", got)
 	}
@@ -49,7 +49,7 @@ func TestTheWolfgangWarnsAboutAGenreItCannotShow(t *testing.T) {
 func TestTheWolfgangWarnsAboutANameWithNoLatinForm(t *testing.T) {
 	emoji := track("emoji", "🎵🎶", "", "Song")
 	plain := track("plain", "Max Richter", "", "Dream")
-	ws := device.Wolfgang.Diagnose([]manifest.Track{emoji, plain})
+	ws := wolfgang.Diagnose([]manifest.Track{emoji, plain})
 	if got := warned(ws, "emoji"); !hasMessage(got, "artist") || !hasMessage(got, "Unknown") {
 		t.Errorf("artist with no Latin form: %q", got)
 	}
@@ -62,7 +62,7 @@ func TestTheWolfgangWarnsWhenCuttingMakesTwoFileNamesAlike(t *testing.T) {
 	a := track("aaaaaa", "Artist", "", "A Very Long Song Title Indeed Yes")
 	b := track("bbbbbb", "Artist", "", "A Very Long Song Title Indeed No")
 	other := track("cccccc", "Artist", "", "A Different Song")
-	ws := device.Wolfgang.Diagnose([]manifest.Track{a, b, other})
+	ws := wolfgang.Diagnose([]manifest.Track{a, b, other})
 	for _, id := range []string{"aaaaaa", "bbbbbb"} {
 		if got := warned(ws, id); !hasMessage(got, "cut") {
 			t.Errorf("%s: %q", id, got)
@@ -75,14 +75,14 @@ func TestTheWolfgangWarnsWhenCuttingMakesTwoFileNamesAlike(t *testing.T) {
 
 func TestTheWolfgangDoesNotBlameTheCutForTwoTracksThatAreTheSame(t *testing.T) {
 	a, b := track("aaaaaa", "Artist", "", "Same"), track("bbbbbb", "Artist", "", "Same")
-	if ws := device.Wolfgang.Diagnose([]manifest.Track{a, b}); len(ws) != 0 {
+	if ws := wolfgang.Diagnose([]manifest.Track{a, b}); len(ws) != 0 {
 		t.Errorf("warnings = %+v", ws)
 	}
 }
 
 func TestTheWolfgangWarnsAboutAnArtistThatLooksLikeSeveral(t *testing.T) {
 	duo := track("duo", "Fairuz & Ziad Rahbani", "", "Song")
-	ws := device.Wolfgang.Diagnose([]manifest.Track{duo})
+	ws := wolfgang.Diagnose([]manifest.Track{duo})
 	if got := warned(ws, "duo"); !hasMessage(got, "several") {
 		t.Errorf("%q", got)
 	}
@@ -108,7 +108,7 @@ func handSet() manifest.Track {
 }
 
 func TestTheWolfgangWritesTheTagsFromTheLatinFormsSetByHand(t *testing.T) {
-	tags := device.Wolfgang.Tags(handSet())
+	tags := wolfgang.Tags(handSet())
 	if tags.Artist != "A. H. Hafez" || tags.Album != "Rawaa'e" {
 		t.Errorf("artist %q, album %q", tags.Artist, tags.Album)
 	}
@@ -123,7 +123,7 @@ func TestTheWolfgangWritesTheTagsFromTheLatinFormsSetByHand(t *testing.T) {
 func TestTheWolfgangsSingleCarriesItsLatinTitleAsTheAlbum(t *testing.T) {
 	tr := handSet()
 	tr.Album, tr.AlbumLatin = "", ""
-	if got := device.Wolfgang.Tags(tr).Album; got != "Bahlam Bek" {
+	if got := wolfgang.Tags(tr).Album; got != "Bahlam Bek" {
 		t.Errorf("album of a single = %q", got)
 	}
 }
@@ -136,7 +136,7 @@ func TestTheGenericTargetKeepsTheTrueNamesWhateverIsSetByHand(t *testing.T) {
 }
 
 func TestTheWolfgangNamesTheFilesAfterTheLatinFormsSetByHand(t *testing.T) {
-	got := layout.PathFor(handSet(), device.Wolfgang.Layout())
+	got := layout.PathFor(handSet(), wolfgang.Layout())
 	if want := "Abdel Halim Hafez/Rawaa'e/01 - Bahlam Bek.mp3"; got != want {
 		t.Errorf("PathFor = %q, want %q", got, want)
 	}
@@ -147,11 +147,11 @@ func TestTheWolfgangNamesTheFilesAfterTheLatinFormsSetByHand(t *testing.T) {
 
 func TestANameWithALatinFormSetByHandIsNotUnknownOnTheWolfgang(t *testing.T) {
 	tr := track("emoji", "🎵🎶", "", "Song")
-	if got := warned(device.Wolfgang.Diagnose([]manifest.Track{tr}), "emoji"); !hasMessage(got, "Unknown") {
+	if got := warned(wolfgang.Diagnose([]manifest.Track{tr}), "emoji"); !hasMessage(got, "Unknown") {
 		t.Fatalf("no warning to start with: %q", got)
 	}
 	tr.ArtistLatin = "Music"
-	if got := warned(device.Wolfgang.Diagnose([]manifest.Track{tr}), "emoji"); len(got) != 0 {
+	if got := warned(wolfgang.Diagnose([]manifest.Track{tr}), "emoji"); len(got) != 0 {
 		t.Errorf("a Latin form was set by hand, yet %q", got)
 	}
 }
@@ -160,7 +160,7 @@ func TestTheGenreWarningIsAboutWhatIsWritten(t *testing.T) {
 	tr := track("g", "A", "", "S")
 	tr.Genre = "Alternative Rock"
 	tr.GenreLatin = "Alt Rock"
-	if got := warned(device.Wolfgang.Diagnose([]manifest.Track{tr}), "g"); len(got) != 0 {
+	if got := warned(wolfgang.Diagnose([]manifest.Track{tr}), "g"); len(got) != 0 {
 		t.Errorf("the Latin genre fits, yet %q", got)
 	}
 }
@@ -172,12 +172,12 @@ func TestTheWarningsComeInTheSameOrderEveryTime(t *testing.T) {
 			track("b-"+artist, artist, "", "A Very Long Song Title Indeed Yes"),
 			track("a-"+artist, artist, "", "A Very Long Song Title Indeed No"))
 	}
-	first := device.Wolfgang.Diagnose(tracks)
+	first := wolfgang.Diagnose(tracks)
 	if len(first) != len(tracks) {
 		t.Fatalf("%d warnings, want one for each of the %d tracks", len(first), len(tracks))
 	}
 	for i := 1; i < 20; i++ { // a map would give another order now and then
-		if ws := device.Wolfgang.Diagnose(tracks); !reflect.DeepEqual(ws, first) {
+		if ws := wolfgang.Diagnose(tracks); !reflect.DeepEqual(ws, first) {
 			t.Fatalf("run %d came in another order:\n%+v\nafter\n%+v", i, ws, first)
 		}
 	}

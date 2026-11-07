@@ -1,0 +1,279 @@
+{
+  "long": {
+    "rows": [
+      {
+        "label": "Folder",
+        "value": "Fairuz/Jerusalem in My Heart"
+      },
+      {
+        "label": "File",
+        "value": "02 - A Title That Ru.mp3"
+      },
+      {
+        "label": "Cut",
+        "value": "02 - A Title That Ru",
+        "tail": "ns On Far Past Twenty",
+        "hint": "The player shows 24 characters of a name, the .mp3 included, and scrolls a longer one: the name is cut at 20, the dim part is cut off.",
+        "cut": true
+      },
+      {
+        "label": "Artist",
+        "value": "Fairuz",
+        "tail": "· 6 of 12"
+      },
+      {
+        "label": "Album",
+        "value": "Jerusalem",
+        "tail": "· 9 of 12"
+      },
+      {
+        "label": "Genre",
+        "value": ""
+      },
+      {
+        "label": "Title",
+        "value": "A Title That Runs On Far Past Twenty",
+        "hint": "The title is kept whole: the player shows file names, not titles."
+      }
+    ],
+    "footnote": "A preview: nothing of it is stored."
+  },
+  "t1": {
+    "rows": [
+      {
+        "label": "Folder",
+        "value": "Shawn James/Shadows"
+      },
+      {
+        "label": "File",
+        "value": "01 - The Wanderer.mp3"
+      },
+      {
+        "label": "Artist",
+        "value": "Shawn James",
+        "tail": "· 11 of 12"
+      },
+      {
+        "label": "Album",
+        "value": "Shadows",
+        "tail": "· 7 of 12"
+      },
+      {
+        "label": "Genre",
+        "value": ""
+      },
+      {
+        "label": "Title",
+        "value": "The Wanderer",
+        "hint": "The title is kept whole: the player shows file names, not titles."
+      }
+    ],
+    "footnote": "A preview: nothing of it is stored."
+  },
+  "t2": {
+    "rows": [
+      {
+        "label": "Folder",
+        "value": "Shawn James/Shadows"
+      },
+      {
+        "label": "File",
+        "value": "12 - Along Our Way.mp3"
+      },
+      {
+        "label": "Artist",
+        "value": "Shawn James",
+        "tail": "· 11 of 12"
+      },
+      {
+        "label": "Album",
+        "value": "Shadows",
+        "tail": "· 7 of 12"
+      },
+      {
+        "label": "Genre",
+        "value": ""
+      },
+      {
+        "label": "Title",
+        "value": "Along Our Way",
+        "hint": "The title is kept whole: the player shows file names, not titles."
+      }
+    ],
+    "footnote": "A preview: nothing of it is stored."
+  },
+  "t3": {
+    "rows": [
+      {
+        "label": "Folder",
+        "value": "Shawn James/Shadows"
+      },
+      {
+        "label": "File",
+        "value": "07 - Flow.mp3"
+      },
+      {
+        "label": "Artist",
+        "value": "Shawn James",
+        "tail": "· 11 of 12"
+      },
+      {
+        "label": "Album",
+        "value": "Shadows",
+        "tail": "· 7 of 12"
+      },
+      {
+        "label": "Genre",
+        "value": ""
+      },
+      {
+        "label": "Title",
+        "value": "Flow",
+        "hint": "The title is kept whole: the player shows file names, not titles."
+      }
+    ],
+    "footnote": "A preview: nothing of it is stored."
+  },
+  "t4": {
+    "rows": [
+      {
+        "label": "Folder",
+        "value": "phoria/Caught a Black Rabbit"
+      },
+      {
+        "label": "File",
+        "value": "04 - Current.mp3"
+      },
+      {
+        "label": "Artist",
+        "value": "phoria",
+        "tail": "· 6 of 12"
+      },
+      {
+        "label": "Album",
+        "value": "Caught",
+        "tail": "· 6 of 12"
+      },
+      {
+        "label": "Genre",
+        "value": ""
+      },
+      {
+        "label": "Title",
+        "value": "Current",
+        "hint": "The title is kept whole: the player shows file names, not titles."
+      }
+    ],
+    "footnote": "A preview: nothing of it is stored."
+  },
+  "t5": {
+    "rows": [
+      {
+        "label": "Folder",
+        "value": "Fairuz"
+      },
+      {
+        "label": "File",
+        "value": "Wtni.mp3"
+      },
+      {
+        "label": "Artist",
+        "value": "Fairuz",
+        "tail": "· 6 of 12"
+      },
+      {
+        "label": "Album",
+        "value": "Wtni",
+        "tail": "· 4 of 12"
+      },
+      {
+        "label": "Genre",
+        "value": ""
+      },
+      {
+        "label": "Title",
+        "value": "Wtni",
+        "hint": "The title is kept whole: the player shows file names, not titles."
+      }
+    ],
+    "footnote": "A preview: nothing of it is stored."
+  },
+  "t6": {
+    "rows": [
+      {
+        "label": "Folder",
+        "value": "Fairuz/Jerusalem in My Heart"
+      },
+      {
+        "label": "File",
+        "value": "01 - Sanarjiou.mp3"
+      },
+      {
+        "label": "Artist",
+        "value": "Fairuz",
+        "tail": "· 6 of 12"
+      },
+      {
+        "label": "Album",
+        "value": "Jerusalem",
+        "tail": "· 9 of 12"
+      },
+      {
+        "label": "Genre",
+        "value": ""
+      },
+      {
+        "label": "Title",
+        "value": "Sanarjiou",
+        "hint": "The title is kept whole: the player shows file names, not titles."
+      }
+    ],
+    "footnote": "A preview: nothing of it is stored."
+  },
+  "t7": {
+    "rows": [
+      {
+        "label": "Folder",
+        "value": "Fairuz"
+      },
+      {
+        "label": "File",
+        "value": "Loose.mp3"
+      },
+      {
+        "label": "Artist",
+        "value": "Fairuz",
+        "tail": "· 6 of 12"
+      },
+      {
+        "label": "Album",
+        "value": "Loose",
+        "tail": "· 5 of 12"
+      },
+      {
+        "label": "Genre",
+        "value": ""
+      },
+      {
+        "label": "Title",
+        "value": "Loose",
+        "hint": "The title is kept whole: the player shows file names, not titles."
+      }
+    ],
+    "footnote": "A preview: nothing of it is stored."
+  },
+  "u1": {
+    "notice": "Not identified yet: it goes to the _Inbox folder.",
+    "rows": [
+      {
+        "label": "Folder",
+        "value": "_Inbox"
+      },
+      {
+        "label": "File",
+        "value": "u1.mp3"
+      }
+    ],
+    "footnote": "A preview: nothing of it is stored."
+  }
+}

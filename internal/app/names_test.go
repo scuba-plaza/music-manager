@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"music-manager/internal/app"
-	"music-manager/internal/device"
 	"music-manager/internal/mp3"
 )
 
@@ -42,7 +41,7 @@ func TestASyncForTheWolfgangKeepsTheTitleTrueAndFoldsTheRest(t *testing.T) {
 	identify(t, a, ts[1].ID, "Dream", "Max Richter", "", 0, 0)
 	dest := t.TempDir()
 
-	mustSync(t, a, app.SyncOptions{Target: dest, Device: device.Wolfgang})
+	mustSync(t, a, app.SyncOptions{Target: dest, Device: wolfgang})
 
 	got := mp3.ReadTagSet(readFile(t, dest, "Firuz/Hits/03 - Wtni.mp3"))
 	if got.Title != "وطني" {

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os/exec"
 	"strings"
 	"testing"
@@ -380,5 +381,19 @@ func TestAPictureThatIsNotACoverLeavesTheCoverAsItWas(t *testing.T) {
 	m, _ = a.Manifest()
 	if after, _ := m.Get(ts[0].ID); after.CoverSHA256 != before.CoverSHA256 || !after.UpdatedAt.Equal(before.UpdatedAt) {
 		t.Errorf("a refused picture changed the track: %+v, was %+v", after, before)
+	}
+	for _, attempt := range []string{one + "&paste=1&name=x.gif", "/api/cover?group=artist%1F" + url.QueryEscape(ts[0].Artist)} {
+		if code, _ := send(t, srv, "PUT", attempt, []byte("GIF89a not a picture")); code != 415 {
+			t.Errorf("%s: %d, want 415", attempt, code)
+		}
+	}
+	res, err := http.Get(srv.URL + "/api/tracks/" + ts[0].ID + "/cover")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	served, _ := io.ReadAll(res.Body)
+	if res.StatusCode != 200 || !bytes.Equal(served, testmp3.JPEG) {
+		t.Errorf("the cover served is no longer the one set: %d, %d bytes", res.StatusCode, len(served))
 	}
 }

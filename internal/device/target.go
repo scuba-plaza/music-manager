@@ -22,8 +22,6 @@ var builtinProfiles = mustParseProfiles(builtinTOML)
 
 var Generic = builtinTarget("generic")
 
-var Wolfgang = builtinTarget("wolfgang-wmp01")
-
 func mustParseProfiles(data []byte) []Profile {
 	profiles, err := ParseProfiles(data)
 	if err != nil {

@@ -24,10 +24,10 @@ func TestAPlaylistFileIsNamedByTheTrueNameOrTheLatinOne(t *testing.T) {
 		if got := device.Generic.PlaylistFile(p); got != c.generic {
 			t.Errorf("generic file of %+v = %q, want %q", p, got, c.generic)
 		}
-		if got := device.Wolfgang.PlaylistFile(p); got != c.wolfgang {
+		if got := wolfgang.PlaylistFile(p); got != c.wolfgang {
 			t.Errorf("Wolfgang file of %+v = %q, want %q", p, got, c.wolfgang)
 		}
-		if got, _ := device.Wolfgang.Playlist(p, nil, nil); got != c.wolfgang {
+		if got, _ := wolfgang.Playlist(p, nil, nil); got != c.wolfgang {
 			t.Errorf("Wolfgang writes %+v to %q, want %q", p, got, c.wolfgang)
 		}
 	}

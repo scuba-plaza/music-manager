@@ -380,14 +380,19 @@ func TestTheLibraryCanBeSortedByEveryKeyBothWaysAndStillFiltered(t *testing.T) {
 		{"sort=title", "Alpha Beta Gamma"},
 		{"sort=title&reverse=1", "Gamma Beta Alpha"},
 		{"sort=artist", "Gamma Alpha Beta"},
+		{"sort=artist&reverse=1", "Beta Alpha Gamma"},
 		{"sort=album", "Gamma Beta Alpha"},
+		{"sort=album&reverse=1", "Beta Gamma Alpha"},
 		{"sort=track", "Gamma Beta Alpha"},
+		{"sort=track&reverse=1", "Beta Gamma Alpha"},
 		{"sort=length", "Alpha Gamma Beta"},
 		{"sort=length&reverse=1", "Beta Gamma Alpha"},
 		{"sort=released", "Beta Gamma Alpha"},
 		{"sort=released&reverse=1", "Gamma Beta Alpha"},
 		{"sort=added", "Alpha Gamma Beta"},
+		{"sort=added&reverse=1", "Beta Gamma Alpha"},
 		{"sort=edited", "Alpha Gamma Beta"},
+		{"sort=edited&reverse=1", "Beta Gamma Alpha"},
 		{"sort=TITLE&q=beta", "Beta"},
 	} {
 		if got := order(c.query); got != c.want {
@@ -507,7 +512,6 @@ func TestTheInspectorSaysWhenATrackWasReleasedAddedAndEdited(t *testing.T) {
 	a, ts := seed(t, sample...)
 	srv := start(t, a)
 	id := ts[0].ID
-	today := time.Now().Format("2006-01-02")
 
 	if code, r := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "released", "text": "1999-05"}); code != 200 || r.Message != "Saved" {
 		t.Fatalf("%d %+v", code, r)
@@ -516,8 +520,14 @@ func TestTheInspectorSaysWhenATrackWasReleasedAddedAndEdited(t *testing.T) {
 	if got := v.field("released").Text; got != "1999-05" {
 		t.Errorf("released %q", got)
 	}
-	if want := "added " + today + " · edited " + today; v.Dates != want {
+	m, _ := a.Manifest()
+	stored, _ := m.Get(id)
+	want := "added " + app.SortValue(stored, app.SortAdded) + " · edited " + app.SortValue(stored, app.SortEdited)
+	if v.Dates != want {
 		t.Errorf("dates %q, want %q", v.Dates, want)
+	}
+	if !regexp.MustCompile(`^added \d{4}-\d{2}-\d{2} · edited \d{4}-\d{2}-\d{2}$`).MatchString(v.Dates) {
+		t.Errorf("dates %q are not two days", v.Dates)
 	}
 
 	if code, _ := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "released", "text": ""}); code != 200 {

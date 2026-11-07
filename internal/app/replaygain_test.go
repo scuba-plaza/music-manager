@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"music-manager/internal/app"
-	"music-manager/internal/device"
 	"music-manager/internal/loudness"
 	"music-manager/internal/mp3"
 	"music-manager/internal/testmp3"
@@ -169,7 +168,7 @@ func TestUnsyncedNoticesThatReplayGainWasTurnedOn(t *testing.T) {
 func TestWolfgangSyncCarriesNoReplayGain(t *testing.T) {
 	a, meter := twoTracks(t)
 	card := t.TempDir()
-	mustSync(t, a, app.SyncOptions{Target: card, Device: device.Wolfgang})
+	mustSync(t, a, app.SyncOptions{Target: card, Device: wolfgang})
 
 	files, _ := filepath.Glob(filepath.Join(card, "*", "*.mp3"))
 	if len(files) != 2 {

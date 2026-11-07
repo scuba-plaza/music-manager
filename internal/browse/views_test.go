@@ -1,6 +1,7 @@
 package browse
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -300,5 +301,34 @@ func TestTheDevicePreviewOfAProfileWithoutATagWidthCountsNothing(t *testing.T) {
 		if row.Label == "Album" && row.Value != "Caught a Black Rabbit" {
 			t.Errorf("album %+v, want it whole", row)
 		}
+	}
+}
+
+func wolfgangDeviceViews() map[string]*DeviceView {
+	s := longNamed()
+	views := map[string]*DeviceView{}
+	for _, tr := range s.Tracks {
+		v, ok := Track(s, tr.ID, TrackOptions{Profile: "wolfgang-wmp01"})
+		if !ok {
+			continue
+		}
+		if dev, at := tabWithID(v, "device"); at >= 0 {
+			views[tr.ID] = dev.Device
+		}
+	}
+	return views
+}
+
+func TestTheDeviceViewOfTheWolfgangProfileIsTheRecordedOne(t *testing.T) {
+	want, err := os.ReadFile("testdata/wolfgang-device.golden.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := json.MarshalIndent(wolfgangDeviceViews(), "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got)+"\n" != string(want) {
+		t.Errorf("the device preview of the Wolfgang changed:\n%s\nwant:\n%s", got, want)
 	}
 }

@@ -21,7 +21,7 @@ func longTrack() manifest.Track {
 // a longer one along when it is hovered: a file name is cut so that all of it
 // fits.
 func TestTheWolfgangsFileNamesFitWhatItShowsWholeWithTheExtension(t *testing.T) {
-	got := layout.PathFor(longTrack(), device.Wolfgang.Layout())
+	got := layout.PathFor(longTrack(), wolfgang.Layout())
 	name := got[strings.LastIndex(got, "/")+1:]
 	if n := utf8.RuneCountInString(name); n != 24 {
 		t.Errorf("%q: the file name is %d characters with .mp3, want 24", got, n)

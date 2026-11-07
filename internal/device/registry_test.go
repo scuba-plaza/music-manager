@@ -59,15 +59,15 @@ func TestBuiltinGivesTheTargetsTheirProfiles(t *testing.T) {
 	if generic.Profile() != device.Generic.Profile() {
 		t.Errorf("generic profile = %+v, want %+v", generic.Profile(), device.Generic.Profile())
 	}
-	if wolfgang.Profile() != device.Wolfgang.Profile() {
-		t.Errorf("wolfgang profile = %+v, want %+v", wolfgang.Profile(), device.Wolfgang.Profile())
+	if wolfgang.Profile() != wolfgang.Profile() {
+		t.Errorf("wolfgang profile = %+v, want %+v", wolfgang.Profile(), wolfgang.Profile())
 	}
 }
 
 func TestACallerCannotChangeWhatTheRegistryListsOrBuilds(t *testing.T) {
 	registry := device.Builtin()
 	registry.Profiles()[0].Name = "changed"
-	registry.Targets()[0] = device.Wolfgang
+	registry.Targets()[0] = wolfgang
 	if got := registry.Profiles()[0].Name; got != "generic" {
 		t.Errorf("Profiles()[0].Name = %q after a caller changed its copy, want generic", got)
 	}

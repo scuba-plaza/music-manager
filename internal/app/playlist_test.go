@@ -281,7 +281,7 @@ func syncedPlaylistLib(t *testing.T) (*app.App, []manifest.Track) {
 func TestSyncWritesAPlaylistTheWolfgangPlayerCanRead(t *testing.T) {
 	a, ts := syncedPlaylistLib(t)
 	target := filepath.Join(t.TempDir(), "player")
-	opts := app.SyncOptions{Target: target, Device: device.Wolfgang}
+	opts := app.SyncOptions{Target: target, Device: wolfgang}
 
 	ops := mustSync(t, a, opts)
 	if len(ops) != 4 { // three tracks and the playlist
@@ -442,7 +442,7 @@ func TestAPlaylistsLatinNameIsSetByHandAndOnlyTheWolfgangFileFollowsIt(t *testin
 	}
 
 	target := filepath.Join(t.TempDir(), "player")
-	mustSync(t, a, app.SyncOptions{Target: target, Device: device.Wolfgang})
+	mustSync(t, a, app.SyncOptions{Target: target, Device: wolfgang})
 	if got := readFile(t, target, "Playlists/Daraseh.m3u"); len(got) == 0 {
 		t.Error("the Wolfgang's playlist is not named by its Latin form")
 	}
