@@ -13,11 +13,15 @@
     in
     {
       overlays.default = final: _prev: {
-        music-manager = final.callPackage ./nix/package.nix { inherit version commit; };
+        music-manager = final.callPackage ./nix/package.nix {
+          inherit version commit;
+          frontend = final.callPackage ./nix/frontend.nix { inherit version; };
+        };
       };
 
       packages = forAll (pkgs: rec {
-        music-manager = pkgs.callPackage ./nix/package.nix { inherit version commit; };
+        frontend = pkgs.callPackage ./nix/frontend.nix { inherit version; };
+        music-manager = pkgs.callPackage ./nix/package.nix { inherit version commit frontend; };
         default = music-manager;
       });
 
@@ -44,6 +48,7 @@
       });
 
       checks = forAll (pkgs: {
+        frontend = self.packages.${pkgs.system}.frontend;
         build = self.packages.${pkgs.system}.default;
       });
     };

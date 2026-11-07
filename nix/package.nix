@@ -2,6 +2,7 @@
   lib,
   buildGoModule,
   makeWrapper,
+  frontend,
   yt-dlp,
   ffmpeg,
   xdg-utils,
@@ -20,8 +21,14 @@ buildGoModule {
       ../go.sum
       ../cmd
       ../internal
+      ../web/src/api/types.gen.ts
     ];
   };
+
+  postPatch = ''
+    mkdir -p internal/web/dist
+    cp -r --no-preserve=mode ${frontend}/. internal/web/dist/
+  '';
 
   vendorHash = "sha256-pdCnt8lqPiPSipa6KmtSxl8c2YZ32vv4X6tMETZRAQY=";
 
