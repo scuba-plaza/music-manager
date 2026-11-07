@@ -43,4 +43,4 @@ NEW means the test was written for this audit (`e2e/parity.spec.ts`, `e2e/rtl.sp
 
 ## Gaps found
 
-None of the lines needed a fix to the page: every NEW test passed on the first run against the real server once its own locators were right. The README still describes `mm web`, `--wolfgang` and the `--wolfgang` default of the Format row, which the move to profiles removes; Task 25 rewrites it.
+None of the lines needed a fix to the page: every NEW test passed on the first run against the real server once its own locators were right.
