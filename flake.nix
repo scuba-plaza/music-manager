@@ -25,10 +25,12 @@
         default = music-manager;
       });
 
+      homeManagerModules.default = import ./nix/hm-module.nix self;
+
       apps = forAll (pkgs: {
         default = {
           type = "app";
-          program = "${self.packages.${pkgs.system}.default}/bin/mm";
+          program = "${self.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/mm";
         };
       });
 
@@ -47,9 +49,61 @@
         };
       });
 
-      checks = forAll (pkgs: {
-        frontend = self.packages.${pkgs.system}.frontend;
-        build = self.packages.${pkgs.system}.default;
-      });
+      checks = forAll (
+        pkgs:
+        let
+          inherit (pkgs) lib;
+          mm = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+          evaluate =
+            devices:
+            (lib.evalModules {
+              modules = [
+                self.homeManagerModules.default
+                {
+                  options = {
+                    home.packages = lib.mkOption { type = lib.types.listOf lib.types.package; default = [ ]; };
+                    home.sessionVariables = lib.mkOption { type = lib.types.attrsOf lib.types.str; default = { }; };
+                    xdg.configFile = lib.mkOption { type = lib.types.attrsOf lib.types.attrs; default = { }; };
+                  };
+                  config = {
+                    _module.args.pkgs = pkgs;
+                    programs.music-manager = {
+                      enable = true;
+                      package = mm;
+                      inherit devices;
+                    };
+                  };
+                }
+              ];
+            }).config.xdg.configFile."mm/devices.toml".source;
+          good = evaluate {
+            my-player = {
+              latinNames = true;
+              tagWidth = 12;
+              coverFormat = "baseline-jpeg";
+              coverMaxEdge = 480;
+              coverQuality = 85;
+            };
+          };
+          bad = evaluate { my-player.coverFormat = "png"; };
+        in
+        {
+          frontend = self.packages.${pkgs.stdenv.hostPlatform.system}.frontend;
+          build = mm;
+          hm-module = pkgs.runCommand "hm-module" { } ''
+            ${mm}/bin/mm --config ${good} --check-config > out
+            grep -q my-player out
+            touch $out
+          '';
+          hm-module-rejects-bad = pkgs.runCommand "hm-module-rejects-bad" { } ''
+            if ${mm}/bin/mm --config ${bad} --check-config 2> err; then
+              echo "a bad profile was accepted"
+              exit 1
+            fi
+            grep -q cover_format err
+            touch $out
+          '';
+        }
+      );
     };
 }
