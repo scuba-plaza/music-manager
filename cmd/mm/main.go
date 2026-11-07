@@ -51,10 +51,10 @@ func serve(ctx context.Context, o launch.Options) error {
 		return err
 	}
 	url := web.URL(ln)
-	fmt.Fprintf(os.Stdout, "mm is at %s  (Ctrl+C stops it)\n", url)
+	fmt.Fprintf(o.Out, "mm is at %s  (Ctrl+C stops it)\n", url)
 	if !o.NoOpen {
 		if err := web.OpenBrowser(url); err != nil {
-			fmt.Fprintln(os.Stdout, "mm: cannot open a browser:", err)
+			fmt.Fprintln(o.Out, "mm: cannot open a browser:", err)
 		}
 	}
 	server := web.New(a, web.WithSource(lookup), web.WithDownloader(ytdlp.New()), web.WithProfiles(o.Profiles))

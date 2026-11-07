@@ -13,10 +13,13 @@ type ProfileInfo struct {
 	Builtin bool
 }
 
-type Registry struct{ profiles []Profile }
+type Registry struct {
+	profiles []Profile
+	builtins int
+}
 
 func Builtin() *Registry {
-	return &Registry{profiles: slices.Clone(builtinProfiles)}
+	return &Registry{profiles: slices.Clone(builtinProfiles), builtins: len(builtinProfiles)}
 }
 
 func LoadRegistry(path string) (*Registry, error) {
@@ -60,7 +63,7 @@ func (r *Registry) Get(name string) (Target, bool) {
 func (r *Registry) Profiles() []ProfileInfo {
 	infos := make([]ProfileInfo, len(r.profiles))
 	for i, p := range r.profiles {
-		infos[i] = ProfileInfo{Name: p.Name, Label: p.Label, Builtin: i < len(builtinProfiles)}
+		infos[i] = ProfileInfo{Name: p.Name, Label: p.Label, Builtin: i < r.builtins}
 	}
 	return infos
 }

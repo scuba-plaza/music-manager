@@ -190,8 +190,13 @@ func TestEveryKindOfBadFileIsRefusedAndNamesWhatIsWrong(t *testing.T) {
 		{"an unknown enum", "[[profile]]\nname = \"my-player\"\ncover_format = \"png\"\n", []string{`profile "my-player"`, "cover_format"}},
 		{"a value of the wrong type", "[[profile]]\nname = \"my-player\"\ntag_width = \"wide\"\n", []string{`profile "my-player"`, "tag_width", "wrong type"}},
 		{"a key given twice", "[[profile]]\nname = \"my-player\"\nlabel = \"a\"\nlabel = \"b\"\n", []string{"line 4", "label", "already"}},
-		{"a profile without a name", "[[profile]]\nlabel = \"Nameless\"\n", []string{"profile \"\"", "name"}},
-		{"text that is not TOML", "[[profile]\nname = ", []string{"line 1"}},
+		{"a profile without a name", "[[profile]]\nlabel = \"Nameless\"\n", []string{"profile #1", "name"}},
+		{"a zero component_max says why", "[[profile]]\nname = \"my-player\"\ncomponent_max = 0\n", []string{"at least 20"}},
+		{"a name with a capital", "[[profile]]\nname = \"My Player\"\n", []string{`profile "My Player"`, "name must be"}},
+		{"a bad second profile", "[[profile]]\nname = \"first\"\n\n[[profile]]\nname = \"second\"\nplaylist_ext = \".pls\"\n", []string{`profile "second"`, "playlist_ext"}},
+		{"a table that is not a profile", "[other]\na = 1\n", []string{"other unknown key"}},
+		{"profile as a plain value", "profile = \"x\"\n", []string{"profile must be a [[profile]] table"}},
+		{"text that is not TOML", "[[profile]\nname = ", []string{"line 1, column "}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -253,5 +258,16 @@ func TestConfigPathPrefersMMConfigThenXDGThenHome(t *testing.T) {
 				t.Errorf("ConfigPath = %q, want %q", got, c.want)
 			}
 		})
+	}
+}
+
+func TestADirectoryInsteadOfAFileIsRefusedAndNamed(t *testing.T) {
+	dir := t.TempDir()
+	registry, err := device.LoadRegistry(dir)
+	if err == nil || registry != nil {
+		t.Fatalf("LoadRegistry(dir) = %v, %v, want an error", registry, err)
+	}
+	if !strings.Contains(err.Error(), dir) || errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("error %q must name %s and not be a missing file", err, dir)
 	}
 }

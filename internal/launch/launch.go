@@ -23,6 +23,7 @@ type Options struct {
 	Config      string
 	CheckConfig bool
 	Profiles    *device.Registry
+	Out         io.Writer
 }
 
 type Env struct {
@@ -50,10 +51,10 @@ func Run(ctx context.Context, e Env) int {
 		fmt.Fprintln(e.Err, "usage: mm [flags]")
 		fs.PrintDefaults()
 	}
-	fs.StringVar(&o.Library, "library", DefaultLibrary(e.Getenv, e.Home), "library directory (env MM_LIBRARY)")
+	fs.StringVar(&o.Library, "library", "", "library directory (default $MM_LIBRARY, else ~/Music/Library)")
 	fs.StringVar(&o.Addr, "addr", defaultAddr, "address to listen on (only this computer: 127.0.0.1, localhost or ::1)")
 	fs.BoolVar(&o.NoOpen, "no-open", false, "do not open the page in a browser")
-	fs.StringVar(&o.Config, "config", "", "device profiles file (default $MM_CONFIG, else $XDG_CONFIG_HOME/mm/devices.toml, else ~/.config/mm/devices.toml)")
+	fs.StringVar(&o.Config, "config", "", "device profiles file (default $MM_CONFIG, else $XDG_CONFIG_HOME/mm/devices.toml, else ~/.config/mm/devices.toml; a file named by this flag or by $MM_CONFIG must exist, the default one may be missing)")
 	fs.BoolVar(&o.CheckConfig, "check-config", false, "check the device profiles file, list the profiles and exit")
 	fs.BoolVar(&showVersion, "version", false, "print the version and exit")
 
@@ -72,6 +73,10 @@ func Run(ctx context.Context, e Env) int {
 		fmt.Fprintf(e.Out, "mm %s\n", version.String())
 		return 0
 	}
+	if o.Library == "" {
+		o.Library = DefaultLibrary(e.Getenv, e.Home)
+	}
+	o.Out = e.Out
 	explicit := false
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {

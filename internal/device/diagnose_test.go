@@ -233,3 +233,34 @@ func TestEachDiagnosticFollowsItsProfileField(t *testing.T) {
 		})
 	}
 }
+
+func TestAClashTheCutDidNotCauseIsNotBlamedOnTheCut(t *testing.T) {
+	profiles, err := device.ParseProfiles([]byte("[[profile]]\nname = \"my-player\"\nstem_max = 20\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tracks := []manifest.Track{
+		track("dotted", "İstanbul", "", "Song"),
+		track("plain1", "Istanbul", "", "Song"),
+	}
+	if ws := profiles[0].Target().Diagnose(tracks); len(ws) != 0 {
+		t.Errorf("names equal without the cut were blamed on it: %+v", ws)
+	}
+}
+
+func TestTwoNamesThatDifferInCaseAndBeyondTheCutAreStillTheSameAfterIt(t *testing.T) {
+	profiles, err := device.ParseProfiles([]byte("[[profile]]\nname = \"my-player\"\nstem_max = 20\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tracks := []manifest.Track{
+		track("upper1", "Artist", "", "A Very Long Song Title Indeed Yes"),
+		track("lower1", "Artist", "", "a very long song title indeed no"),
+	}
+	ws := profiles[0].Target().Diagnose(tracks)
+	for _, id := range []string{"upper1", "lower1"} {
+		if got := warned(ws, id); !hasMessage(got, "cut") {
+			t.Errorf("%s: %q", id, got)
+		}
+	}
+}

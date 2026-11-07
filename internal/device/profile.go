@@ -62,7 +62,7 @@ func ParseProfiles(data []byte) ([]Profile, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := p.Validate(); err != nil {
+		if err := p.validate(describeProfile(position, table)); err != nil {
 			return nil, err
 		}
 		profiles = append(profiles, p)
@@ -78,21 +78,26 @@ func decodeDocument(data []byte) (document, error) {
 	var unknown *toml.StrictMissingError
 	if errors.As(err, &unknown) {
 		first := unknown.Errors[0]
-		row, _ := first.Position()
-		return document{}, fmt.Errorf("line %d: %s unknown key", row, strings.Join(first.Key(), "."))
+		row, column := first.Position()
+		return document{}, fmt.Errorf("line %d, column %d: %s unknown key", row, column, strings.Join(first.Key(), "."))
 	}
 	var invalid *toml.DecodeError
 	if errors.As(err, &invalid) {
-		row, _ := invalid.Position()
-		return document{}, fmt.Errorf("line %d: %w", row, invalid)
+		row, column := invalid.Position()
+		if key := invalid.Key(); len(key) == 1 && key[0] == "profile" && strings.Contains(invalid.Error(), "cannot decode") {
+			return document{}, fmt.Errorf("line %d, column %d: profile must be a [[profile]] table", row, column)
+		}
+		return document{}, fmt.Errorf("line %d, column %d: %s", row, column, invalid.Error())
 	}
 	return doc, err
 }
 
 func profileFromTable(position int, table map[string]any) (Profile, error) {
 	who := describeProfile(position, table)
-	if key, found := firstUnknownKey(table); found {
-		return Profile{}, fmt.Errorf("profile %s: %s unknown key", who, key)
+	if keys := unknownKeys(table); len(keys) == 1 {
+		return Profile{}, fmt.Errorf("profile %s: %s unknown key", who, keys[0])
+	} else if len(keys) > 1 {
+		return Profile{}, fmt.Errorf("profile %s: %s unknown keys", who, strings.Join(keys, ", "))
 	}
 	p := Profile{
 		ComponentMax:  200,
@@ -114,13 +119,14 @@ func profileFromTable(position int, table map[string]any) (Profile, error) {
 	return p, nil
 }
 
-func firstUnknownKey(table map[string]any) (string, bool) {
+func unknownKeys(table map[string]any) []string {
+	var unknown []string
 	for _, key := range slices.Sorted(maps.Keys(table)) {
 		if !profileKeys[key] {
-			return key, true
+			unknown = append(unknown, key)
 		}
 	}
-	return "", false
+	return unknown
 }
 
 func describeProfile(position int, table map[string]any) string {
@@ -138,9 +144,11 @@ func describeValueError(err error) string {
 	return err.Error()
 }
 
-func (p Profile) Validate() error {
+func (p Profile) Validate() error { return p.validate(fmt.Sprintf("%q", p.Name)) }
+
+func (p Profile) validate(who string) error {
 	fail := func(key, problem string, args ...any) error {
-		return fmt.Errorf("profile %q: %s %s", p.Name, key, fmt.Sprintf(problem, args...))
+		return fmt.Errorf("profile %s: %s %s", who, key, fmt.Sprintf(problem, args...))
 	}
 	if !profileName.MatchString(p.Name) {
 		return fail("name", "must be lower-case letters, digits and hyphens, starting with a letter or digit")
@@ -156,6 +164,12 @@ func (p Profile) Validate() error {
 	}
 	if p.TagWidth > 0 && !p.LatinNames {
 		return fail("tag_width", "needs latin_names")
+	}
+	if p.CoverMaxEdge < 0 {
+		return fail("cover_max_edge", "must not be negative, not %d", p.CoverMaxEdge)
+	}
+	if p.CoverQuality < 0 || p.CoverQuality > maxCoverQuality {
+		return fail("cover_quality", "must be from 0 to %d, not %d", maxCoverQuality, p.CoverQuality)
 	}
 	switch p.CoverFormat {
 	case "keep":

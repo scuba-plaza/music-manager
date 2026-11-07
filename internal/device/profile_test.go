@@ -45,6 +45,9 @@ func TestValidateRejects(t *testing.T) {
 		{"a tag_width without latin_names", "my-player", "tag_width", func(p *device.Profile) { p.TagWidth = 12 }},
 		{"a cover_format that is not known", "my-player", "cover_format", func(p *device.Profile) { p.CoverFormat = "png" }},
 		{"an empty cover_format", "my-player", "cover_format", func(p *device.Profile) { p.CoverFormat = "" }},
+		{"a negative cover_max_edge", "my-player", "cover_max_edge", func(p *device.Profile) { p.CoverMaxEdge = -1 }},
+		{"a negative cover_quality", "my-player", "cover_quality", func(p *device.Profile) { p.CoverQuality = -1 }},
+		{"a cover_quality above 100 that keep never uses", "my-player", "cover_quality", func(p *device.Profile) { p.CoverQuality = 101 }},
 		{"baseline-jpeg without cover_max_edge", "my-player", "cover_max_edge", func(p *device.Profile) {
 			p.CoverFormat = "baseline-jpeg"
 			p.CoverQuality = 85
@@ -447,6 +450,55 @@ func TestParseCallsAWrongTypeByThatName(t *testing.T) {
 		t.Fatal("ParseProfiles = nil error, want one")
 	}
 	for _, want := range []string{`profile "my-player"`, "replaygain", "wrong type"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err, want)
+		}
+	}
+}
+
+func TestParseNamesEveryUnknownKeyOfAProfile(t *testing.T) {
+	document := "[[profile]]\nname = \"my-player\"\nzeta = 1\nalpha = 2\nlatin_names = true\n"
+	_, err := device.ParseProfiles([]byte(document))
+	if err == nil {
+		t.Fatal("ParseProfiles = nil error, want one")
+	}
+	want := `profile "my-player": alpha, zeta unknown keys`
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("error %q does not contain %q", err, want)
+	}
+}
+
+func TestParseSaysInPlainWordsThatProfileMustBeATableArray(t *testing.T) {
+	_, err := device.ParseProfiles([]byte("profile = \"x\"\n"))
+	if err == nil {
+		t.Fatal("ParseProfiles = nil error, want one")
+	}
+	if !strings.Contains(err.Error(), "profile must be a [[profile]] table") {
+		t.Errorf("error %q does not say what profile must be", err)
+	}
+	for _, leaked := range []string{"struct field", "map[", "interface"} {
+		if strings.Contains(err.Error(), leaked) {
+			t.Errorf("error %q leaks %q", err, leaked)
+		}
+	}
+}
+
+func TestParseGivesTheLineAndColumnOfASyntaxError(t *testing.T) {
+	_, err := device.ParseProfiles([]byte("[[profile]]\nname = \"a\"\nlabel = = 3\n"))
+	if err == nil {
+		t.Fatal("ParseProfiles = nil error, want one")
+	}
+	if !strings.Contains(err.Error(), "line 3, column ") {
+		t.Errorf("error %q has no line and column", err)
+	}
+}
+
+func TestParseNamesAProfileWithAnInvalidNameByItsPositionWhenItHasNone(t *testing.T) {
+	_, err := device.ParseProfiles([]byte("[[profile]]\nname = \"first\"\n\n[[profile]]\nlabel = \"Nameless\"\n"))
+	if err == nil {
+		t.Fatal("ParseProfiles = nil error, want one")
+	}
+	for _, want := range []string{"profile #2", "name must be"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not contain %q", err, want)
 		}

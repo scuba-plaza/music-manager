@@ -57,7 +57,7 @@ func (target profileTarget) Diagnose(tracks []manifest.Track) []Warning {
 		for _, t := range same {
 			var clashes []string
 			for _, u := range same {
-				if u.ID != t.ID && !strings.EqualFold(layout.PathFor(u, uncut), layout.PathFor(t, uncut)) {
+				if u.ID != t.ID && strings.ToLower(layout.PathFor(u, uncut)) != strings.ToLower(layout.PathFor(t, uncut)) {
 					clashes = append(clashes, u.ID)
 				}
 			}

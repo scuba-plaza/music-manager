@@ -278,3 +278,92 @@ func TestAMissingConfigNamedByTheEnvironmentFails(t *testing.T) {
 		}
 	}
 }
+
+func writeAt(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAConfigFileNamedByTheEnvironmentGivesTheServerItsProfiles(t *testing.T) {
+	path := writeConfig(t, userProfile)
+	p := &probe{}
+	code, _, errs := run(t, p, configEnv("MM_CONFIG", path))
+	if code != 0 || p.calls != 1 {
+		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
+	}
+	if got := profileNames(p.options); !slices.Equal(got, []string{"generic", "wolfgang-wmp01", "my-player"}) {
+		t.Errorf("profiles %v", got)
+	}
+	if p.options.Config != path {
+		t.Errorf("config %q, want %q", p.options.Config, path)
+	}
+}
+
+func TestTheDefaultConfigFilesAreReadAndAnInvalidOneRefusesToStart(t *testing.T) {
+	root := t.TempDir()
+	xdg := filepath.Join(root, "xdg")
+	home := filepath.Join(root, "home")
+	cases := []struct {
+		name   string
+		getenv func(string) string
+		path   string
+	}{
+		{"XDG_CONFIG_HOME", configEnv("XDG_CONFIG_HOME", xdg), filepath.Join(xdg, "mm", "devices.toml")},
+		{"home", noEnv, filepath.Join(home, ".config", "mm", "devices.toml")},
+	}
+	for _, c := range cases {
+		writeAt(t, c.path, userProfile)
+		p := &probe{}
+		code, _, errs := runAt(home, p, c.getenv)
+		if code != 0 || p.calls != 1 {
+			t.Fatalf("%s: code %d, calls %d, err %q", c.name, code, p.calls, errs)
+		}
+		if got := profileNames(p.options); !slices.Equal(got, []string{"generic", "wolfgang-wmp01", "my-player"}) {
+			t.Errorf("%s: profiles %v", c.name, got)
+		}
+		writeAt(t, c.path, typoProfile)
+		p = &probe{}
+		code, _, errs = runAt(home, p, c.getenv)
+		if code != 1 || p.calls != 0 || !strings.Contains(errs, c.path) || !strings.Contains(errs, "latin_nmes") {
+			t.Errorf("%s invalid: code %d, calls %d, err %q", c.name, code, p.calls, errs)
+		}
+	}
+}
+
+func TestHelpSaysWhichConfigFileMayBeMissing(t *testing.T) {
+	_, _, errs := run(t, &probe{}, noEnv, "--help")
+	for _, want := range []string{"$MM_CONFIG", "must exist"} {
+		if !strings.Contains(errs, want) {
+			t.Errorf("usage does not say %q: %q", want, errs)
+		}
+	}
+}
+
+func TestHelpDoesNotPrintTheRealHomeDirectory(t *testing.T) {
+	_, _, errs := runAt("/home/someone", &probe{}, noEnv, "--help")
+	if strings.Contains(errs, "/home/someone") {
+		t.Errorf("usage leaks the home directory: %q", errs)
+	}
+	if !strings.Contains(errs, "~/Music/Library") {
+		t.Errorf("usage does not show the default library: %q", errs)
+	}
+}
+
+func TestTheServerWritesItsMessagesWhereTheEnvironmentSaysAndKnowsTheLibrary(t *testing.T) {
+	p := &probe{}
+	var o bytes.Buffer
+	code := launch.Run(context.Background(), launch.Env{
+		Args: []string{"--library", "/music"}, Getenv: noEnv, Home: home, Out: &o, Err: &bytes.Buffer{}, Serve: p.serve,
+	})
+	if code != 0 || p.options.Out != &o {
+		t.Errorf("code %d, the server's output is %v, want the environment's", code, p.options.Out)
+	}
+	if p.options.Library != "/music" {
+		t.Errorf("library %q", p.options.Library)
+	}
+}

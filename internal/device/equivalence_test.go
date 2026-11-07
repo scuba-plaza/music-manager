@@ -220,3 +220,18 @@ func TestBuiltinTargetsMatchTheRecordedOutputs(t *testing.T) {
 		})
 	}
 }
+
+func TestTheCoverInputsAreTheBytesTheOutputsWereRecordedFrom(t *testing.T) {
+	want := map[string]string{
+		"png":          "2639b2636451896f6fc49a0dbfdecdd7451853b532b9321577d25a56da6d9732",
+		"jpeg":         "ce88f0404138be564159121ed37e478829f871dedb58d23810c4f6e07d36cabb",
+		"jpeg-3000":    "d699e9c4f55bb1d26cd5d19c53497136a2d12c5e11926436bc680aafe8b852c6",
+		"not-an-image": "36f4efc0fe706f226ad2c2f90fa8b74bfb73ac6f512ab8116344e945704ecd25",
+	}
+	for _, c := range fixtureCovers(t) {
+		sum := sha256.Sum256(c.data)
+		if got := hex.EncodeToString(sum[:]); got != want[c.name] {
+			t.Errorf("the %s input is %s, not %s: the encoders of the standard library changed, so the recorded outputs cannot be compared", c.name, got, want[c.name])
+		}
+	}
+}
