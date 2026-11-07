@@ -342,7 +342,22 @@ function answer(request: StubRequest, info: InfoView, library: LibraryResponse, 
 export function stubServer(info: InfoView = infoView(), library: LibraryResponse = libraryResponse(), options: StubOptions = {}) {
   const fetchMock = vi.fn<typeof fetch>((input, init) => {
     const request = { method: init?.method ?? 'GET', url: new URL(urlOf(input), 'http://stub.invalid'), body: bodyOf(init) };
-    return Promise.resolve(answer(request, info, library, options));
+    const answered = Promise.resolve(answer(request, info, library, options));
+    const signal = init?.signal;
+    if (signal === undefined || signal === null) {
+      return answered;
+    }
+    return new Promise<Response>((resolve, reject) => {
+      const abort = () => {
+        reject(new DOMException('The operation was aborted.', 'AbortError'));
+      };
+      if (signal.aborted) {
+        abort();
+        return;
+      }
+      signal.addEventListener('abort', abort, { once: true });
+      answered.then(resolve, reject);
+    });
   });
   vi.stubGlobal('fetch', fetchMock);
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -355,4 +370,14 @@ export function requestsTo(fetchMock: { mock: { calls: Parameters<typeof fetch>[
     const sent = init?.method ?? 'GET';
     return sent === method && url.pathname + url.search === path ? [bodyOf(init)] : [];
   });
+}
+
+export function slowAnswer(): { response: Response; finish: (body: unknown) => void } {
+  let finish: (body: unknown) => void = () => undefined;
+  const body = new Promise<unknown>((resolve) => {
+    finish = resolve;
+  });
+  const response = new Response(null, { headers: { 'Content-Type': 'application/json' } });
+  vi.spyOn(response, 'json').mockReturnValue(body);
+  return { response, finish };
 }

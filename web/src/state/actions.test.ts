@@ -776,7 +776,7 @@ describe('actions that belong to later work', () => {
     showSample(keys.miles, { marks: new Set(['blue']) });
   });
 
-  it.each(['sync', 'add', 'identify', 'identifyAll', 'adopt', 'doctor'] as const)(
+  it.each(['sync'] as const)(
     '%s changes nothing yet',
     (action) => {
       const before = useApp.getState();

@@ -1,7 +1,11 @@
+import { Add } from '../dialogs/Add';
 import { Ask } from '../dialogs/Ask';
 import { BulkForm } from '../dialogs/BulkForm';
 import { CopyList } from '../dialogs/CopyList';
+import { Doctor } from '../dialogs/Doctor';
 import { Help } from '../dialogs/Help';
+import { Identify } from '../dialogs/Identify';
+import { IdentifyAll } from '../dialogs/IdentifyAll';
 import { PlaylistPicker } from '../dialogs/PlaylistPicker';
 import { SortMenu } from '../dialogs/SortMenu';
 import { useApp } from '../state/store';
@@ -25,6 +29,14 @@ export function OverlayHost() {
       return <CopyList id={overlay.id} title={overlay.title} choices={overlay.choices} />;
     case 'bulk':
       return <BulkForm ids={overlay.ids} head={overlay.head} />;
+    case 'identify':
+      return <Identify />;
+    case 'identifyAll':
+      return <IdentifyAll />;
+    case 'add':
+      return <Add />;
+    case 'doctor':
+      return <Doctor />;
     default:
       return null;
   }

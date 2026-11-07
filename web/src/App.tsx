@@ -9,14 +9,11 @@ import { OverlayHost } from './overlay/OverlayHost';
 import { connect, loadInfo, loadLibrary, run } from './state/actions';
 import { installPictures } from './state/cover';
 import { isTrack } from './state/inspector';
+import { jobEvent } from './state/jobs';
 import { loadProfiles } from './state/profiles';
 import { useApp } from './state/store';
 import './styles/tokens.css';
 import './styles/app.css';
-
-function ignoreJob(): void {
-  return;
-}
 
 export function App() {
   const title = useApp((s) => s.lib?.view.sort.title ?? 'Library');
@@ -27,7 +24,7 @@ export function App() {
     void loadInfo();
     void loadProfiles();
     void loadLibrary();
-    return connect(ignoreJob);
+    return connect(jobEvent);
   }, []);
 
   useEffect(() => installKeys(document, run), []);

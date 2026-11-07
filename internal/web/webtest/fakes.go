@@ -45,6 +45,8 @@ func (FakeSource) CoverFront(context.Context, string) ([]byte, error) { return n
 
 const defaultAudioFrames = 700
 
+const DuplicateLink = "https://www.youtube.com/watch?v=duplicate"
+
 type FakeDownloader struct {
 	Audio []byte
 	Info  app.Info
@@ -58,6 +60,9 @@ func (d *FakeDownloader) Download(_ context.Context, url, dir string) (app.Downl
 	d.calls = append(d.calls, url)
 	d.mu.Unlock()
 	audio := d.Audio
+	if url == DuplicateLink {
+		audio = testmp3.Silent(identifiedTracks[0].frames)
+	}
 	if audio == nil {
 		audio = testmp3.Silent(defaultAudioFrames)
 	}

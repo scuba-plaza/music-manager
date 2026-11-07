@@ -11,6 +11,7 @@ export type OverlayState =
   | { kind: 'copy'; id: string; title: string; choices: CopyChoice[] }
   | { kind: 'bulk'; ids: string[]; head: string }
   | { kind: 'identify' }
+  | { kind: 'identifyAll' }
   | { kind: 'add' }
   | { kind: 'doctor' }
   | { kind: 'sync' };

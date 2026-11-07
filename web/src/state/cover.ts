@@ -2,6 +2,7 @@ import { query, send } from '../api/client';
 import type { ChangeResponse } from '../api/types.gen';
 import { setStatus } from './actions';
 import { attempt } from './edit';
+import { hasMp3, uploadFiles } from './ingest';
 import { currentField, isTrack } from './inspector';
 import { useApp } from './store';
 import { isAlbum, markedIds, rowByKey } from './tree';
@@ -96,6 +97,10 @@ export async function pastePicture(file: File): Promise<void> {
 }
 
 export async function dropFiles(files: readonly File[]): Promise<void> {
+  if (hasMp3(files)) {
+    await uploadFiles(files);
+    return;
+  }
   const image = pictureIn(files) ?? files.find((f) => f.type.startsWith('image/'));
   if (image === undefined) {
     setStatus('Drop MP3 files to add them, or a JPEG or PNG picture to make it a cover', 'bad');

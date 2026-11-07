@@ -4,6 +4,7 @@ import type { InfoView, JobView, LibraryResponse, PeekView, RowView, TrackView }
 import type { ActionName } from '../keys/keymap';
 import { opensOverlay } from '../overlay/open';
 import { runInspector, stopPlaying } from './edit';
+import { runLookup } from './lookup';
 import { runOps } from './ops';
 import { useApp, type AppState, type Focus } from './store';
 import {
@@ -476,7 +477,7 @@ export function run(action: ActionName): void {
       toggleFocus(focus);
       break;
     default:
-      if (!opensOverlay(action) && !runOps(action)) {
+      if (!opensOverlay(action) && !runOps(action) && !runLookup(action)) {
         runInspector(action);
       }
       break;

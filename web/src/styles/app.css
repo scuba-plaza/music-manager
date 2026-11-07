@@ -884,3 +884,85 @@ body.dropping .app {
   outline: 2px dashed var(--accent);
   outline-offset: -6px;
 }
+
+.accent {
+  color: var(--accent);
+}
+
+.good {
+  color: var(--good);
+}
+
+.busy::after {
+  content: '';
+  display: inline-block;
+  inline-size: 1ch;
+  margin-inline-start: 0.5ch;
+  block-size: 1em;
+  border-inline-end: 0.6ch solid var(--accent);
+  vertical-align: text-bottom;
+  animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 1.5ch;
+  margin-block: 0.4em 0.6em;
+}
+
+.progress {
+  flex: 1;
+  block-size: 0.9em;
+  border: 1px solid var(--rule);
+  background: repeating-linear-gradient(90deg, var(--rule) 0 1px, transparent 1px 0.6ch);
+}
+
+.progress > i {
+  display: block;
+  block-size: 100%;
+  background: var(--accent);
+  transition: inline-size 0.2s;
+}
+
+.diff {
+  display: grid;
+  grid-template-columns: 8ch minmax(0, 1fr);
+  gap: 0 1ch;
+  margin-block: 0.2em 0.4em;
+  margin-inline: 1ch 0;
+  overflow-wrap: anywhere;
+}
+
+.problems {
+  max-block-size: 50vh;
+  margin-block-start: 0.4em;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+.problem {
+  padding-inline: 0.5ch;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.problem > :first-child {
+  margin-inline-end: 1ch;
+}
+
+.problem.on {
+  background: var(--sel);
+}
+
+.pathrow {
+  min-block-size: 1.45em;
+  overflow-wrap: anywhere;
+}

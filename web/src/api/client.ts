@@ -87,8 +87,8 @@ export function get<T>(path: string, init?: { signal?: AbortSignal }): Promise<T
   return call<T>('GET', path, undefined, init?.signal);
 }
 
-export function send<T>(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body?: unknown): Promise<T> {
-  return call<T>(method, path, body);
+export function send<T>(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body?: unknown, init?: { signal?: AbortSignal }): Promise<T> {
+  return call<T>(method, path, body, init?.signal);
 }
 
 export function query(params: Record<string, string | number | boolean | null | undefined>): string {

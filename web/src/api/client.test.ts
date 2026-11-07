@@ -124,6 +124,15 @@ describe('the client', () => {
 
     expect(requestOf(fetchMock).init.signal).toBe(controller.signal);
   });
+
+  it('hands the abort signal to fetch when sending, too', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({}));
+    const controller = new AbortController();
+
+    await send('POST', '/api/tracks/a/candidates', {}, { signal: controller.signal });
+
+    expect(requestOf(fetchMock).init.signal).toBe(controller.signal);
+  });
 });
 
 describe('getBlob', () => {
