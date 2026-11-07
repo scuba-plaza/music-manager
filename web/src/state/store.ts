@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { CopyChoice, InfoView, LibraryResponse, PeekView, ProfileView, TrackView } from '../api/types.gen';
+import type { Hint } from '../keys/keymap';
 
 export type Focus = 'tree' | 'inspector';
 
@@ -24,6 +25,10 @@ export interface EditState {
   error?: string;
 }
 
+export function closeOverlay(): void {
+  useApp.setState({ overlay: null });
+}
+
 export interface AppState {
   info: InfoView | null;
   lib: LibraryResponse | null;
@@ -44,6 +49,8 @@ export interface AppState {
   profile: string;
   status: { text: string; kind: '' | 'bad' | 'good' };
   overlay: OverlayState | null;
+  dialogHints: readonly Hint[];
+  helpPage: number;
   busy: boolean;
 }
 
@@ -100,6 +107,8 @@ export const useApp = create<AppState>()(() => ({
   profile: '',
   status: { text: '', kind: '' },
   overlay: null,
+  dialogHints: [],
+  helpPage: 0,
   busy: false,
 }));
 

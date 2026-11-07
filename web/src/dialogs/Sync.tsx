@@ -3,7 +3,7 @@ import { Progress } from '../components/Progress';
 import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList } from '../overlay/MenuList';
-import { closeOverlay } from '../overlay/open';
+import { closeOverlay } from '../state/store';
 import { useApp } from '../state/store';
 import {
   applyPlan,

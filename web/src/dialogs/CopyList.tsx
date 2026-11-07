@@ -3,7 +3,8 @@ import type { CopyChoice } from '../api/types.gen';
 import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList, moveIn } from '../overlay/MenuList';
-import { closeOverlay, copyAttributes } from '../overlay/open';
+import { copyAttributes } from '../overlay/confirm';
+import { closeOverlay } from '../state/store';
 
 interface CopyListProps {
   id: string;

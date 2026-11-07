@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
-import { closeOverlay } from '../overlay/open';
+import { closeOverlay } from '../state/store';
 import { chooseProblem, goToProblem, moveProblem, useDoctor } from '../state/doctor';
 import { plural } from '../state/text';
 

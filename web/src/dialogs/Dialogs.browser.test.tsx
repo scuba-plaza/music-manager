@@ -284,6 +284,30 @@ describe('help', () => {
     await expect.poll(selected).toBe(`1 ${pages[0]?.page ?? ''}`);
     await expect.element(dialog().getByText('Ctrl+C in the terminal where mm runs stops the program.')).toBeVisible();
   });
+
+  test('the help opens on the page it was closed on', async () => {
+    await openApp();
+    await onRow(soWhat);
+    await userEvent.keyboard('?');
+    const selected = () => dialog().getByRole('tab', { selected: true }).element().textContent;
+    const pages = helpPages();
+    await userEvent.keyboard('3');
+    await expect.poll(selected).toBe(`3 ${pages[2]?.page ?? ''}`);
+
+    await userEvent.keyboard('{Escape}');
+    await expect.element(dialog()).not.toBeInTheDocument();
+    await userEvent.keyboard('?');
+
+    await expect.poll(selected).toBe(`3 ${pages[2]?.page ?? ''}`);
+  });
+
+  test('the help of a freshly loaded page starts at the first page', async () => {
+    await openApp();
+    await onRow(soWhat);
+    await userEvent.keyboard('?');
+
+    await expect.poll(() => dialog().getByRole('tab', { selected: true }).element().textContent).toBe(`1 ${helpPages()[0]?.page ?? ''}`);
+  });
 });
 
 describe('the sort menu', () => {

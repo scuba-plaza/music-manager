@@ -48,6 +48,8 @@ function state(overrides: Partial<AppState> = {}): AppState {
     profile: '',
     status: { text: '', kind: '' },
     overlay: null,
+    dialogHints: [],
+    helpPage: 0,
     busy: false,
     ...overrides,
   };

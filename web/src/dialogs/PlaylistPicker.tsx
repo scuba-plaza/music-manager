@@ -3,7 +3,8 @@ import type { PlaylistView } from '../api/types.gen';
 import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList, moveIn } from '../overlay/MenuList';
-import { addToPlaylist, closeOverlay } from '../overlay/open';
+import { addToPlaylist } from '../overlay/confirm';
+import { closeOverlay } from '../state/store';
 import { plural } from '../state/text';
 
 interface PlaylistPickerProps {

@@ -1,7 +1,6 @@
 import { useId, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
-import type { KeyEventLike } from '../keys/keymap';
-import { useDialogHints, type Hint } from './hints';
-import { closeOverlay } from './open';
+import type { Hint, KeyEventLike } from '../keys/keymap';
+import { closeOverlay, useApp } from '../state/store';
 
 export interface DialogProps {
   title: ReactNode;
@@ -35,7 +34,7 @@ export function Dialog({ title, hints, onKey, children }: DialogProps) {
     document.addEventListener('focusin', keepFocus);
     return () => {
       document.removeEventListener('focusin', keepFocus);
-      useDialogHints.setState({ hints: [] });
+      useApp.setState({ dialogHints: [] });
       if (before instanceof HTMLElement && before.isConnected) {
         before.focus({ preventScroll: true });
       }
@@ -43,7 +42,7 @@ export function Dialog({ title, hints, onKey, children }: DialogProps) {
   }, []);
 
   useLayoutEffect(() => {
-    useDialogHints.setState({ hints });
+    useApp.setState({ dialogHints: hints });
   }, [hints]);
 
   useLayoutEffect(() => {

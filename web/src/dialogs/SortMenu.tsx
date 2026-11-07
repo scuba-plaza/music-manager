@@ -3,7 +3,8 @@ import type { SortView } from '../api/types.gen';
 import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList, moveIn } from '../overlay/MenuList';
-import { chooseSort, closeOverlay } from '../overlay/open';
+import { chooseSort } from '../overlay/confirm';
+import { closeOverlay } from '../state/store';
 
 const hints = [
   { keys: 'enter', label: 'choose' },

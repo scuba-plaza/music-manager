@@ -1,11 +1,10 @@
 import { editHints, filterHints, hintsFor } from '../keys/keymap';
-import { useDialogHints } from '../overlay/hints';
 import { hasSecondNumber } from '../state/inspector';
 import { useApp } from '../state/store';
 
 export function Footer() {
   const state = useApp();
-  const dialogHints = useDialogHints((s) => s.hints);
+  const dialogHints = useApp((s) => s.dialogHints);
   const { text, kind } = state.status;
   let hints = hintsFor(state);
   if (state.overlay !== null) {

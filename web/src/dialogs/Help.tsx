@@ -1,7 +1,7 @@
-import { Fragment, useState } from 'react';
+import { Fragment } from 'react';
 import { helpPages, type KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
-import { closeOverlay } from '../overlay/open';
+import { closeOverlay, useApp } from '../state/store';
 
 const pages = helpPages();
 const closers = new Set(['Escape', '?', 'q', 'Enter']);
@@ -12,15 +12,12 @@ const hints = [
   { keys: 'esc', label: 'close' },
 ];
 
-let lastPage = 0;
-
 export function Help() {
-  const [page, setPage] = useState(lastPage);
+  const page = useApp((s) => s.helpPage);
   const rows = pages[page]?.rows ?? [];
 
   function turn(to: number): void {
-    lastPage = (to + pages.length) % pages.length;
-    setPage(lastPage);
+    useApp.setState({ helpPage: (to + pages.length) % pages.length });
   }
 
   function onKey(e: KeyEventLike): boolean {

@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef } from 'react';
 import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList } from '../overlay/MenuList';
-import { closeOverlay } from '../overlay/open';
+import { closeOverlay } from '../state/store';
 import {
   applyCandidate,
   cancelSearchEditing,

@@ -5,6 +5,11 @@ export type Scope = 'common' | 'tree' | 'inspector';
 
 export type KeyEventLike = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey' | 'isComposing'>;
 
+export interface Hint {
+  keys: string;
+  label: string;
+}
+
 export type HelpPage = 'Moving' | 'Editing' | 'Marking' | 'Library';
 
 export type ActionName =

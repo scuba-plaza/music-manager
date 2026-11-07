@@ -1,6 +1,6 @@
 import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
-import { closeOverlay } from '../overlay/open';
+import { closeOverlay } from '../state/store';
 
 interface AskProps {
   head: string;
