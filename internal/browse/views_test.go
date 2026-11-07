@@ -3,7 +3,6 @@ package browse
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -74,15 +73,15 @@ func TestASortedLibraryIsOneListWithAWayBackToTheTree(t *testing.T) {
 	}
 }
 
-func TestATrackHasThreeTabsAndAFourthUnderWolfgang(t *testing.T) {
+func TestATrackHasThreeTabsAndTheDeviceTabOnlyWithAProfile(t *testing.T) {
 	s := snapshot()
 	v, ok := Track(s, "t1", TrackOptions{})
 	if !ok || len(v.Tabs) != 3 || v.Tabs[0].Name != "Details" || v.Tabs[1].Name != "Audio" || v.Tabs[2].Name != "Latin" {
 		t.Fatalf("%+v", v.Tabs)
 	}
-	w, _ := Track(s, "t1", TrackOptions{Wolfgang: true})
-	if len(w.Tabs) != 4 || w.Tabs[3].Wolfgang == nil || len(w.Tabs[3].Wolfgang.Rows) == 0 {
-		t.Errorf("wolfgang tab: %+v", w.Tabs)
+	w, _ := Track(s, "t1", TrackOptions{Profile: "wolfgang-wmp01"})
+	if len(w.Tabs) != 4 || w.Tabs[3].Device == nil || len(w.Tabs[3].Device.Rows) == 0 {
+		t.Errorf("device tab: %+v", w.Tabs)
 	}
 	if _, ok := Track(s, "nope", TrackOptions{}); ok {
 		t.Error("found a track that is not there")
@@ -240,22 +239,8 @@ func userRegistry(t *testing.T, content string) *device.Registry {
 	return r
 }
 
-func TestTheDeviceViewMatchesTheLegacyWolfgangViewForTheWolfgangProfile(t *testing.T) {
+func TestTheDeviceViewOfTheWolfgangProfileSaysWhatThePlayerShows(t *testing.T) {
 	s := longNamed()
-	for _, id := range []string{"long", "t4", "u1"} {
-		v, _ := Track(s, id, TrackOptions{Wolfgang: true, Profile: "wolfgang-wmp01"})
-		legacy, at := tabWithID(v, "wolfgang")
-		if at != 3 || legacy.Name != "Wolfgang" || legacy.Wolfgang == nil {
-			t.Fatalf("%s: the legacy tab is not the fourth: %+v", id, v.Tabs)
-		}
-		dev, at := tabWithID(v, "device")
-		if at != 4 || dev.Name != "Device" || dev.Device == nil || dev.Wolfgang != nil {
-			t.Fatalf("%s: device tab %+v", id, v.Tabs)
-		}
-		if !reflect.DeepEqual(dev.Device, legacy.Wolfgang) {
-			t.Errorf("%s: device view %+v, legacy %+v", id, dev.Device, legacy.Wolfgang)
-		}
-	}
 	v, _ := Track(s, "long", TrackOptions{Profile: "wolfgang-wmp01"})
 	dev, _ := tabWithID(v, "device")
 	if got := strings.Join(rowLabels(dev.Device), ","); got != "Folder,File,Cut,Artist,Album,Genre,Title" {
@@ -272,8 +257,8 @@ func TestTheDeviceViewMatchesTheLegacyWolfgangViewForTheWolfgangProfile(t *testi
 }
 
 func TestTheDeviceTabIsThereOnlyWhenAProfileIsAsked(t *testing.T) {
-	v, _ := Track(snapshot(), "t1", TrackOptions{Wolfgang: true})
-	if _, at := tabWithID(v, "device"); at != -1 || len(v.Tabs) != 4 {
+	v, _ := Track(snapshot(), "t1", TrackOptions{})
+	if _, at := tabWithID(v, "device"); at != -1 || len(v.Tabs) != 3 {
 		t.Errorf("tabs %+v", v.Tabs)
 	}
 	ids := []string{}

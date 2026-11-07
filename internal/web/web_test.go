@@ -91,36 +91,12 @@ var sample = []seedTrack{
 	{"", "", "", 0}, // not identified
 }
 
-func TestThePageIsServed(t *testing.T) {
-	a, _ := seed(t, sample...)
-	srv := start(t, a)
-	res, err := http.Get(srv.URL + "/")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
-	if res.StatusCode != 200 || !strings.Contains(string(body), "<title>mm</title>") {
-		t.Errorf("status %d, body %.80q", res.StatusCode, body)
-	}
-	for _, p := range []string{"/app.css", "/js/main.js"} {
-		if r, err := http.Get(srv.URL + p); err != nil || r.StatusCode != 200 {
-			t.Errorf("%s: %v %v", p, r, err)
-		}
-	}
-}
-
 func TestInfoSaysWhatTheServerCanDo(t *testing.T) {
 	a, _ := seed(t, sample...)
 	var info map[string]any
 	getJSON(t, start(t, a).URL+"/api/info", &info)
-	if info["canAdd"] != false || info["lookup"] != false || info["wolfgang"] != false {
+	if info["canAdd"] != false || info["lookup"] != false {
 		t.Errorf("a server with nothing added: %v", info)
-	}
-	var full map[string]any
-	getJSON(t, start(t, a, WithWolfgang(), WithSource(nil)).URL+"/api/info", &full)
-	if full["wolfgang"] != true {
-		t.Errorf("wolfgang not on: %v", full)
 	}
 }
 
@@ -600,44 +576,44 @@ func TestTheLatinTabShowsAFormSetByHandAsSetAndAWorkedOutFormDimly(t *testing.T)
 	}
 }
 
-type wolfgangPreview struct {
+type devicePreview struct {
 	Rows     []struct{ Label, Value string }
 	Warnings []string
 }
 
-func wolfgangTabOf(t *testing.T, srv *httptest.Server, id string) wolfgangPreview {
+func deviceTabOf(t *testing.T, srv *httptest.Server, id, profile string) devicePreview {
 	t.Helper()
 	var v struct {
 		Tabs []struct {
-			Name     string
-			Wolfgang *wolfgangPreview
+			Name   string
+			Device *devicePreview
 		}
 	}
-	if code := getJSON(t, srv.URL+"/api/tracks/"+id, &v); code != 200 || len(v.Tabs) != 4 || v.Tabs[3].Name != "Wolfgang" || v.Tabs[3].Wolfgang == nil {
+	if code := getJSON(t, srv.URL+"/api/tracks/"+id+"?profile="+profile, &v); code != 200 || len(v.Tabs) != 4 || v.Tabs[3].Name != "Device" || v.Tabs[3].Device == nil {
 		t.Fatalf("%d %+v", code, v)
 	}
-	return *v.Tabs[3].Wolfgang
+	return *v.Tabs[3].Device
 }
 
-func TestTheWolfgangTabSaysWhatThePlayerWillShowAndWhatItWillNotShowWell(t *testing.T) {
+func TestTheDeviceTabOfTheWolfgangProfileSaysWhatThePlayerWillShowAndWhatItWillNotShowWell(t *testing.T) {
 	a, ts := seed(t, seedTrack{"Bahlam Bek", "Abdel Halim Hafez", "Abd El Halim Hafez", 1}, seedTrack{"Song", "Band", "", 0})
 	genre := "Alternative Rock"
 	if _, err := a.Edit(ts[1].ID, app.Edit{Genre: &genre}); err != nil {
 		t.Fatal(err)
 	}
-	srv := start(t, a, WithWolfgang())
+	srv := start(t, a)
 
 	shown := map[string]string{}
-	for _, r := range wolfgangTabOf(t, srv, ts[0].ID).Rows {
+	for _, r := range deviceTabOf(t, srv, ts[0].ID, "wolfgang-wmp01").Rows {
 		shown[r.Label] = r.Value
 	}
 	if shown["Artist"] != "A. H. Hafez" || shown["Album"] != "Abd El Halim" {
 		t.Errorf("the player shows %+v, want the artist and the album within its 12 characters", shown)
 	}
-	if w := wolfgangTabOf(t, srv, ts[0].ID).Warnings; len(w) != 0 {
+	if w := deviceTabOf(t, srv, ts[0].ID, "wolfgang-wmp01").Warnings; len(w) != 0 {
 		t.Errorf("a track the player shows well has warnings: %v", w)
 	}
-	if w := wolfgangTabOf(t, srv, ts[1].ID).Warnings; len(w) != 1 || !strings.Contains(w[0], "genre") {
+	if w := deviceTabOf(t, srv, ts[1].ID, "wolfgang-wmp01").Warnings; len(w) != 1 || !strings.Contains(w[0], "genre") {
 		t.Errorf("warnings %v, want one about the genre", w)
 	}
 }
@@ -672,19 +648,18 @@ func TestProfilesEndpointListsBuiltinsThenUser(t *testing.T) {
 
 func TestTheDeviceTabFollowsTheProfileParameter(t *testing.T) {
 	a, ts := seed(t, seedTrack{"Bahlam Bek Ya Habibi Forever", "Abdel Halim Hafez", "Abd El Halim Hafez", 1})
-	srv := start(t, a, WithWolfgang(), WithProfiles(registryWith(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")))
+	srv := start(t, a, WithProfiles(registryWith(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")))
 	type tab struct {
-		ID       string
-		Name     string
-		Wolfgang *wolfgangPreview
-		Device   *wolfgangPreview
+		ID     string
+		Name   string
+		Device *devicePreview
 	}
 	tabsFor := func(query string) (int, []tab) {
 		var v struct{ Tabs []tab }
 		code := getJSON(t, srv.URL+"/api/tracks/"+ts[0].ID+query, &v)
 		return code, v.Tabs
 	}
-	rows := func(p *wolfgangPreview) map[string]string {
+	rows := func(p *devicePreview) map[string]string {
 		shown := map[string]string{}
 		for _, r := range p.Rows {
 			shown[r.Label] = r.Value
@@ -693,20 +668,20 @@ func TestTheDeviceTabFollowsTheProfileParameter(t *testing.T) {
 	}
 
 	_, plain := tabsFor("")
-	if len(plain) != 4 || plain[3].ID != "wolfgang" || plain[3].Wolfgang == nil {
-		t.Fatalf("without a profile the old page's tabs change: %+v", plain)
+	if len(plain) != 3 {
+		t.Fatalf("without a profile there are three tabs: %+v", plain)
 	}
 
 	_, wolfgang := tabsFor("?profile=wolfgang-wmp01")
-	if len(wolfgang) != 5 || wolfgang[4].ID != "device" || wolfgang[4].Device == nil {
+	if len(wolfgang) != 4 || wolfgang[3].ID != "device" || wolfgang[3].Device == nil {
 		t.Fatalf("tabs %+v", wolfgang)
 	}
-	if got := rows(wolfgang[4].Device); got["Artist"] != "A. H. Hafez" || got["Cut"] == "" {
+	if got := rows(wolfgang[3].Device); got["Artist"] != "A. H. Hafez" || got["Cut"] == "" {
 		t.Errorf("the Wolfgang preview %+v", got)
 	}
 
 	_, mine := tabsFor("?profile=my-player")
-	if got := rows(mine[4].Device); got["Artist"] != "Abdel Halim Hafez" || got["Cut"] != "" {
+	if got := rows(mine[3].Device); got["Artist"] != "Abdel Halim Hafez" || got["Cut"] != "" {
 		t.Errorf("the my-player preview %+v", got)
 	}
 
@@ -747,13 +722,13 @@ func answerStrictly(t *testing.T, base, method, path string, body, into any) int
 func TestEveryResponseDecodesIntoItsNamedType(t *testing.T) {
 	a, ts := seed(t, sample...)
 	drive := t.TempDir()
-	s := New(a, WithWolfgang(), WithSource(webtest.FakeSource{}))
+	s := New(a, WithSource(webtest.FakeSource{}))
 	s.mounts = func() []string { return []string{drive} }
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
 
 	var info InfoView
-	if code := answerStrictly(t, srv.URL, "GET", "/api/info", nil, &info); code != 200 || !strings.HasSuffix(info.Root, "lib") || info.Version != version.String() || !info.Wolfgang || info.CanAdd || !info.Lookup {
+	if code := answerStrictly(t, srv.URL, "GET", "/api/info", nil, &info); code != 200 || !strings.HasSuffix(info.Root, "lib") || info.Version != version.String() || info.CanAdd || !info.Lookup {
 		t.Errorf("info %d %+v", code, info)
 	}
 
@@ -769,7 +744,7 @@ func TestEveryResponseDecodesIntoItsNamedType(t *testing.T) {
 	}
 
 	var targets SyncTargetsView
-	if code := answerStrictly(t, srv.URL, "GET", "/api/sync/targets", nil, &targets); code != 200 || !targets.Wolfgang || len(targets.Targets) != 2 || targets.Targets[0].Kind != "library" || targets.Targets[1].Kind != "drive" || targets.Targets[1].Path != drive {
+	if code := answerStrictly(t, srv.URL, "GET", "/api/sync/targets", nil, &targets); code != 200 || len(targets.Targets) != 2 || targets.Targets[0].Kind != "library" || targets.Targets[1].Kind != "drive" || targets.Targets[1].Path != drive {
 		t.Errorf("targets %d %+v", code, targets)
 	}
 

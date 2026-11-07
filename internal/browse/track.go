@@ -67,14 +67,13 @@ type DeviceView struct {
 
 // TabView is a page of the inspector.
 type TabView struct {
-	ID       string      `json:"id"`
-	Name     string      `json:"name"`
-	Notes    []string    `json:"notes,omitempty"`
-	Warn     bool        `json:"warn,omitempty"`
-	Fields   []FieldView `json:"fields"`
-	Bar      *BarView    `json:"bar,omitempty"`
-	Wolfgang *DeviceView `json:"wolfgang,omitempty"`
-	Device   *DeviceView `json:"device,omitempty"`
+	ID     string      `json:"id"`
+	Name   string      `json:"name"`
+	Notes  []string    `json:"notes,omitempty"`
+	Warn   bool        `json:"warn,omitempty"`
+	Fields []FieldView `json:"fields"`
+	Bar    *BarView    `json:"bar,omitempty"`
+	Device *DeviceView `json:"device,omitempty"`
 }
 
 // TrackView is the inspector for one track.
@@ -94,8 +93,6 @@ type TrackView struct {
 
 // TrackOptions are what the inspector depends on besides the track.
 type TrackOptions struct {
-	// Wolfgang adds the preview tab.
-	Wolfgang bool
 	// CoverInfo describes a stored cover image, for example "500×500 JPEG".
 	CoverInfo func(sha string) string
 	Profile   string
@@ -126,7 +123,7 @@ func Track(s Snapshot, id string, o TrackOptions) (TrackView, bool) {
 		return TrackView{}, false
 	}
 	for i, tab := range inspectorTabs {
-		if tab.id == "wolfgang" && !o.Wolfgang || tab.id == "device" && o.Profile == "" {
+		if tab.id == "device" && o.Profile == "" {
 			continue
 		}
 		tv := TabView{ID: tab.id, Name: tab.name, Fields: []FieldView{}}
@@ -137,11 +134,6 @@ func Track(s Snapshot, id string, o TrackOptions) (TrackView, bool) {
 			tv.Notes = []string{"Dim forms are worked out from the names. Type one to set it by hand; sorting, search and devices that cannot show the true names use it."}
 		}
 		for _, f := range tab.fields {
-			if f == fWolfgang {
-				wolfgang, _ := profiles.Get("wolfgang-wmp01")
-				tv.Wolfgang = deviceView(s, t, wolfgang)
-				continue
-			}
 			if f == fDevice {
 				tv.Device = deviceView(s, t, previewed)
 				continue
@@ -195,7 +187,7 @@ func (f fieldKind) key() string {
 	return [...]string{
 		"title", "artist", "album", "track", "released", "genre", "cutStart", "cutEnd", "cover",
 		"volume", "fadeIn", "fadeOut", "latinTitle", "latinArtist", "latinAlbum", "latinGenre",
-		"wolfgang", "albumOf", "playlistName", "playlistLatin", "device",
+		"albumOf", "playlistName", "playlistLatin", "device",
 	}[f]
 }
 

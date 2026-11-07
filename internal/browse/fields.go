@@ -36,8 +36,7 @@ const (
 	fLatinArtist
 	fLatinAlbum
 	fLatinGenre
-	fWolfgang // the read-only preview under --wolfgang
-	fAlbumOf  // the number of tracks on an album, of all its tracks
+	fAlbumOf // the number of tracks on an album, of all its tracks
 	fPlaylistName
 	fPlaylistLatin
 	fDevice
@@ -54,7 +53,6 @@ var inspectorTabs = []inspectorTab{
 	{"details", "Details", []fieldKind{fTitle, fArtist, fAlbum, fTrack, fReleased, fGenre, fCover}},
 	{"audio", "Audio", []fieldKind{fCutStart, fCutEnd, fVolume, fFadeIn, fFadeOut}},
 	{"latin", "Latin", []fieldKind{fLatinTitle, fLatinArtist, fLatinAlbum, fLatinGenre}},
-	{"wolfgang", "Wolfgang", []fieldKind{fWolfgang}},
 	{"device", "Device", []fieldKind{fDevice}},
 }
 
@@ -79,7 +77,7 @@ func tabOf(f fieldKind) int {
 }
 
 func (f fieldKind) label() string {
-	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Volume", "Fade in", "Fade out", "Title", "Artist", "Album", "Genre", "Wolfgang", "Tracks on album", "Name", "Latin name", "Device"}[f]
+	return [...]string{"Title", "Artist", "Album", "Track", "Released", "Genre", "Cut start", "Cut end", "Cover", "Volume", "Fade in", "Fade out", "Title", "Artist", "Album", "Genre", "Tracks on album", "Name", "Latin name", "Device"}[f]
 }
 
 // what is the field as a change of it is named: "title", or "Latin title" for

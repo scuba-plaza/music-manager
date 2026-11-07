@@ -135,7 +135,6 @@ export interface InfoView {
   lookup: boolean;
   root: string;
   version: string;
-  wolfgang: boolean;
 }
 
 export interface JobView {
@@ -291,7 +290,6 @@ export interface SyncData {
 
 export interface SyncTargetsView {
   targets: TargetView[];
-  wolfgang: boolean;
 }
 
 export interface TabView {
@@ -301,7 +299,6 @@ export interface TabView {
   warn?: boolean;
   fields: FieldView[];
   bar?: BarView;
-  wolfgang?: DeviceView;
   device?: DeviceView;
 }
 

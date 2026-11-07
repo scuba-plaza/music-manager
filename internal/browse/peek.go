@@ -66,7 +66,7 @@ func Peek(s Snapshot, key, filter string) (PeekView, bool) {
 	switch r.Kind {
 	case kindGroup:
 		if r.Key == playlistsKey {
-			v.Info = []string{"Playlists are lists of tracks in an order of your own. Sync writes each one as an .m3u8 file in the Playlists folder (an .m3u for the Wolfgang)."}
+			v.Info = []string{"Playlists are lists of tracks in an order of your own. Sync writes each one as a playlist file in the Playlists folder, in the form the device profile asks for."}
 			v.List = playlistsList(s)
 		} else {
 			v.Info = []string{"These tracks have not been identified yet, so they have no proper title or artist and sit in the _Inbox folder."}

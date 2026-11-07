@@ -54,7 +54,7 @@ function planned(over: Partial<PlanView> = {}): JobView {
 
 const served: StubRoute = ({ method, url }) => {
   if (method === 'GET' && url.pathname === '/api/sync/targets') {
-    return jsonResponse({ targets, wolfgang: false });
+    return jsonResponse({ targets });
   }
   if (method === 'POST' && url.pathname === '/api/sync/plan') {
     return jsonResponse(job('running'));

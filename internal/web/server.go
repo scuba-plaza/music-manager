@@ -7,7 +7,6 @@ package web
 
 import (
 	"context"
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,15 +25,11 @@ import (
 	"music-manager/internal/version"
 )
 
-//go:embed static
-var staticFiles embed.FS
-
 // Server is the web interface to one library.
 type Server struct {
 	app        *app.App
 	source     app.MetadataSource
 	downloader app.Downloader
-	wolfgang   bool
 	profiles   *device.Registry
 	frontend   fs.FS
 
@@ -60,9 +55,6 @@ func WithSource(s app.MetadataSource) Option { return func(v *Server) { v.source
 // WithDownloader lets the server add tracks by downloading them.
 func WithDownloader(d app.Downloader) Option { return func(v *Server) { v.downloader = d } }
 
-// WithWolfgang shows what a sync for the Wolfgang WMP01 writes.
-func WithWolfgang() Option { return func(v *Server) { v.wolfgang = true } }
-
 func WithProfiles(r *device.Registry) Option { return func(v *Server) { v.profiles = r } }
 
 // New returns the server for a library.
@@ -75,6 +67,13 @@ func New(a *app.App, opts ...Option) *Server {
 	if s.profiles == nil {
 		s.profiles = a.Profiles()
 	}
+	if s.frontend == nil {
+		dist, err := fs.Sub(distFiles, "dist")
+		if err != nil {
+			panic(err)
+		}
+		s.frontend = dist
+	}
 	s.ed = browse.NewEditor(a, browse.WithSource(s.source), browse.WithDownloader(s.downloader))
 	s.routes()
 	return s
@@ -84,15 +83,7 @@ func New(a *app.App, opts ...Option) *Server {
 func (s *Server) Handler() http.Handler { return guard(s.mux) }
 
 func (s *Server) routes() {
-	if s.frontend != nil {
-		s.mux.Handle("GET /", frontendHandler(s.frontend))
-	} else {
-		static, err := fs.Sub(staticFiles, "static")
-		if err != nil {
-			panic(err)
-		}
-		s.mux.Handle("GET /", noCache(http.FileServerFS(static)))
-	}
+	s.mux.Handle("GET /", frontendHandler(s.frontend))
 
 	s.mux.HandleFunc("GET /api/info", s.info)
 	s.mux.HandleFunc("GET /api/profiles", s.listProfiles)
@@ -166,11 +157,10 @@ func URL(ln net.Listener) string {
 }
 
 type InfoView struct {
-	CanAdd   bool   `json:"canAdd"`
-	Lookup   bool   `json:"lookup"`
-	Root     string `json:"root"`
-	Version  string `json:"version"`
-	Wolfgang bool   `json:"wolfgang"`
+	CanAdd  bool   `json:"canAdd"`
+	Lookup  bool   `json:"lookup"`
+	Root    string `json:"root"`
+	Version string `json:"version"`
 }
 
 type ErrorView struct {
@@ -186,11 +176,10 @@ func (s *Server) info(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, InfoView{
-		CanAdd:   s.downloader != nil,
-		Lookup:   s.source != nil,
-		Root:     root,
-		Version:  version.String(),
-		Wolfgang: s.wolfgang,
+		CanAdd:  s.downloader != nil,
+		Lookup:  s.source != nil,
+		Root:    root,
+		Version: version.String(),
 	})
 }
 
@@ -216,13 +205,6 @@ func capitalize(s string) string {
 }
 
 var errNotFound = errors.New("not found")
-
-func noCache(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
-		h.ServeHTTP(w, r)
-	})
-}
 
 // root is the library folder as a full path, wherever mm was started from.
 func (s *Server) root() string {

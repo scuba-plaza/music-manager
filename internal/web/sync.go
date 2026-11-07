@@ -87,14 +87,12 @@ func (s *Server) syncRoutes() {
 }
 
 type SyncTargetsView struct {
-	Targets  []browse.TargetView `json:"targets"`
-	Wolfgang bool                `json:"wolfgang"`
+	Targets []browse.TargetView `json:"targets"`
 }
 
 func (s *Server) syncTargets(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, SyncTargetsView{
-		Targets:  browse.Targets(s.root(), s.mounts()),
-		Wolfgang: s.wolfgang,
+		Targets: browse.Targets(s.root(), s.mounts()),
 	})
 }
 
@@ -148,10 +146,9 @@ func inside(p, dir string) bool {
 
 func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Library  bool
-		Folder   string
-		Wolfgang bool
-		Profile  string
+		Library bool
+		Folder  string
+		Profile string
 	}
 	if !read(w, r, &in) {
 		return
@@ -161,7 +158,7 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnprocessableEntity, err)
 		return
 	}
-	dev, err := s.syncDevice(isLibrary, in.Profile, in.Wolfgang)
+	dev, err := s.syncDevice(isLibrary, in.Profile)
 	if err != nil {
 		fail(w, http.StatusBadRequest, err)
 		return
@@ -215,14 +212,12 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, v)
 }
 
-func (s *Server) syncDevice(isLibrary bool, profile string, wolfgang bool) (device.Target, error) {
+func (s *Server) syncDevice(isLibrary bool, profile string) (device.Target, error) {
 	switch {
 	case isLibrary:
 		return device.Generic, nil
 	case profile != "":
 		return s.profile(profile)
-	case wolfgang:
-		return s.profile("wolfgang-wmp01")
 	}
 	return device.Generic, nil
 }

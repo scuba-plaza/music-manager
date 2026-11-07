@@ -64,11 +64,10 @@ func TestTheTargetsAreTheLibraryFolderAndTheDrives(t *testing.T) {
 	a, _ := seed(t, sample...)
 	_, ts := syncServer(t, a, "/run/media/tau/PLAYER")
 	var out struct {
-		Targets  []browse.TargetView
-		Wolfgang bool
+		Targets []browse.TargetView
 	}
 	if code := getJSON(t, ts.URL+"/api/sync/targets", &out); code != 200 || len(out.Targets) != 2 ||
-		out.Targets[0].Kind != "library" || out.Targets[1].Path != "/run/media/tau/PLAYER" || out.Wolfgang {
+		out.Targets[0].Kind != "library" || out.Targets[1].Path != "/run/media/tau/PLAYER" {
 		t.Errorf("%d %+v", code, out)
 	}
 }
@@ -127,7 +126,7 @@ func TestSyncingTheLibraryFolderRecordsItAndClearsUndo(t *testing.T) {
 	if getJSON(t, srv.URL+"/api/library", &lib); lib.Unsynced.Known || lib.History.Undo == "" {
 		t.Fatalf("%+v", lib)
 	}
-	_, d := planned(t, srv.URL, obj{"library": true, "wolfgang": true})
+	_, d := planned(t, srv.URL, obj{"library": true})
 	if d.Plan.Where != "Library folder" || d.Plan.Counts.Create != 4 {
 		t.Fatalf("%+v", d.Plan)
 	}
@@ -339,7 +338,7 @@ func TestAPlanForTheWolfgangNamesItAndWarnsAboutWhatItWillNotShowWell(t *testing
 	_, srv := syncServer(t, a)
 	target := t.TempDir()
 
-	_, d := planned(t, srv.URL, obj{"folder": target, "wolfgang": true})
+	_, d := planned(t, srv.URL, obj{"folder": target, "profile": "wolfgang-wmp01"})
 	if !strings.HasSuffix(d.Plan.Where, "Wolfgang WMP01") {
 		t.Errorf("the plan is for %q, want it to name the Wolfgang", d.Plan.Where)
 	}
@@ -404,7 +403,7 @@ func TestSyncPlanForTheLibraryFolderIgnoresTheProfile(t *testing.T) {
 func TestSyncPlanWithAProfileUsesItsRules(t *testing.T) {
 	a, _ := seed(t, sample...)
 	srv := profileSyncServer(t, a, registryWith(t, shortStems))
-	_, d := planned(t, srv.URL, obj{"folder": t.TempDir(), "profile": "short-stems", "wolfgang": true})
+	_, d := planned(t, srv.URL, obj{"folder": t.TempDir(), "profile": "short-stems"})
 	if !strings.HasSuffix(d.Plan.Where, " · Short Stems") {
 		t.Errorf("the plan is for %q, want it to name the profile", d.Plan.Where)
 	}
@@ -421,12 +420,30 @@ func TestSyncPlanWithAProfileUsesItsRules(t *testing.T) {
 		t.Errorf("%d tracks planned: %+v", mp3s, d.Plan.Ops)
 	}
 
-	_, w := planned(t, srv.URL, obj{"folder": t.TempDir(), "wolfgang": true})
-	if !strings.HasSuffix(w.Plan.Where, " · Wolfgang WMP01") {
-		t.Errorf("the legacy flag plans for %q", w.Plan.Where)
-	}
 	_, g := planned(t, srv.URL, obj{"folder": t.TempDir()})
 	if strings.Contains(g.Plan.Where, "·") || !slices.ContainsFunc(g.Plan.Ops, func(op browse.OpView) bool { return op.Path == "Shawn James/Shadows/01 - The Wanderer.mp3" }) {
 		t.Errorf("without a profile the plan is not generic: %q %+v", g.Plan.Where, g.Plan.Ops)
+	}
+}
+
+func TestTheLegacyWolfgangFieldIsGone(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a)
+	var refused reply
+	if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": t.TempDir(), "wolfgang": true}, &refused); code != 400 || !strings.Contains(refused.Error, "wolfgang") {
+		t.Errorf("a plan that still sends the old flag: %d %+v, want it refused like any unknown field", code, refused)
+	}
+	_, d := planned(t, srv.URL, obj{"folder": t.TempDir()})
+	if strings.Contains(d.Plan.Where, " · ") || len(d.Plan.Warnings) != 0 {
+		t.Errorf("a plan with no profile is not for generic: %q %+v", d.Plan.Where, d.Plan.Warnings)
+	}
+	for _, path := range []string{"/api/info", "/api/sync/targets"} {
+		var body map[string]any
+		if code := getJSON(t, srv.URL+path, &body); code != 200 {
+			t.Fatalf("%s: %d", path, code)
+		}
+		if _, there := body["wolfgang"]; there {
+			t.Errorf("%s still says %v about the Wolfgang", path, body["wolfgang"])
+		}
 	}
 }

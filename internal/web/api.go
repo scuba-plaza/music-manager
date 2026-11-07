@@ -87,7 +87,7 @@ func (s *Server) track(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	v, ok := browse.Track(snap, r.PathValue("id"), browse.TrackOptions{Wolfgang: s.wolfgang, CoverInfo: s.describeCover, Profile: profile, Profiles: s.profiles})
+	v, ok := browse.Track(snap, r.PathValue("id"), browse.TrackOptions{CoverInfo: s.describeCover, Profile: profile, Profiles: s.profiles})
 	if !ok {
 		fail(w, http.StatusNotFound, errNotFound)
 		return

@@ -181,7 +181,7 @@ func (e *Editor) SetField(id, field, text, second string) (Result, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	f, ok := fieldByKey(field)
-	if !ok || f == fWolfgang || f == fCover || f > fLatinGenre {
+	if !ok || f == fCover || f > fLatinGenre {
 		return Result{}, fmt.Errorf("there is no field %q to edit", field)
 	}
 	s, err := e.snapshot()

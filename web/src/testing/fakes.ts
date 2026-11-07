@@ -48,7 +48,7 @@ export function deniedStorage() {
 }
 
 export function infoView(overrides: Partial<InfoView> = {}): InfoView {
-  return { canAdd: true, lookup: true, root: '/music', version: 'test', wolfgang: false, ...overrides };
+  return { canAdd: true, lookup: true, root: '/music', version: 'test', ...overrides };
 }
 
 export function libraryResponse(stamp = 's1', overrides: Partial<LibraryResponse> = {}): LibraryResponse {

@@ -2,6 +2,7 @@ package web
 
 import (
 	"io"
+	"io/fs"
 	"net/http"
 	"strings"
 	"testing"
@@ -80,6 +81,24 @@ func TestAPIRoutesStillWinOverTheFrontend(t *testing.T) {
 		}
 		if info.Root == "" {
 			t.Errorf("%s: /api/info did not answer with the info: %+v", name, info)
+		}
+	}
+}
+
+func TestWithoutOptionsTheServerServesTheEmbeddedDist(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a)
+	res, _ := fetch(t, srv.URL+"/")
+	want := http.StatusServiceUnavailable
+	if _, err := fs.Stat(distFiles, "dist/index.html"); err == nil {
+		want = http.StatusOK
+	}
+	if res.StatusCode != want {
+		t.Errorf("status %d, want %d", res.StatusCode, want)
+	}
+	if want == http.StatusOK {
+		if res, body := fetch(t, srv.URL+"/"); !strings.Contains(body, `src="/assets/`) || res.Header.Get("Cache-Control") != "no-cache" {
+			t.Errorf("the page served is not the built front end: %q", body)
 		}
 	}
 }

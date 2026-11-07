@@ -146,7 +146,7 @@ func TestNoListInAnAnswerIsNull(t *testing.T) {
 		name string
 		app  *app.App
 	}{{"empty", empty}, {"full", full}} {
-		srv := start(t, lib.app, source, WithWolfgang())
+		srv := start(t, lib.app, source)
 		check := func(method, path string, body any, typ reflect.Type) []byte {
 			raw := readRaw(t, srv.URL, method, path, body)
 			noNullCollections(t, lib.name+" "+method+" "+path, raw, typ)
@@ -191,7 +191,7 @@ func TestNoListInAnAnswerIsNull(t *testing.T) {
 
 func TestNoListIsNullForALibraryWithoutPlaylists(t *testing.T) {
 	a, ts := seed(t, sample...)
-	srv := start(t, a, WithWolfgang())
+	srv := start(t, a)
 	check := func(path string, typ reflect.Type) {
 		noNullCollections(t, path, readRaw(t, srv.URL, "GET", path, nil), typ)
 	}
