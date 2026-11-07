@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import type { KeyEventLike } from '../keys/keymap';
+import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
 import {
   chooseFiles,
@@ -167,7 +168,7 @@ export function Add() {
               }}
             />
           </div>
-          {error !== '' && <div className="bad">{error}</div>}
+          {error !== '' && <Problem text={error} />}
           <div className="buttons">
             <button
               type="button"
@@ -205,9 +206,7 @@ export function Add() {
         </>
       )}
       {phase === 'failed' && (
-        <div className="bad" role="alert">
-          <bdi dir="auto">{error}</bdi>
-        </div>
+        <Problem text={error} />
       )}
       {phase === 'form' && (
         <>
@@ -284,7 +283,7 @@ export function Add() {
               <bdi dir="auto">{pathNote}</bdi>
             </span>
           </div>
-          {error !== '' && <div className="bad">{error}</div>}
+          {error !== '' && <Problem text={error} />}
         </>
       )}
     </Dialog>

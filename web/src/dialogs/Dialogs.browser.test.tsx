@@ -137,7 +137,11 @@ describe('the dialog shell', () => {
     await expect.element(dialog()).toBeVisible();
 
     const box = dialog().element().getBoundingClientRect();
-    await userEvent.click(page.getByTestId('backdrop'), { position: { x: 2, y: Math.max(2, box.top - 20) } });
+    const backdrop = dialog().element().parentElement;
+    if (backdrop === null) {
+      throw new Error('the dialog has no backdrop');
+    }
+    await userEvent.click(page.elementLocator(backdrop), { position: { x: 2, y: Math.max(2, box.top - 20) } });
 
     await expect.element(dialog()).not.toBeInTheDocument();
   });
@@ -253,6 +257,21 @@ describe('ask', () => {
     await userEvent.keyboard('{Escape}');
     await expect.element(dialog()).not.toBeInTheDocument();
     expect(onYes).toHaveBeenCalledTimes(2);
+  });
+
+  test('enter on the focused Cancel button cancels and does not go ahead', async () => {
+    await openApp();
+    await onRow(soWhat);
+    const onYes = vi.fn();
+    askFor(onYes);
+    await expect.element(dialog()).toBeVisible();
+
+    await userEvent.keyboard('{Tab}{Tab}');
+    await expect.element(dialog().getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+
+    await expect.element(dialog()).not.toBeInTheDocument();
+    expect(onYes).not.toHaveBeenCalled();
   });
 });
 
@@ -398,6 +417,7 @@ describe('the copy list', () => {
     await userEvent.keyboard('{Enter}');
 
     await expect.element(dialog().getByRole('alert')).toHaveTextContent('Tick what to copy');
+    expect(dialog().getByRole('alert').element().querySelector('bdi[dir="auto"]')).not.toBeNull();
     expect(requestsTo(fetchMock, 'POST', '/api/copy')).toEqual([]);
   });
 
@@ -506,6 +526,7 @@ describe('the playlist picker', () => {
     await userEvent.keyboard('{Enter}');
 
     await expect.element(dialog().getByRole('alert')).toHaveTextContent('Type a name');
+    expect(dialog().getByRole('alert').element().querySelector('bdi[dir="auto"]')).not.toBeNull();
     expect(requestsTo(fetchMock, 'POST', '/api/playlists')).toEqual([]);
   });
 
@@ -663,5 +684,128 @@ describe('the bulk form', () => {
 
     await expect.element(dialog()).not.toBeInTheDocument();
     expect(requestsTo(fetchMock, 'POST', '/api/bulk')).toEqual([]);
+  });
+});
+
+describe('names in their own direction and ticks that are told', () => {
+  const arabicCopy: CopyChoice[] = [
+    { key: 'cover', label: 'Cover', has: false, text: '' },
+    { key: 'artist', label: 'Artist', has: true, text: 'فيروز' },
+    { key: 'album', label: 'Album', has: true, text: 'وطني' },
+  ];
+  const copying: StubRoute = ({ method, url }) =>
+    method === 'GET' && url.pathname === '/api/tracks/sowhat/copyable' ? jsonResponse(arabicCopy) : undefined;
+
+  test('the copy list lays out the title and every name in its own direction and says what is ticked and what is off', async () => {
+    await openApp(library(), copying);
+    await onRow(soWhat);
+
+    await userEvent.keyboard('c');
+
+    await expect.element(dialog().getByRole('option').first()).toBeVisible();
+    const heading = dialog().getByRole('heading').element();
+    expect(heading.querySelector('bdi[dir="auto"]')?.textContent).toBe('So What');
+    for (const option of dialog().getByRole('option').elements()) {
+      expect(option.querySelectorAll('bdi[dir="auto"]')).toHaveLength(2);
+    }
+    const [cover, artist, album] = dialog().getByRole('option').elements();
+    expect(cover?.getAttribute('aria-disabled')).toBe('true');
+    expect(cover?.hasAttribute('aria-checked')).toBe(false);
+    expect(artist?.getAttribute('aria-checked')).toBe('true');
+    await userEvent.keyboard('{ArrowDown}{ArrowDown} ');
+    await expect.poll(() => album?.getAttribute('aria-checked')).toBe('false');
+  });
+
+  test('the playlist chooser and the name of a new one are laid out in their own direction and a name is at most 80 characters', async () => {
+    await openApp(library([{ name: 'سهرة', count: 1, length: '0:03' }]));
+    await onRow(soWhat);
+
+    await userEvent.keyboard('p');
+
+    await expect.element(dialog().getByRole('option').first()).toBeVisible();
+    const names = dialog().getByRole('option').elements().map((option) => option.querySelector('.label bdi')?.getAttribute('dir'));
+    expect(names).toEqual(['auto', 'auto']);
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    const name = dialog().getByRole('textbox', { name: 'Name of the playlist' });
+    await expect.element(name).toBeVisible();
+    expect(name.element().getAttribute('dir')).toBe('auto');
+    expect(name.element().getAttribute('maxlength')).toBe('80');
+  });
+});
+
+describe('the hints, the vi keys and the clicks of the small dialogs', () => {
+  const selectedOption = () => dialog().getByRole('option', { selected: true }).element().textContent;
+  const selectedPage = () => dialog().getByRole('tab', { selected: true }).element().textContent;
+
+  test('each dialog shows its own keys at the bottom', async () => {
+    await openApp();
+    await onRow(soWhat);
+
+    await userEvent.keyboard('?');
+    await expect.poll(hints).toEqual(['←→ page', 'esc close']);
+    await userEvent.keyboard('{Escape}');
+    await userEvent.keyboard('S');
+    await expect.poll(hints).toEqual(['enter choose', 'r reverse', 'esc close']);
+    await userEvent.keyboard('{Escape}');
+    await userEvent.keyboard('c');
+    await expect.poll(hints).toEqual(['space ticks', 'enter copies', 'esc close']);
+  });
+
+  test('in the help l and h turn the pages and q closes it', async () => {
+    await openApp();
+    await onRow(soWhat);
+    const pages = helpPages();
+    await userEvent.keyboard('?');
+
+    await userEvent.keyboard('l');
+    await expect.poll(selectedPage).toBe(`2 ${pages[1]?.page ?? ''}`);
+    await userEvent.keyboard('h');
+    await expect.poll(selectedPage).toBe(`1 ${pages[0]?.page ?? ''}`);
+    await userEvent.keyboard('q');
+
+    await expect.element(dialog()).not.toBeInTheDocument();
+  });
+
+  test('in the sort menu j and k move, r reverses, a click chooses and q closes it', async () => {
+    await openApp();
+    await onRow(soWhat);
+    await userEvent.keyboard('S');
+    await expect.element(dialog()).toHaveAccessibleName('Sort');
+
+    await userEvent.keyboard('j');
+    await expect.poll(selectedOption).toContain('Artist');
+    await userEvent.keyboard('k');
+    await expect.poll(selectedOption).toContain('Tree');
+    await userEvent.keyboard('r');
+    await expect.element(dialog().getByText('reverse: on')).toBeVisible();
+    await userEvent.click(dialog().getByRole('option', { name: /Title/ }));
+
+    await expect.element(dialog()).not.toBeInTheDocument();
+    await expect.poll(libraryRequests).toContain('/api/library?sort=title&reverse=1');
+
+    await userEvent.keyboard('S');
+    await expect.element(dialog()).toBeVisible();
+    await userEvent.keyboard('q');
+    await expect.element(dialog()).not.toBeInTheDocument();
+  });
+
+  test('in the copy list j and k move, a click ticks and unticks, and q closes it', async () => {
+    await openApp();
+    await onRow(soWhat);
+    await userEvent.keyboard('c');
+    await expect.element(dialog().getByRole('option').first()).toBeVisible();
+
+    await userEvent.keyboard('j');
+    await expect.poll(selectedOption).toContain('Album');
+    await userEvent.keyboard('k');
+    await expect.poll(selectedOption).toContain('Artist');
+    const album = dialog().getByRole('option', { name: /Album/ });
+    await userEvent.click(album);
+    await expect.poll(() => album.element().getAttribute('aria-checked')).toBe('false');
+    await userEvent.click(album);
+    await expect.poll(() => album.element().getAttribute('aria-checked')).toBe('true');
+    await userEvent.keyboard('q');
+
+    await expect.element(dialog()).not.toBeInTheDocument();
   });
 });

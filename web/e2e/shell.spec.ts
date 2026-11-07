@@ -13,7 +13,7 @@ async function boxOf(locator: Locator): Promise<{ x: number; y: number; width: n
 async function openPage(page: Page, width: number, height = 700): Promise<void> {
   await page.setViewportSize({ width, height });
   await page.goto('/');
-  await expect(page.getByRole('banner')).toContainText('6 tracks');
+  await expect(page.getByRole('banner')).toContainText(/\d+ tracks/);
 }
 
 async function putCursorOnTrack(page: Page): Promise<void> {
@@ -33,14 +33,14 @@ async function dragDivider(page: Page, to: number): Promise<void> {
 
 test('the header shows the library folder, the tracks and what waits to sync', async ({ page, request }) => {
   const info = (await (await request.get('/api/info')).json()) as InfoView;
-  const { unsynced } = (await (await request.get('/api/library')).json()) as LibraryResponse;
+  const { unsynced, view } = (await (await request.get('/api/library')).json()) as LibraryResponse;
   expect(unsynced.n).toBeGreaterThan(0);
 
   await openPage(page, 1200, 800);
 
   const header = page.getByRole('banner');
   await expect(header).toContainText(info.root);
-  await expect(header).toContainText('6 tracks · 1 need work');
+  await expect(header).toContainText(`${String(view.tracks)} tracks · ${String(view.needWork)} need work`);
   await expect(header.getByRole('button', { name: /to sync/ })).toHaveText(`${String(unsynced.n)} to sync · press s`);
   await expect(page).toHaveTitle(`mm · ${info.root}`);
 });
@@ -182,4 +182,23 @@ test('a long library path is cut short in the header and the page does not scrol
   expect(root.x + root.width).toBeLessThanOrEqual(500);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('a stored light theme is on the page before the page script runs', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('mm.theme', 'light');
+  });
+  await page.route('**/*.js', (route) => route.abort());
+
+  await page.goto('/');
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+});
+
+test('a page without a stored theme is dark before the page script runs', async ({ page }) => {
+  await page.route('**/*.js', (route) => route.abort());
+
+  await page.goto('/');
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });

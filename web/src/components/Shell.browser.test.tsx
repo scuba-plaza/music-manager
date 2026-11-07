@@ -5,6 +5,8 @@ import { App } from '../App';
 import { setStatus } from '../state/status';
 import { useApp } from '../state/store';
 import { deniedStorage, FakeEventSource, infoView, libraryResponse, stubServer } from '../testing/fakes';
+import '../styles/tokens.css';
+import '../styles/app.css';
 import { Footer } from './Footer';
 import { Header } from './Header';
 
@@ -22,6 +24,8 @@ function libraryOf(tracks: number, needWork: number, n: number) {
   return { ...base, view: { ...base.view, rows, tracks, needWork } };
 }
 
+const startingViewport = { width: window.innerWidth, height: window.innerHeight };
+
 const themeButton = () => page.getByRole('button', { name: 'Switch theme' });
 
 beforeEach(() => {
@@ -33,7 +37,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   vi.unstubAllGlobals();
-  await page.viewport(414, 896);
+  await page.viewport(startingViewport.width, startingViewport.height);
 });
 
 describe('the footer', () => {
@@ -124,6 +128,16 @@ describe('the header', () => {
     expect(localStorage.getItem('mm.theme')).toBe('dark');
   });
 
+  test('each theme paints the page with its own colours', async () => {
+    await render(<Header />);
+    const paint = () => getComputedStyle(document.body).backgroundColor;
+
+    expect(paint()).toBe('rgb(40, 36, 32)');
+    await themeButton().click();
+
+    expect(paint()).toBe('rgb(246, 239, 228)');
+  });
+
   test('the theme switches although the browser will not store it', async () => {
     vi.stubGlobal('localStorage', deniedStorage());
 
@@ -168,6 +182,21 @@ describe('the application', () => {
     await expect.element(app).not.toHaveAttribute('aria-busy');
   });
 
+
+  test('unmounting the page takes its keys, its picture paste and its stream away', async () => {
+    const mounted = await render(<App />);
+    await expect.element(page.getByRole('banner')).toHaveTextContent('/music/library');
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }));
+    await expect.poll(() => useApp.getState().overlay?.kind).toBe('help');
+    useApp.setState({ overlay: null });
+
+    await mounted.unmount();
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }));
+
+    expect(useApp.getState().overlay).toBeNull();
+    expect(FakeEventSource.instances.filter((stream) => !stream.closed)).toEqual([]);
+  });
+
   test('the arrow keys switch between the panes in a window narrower than 800px', async () => {
     await page.viewport(500, 700);
     await render(<App />);
@@ -206,5 +235,17 @@ describe('the application', () => {
     expect(getComputedStyle(document.body).fontFamily).toMatch(/^system-ui, "Noto Sans Arabic", "Noto Naskh Arabic"/);
     expect(getComputedStyle(mono).fontFamily).toMatch(/monospace$/);
     mono.remove();
+  });
+});
+
+describe('what a server message looks like', () => {
+  test('the status line lays its text out in its own direction', async () => {
+    await render(<Footer />);
+    setStatus('تعذر الحفظ', 'bad');
+
+    const text = page.getByText('تعذر الحفظ');
+    await expect.element(text).toBeVisible();
+    expect(text.element().tagName).toBe('BDI');
+    expect(text.element().getAttribute('dir')).toBe('auto');
   });
 });

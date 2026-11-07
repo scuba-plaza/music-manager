@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { KeyEventLike } from '../keys/keymap';
+import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
 import { closeOverlay } from '../state/store';
 import { chooseProblem, goToProblem, moveProblem, useDoctor } from '../state/doctor';
@@ -48,9 +49,7 @@ export function Doctor() {
         </>
       )}
       {phase === 'failed' && (
-        <div className="bad" role="alert">
-          {error}
-        </div>
+        <Problem text={error} />
       )}
       {phase === 'done' && result !== null && result.problems.length === 0 && <div className="good">No problems found.</div>}
       {phase === 'done' && result !== null && result.problems.length > 0 && (

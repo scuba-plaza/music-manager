@@ -18,8 +18,10 @@ import { scrollCursorIntoView } from '../state/treeDom';
 const emptyLibrary = 'The library is empty. Press a to add from a link, or drop files on the page.';
 
 const markGlyphs: Record<MarkState, string> = { none: '', some: '◐', all: '●' };
+const checked: Record<MarkState, boolean | 'mixed' | undefined> = { none: undefined, some: 'mixed', all: true };
 
 interface TreeRowProps {
+  id: string;
   row: RowView;
   cursor: boolean;
   mark: MarkState;
@@ -32,7 +34,7 @@ function clicked(e: MouseEvent, part: string): boolean {
   return e.target instanceof Element && e.target.closest(part) !== null;
 }
 
-const TreeRow = memo(function TreeRow({ row, cursor, mark, open, flat, filtering }: TreeRowProps) {
+const TreeRow = memo(function TreeRow({ id, row, cursor, mark, open, flat, filtering }: TreeRowProps) {
   const folder = isFolder(row);
   const classes = ['row', row.kind];
   if (cursor) {
@@ -62,11 +64,13 @@ const TreeRow = memo(function TreeRow({ row, cursor, mark, open, flat, filtering
   return (
     <div
       role="treeitem"
+      id={id}
       className={classes.join(' ')}
       data-key={row.key}
       data-mark={mark === 'none' ? undefined : mark}
       aria-level={row.depth + 1}
       aria-selected={cursor}
+      aria-checked={checked[mark]}
       aria-expanded={folder ? open : undefined}
       style={flat ? undefined : { paddingInlineStart: `${String(row.depth * 1.25)}rem` }}
       onClick={click}
@@ -137,6 +141,7 @@ function FilterBox() {
 }
 
 export function Tree() {
+  const idBase = useId();
   const lib = useApp((s) => s.lib);
   const filter = useApp((s) => s.filter);
   const expanded = useApp((s) => s.expanded);
@@ -160,20 +165,36 @@ export function Tree() {
     }
   }, [lib, status]);
 
+  const activeAt = shown.findIndex((row) => row.key === cursor);
+  const activeId = activeAt < 0 ? undefined : `${idBase}-${String(activeAt)}`;
+
+  const failing = lib === null && failure !== '';
   let notice = '';
   if (lib === null) {
     notice = failure === '' ? 'Loading…' : failure;
   } else if (shown.length === 0) {
-    notice = lib.view.tracks === 0 ? emptyLibrary : 'Nothing matches the filter.';
+    if (lib.view.tracks === 0) {
+      notice = emptyLibrary;
+    } else {
+      notice = filter.trim() === '' ? 'Loading…' : 'Nothing matches the filter.';
+    }
   }
 
   return (
     <div className="pane-body tree-body" data-testid="tree-pane">
       <FilterBox />
-      <div role="tree" aria-label="Library tree" className="tree" tabIndex={0} onFocus={takeTreeFocus}>
-        {shown.map((row) => (
+      <div
+        role="tree"
+        aria-label="Library tree"
+        aria-activedescendant={activeId}
+        className="tree"
+        tabIndex={0}
+        onFocus={takeTreeFocus}
+      >
+        {shown.map((row, i) => (
           <TreeRow
             key={row.key}
+            id={`${idBase}-${String(i)}`}
             row={row}
             cursor={row.key === cursor}
             mark={lib === null ? 'none' : markStateOf(lib.view.rows, row, marks)}
@@ -183,7 +204,11 @@ export function Tree() {
           />
         ))}
       </div>
-      {notice !== '' && <div className="empty">{notice}</div>}
+      {notice !== '' && (
+        <div className="empty" role={failing ? 'alert' : 'status'}>
+          <bdi dir="auto">{notice}</bdi>
+        </div>
+      )}
     </div>
   );
 }

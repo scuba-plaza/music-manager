@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef } from 'react';
 import type { KeyEventLike } from '../keys/keymap';
+import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList } from '../overlay/MenuList';
 import { closeOverlay } from '../state/store';
@@ -120,9 +121,7 @@ export function Identify() {
       )}
       {phase === 'failed' && (
         <>
-          <div className="warn" role="alert">
-            <bdi dir="auto">{error}</bdi>
-          </div>
+          <Problem text={error} kind="warn" />
           <div className="ask-body">Press / to search with other words.</div>
         </>
       )}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { CopyChoice } from '../api/types.gen';
 import type { KeyEventLike } from '../keys/keymap';
+import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList, moveIn } from '../overlay/MenuList';
 import { copyAttributes } from '../overlay/confirm';
@@ -62,6 +63,7 @@ export function CopyList({ id, title, choices }: CopyListProps) {
     label: c.label,
     detail: c.has ? c.text : '—',
     off: !c.has,
+    checked: c.has ? ticked[i] === true : undefined,
   }));
 
   return (
@@ -84,9 +86,7 @@ export function CopyList({ id, title, choices }: CopyListProps) {
         }}
       />
       {error !== '' && (
-        <div className="bad" role="alert">
-          {error}
-        </div>
+        <Problem text={error} />
       )}
     </Dialog>
   );

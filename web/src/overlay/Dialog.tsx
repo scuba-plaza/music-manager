@@ -76,7 +76,7 @@ export function Dialog({ title, hints, onKey, children }: DialogProps) {
   }
 
   return (
-    <div className="backdrop" data-testid="backdrop" onMouseDown={mouseDown}>
+    <div className="backdrop" onMouseDown={mouseDown}>
       <div ref={ref} className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={keyDown}>
         <h2 id={titleId} className="dialog-title">
           {title}

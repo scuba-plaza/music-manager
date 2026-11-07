@@ -9,7 +9,8 @@ function lint(code: string, filename = 'src/sample.ts') {
     code,
     [
       {
-        files: ['**/*.ts'],
+        files: ['**/*.ts', '**/*.jsx'],
+        languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
         plugins: { local: { rules: { 'no-comments': noComments } } },
         rules: { 'local/no-comments': 'error' },
       },
@@ -32,6 +33,13 @@ describe('local/no-comments', () => {
   test('reports every comment', () => {
     const messages = lint('// one\nexport const a = 1; /* two */\n');
     expect(messages).toHaveLength(2);
+  });
+
+  test('reports a comment in JSX, between tags and among attributes', () => {
+    const between = lint('export const a = <div>{/* the answer */}</div>;\n', 'src/sample.jsx');
+    expect(between.map((m) => [m.ruleId, m.line])).toEqual([['local/no-comments', 1]]);
+    const among = lint('export const a = (\n  <div\n    // the answer\n    title="x"\n  />\n);\n', 'src/sample.jsx');
+    expect(among.map((m) => [m.ruleId, m.line])).toEqual([['local/no-comments', 3]]);
   });
 
   test('accepts code without comments, even with slashes in strings', () => {

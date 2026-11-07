@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Progress } from '../components/Progress';
 import type { KeyEventLike } from '../keys/keymap';
+import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList } from '../overlay/MenuList';
 import { closeOverlay } from '../state/store';
@@ -260,7 +261,7 @@ export function Sync() {
             </label>
           </div>
           <Format library={false} how="" />
-          {error !== '' && <div className="bad">{error}</div>}
+          {error !== '' && <Problem text={error} />}
         </>
       )}
       {phase === 'planning' && (
@@ -333,7 +334,7 @@ export function Sync() {
               )}
             </>
           )}
-          {error !== '' && <div className="bad">{error}</div>}
+          {error !== '' && <Problem text={error} />}
           {phase === 'confirming' ? (
             <div className="buttons">
               <button type="button" className="btn primary" onClick={confirmDelete}>
@@ -383,9 +384,7 @@ export function Sync() {
         </>
       )}
       {phase === 'failed' && (
-        <div className="bad" role="alert">
-          {error}
-        </div>
+        <Problem text={error} />
       )}
     </Dialog>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlaylistView } from '../api/types.gen';
 import type { KeyEventLike } from '../keys/keymap';
+import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList, moveIn } from '../overlay/MenuList';
 import { addToPlaylist } from '../overlay/confirm';
@@ -117,9 +118,7 @@ export function PlaylistPicker({ ids, lists }: PlaylistPickerProps) {
         />
       )}
       {error !== '' && (
-        <div className="bad" role="alert">
-          {error}
-        </div>
+        <Problem text={error} />
       )}
     </Dialog>
   );

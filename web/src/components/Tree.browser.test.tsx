@@ -777,7 +777,8 @@ describe('what the pane says when it has no rows', () => {
     await expect.element(filterBox()).toHaveValue('');
     await pause(250);
     expect(page.getByText('The library is empty.', { exact: false }).elements()).toHaveLength(0);
-    await expect.element(page.getByText('Nothing matches the filter.')).toBeVisible();
+    await expect.element(page.getByText('Loading…')).toBeVisible();
+    expect(page.getByText('Nothing matches the filter.').elements()).toHaveLength(0);
   });
 });
 
@@ -809,5 +810,68 @@ describe('giving the keys back to the tree', () => {
     expect(useApp.getState().focus).toBe('tree');
     await userEvent.keyboard('j');
     await expect.poll(cursorLabel).toBe('Needs work');
+  });
+});
+
+describe('what a screen reader is told', () => {
+  test('a marked row is checked, a part-marked folder is mixed, and an unmarked row says nothing', async () => {
+    useApp.setState({ expanded: new Set([milesKey, kindOfBlueKey]) });
+    await showTree();
+    await userEvent.click(page.getByRole('treeitem', { name: /So What/ }));
+    await userEvent.keyboard(' ');
+
+    await expect.poll(() => rowOf('So What').getAttribute('aria-checked')).toBe('true');
+    expect(rowOf('Kind of Blue').getAttribute('aria-checked')).toBe('mixed');
+    expect(rowOf('Miles Davis').getAttribute('aria-checked')).toBe('mixed');
+    expect(rowOf('Blue in Green').hasAttribute('aria-checked')).toBe(false);
+  });
+
+  test('the tree names the row under the cursor as its active descendant', async () => {
+    useApp.setState({ expanded: new Set([milesKey, kindOfBlueKey]) });
+    await showTree();
+    await userEvent.click(page.getByRole('treeitem', { name: /Blue in Green/ }));
+
+    await expect.poll(cursorLabel).toBe('Blue in Green');
+    const active = page.getByRole('tree').element().getAttribute('aria-activedescendant');
+    expect(active).not.toBeNull();
+    expect(document.getElementById(active ?? '')).toBe(rowOf('Blue in Green'));
+    await userEvent.keyboard('k');
+    await expect.poll(() => document.getElementById(page.getByRole('tree').element().getAttribute('aria-activedescendant') ?? '')).toBe(rowOf('So What'));
+  });
+
+  test('loading and an empty library are a status, a failure is an alert, and both are laid out in their own direction', async () => {
+    useApp.setState({ lib: null });
+    await render(<Tree />);
+    const loading = page.getByText('Loading…');
+    await expect.element(loading).toBeVisible();
+    expect(loading.element().closest('[role="status"]')).not.toBeNull();
+
+    useApp.setState({ status: { text: 'تعذر الوصول', kind: 'bad' } });
+    const failure = page.getByText('تعذر الوصول');
+    await expect.element(failure).toBeVisible();
+    expect(failure.element().tagName).toBe('BDI');
+    expect(failure.element().getAttribute('dir')).toBe('auto');
+    expect(failure.element().closest('[role="alert"]')).not.toBeNull();
+  });
+});
+
+describe('the notice of an empty tree', () => {
+  function emptied(filter: string): LibraryResponse {
+    const base = sampleLibrary();
+    useApp.setState({ filter });
+    return { ...base, view: { ...base.view, rows: [], shown: 0 } };
+  }
+
+  test('a filter that matches nothing says so', async () => {
+    await showTree(emptied('zzz'));
+
+    await expect.element(page.getByText('Nothing matches the filter.')).toBeVisible();
+  });
+
+  test('with the filter gone the old answer is not blamed on a filter while the new one is awaited', async () => {
+    await showTree(emptied(''));
+
+    await expect.element(page.getByText('Loading…')).toBeVisible();
+    expect(page.getByText('Nothing matches the filter.').elements()).toHaveLength(0);
   });
 });

@@ -219,7 +219,11 @@ export function Inspector() {
   let body = null;
   if (detail === null) {
     if (detailError !== '') {
-      body = <div className="empty bad">{detailError}</div>;
+      body = (
+        <div className="empty bad" role="alert">
+          <bdi dir="auto">{detailError}</bdi>
+        </div>
+      );
     } else if (hasTracks) {
       body = <div className="empty">Nothing selected</div>;
     }

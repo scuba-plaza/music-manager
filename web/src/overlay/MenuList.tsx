@@ -5,6 +5,7 @@ export interface MenuRow {
   label: string;
   detail: string;
   off?: boolean;
+  checked?: boolean | undefined;
 }
 
 interface MenuListProps {
@@ -29,6 +30,7 @@ export function MenuList({ label, rows, cursor, onChoose }: MenuListProps) {
           role="option"
           aria-selected={i === cursor}
           aria-disabled={row.off === true ? true : undefined}
+          aria-checked={row.checked}
           className={['item', i === cursor ? 'on' : '', row.off === true ? 'off' : ''].join(' ').trim()}
           onClick={() => {
             onChoose(i);

@@ -17,7 +17,7 @@ export function Footer() {
   return (
     <footer className="footer">
       <div role="status" className={kind === '' ? 'status' : `status ${kind}`}>
-        {text}
+        <bdi dir="auto">{text}</bdi>
       </div>
       <ul className="hints" aria-label="Keys">
         {hints.map((hint) => (
