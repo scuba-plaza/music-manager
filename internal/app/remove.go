@@ -8,7 +8,7 @@ import (
 
 // Remove deletes the record of a track. Its audio and cover stay in the
 // stores until the next sync collects them, and its rendered file is a stray
-// that sync --prune deletes.
+// that a sync deletes when asked to remove strays.
 func (a *App) Remove(id string) (manifest.Track, error) {
 	removed, err := a.RemoveMany([]string{id})
 	if err != nil {

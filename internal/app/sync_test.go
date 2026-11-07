@@ -31,7 +31,7 @@ func libWithTracks(t *testing.T, frames ...int) *app.App {
 func mustSync(t *testing.T, a *app.App, opts app.SyncOptions) []render.Op {
 	t.Helper()
 	plan := mustPlan(t, a, opts)
-	if err := plan.Apply(); err != nil {
+	if err := plan.ApplyWith(nil); err != nil {
 		t.Fatal(err)
 	}
 	return plan.Ops
@@ -347,7 +347,7 @@ func TestSyncDoesNotCollectTheFilesOfATrackAddedAfterThePlanWasMade(t *testing.T
 		t.Fatal("the added track has no cover to lose")
 	}
 
-	if err := plan.Apply(); err != nil {
+	if err := plan.ApplyWith(nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(a.AudioPath(added.AudioSHA256)); err != nil {

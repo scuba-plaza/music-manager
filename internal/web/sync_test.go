@@ -296,7 +296,7 @@ func TestACountIsFoundForALibraryNeverSynced(t *testing.T) {
 	// a folder that is up to date is recorded as such
 	b, _ := seed(t, sample...)
 	plan, err := b.PlanSync(app.SyncOptions{})
-	if err != nil || plan.Apply() != nil {
+	if err != nil || plan.ApplyWith(nil) != nil {
 		t.Fatal(err)
 	}
 	os.Remove(filepath.Join(b.Root(), ".mm", "synced.json"))
@@ -426,12 +426,12 @@ func TestSyncPlanWithAProfileUsesItsRules(t *testing.T) {
 	}
 }
 
-func TestTheLegacyWolfgangFieldIsGone(t *testing.T) {
+func TestAPlanNamesNoDeviceBesidesItsProfile(t *testing.T) {
 	a, _ := seed(t, sample...)
 	srv := start(t, a)
 	var refused reply
 	if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": t.TempDir(), "wolfgang": true}, &refused); code != 400 || !strings.Contains(refused.Error, "wolfgang") {
-		t.Errorf("a plan that still sends the old flag: %d %+v, want it refused like any unknown field", code, refused)
+		t.Errorf("a plan with a field the server does not know: %d %+v, want it refused", code, refused)
 	}
 	_, d := planned(t, srv.URL, obj{"folder": t.TempDir()})
 	if strings.Contains(d.Plan.Where, " · ") || len(d.Plan.Warnings) != 0 {
@@ -443,7 +443,7 @@ func TestTheLegacyWolfgangFieldIsGone(t *testing.T) {
 			t.Fatalf("%s: %d", path, code)
 		}
 		if _, there := body["wolfgang"]; there {
-			t.Errorf("%s still says %v about the Wolfgang", path, body["wolfgang"])
+			t.Errorf("%s says %v about a Wolfgang flag", path, body["wolfgang"])
 		}
 	}
 }

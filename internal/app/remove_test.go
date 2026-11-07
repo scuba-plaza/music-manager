@@ -34,7 +34,7 @@ func TestRemoveDeletesTheRecordAndSyncCollectsItsBlobs(t *testing.T) {
 	}
 
 	plan := mustPlan(t, a, app.SyncOptions{})
-	if err := plan.Apply(); err != nil {
+	if err := plan.ApplyWith(nil); err != nil {
 		t.Fatal(err)
 	}
 	if plan.Collected != 2 { // the audio and the cover
@@ -68,7 +68,7 @@ func TestSyncKeepsBlobsSharedAcrossTracksAndTargets(t *testing.T) {
 	a.Remove(ts[0].ID)
 	target := filepath.Join(t.TempDir(), "player")
 	plan := mustPlan(t, a, app.SyncOptions{Target: target})
-	if err := plan.Apply(); err != nil {
+	if err := plan.ApplyWith(nil); err != nil {
 		t.Fatal(err)
 	}
 	if plan.Collected != 1 { // only ts[0]'s audio

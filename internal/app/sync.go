@@ -128,15 +128,12 @@ func (p *SyncPlan) WithPrune(prune bool) *SyncPlan {
 	return &q
 }
 
-// Apply carries out the plan: it writes created and updated files and
+// ApplyWith carries out the plan: it writes created and updated files and
 // removes the files the plan marks for removal, along with directories left
 // empty. Strays are left alone. Finally it deletes audio and cover blobs that
-// no record uses any more.
-func (p *SyncPlan) Apply() error { return p.ApplyWith(nil) }
-
-// ApplyWith is Apply that reports how many of the plan's operations are done.
-// After a sync into the library folder it also records what was synced, for
-// Unsynced.
+// no record uses any more. It reports how many of the plan's operations are
+// done (progress may be nil). After a sync into the library folder it also
+// records what was synced, for Unsynced.
 func (p *SyncPlan) ApplyWith(progress func(done, total int)) error {
 	for i, op := range p.Ops {
 		if !filepath.IsLocal(filepath.FromSlash(op.Path)) {

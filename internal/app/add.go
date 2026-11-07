@@ -171,14 +171,6 @@ func (a *App) usable(m *manifest.Manifest, d *Draft) error {
 	return nil
 }
 
-func (a *App) Add(ctx context.Context, req AddRequest, dl Downloader) (manifest.Track, error) {
-	d, err := a.Fetch(ctx, req, dl)
-	if err != nil {
-		return manifest.Track{}, err
-	}
-	return a.Finish(ctx, d, withDefaults(req.Edit, d.Info))
-}
-
 // lookup searches req.Source for what the download is, returning the best
 // match if it is a confident one. Failures only produce a warning.
 func (a *App) lookup(ctx context.Context, req AddRequest, info Info) *Candidate {
@@ -221,31 +213,4 @@ func missingFields(t manifest.Track) error {
 		missing = append(missing, "artist")
 	}
 	return fmt.Errorf("missing %s", strings.Join(missing, " and "))
-}
-
-func withDefaults(given Edit, info Info) Edit {
-	e := given
-	artist := info.Artist
-	if artist == "" {
-		artist = strings.TrimSuffix(info.Uploader, " - Topic")
-	}
-	text := func(dst **string, v string) {
-		if *dst == nil {
-			v = strings.TrimSpace(v)
-			*dst = &v
-		}
-	}
-	count := func(dst **int, n int) {
-		if *dst == nil && n > 0 {
-			*dst = &n
-		}
-	}
-	text(&e.Title, info.Title)
-	text(&e.Artist, artist)
-	text(&e.Album, info.Album)
-	count(&e.TrackNumber, info.TrackNumber)
-	count(&e.TrackTotal, info.TrackTotal)
-	text(&e.Released, info.Released)
-	text(&e.Genre, "")
-	return e
 }

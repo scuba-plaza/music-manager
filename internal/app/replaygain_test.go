@@ -71,7 +71,7 @@ func TestASilentTrackIsSyncedWithoutTagsAndWithoutFuss(t *testing.T) {
 	a, meter := twoTracks(t)
 	meter.errs = map[int]error{60: loudness.ErrUnmeasurable}
 	plan := mustPlan(t, a, app.SyncOptions{})
-	if err := plan.Apply(); err != nil {
+	if err := plan.ApplyWith(nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := replayGainTags(t, a, "Band/Calm.mp3"); len(got) != 0 {
@@ -91,7 +91,7 @@ func TestATrackThatCannotBeMeasuredIsSyncedWithoutTagsAndReported(t *testing.T) 
 	a, meter := twoTracks(t)
 	meter.errs = map[int]error{60: errors.New("ffmpeg: Invalid data found when processing input")}
 	plan := mustPlan(t, a, app.SyncOptions{})
-	if err := plan.Apply(); err != nil {
+	if err := plan.ApplyWith(nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := replayGainTags(t, a, "Band/Calm.mp3"); len(got) != 0 {
@@ -214,7 +214,7 @@ func TestSyncWritesNoReplayGainTagsWhenThereIsNoMeter(t *testing.T) {
 	identify(t, a, ts[1].ID, "Calm", "Band", "", 0, 0)
 
 	plan := mustPlan(t, a, app.SyncOptions{})
-	if err := plan.Apply(); err != nil {
+	if err := plan.ApplyWith(nil); err != nil {
 		t.Fatal(err)
 	}
 	for _, rel := range []string{"Band/Loud.mp3", "Band/Calm.mp3"} {
