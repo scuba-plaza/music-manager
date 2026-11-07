@@ -1,14 +1,14 @@
-import { get, query } from '../api/client';
-import { subscribe } from '../api/events';
-import type { InfoView, JobView, LibraryResponse, PeekView, RowView, TrackView } from '../api/types.gen';
+import type { RowView } from '../api/types.gen';
 import type { ActionName } from '../keys/keymap';
 import { opensOverlay } from '../overlay/open';
+import { change } from './detail';
 import { runInspector, stopPlaying } from './edit';
+import { loadLibrary } from './library';
 import { runLookup } from './lookup';
 import { runOps } from './ops';
-import { useApp, type AppState, type Focus } from './store';
+import { setStatus } from './status';
+import { useApp, type Focus } from './store';
 import {
-  ancestorKeys,
   canFold,
   idsOf,
   isFlat,
@@ -16,172 +16,11 @@ import {
   isOpen,
   keysToOpenOneLevel,
   rowByKey,
-  settledCursor,
-  trackRowKey,
   visibleRows,
 } from './tree';
 import { centreCursor, focusFilterBox, leaveFilterBox, pageSize } from './treeDom';
 
-const detailPause = 40;
 const filterPause = 150;
-
-export function setStatus(text: string, kind: AppState['status']['kind'] = ''): void {
-  useApp.setState({ status: { text, kind } });
-}
-
-export function fail(err: unknown): void {
-  setStatus(err instanceof Error ? err.message : String(err), 'bad');
-}
-
-export async function loadInfo(): Promise<void> {
-  try {
-    useApp.setState({ info: await get<InfoView>('/api/info') });
-  } catch (err) {
-    fail(err);
-  }
-}
-
-let detailSeq = 0;
-let detailTimer: ReturnType<typeof setTimeout> | undefined;
-let detailAwaited = false;
-
-function scheduleDetail(): void {
-  clearTimeout(detailTimer);
-  detailAwaited = true;
-  detailTimer = setTimeout(() => {
-    void loadDetail();
-  }, detailPause);
-}
-
-export function dropDetail(): boolean {
-  clearTimeout(detailTimer);
-  detailSeq += 1;
-  const awaited = detailAwaited;
-  detailAwaited = false;
-  return awaited;
-}
-
-export async function loadDetail(): Promise<void> {
-  clearTimeout(detailTimer);
-  detailSeq += 1;
-  const seq = detailSeq;
-  detailAwaited = true;
-  const { lib, cursor, filter, profile } = useApp.getState();
-  const row = rowByKey(lib, cursor);
-  if (row === undefined) {
-    detailAwaited = false;
-    useApp.setState({ detail: null, detailError: '' });
-    return;
-  }
-  try {
-    const detail =
-      row.kind === 'track'
-        ? await get<TrackView>(`/api/tracks/${encodeURIComponent(row.trackId ?? '')}` + query({ profile }))
-        : await get<PeekView>('/api/peek' + query({ key: row.key, q: filter.trim() }));
-    if (seq === detailSeq) {
-      detailAwaited = false;
-      useApp.setState({ detail, detailError: '' });
-    }
-  } catch (err) {
-    if (seq === detailSeq) {
-      detailAwaited = false;
-      useApp.setState({ detail: null, detailError: err instanceof Error ? err.message : String(err) });
-      fail(err);
-    }
-  }
-}
-
-function change(patch: Partial<AppState>): void {
-  const before = useApp.getState();
-  const cursor = settledCursor({ ...before, ...patch });
-  const moved = cursor !== before.cursor;
-  useApp.setState(moved ? { ...patch, cursor, edit: null, playing: null } : { ...patch, cursor });
-  if (moved) {
-    scheduleDetail();
-  }
-}
-
-function followMoves(expanded: Set<string>, cursor: string | null, moves: Record<string, string>) {
-  const next = new Set(expanded);
-  let at = cursor;
-  for (const [from, to] of Object.entries(moves)) {
-    if (next.delete(from)) {
-      next.add(to);
-    }
-    if (at === from) {
-      at = to;
-    }
-  }
-  return { expanded: next, cursor: at };
-}
-
-function revealTrack(lib: LibraryResponse, expanded: Set<string>, cursor: string | null, id: string) {
-  const current = rowByKey(lib, cursor);
-  const row = current?.trackId === id ? current : rowByKey(lib, trackRowKey(id));
-  if (row === undefined) {
-    return { expanded, cursor };
-  }
-  return { expanded: new Set([...expanded, ...ancestorKeys(lib.view.rows, row)]), cursor: row.key };
-}
-
-function withoutGoneTracks(marks: Set<string>, lib: LibraryResponse): Set<string> {
-  const have = new Set(lib.view.rows.flatMap((row) => (row.trackId === undefined ? [] : [row.trackId])));
-  const kept = [...marks].filter((id) => have.has(id));
-  return kept.length === marks.size ? marks : new Set(kept);
-}
-
-let librarySeq = 0;
-
-export interface LibraryOptions {
-  moves?: Record<string, string> | undefined;
-  reveal?: string | undefined;
-}
-
-export async function loadLibrary(options: LibraryOptions = {}): Promise<void> {
-  librarySeq += 1;
-  const seq = librarySeq;
-  const { filter, sort } = useApp.getState();
-  try {
-    const lib = await get<LibraryResponse>(
-      '/api/library' + query({ q: filter.trim(), sort: sort.key, reverse: sort.key !== '' && sort.reverse }),
-    );
-    if (seq !== librarySeq) {
-      return;
-    }
-    const state = useApp.getState();
-    const followed = options.moves === undefined ? state : followMoves(state.expanded, state.cursor, options.moves);
-    const revealed = options.reveal === undefined ? followed : revealTrack(lib, followed.expanded, followed.cursor, options.reveal);
-    change({
-      lib,
-      sort: { key: lib.view.sort.key, reverse: lib.view.sort.reverse },
-      marks: filter.trim() === '' ? withoutGoneTracks(state.marks, lib) : state.marks,
-      expanded: revealed.expanded,
-      cursor: revealed.cursor,
-    });
-    await loadDetail();
-  } catch (err) {
-    if (seq === librarySeq) {
-      fail(err);
-    }
-  }
-}
-
-export function connect(onJob: (job: JobView) => void): () => void {
-  return subscribe({
-    library(stamp) {
-      const { lib, busy } = useApp.getState();
-      if (stamp !== lib?.stamp && !busy) {
-        void loadLibrary();
-      }
-    },
-    job: onJob,
-    open() {
-      if (useApp.getState().lib) {
-        void loadLibrary();
-      }
-    },
-  });
-}
 
 function focusPane(focus: Focus): void {
   useApp.setState({ focus });

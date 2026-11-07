@@ -86,7 +86,7 @@ kbd {
   font-weight: bold;
 }
 
-.root {
+.library-root {
   min-width: 0;
   overflow: hidden;
   color: var(--dim);

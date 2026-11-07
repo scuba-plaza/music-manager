@@ -48,7 +48,7 @@ export function Header() {
       <div className="head-start">
         <span className="brand">mm</span>
         {root !== undefined && (
-          <span className="root" title={root}>
+          <span className="library-root" title={root}>
             <bdi dir="auto">{root}</bdi>
           </span>
         )}

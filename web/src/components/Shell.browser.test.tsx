@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-react';
 import { App } from '../App';
-import { setStatus } from '../state/actions';
+import { setStatus } from '../state/status';
 import { useApp } from '../state/store';
 import { deniedStorage, FakeEventSource, infoView, libraryResponse, stubServer } from '../testing/fakes';
 import { Footer } from './Footer';

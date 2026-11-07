@@ -1,7 +1,10 @@
 import { getBlob, query, send } from '../api/client';
 import type { ChangeResponse, FieldView, HintView, PathView } from '../api/types.gen';
 import type { ActionName } from '../keys/keymap';
-import { dropDetail, fail, loadDetail, loadLibrary, pointRow, setStatus } from './actions';
+import { dropDetail, loadDetail } from './detail';
+import { loadLibrary } from './library';
+import { pointRow } from './actions';
+import { fail, setStatus } from './status';
 import { chooseCover, removeCover } from './cover';
 import { chooseTab, currentField, fieldIndex, fieldList, isTrack, moveField, nextTab, nudgeable, previousTabOrBack } from './inspector';
 import { useApp, type EditState } from './store';

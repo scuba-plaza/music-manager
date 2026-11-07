@@ -13,7 +13,8 @@ import {
   type StubRoute,
 } from '../testing/fakes';
 import { send } from '../api/client';
-import { loadDetail, run } from './actions';
+import { run } from './actions';
+import { loadDetail } from './detail';
 import { applyBulk, typeBulk, useBulk } from './bulk';
 import { coverChosen, dropFiles, pastePicture, setCover } from './cover';
 import { applyChange } from './edit';

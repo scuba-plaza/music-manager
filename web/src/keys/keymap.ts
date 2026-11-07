@@ -245,12 +245,8 @@ export function keyName(e: KeyEventLike): string {
   return held.length === 0 ? key : `${held.join('+')}+${key.toLowerCase()}`;
 }
 
-function usable(e: KeyEventLike): boolean {
-  return !e.metaKey && !e.altKey && !e.isComposing;
-}
-
 export function resolve(scope: 'tree' | 'inspector', e: KeyEventLike): ActionName | undefined {
-  if (!usable(e)) {
+  if (e.isComposing) {
     return undefined;
   }
   const name = keyName(e);
@@ -259,7 +255,7 @@ export function resolve(scope: 'tree' | 'inspector', e: KeyEventLike): ActionNam
 }
 
 export function resolveFilter(e: KeyEventLike): ActionName | undefined {
-  if (!usable(e)) {
+  if (e.isComposing) {
     return undefined;
   }
   const name = keyName(e);

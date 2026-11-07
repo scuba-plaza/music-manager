@@ -22,13 +22,22 @@ function isErrorBody(data: unknown): data is ErrorView {
   return typeof data === 'object' && data !== null && 'error' in data && typeof data.error === 'string' && data.error !== '';
 }
 
+const unreadable = 'mm gave an answer the page cannot read.';
+
 async function readBody(res: Response): Promise<unknown> {
   const type = res.headers.get('Content-Type') ?? '';
   if (!type.includes('json')) {
-    return null;
+    if ((await res.text()) === '') {
+      return null;
+    }
+    throw new ApiError(unreadable, res.status);
   }
-  const data: unknown = await res.json();
-  return data;
+  try {
+    const data: unknown = await res.json();
+    return data;
+  } catch {
+    throw new ApiError(unreadable, res.status);
+  }
 }
 
 async function errorBody(res: Response): Promise<unknown> {

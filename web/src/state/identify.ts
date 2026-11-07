@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { send } from '../api/client';
 import type { CandidateView, ChangeResponse, SearchView } from '../api/types.gen';
-import { loadLibrary, setStatus } from './actions';
+import { loadLibrary } from './library';
+import { setStatus } from './status';
 import { applyChange } from './edit';
 import { useApp } from './store';
 import { rowByKey } from './tree';

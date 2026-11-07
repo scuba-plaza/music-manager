@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { get } from '../api/client';
 import type { DoctorView } from '../api/types.gen';
-import { loadLibrary } from './actions';
+import { loadLibrary } from './library';
 import { useApp } from './store';
 
 export type DoctorPhase = 'checking' | 'done' | 'failed';

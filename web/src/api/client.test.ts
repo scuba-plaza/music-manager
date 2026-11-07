@@ -173,3 +173,30 @@ describe('query', () => {
     expect(query({ q: 'a&b=c', 'k y': 'é' })).toBe('?q=a%26b%3Dc&k+y=%C3%A9');
   });
 });
+
+describe('an answer the page cannot read', () => {
+  it('is an error that says so when it claims to be JSON and is not', async () => {
+    fetchMock.mockResolvedValue(new Response('{"root":', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    const failure = await get('/api/info').catch((err: unknown) => err);
+
+    expect(failure).toBeInstanceOf(ApiError);
+    expect(failure).toMatchObject({ message: 'mm gave an answer the page cannot read.', status: 200 });
+  });
+
+  it('is an error when an answer with content is not JSON at all', async () => {
+    fetchMock.mockResolvedValue(new Response('<!doctype html>', { status: 200, headers: { 'Content-Type': 'text/html' } }));
+
+    const failure = await get('/api/info').catch((err: unknown) => err);
+
+    expect(failure).toMatchObject({ message: 'mm gave an answer the page cannot read.', status: 200 });
+  });
+
+  it('is nothing when there is no content, with or without a type', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 200, headers: { 'Content-Type': 'text/plain' } }));
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    expect(await send<null>('POST', '/api/undo')).toBeNull();
+    expect(await send<null>('DELETE', '/api/jobs/a')).toBeNull();
+  });
+});

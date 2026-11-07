@@ -1,6 +1,6 @@
 import { query, send } from '../api/client';
 import type { ChangeResponse } from '../api/types.gen';
-import { setStatus } from './actions';
+import { setStatus } from './status';
 import { attempt } from './edit';
 import { hasMp3, uploadFiles } from './ingest';
 import { currentField, isTrack } from './inspector';

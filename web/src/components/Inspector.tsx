@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import type { DeviceView, PeekView, TrackView } from '../api/types.gen';
-import { fail } from '../state/actions';
+import { fail } from '../state/status';
 import { coverChooserAttribute, coverChosen } from '../state/cover';
 import { goToRow, stopPlaying } from '../state/edit';
 import { chooseTab, isTrack, tabIndex } from '../state/inspector';

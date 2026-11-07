@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { connect } from '../state/actions';
+import { connect } from '../state/library';
 import { useApp } from '../state/store';
 import { FakeEventSource, jsonResponse, libraryResponse, memoryStorage, requestOf, urlOf } from '../testing/fakes';
 import { subscribe } from './events';
@@ -20,8 +20,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  expect(FakeEventSource.instances.filter((stream) => !stream.closed)).toEqual([]);
+  const open = FakeEventSource.instances.filter((stream) => !stream.closed);
   vi.unstubAllGlobals();
+  expect(open).toEqual([]);
 });
 
 describe('subscribe', () => {

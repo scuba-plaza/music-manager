@@ -12,7 +12,8 @@ import {
   withDevice,
   type StubRoute,
 } from '../testing/fakes';
-import { loadDetail, run } from './actions';
+import { run } from './actions';
+import { loadDetail } from './detail';
 import { applyChange, cancelEdit, chooseField, saveEdit, startEdit, stopPlaying, typeEdit } from './edit';
 import { chooseProfile, loadProfiles } from './profiles';
 import { useApp } from './store';

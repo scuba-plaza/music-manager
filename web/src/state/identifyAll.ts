@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { send } from '../api/client';
 import type { IdentifyProgress, JobView } from '../api/types.gen';
-import { fail, loadLibrary, setStatus } from './actions';
+import { loadLibrary } from './library';
+import { fail, setStatus } from './status';
 import { needLookup } from './identify';
 import { follow, stopJob } from './jobs';
 import { useApp } from './store';

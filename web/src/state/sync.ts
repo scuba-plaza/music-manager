@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { get, send } from '../api/client';
 import type { JobView, PlanView, SyncData, SyncTargetsView, TargetView } from '../api/types.gen';
-import { fail, loadLibrary, setStatus } from './actions';
+import { loadLibrary } from './library';
+import { fail, setStatus } from './status';
 import { follow, stopJob } from './jobs';
 import { useApp } from './store';
 

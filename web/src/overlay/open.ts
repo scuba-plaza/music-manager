@@ -1,7 +1,8 @@
 import { get, send } from '../api/client';
 import type { ChangeResponse, CopyChoice } from '../api/types.gen';
 import type { ActionName } from '../keys/keymap';
-import { fail, loadLibrary, setStatus } from '../state/actions';
+import { loadLibrary } from '../state/library';
+import { fail, setStatus } from '../state/status';
 import { applyChange } from '../state/edit';
 import { useApp, type AppState } from '../state/store';
 import { openSync } from '../state/sync';

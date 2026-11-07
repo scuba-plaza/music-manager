@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { send } from '../api/client';
 import type { AddForm, ChangeResponse, DraftView, DuplicateView, Fetched, JobView, PathView } from '../api/types.gen';
-import { loadLibrary, setStatus } from './actions';
+import { loadLibrary } from './library';
+import { setStatus } from './status';
 import { applyChange } from './edit';
 import { uploadFiles } from './ingest';
 import { follow, stopJob } from './jobs';

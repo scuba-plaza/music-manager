@@ -12,19 +12,9 @@ import {
   sampleLibrary,
   stubServer,
 } from '../testing/fakes';
-import {
-  composeFilter,
-  fail,
-  foldRow,
-  loadInfo,
-  loadLibrary,
-  markRow,
-  pointRow,
-  run,
-  setFilter,
-  setStatus,
-  typeFilter,
-} from './actions';
+import { composeFilter, foldRow, markRow, pointRow, run, setFilter, typeFilter } from './actions';
+import { loadInfo, loadLibrary } from './library';
+import { fail, setStatus } from './status';
 import { useApp } from './store';
 import * as treeDom from './treeDom';
 import { rowByKey } from './tree';
@@ -179,6 +169,26 @@ describe('loadLibrary', () => {
     await older;
 
     expect(useApp.getState().lib?.stamp).toBe('newer');
+  });
+
+  it('says nothing of an older request that fails after a newer one was answered', async () => {
+    const resolvers: ((response: Response) => void)[] = [];
+    fetchMock.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+
+    const older = loadLibrary();
+    const newer = loadLibrary();
+    resolvers[1]?.(jsonResponse(libraryResponse('newer')));
+    await newer;
+    resolvers[0]?.(jsonResponse({ error: 'the records are locked' }, 500));
+    await older;
+
+    expect(useApp.getState().lib?.stamp).toBe('newer');
+    expect(useApp.getState().status.kind).not.toBe('bad');
   });
 
   it('shows the error and keeps the library it had', async () => {

@@ -1,6 +1,6 @@
 import { send } from '../api/client';
 import type { ChangeResponse } from '../api/types.gen';
-import { setStatus } from './actions';
+import { setStatus } from './status';
 import { attempt } from './edit';
 import { plural } from './text';
 

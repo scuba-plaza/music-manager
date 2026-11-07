@@ -1,7 +1,7 @@
 import { send } from '../api/client';
 import type { ChangeResponse } from '../api/types.gen';
 import type { ActionName } from '../keys/keymap';
-import { setStatus } from './actions';
+import { setStatus } from './status';
 import { openAdd } from './add';
 import { openDoctor } from './doctor';
 import { attempt } from './edit';

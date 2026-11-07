@@ -1,7 +1,8 @@
 import { send } from '../api/client';
 import type { ChangeResponse, LibraryResponse, RowView } from '../api/types.gen';
 import type { ActionName } from '../keys/keymap';
-import { enterFields, setStatus } from './actions';
+import { enterFields } from './actions';
+import { setStatus } from './status';
 import { openBulk } from './bulk';
 import { clipboardPicture, pastePicture } from './cover';
 import { attempt } from './edit';

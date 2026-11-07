@@ -174,11 +174,11 @@ test('no horizontal scrollbar at 500px', async ({ page, press }) => {
 
 test('a long library path is cut short in the header and the page does not scroll sideways', async ({ page }) => {
   await openPage(page, 500);
-  await page.locator('.root bdi').evaluate((path) => {
+  await page.locator('.library-root bdi').evaluate((path) => {
     path.textContent = '/media/'.concat('a-very-long-folder-name/'.repeat(20));
   });
 
-  const root = await boxOf(page.locator('.root'));
+  const root = await boxOf(page.locator('.library-root'));
   expect(root.x + root.width).toBeLessThanOrEqual(500);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);

@@ -1,6 +1,7 @@
 import { get } from '../api/client';
 import type { ProfileView } from '../api/types.gen';
-import { fail, loadDetail } from './actions';
+import { loadDetail } from './detail';
+import { fail } from './status';
 import { isTrack } from './inspector';
 import { useApp } from './store';
 
