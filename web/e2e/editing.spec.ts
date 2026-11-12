@@ -369,6 +369,7 @@ test('a picture dropped on the page becomes the cover of the track under the cur
 });
 
 test('enter on the Cover field chooses a file, which becomes the cover', async ({ page }) => {
+  const chooser = page.waitForEvent('filechooser');
   await openAll(page);
   await row(page, 'Giant Steps').last().click();
   await page.keyboard.press('Enter');
@@ -376,7 +377,7 @@ test('enter on the Cover field chooses a file, which becomes the cover', async (
   await pane.getByTestId('value-cover').click();
   await expect(page.getByRole('list', { name: 'Keys' })).toContainText('enter choose');
 
-  const chooser = page.waitForEvent('filechooser');
+  await expect(pane.getByTestId('value-cover')).toHaveClass(/\bcur\b/);
   await page.keyboard.press('Enter');
   await (await chooser).setFiles({ name: 'front.png', mimeType: 'image/png', buffer: Buffer.from(pixel, 'base64') });
 

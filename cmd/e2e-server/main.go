@@ -122,10 +122,14 @@ func (l *seededServers) reset() error {
 		defer close(ended)
 		_ = server.Serve(ctx, ln)
 	}()
+	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: ln.Addr().String()})
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	proxy.Transport = transport
 	next := &instance{
-		proxy: httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: ln.Addr().String()}),
+		proxy: proxy,
 		stop: func() {
 			cancel()
+			transport.CloseIdleConnections()
 			<-ended
 			_ = os.RemoveAll(dir)
 		},
