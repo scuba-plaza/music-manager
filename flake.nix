@@ -31,6 +31,7 @@
         default = {
           type = "app";
           program = "${self.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/mm";
+          meta.description = self.packages.${pkgs.stdenv.hostPlatform.system}.default.meta.description;
         };
       });
 
