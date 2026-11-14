@@ -418,7 +418,7 @@ func TestSeveralTracksAreEditedTogether(t *testing.T) {
 	ids := idsOf(ts[:3])
 	v := BulkValues{Genre: "Folk", Of: "12", Album: "-"}
 	p := PreviewBulk(snap(t, a), ids, v)
-	if p.Changed != 3 || p.Error != "" || p.Summary != "Album → none (a single) · Tracks on album → 12 · Genre → Folk" {
+	if p.Changed != 3 || len(p.Fields) != 0 || p.Summary != "Album → none (a single) · Tracks on album → 12 · Genre → Folk" {
 		t.Errorf("%+v", p)
 	}
 	if r, err := ed.Bulk(ids, v); err != nil || r.Message != "Changed 3 tracks" {
@@ -430,10 +430,10 @@ func TestSeveralTracksAreEditedTogether(t *testing.T) {
 	if _, err := ed.Bulk(ids, v); err == nil || !strings.Contains(err.Error(), "Nothing to change") {
 		t.Errorf("%v", err)
 	}
-	if p := PreviewBulk(snap(t, a), ids, BulkValues{Artist: "-"}); !strings.Contains(p.Error, "cannot be cleared") {
+	if p := PreviewBulk(snap(t, a), ids, BulkValues{Artist: "-"}); !strings.Contains(p.Fields["artist"], "cannot be cleared") {
 		t.Errorf("%+v", p)
 	}
-	if p := PreviewBulk(snap(t, a), ids, BulkValues{CutStart: "soon"}); !strings.Contains(p.Error, "Cut start") {
+	if p := PreviewBulk(snap(t, a), ids, BulkValues{CutStart: "soon"}); !strings.Contains(p.Fields["cutStart"], "Cut start") {
 		t.Errorf("%+v", p)
 	}
 	ed.Undo()

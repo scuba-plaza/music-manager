@@ -33,11 +33,13 @@ const clearMark = "-"
 // edit turns the typed values into the change to make to every track.
 func (v BulkValues) edit() (app.Edit, error) {
 	var e app.Edit
+	bad := app.FieldErrors{}
 	if s := strings.TrimSpace(v.Artist); s != "" {
 		if s == clearMark {
-			return e, errors.New("An artist cannot be cleared")
+			bad["artist"] = "An artist cannot be cleared"
+		} else {
+			e.Artist = &s
 		}
-		e.Artist = &s
 	}
 	if s := strings.TrimSpace(v.Album); s != "" {
 		if s == clearMark {
@@ -47,23 +49,25 @@ func (v BulkValues) edit() (app.Edit, error) {
 	}
 	if s := strings.TrimSpace(v.Of); s != "" {
 		n := 0
+		var err error
 		if s != clearMark {
-			var err error
-			if n, err = count(s); err != nil {
-				return e, errors.New("Tracks on the album must be a whole number")
-			}
+			n, err = count(s)
 		}
-		e.TrackTotal = &n
+		if err != nil {
+			bad["of"] = "Tracks on the album must be a whole number"
+		} else {
+			e.TrackTotal = &n
+		}
 	}
 	if s := strings.TrimSpace(v.Released); s != "" {
 		if s == clearMark {
 			s = ""
 		}
-		date, err := app.NormalizeDate(s)
-		if err != nil {
-			return e, err
+		if date, err := app.NormalizeDate(s); err != nil {
+			bad["released"] = err.Error()
+		} else {
+			e.Released = &date
 		}
-		e.Released = &date
 	}
 	if s := strings.TrimSpace(v.Genre); s != "" {
 		if s == clearMark {
@@ -74,14 +78,20 @@ func (v BulkValues) edit() (app.Edit, error) {
 	for _, f := range []struct {
 		text string
 		dst  **string
+		key  string
 		name string
-	}{{v.ArtistLatin, &e.ArtistLatin, "Artist (Latin)"}, {v.AlbumLatin, &e.AlbumLatin, "Album (Latin)"}, {v.GenreLatin, &e.GenreLatin, "Genre (Latin)"}} {
+	}{
+		{v.ArtistLatin, &e.ArtistLatin, "artistLatin", "Artist (Latin)"},
+		{v.AlbumLatin, &e.AlbumLatin, "albumLatin", "Album (Latin)"},
+		{v.GenreLatin, &e.GenreLatin, "genreLatin", "Genre (Latin)"},
+	} {
 		s := strings.TrimSpace(f.text)
 		switch {
 		case s == "":
 			continue
 		case strings.ContainsAny(s, "\r\n"):
-			return e, errors.New(f.name + " must be on one line")
+			bad[f.key] = f.name + " must be on one line"
+			continue
 		case s == clearMark:
 			s = ""
 		}
@@ -90,8 +100,9 @@ func (v BulkValues) edit() (app.Edit, error) {
 	for _, c := range []struct {
 		text string
 		dst  **time.Duration
+		key  string
 		name string
-	}{{v.CutStart, &e.TrimStart, "Cut start"}, {v.CutEnd, &e.TrimEnd, "Cut end"}} {
+	}{{v.CutStart, &e.TrimStart, "cutStart", "Cut start"}, {v.CutEnd, &e.TrimEnd, "cutEnd", "Cut end"}} {
 		s := strings.TrimSpace(c.text)
 		if s == "" {
 			continue
@@ -100,10 +111,14 @@ func (v BulkValues) edit() (app.Edit, error) {
 		if s != clearMark {
 			var err error
 			if d, err = timecode.Parse(s); err != nil {
-				return e, errors.New(c.name + ": " + err.Error())
+				bad[c.key] = c.name + ": " + err.Error()
+				continue
 			}
 		}
 		*c.dst = &d
+	}
+	if err := bad.OrNil(); err != nil {
+		return app.Edit{}, err
 	}
 	return e, nil
 }
@@ -171,17 +186,18 @@ func (v BulkValues) Summary() string {
 
 // BulkPreview says what the values would do to the tracks, or why they cannot be used.
 type BulkPreview struct {
-	Summary string `json:"summary"`
-	Changed int    `json:"changed"`
-	Error   string `json:"error,omitempty"`
+	Summary string            `json:"summary"`
+	Changed int               `json:"changed"`
+	Fields  map[string]string `json:"fields,omitempty"`
 }
 
 // PreviewBulk checks the values typed for the tracks, without changing anything.
 func PreviewBulk(s Snapshot, ids []string, v BulkValues) BulkPreview {
 	p := BulkPreview{Summary: v.Summary()}
 	edits, err := bulkPlan(s.tracksFor(ids), v)
-	if err != nil {
-		p.Error = err.Error()
+	var fields app.FieldErrors
+	if errors.As(err, &fields) {
+		p.Fields = fields
 		return p
 	}
 	p.Changed = len(edits)

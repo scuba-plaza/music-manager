@@ -19,10 +19,11 @@ import (
 
 // reply is what a change answers: the result, and how undo and redo stand.
 type reply struct {
-	Message string `json:"message"`
-	Reveal  string `json:"reveal"`
-	Same    bool   `json:"same"`
-	Error   string `json:"error"`
+	Message string            `json:"message"`
+	Reveal  string            `json:"reveal"`
+	Same    bool              `json:"same"`
+	Error   string            `json:"error"`
+	Fields  map[string]string `json:"fields"`
 	History struct {
 		Undo string `json:"undo"`
 		Redo string `json:"redo"`

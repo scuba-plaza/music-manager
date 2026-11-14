@@ -157,7 +157,8 @@ type InfoView struct {
 }
 
 type ErrorView struct {
-	Error string `json:"error"`
+	Error  string            `json:"error"`
+	Fields map[string]string `json:"fields,omitempty"`
 }
 
 // info is what does not change while the program runs.
@@ -186,7 +187,12 @@ func fail(w http.ResponseWriter, status int, err error) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(ErrorView{Error: capitalize(err.Error())})
+	view := ErrorView{Error: capitalize(err.Error())}
+	var fields app.FieldErrors
+	if errors.As(err, &fields) {
+		view.Fields = fields
+	}
+	_ = json.NewEncoder(w).Encode(view)
 }
 
 func capitalize(s string) string {

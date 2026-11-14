@@ -294,7 +294,7 @@ func (d draft) edit() (app.Edit, error) {
 	case fTitle, fArtist, fAlbum:
 		text := strings.TrimSpace(d.text)
 		if text == "" && d.field != fAlbum {
-			return e, fmt.Errorf("%s cannot be empty", d.field.label())
+			return e, app.Invalid(d.field.key(), fmt.Sprintf("%s cannot be empty", d.field.label()))
 		}
 		switch d.field {
 		case fTitle:
@@ -319,23 +319,29 @@ func (d draft) edit() (app.Edit, error) {
 	case fAlbumOf:
 		of, err := count(d.text)
 		if err != nil {
-			return e, errors.New("Tracks on album must be a whole number, or empty")
+			return e, app.Invalid(d.field.key(), "Tracks on album must be a whole number, or empty")
 		}
 		e.TrackTotal = &of
 	case fTrack:
-		n, err := count(d.text)
-		if err != nil {
-			return e, errors.New("Track must be a whole number, or empty")
+		n, nErr := count(d.text)
+		of, ofErr := count(d.second)
+		bad := app.FieldErrors{}
+		if nErr != nil {
+			bad["track"] = "Track must be a whole number, or empty"
 		}
-		of, err := count(d.second)
-		if err != nil {
-			return e, errors.New("Tracks on the album must be a whole number, or empty")
+		if ofErr != nil {
+			bad["of"] = "Tracks on the album must be a whole number, or empty"
+		} else if nErr == nil && n > 0 && of > 0 && of < n {
+			bad["of"] = fmt.Sprintf("Tracks on the album cannot be fewer than the track number, %d", n)
+		}
+		if err := bad.OrNil(); err != nil {
+			return e, err
 		}
 		e.TrackNumber, e.TrackTotal = &n, &of
 	case fReleased:
 		date, err := app.NormalizeDate(d.text)
 		if err != nil {
-			return e, err
+			return e, app.Invalid(d.field.key(), err.Error())
 		}
 		e.Released = &date
 	case fGenre:
@@ -344,13 +350,13 @@ func (d draft) edit() (app.Edit, error) {
 	case fVolume:
 		db, err := app.ParseGain(d.text)
 		if err != nil {
-			return e, err
+			return e, app.Invalid(d.field.key(), err.Error())
 		}
 		e.GainDB = &db
 	case fFadeIn, fFadeOut:
 		span, err := app.ParseFade(d.text, d.field == fFadeIn, d.track)
 		if err != nil {
-			return e, err
+			return e, app.Invalid(d.field.key(), err.Error())
 		}
 		if d.field == fFadeIn {
 			e.FadeIn = &span
@@ -362,7 +368,7 @@ func (d draft) edit() (app.Edit, error) {
 		if s := strings.TrimSpace(d.text); s != "" {
 			v, err := timecode.Parse(s)
 			if err != nil {
-				return e, fmt.Errorf("%s: %w", d.field.label(), err)
+				return e, app.Invalid(d.field.key(), fmt.Sprintf("%s: %s", d.field.label(), err))
 			}
 			cut = v
 		}

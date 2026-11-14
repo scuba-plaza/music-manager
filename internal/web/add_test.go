@@ -41,7 +41,7 @@ func TestATrackIsFetchedFromALinkAndAdded(t *testing.T) {
 	if code := raw(t, srv.URL, "POST", "/api/add/path", obj{"form": form}, &p); code != 200 || p.Path != "Some Band/Record/02 - A song.mp3" {
 		t.Errorf("%d %q", code, p.Path)
 	}
-	if code, r := send(t, srv, "POST", "/api/add/finish", obj{"draft": out.Draft.Draft, "form": obj{"title": " "}}); code != 422 || !strings.Contains(r.Error, "cannot be empty") {
+	if code, r := send(t, srv, "POST", "/api/add/finish", obj{"draft": out.Draft.Draft, "form": obj{"title": " "}}); code != 422 || r.Fields["title"] != "Title cannot be empty" {
 		t.Errorf("%d %+v", code, r)
 	}
 	code, r := send(t, srv, "POST", "/api/add/finish", obj{"draft": out.Draft.Draft, "form": form})

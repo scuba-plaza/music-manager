@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"strings"
 
@@ -57,12 +58,21 @@ func (f AddForm) Edit() (app.Edit, error) {
 		{field: fCutStart, text: f.CutStart},
 		{field: fCutEnd, text: f.CutEnd},
 	}
+	bad := app.FieldErrors{}
 	for _, p := range parts {
 		part, err := p.edit()
+		var fields app.FieldErrors
+		if errors.As(err, &fields) {
+			maps.Copy(bad, fields)
+			continue
+		}
 		if err != nil {
-			return e, err
+			return app.Edit{}, err
 		}
 		e = mergeEdits(e, part)
+	}
+	if err := bad.OrNil(); err != nil {
+		return app.Edit{}, err
 	}
 	return e, nil
 }

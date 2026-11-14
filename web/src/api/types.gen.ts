@@ -23,7 +23,7 @@ export interface BarView {
 export interface BulkPreview {
   summary: string;
   changed: number;
-  error?: string;
+  fields?: Record<string, string>;
 }
 
 export interface ChangeResponse {
@@ -75,6 +75,7 @@ export interface DuplicateView {
 
 export interface ErrorView {
   error: string;
+  fields?: Record<string, string>;
 }
 
 export interface Fetched {
