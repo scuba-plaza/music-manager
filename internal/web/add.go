@@ -40,8 +40,8 @@ func (s *Server) addFetch(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnprocessableEntity, errors.New("adding from YouTube is not available: yt-dlp is not set up"))
 		return
 	}
-	if browse.CleanLink(in.URL) == "" {
-		fail(w, http.StatusUnprocessableEntity, errors.New("paste a link first"))
+	if _, err := browse.CheckLink(in.URL); err != nil {
+		fail(w, http.StatusUnprocessableEntity, err)
 		return
 	}
 	v, err := s.jobs.start("add", func(ctx context.Context, _ func(any)) (any, error) {

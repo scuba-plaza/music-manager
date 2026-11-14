@@ -92,6 +92,16 @@ func TestAddingNeedsADownloaderAndALink(t *testing.T) {
 	}
 }
 
+func TestOnlyAWebLinkIsDownloaded(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a, WithDownloader(&webtest.FakeDownloader{}))
+	for _, link := range []string{"--exec=touch/tmp/x", "-h", "ftp://example.org/a", "file:///etc/passwd", "youtube.com/watch?v=1", "https://", "http:///path"} {
+		if code, r := send(t, srv, "POST", "/api/add/fetch", obj{"url": link}); code != 422 || !strings.Contains(r.Error, "web link") {
+			t.Errorf("%q: %d %+v, want 422 about a web link", link, code, r)
+		}
+	}
+}
+
 // upload sends files as the page does when some are dropped on it.
 func upload(t *testing.T, base string, files map[string][]byte) (int, reply) {
 	t.Helper()

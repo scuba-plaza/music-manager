@@ -89,6 +89,19 @@ func TestDownloadRunsYtDlpForAudioAndReportsTheMetadata(t *testing.T) {
 	}
 }
 
+func TestDownloadPutsTheURLAfterTheEndOfOptions(t *testing.T) {
+	argsFile := fakeBin(t, musicJSON, 0)
+	if _, err := ytdlp.New().Download(context.Background(), "https://youtu.be/vid123", t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(argsFile)
+	args := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	n := len(args)
+	if n < 2 || args[n-2] != "--" || args[n-1] != "https://youtu.be/vid123" {
+		t.Errorf("the arguments must end with -- and the URL: %v", args)
+	}
+}
+
 func TestDownloadFallsBackToTheVideoTitle(t *testing.T) {
 	fakeBin(t, `{"id":"vid123","title":"Just A Title","uploader":"Chan"}`+"\n", 0)
 	got, err := ytdlp.New().Download(context.Background(), "u", t.TempDir())
