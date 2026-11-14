@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { send } from '../api/client';
 import type { BulkPreview, ChangeResponse } from '../api/types.gen';
+import { ApiError } from '../api/client';
 import { applyChange } from './edit';
+import { cleanChecks, firstWrong, left, tried, verdict, type FormChecks } from './form';
 import { useApp } from './store';
 
 export const bulkFields = [
@@ -33,11 +35,19 @@ function blank(): BulkValues {
   return { artist: '', artistLatin: '', album: '', albumLatin: '', of: '', released: '', genre: '', genreLatin: '', cutStart: '', cutEnd: '' };
 }
 
-function fresh(): { values: BulkValues; summary: BulkSummary } {
-  return { values: blank(), summary: { text: prompt, bad: false } };
+interface BulkState {
+  values: BulkValues;
+  summary: BulkSummary;
+  checks: FormChecks;
 }
 
-export const useBulk = create<{ values: BulkValues; summary: BulkSummary }>()(fresh);
+function fresh(): BulkState {
+  return { values: blank(), summary: { text: prompt, bad: false }, checks: cleanChecks() };
+}
+
+export const useBulk = create<BulkState>()(fresh);
+
+const order: readonly string[] = bulkFields.map((f) => f.key);
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let seq = 0;
@@ -72,7 +82,7 @@ async function preview(): Promise<void> {
   try {
     const answer = await send<BulkPreview>('POST', '/api/bulk/preview', { ids, values: useBulk.getState().values });
     if (mine === seq) {
-      say(answer.error !== undefined && answer.error !== '' ? { text: answer.error, bad: true } : { text: answer.summary || prompt, bad: false });
+      useBulk.setState((s) => ({ summary: { text: answer.summary || prompt, bad: false }, checks: verdict(s.checks, answer.fields ?? {}) }));
     }
   } catch (err) {
     if (mine === seq) {
@@ -89,21 +99,30 @@ export function typeBulk(key: BulkKey, text: string): void {
   }, previewPause);
 }
 
-export async function applyBulk(): Promise<void> {
+export function leaveBulk(key: BulkKey): void {
+  useBulk.setState((s) => ({ checks: left(s.checks, key) }));
+}
+
+export async function applyBulk(): Promise<string | undefined> {
   const ids = shownIds();
   if (ids === undefined) {
-    return;
+    return undefined;
   }
   const { values } = useBulk.getState();
   try {
     await applyChange(() => send<ChangeResponse>('POST', '/api/bulk', { ids, values }));
   } catch (err) {
+    if (err instanceof ApiError && Object.keys(err.fields).length > 0) {
+      useBulk.setState((s) => ({ checks: tried(verdict(s.checks, err.fields)) }));
+      return firstWrong(useBulk.getState().checks, order);
+    }
     if (err instanceof Error && err.message !== '') {
       say({ text: err.message, bad: true });
     }
-    return;
+    return undefined;
   }
   useApp.setState({ overlay: null });
+  return undefined;
 }
 
 useApp.subscribe((state, previous) => {

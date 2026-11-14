@@ -849,7 +849,8 @@ input.edit.short {
   margin-block: 0.6rem;
 }
 
-.form .label {
+.form .label,
+.form .field {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
@@ -857,8 +858,29 @@ input.edit.short {
   color: var(--dim);
 }
 
-.form .label:focus-within {
+.form .label:focus-within,
+.form .field:focus-within {
   color: var(--accent);
+}
+
+.form .field > .label {
+  display: block;
+  grid-column: 1;
+}
+
+.form .field.wrong > .label {
+  color: var(--bad);
+}
+
+.field .control {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.field-error {
+  color: var(--bad);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
 }
 
 .form input.edit {
@@ -868,6 +890,11 @@ input.edit.short {
 
 .form input.edit:focus {
   border-color: var(--accent);
+}
+
+.form input.edit[aria-invalid='true'],
+.form input.edit[aria-invalid='true']:focus {
+  border-color: var(--bad);
 }
 
 .bulk-summary {

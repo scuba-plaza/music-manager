@@ -15,7 +15,8 @@ import {
 import { send } from '../api/client';
 import { run } from './actions';
 import { loadDetail } from './detail';
-import { applyBulk, typeBulk, useBulk } from './bulk';
+import { applyBulk, leaveBulk, typeBulk, useBulk } from './bulk';
+import { cleanChecks, shownErrors } from './form';
 import { coverChosen, dropFiles, pastePicture, setCover } from './cover';
 import { applyChange } from './edit';
 import { useApp, type AppState } from './store';
@@ -184,7 +185,7 @@ describe('the bulk form', () => {
     run('bulkEdit');
 
     expect(useApp.getState().overlay).toEqual({ kind: 'bulk', ids: ['blue', 'sowhat'], head: 'Edit 2 marked tracks' });
-    expect(useBulk.getState()).toEqual({ values: blankValues, summary: { text: 'Type what the tracks should have.', bad: false } });
+    expect(useBulk.getState()).toEqual({ values: blankValues, summary: { text: 'Type what the tracks should have.', bad: false }, checks: cleanChecks() });
   });
 
   it('with nothing marked, e goes into the fields of a track, an artist, an album or a playlist', () => {
@@ -261,11 +262,11 @@ describe('the bulk form', () => {
     expect(useBulk.getState().summary).toEqual({ text: 'Album → Blue', bad: false });
   });
 
-  it('values the server cannot use are said in the summary, as bad', async () => {
+  it('values the server cannot use are kept by field, and shown once the field is left', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     serve(({ method, url }) =>
       method === 'POST' && url.pathname === '/api/bulk/preview'
-        ? jsonResponse({ summary: 'Tracks on album → many', changed: 0, error: 'Tracks on the album must be a whole number' })
+        ? jsonResponse({ summary: 'Tracks on album → many', changed: 0, fields: { of: 'Tracks on the album must be a whole number' } })
         : undefined,
     );
     show(keys.kindOfBlue, { marks: new Set(['sowhat']) });
@@ -274,7 +275,30 @@ describe('the bulk form', () => {
     typeBulk('of', 'many');
     await vi.advanceTimersByTimeAsync(150);
 
-    expect(useBulk.getState().summary).toEqual({ text: 'Tracks on the album must be a whole number', bad: true });
+    expect(useBulk.getState().checks.wrong).toEqual({ of: 'Tracks on the album must be a whole number' });
+    expect(useBulk.getState().summary).toEqual({ text: 'Tracks on album → many', bad: false });
+    expect(shownErrors(useBulk.getState().checks)).toEqual({});
+
+    leaveBulk('of');
+
+    expect(shownErrors(useBulk.getState().checks)).toEqual({ of: 'Tracks on the album must be a whole number' });
+  });
+
+  it('a message goes when the values no longer have the fault', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    let answer: Record<string, unknown> = { summary: 'x', changed: 0, fields: { of: 'bad' } };
+    serve(({ method, url }) => (method === 'POST' && url.pathname === '/api/bulk/preview' ? jsonResponse(answer) : undefined));
+    show(keys.kindOfBlue, { marks: new Set(['sowhat']) });
+    run('bulkEdit');
+    typeBulk('of', 'many');
+    await vi.advanceTimersByTimeAsync(150);
+    leaveBulk('of');
+    answer = { summary: 'Tracks on album → 12', changed: 1 };
+
+    typeBulk('of', '12');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(shownErrors(useBulk.getState().checks)).toEqual({});
   });
 
   it('an empty summary asks again for what the tracks should have', async () => {
@@ -337,9 +361,26 @@ describe('the bulk form', () => {
     show(keys.kindOfBlue, { marks: new Set(['sowhat']) });
     run('bulkEdit');
 
-    await applyBulk();
+    const wrong = await applyBulk();
 
+    expect(wrong).toBeUndefined();
     expect(useBulk.getState().summary).toEqual({ text: 'Nothing to change', bad: true });
+    expect(useApp.getState()).toMatchObject({ overlay: { kind: 'bulk' }, busy: false });
+  });
+
+  it('a refusal that names fields shows every one of them and says which field comes first', async () => {
+    serve(({ method, url }) =>
+      method === 'POST' && url.pathname === '/api/bulk'
+        ? jsonResponse({ error: '2 fields need fixing', fields: { cutStart: 'Cut start: invalid time "x"', artist: 'An artist cannot be cleared' } }, 422)
+        : undefined,
+    );
+    show(keys.kindOfBlue, { marks: new Set(['sowhat']) });
+    run('bulkEdit');
+
+    const wrong = await applyBulk();
+
+    expect(wrong).toBe('artist');
+    expect(shownErrors(useBulk.getState().checks)).toEqual({ cutStart: 'Cut start: invalid time "x"', artist: 'An artist cannot be cleared' });
     expect(useApp.getState()).toMatchObject({ overlay: { kind: 'bulk' }, busy: false });
   });
 });

@@ -77,6 +77,23 @@ describe('the client', () => {
     expect(err).toHaveProperty('status', 422);
   });
 
+  it('keeps the messages that belong to fields', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ error: '2 fields need fixing', fields: { title: 'Title cannot be empty', released: 'Not a date' } }, 422));
+
+    const err = await send('POST', '/api/add/finish', {}).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toHaveProperty('fields', { title: 'Title cannot be empty', released: 'Not a date' });
+  });
+
+  it('has no field messages when the error is about nothing in particular', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ error: 'no such track' }, 422));
+
+    const err = await get('/api/tracks/zz').catch((e: unknown) => e);
+
+    expect(err).toHaveProperty('fields', {});
+  });
+
   it('names the status when the error body is not JSON', async () => {
     fetchMock.mockResolvedValue(new Response('<h1>bad gateway</h1>', { status: 502, statusText: 'Bad Gateway', headers: { 'Content-Type': 'text/html' } }));
 

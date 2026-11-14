@@ -4,11 +4,13 @@ const unreachable = 'Cannot reach mm. Is it still running?';
 
 export class ApiError extends Error {
   readonly status: number;
+  readonly fields: Readonly<Record<string, string>>;
 
-  constructor(message: string, status = 0) {
+  constructor(message: string, status = 0, fields: Readonly<Record<string, string>> = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.fields = fields;
   }
 }
 
@@ -20,6 +22,19 @@ function isAbort(err: unknown): boolean {
 
 function isErrorBody(data: unknown): data is ErrorView {
   return typeof data === 'object' && data !== null && 'error' in data && typeof data.error === 'string' && data.error !== '';
+}
+
+function fieldsOf(data: ErrorView): Record<string, string> {
+  const raw: unknown = data.fields;
+  const out: Record<string, string> = {};
+  if (typeof raw === 'object' && raw !== null) {
+    for (const [key, text] of Object.entries(raw)) {
+      if (typeof text === 'string' && text !== '') {
+        out[key] = text;
+      }
+    }
+  }
+  return out;
 }
 
 const unreadable = 'mm gave an answer the page cannot read.';
@@ -51,7 +66,7 @@ async function errorBody(res: Response): Promise<unknown> {
 async function failure(res: Response): Promise<ApiError> {
   const data = await errorBody(res);
   if (isErrorBody(data)) {
-    return new ApiError(data.error, res.status);
+    return new ApiError(data.error, res.status, fieldsOf(data));
   }
   const text = res.statusText === '' ? `Request failed (${String(res.status)})` : `${String(res.status)} ${res.statusText}`;
   return new ApiError(text, res.status);

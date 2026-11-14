@@ -596,7 +596,7 @@ describe('the bulk form', () => {
       dialog()
         .getByRole('textbox')
         .elements()
-        .map((input) => input.getAttribute('aria-label')),
+        .map((input) => (input as HTMLInputElement).labels?.[0]?.textContent),
     ).toEqual(names);
     for (const input of dialog().getByRole('textbox').elements()) {
       expect([input.getAttribute('dir'), input.getAttribute('placeholder')]).toEqual(['auto', '(keep)']);
@@ -664,6 +664,55 @@ describe('the bulk form', () => {
 
     await expect.element(summary()).toHaveTextContent('Nothing to change');
     expect(summary().element().classList.contains('bad')).toBe(true);
+    await expect.element(dialog()).toBeVisible();
+  });
+
+  test('a value the server cannot use is said under its field once the field is left, not while it is typed', async () => {
+    await openForm(({ method, url, body }) => {
+      if (method === 'POST' && url.pathname === '/api/bulk/preview') {
+        const of = (body as { values: Record<string, string> }).values.of;
+        return jsonResponse(of === 'many' ? { summary: 'Tracks on album → many', changed: 0, fields: { of: 'Tracks on the album must be a whole number' } } : { summary: '', changed: 2 });
+      }
+      return undefined;
+    });
+
+    await userEvent.click(field('Tracks on album'));
+    await userEvent.keyboard('many');
+    await expect.poll(() => requestsTo(fetchMock, 'POST', '/api/bulk/preview').length).toBeGreaterThan(0);
+    await expect.element(dialog().getByRole('alert')).not.toBeInTheDocument();
+
+    await userEvent.keyboard('{Tab}');
+
+    await expect.element(dialog().getByRole('alert')).toHaveTextContent('Tracks on the album must be a whole number');
+    await expect.element(field('Tracks on album')).toBeInvalid();
+    await expect.element(field('Released')).not.toBeInvalid();
+    await expect.element(summary()).toHaveTextContent('Tracks on album → many');
+
+    await userEvent.click(field('Tracks on album'));
+    await userEvent.keyboard('{Control>}a{/Control}12');
+    await expect.element(dialog().getByRole('alert')).not.toBeInTheDocument();
+  });
+
+  test('enter with fields that are wrong says every one and goes to the first, and the form stays open', async () => {
+    await openForm(({ method, url }) =>
+      method === 'POST' && url.pathname === '/api/bulk'
+        ? jsonResponse({ error: '2 fields need fixing', fields: { cutStart: 'Cut start: invalid time "x"', artist: 'An artist cannot be cleared' } }, 422)
+        : undefined,
+    );
+    await userEvent.click(field('Genre'));
+
+    await userEvent.keyboard('{Enter}');
+
+    await expect.element(dialog().getByRole('alert').first()).toBeVisible();
+    expect(
+      dialog()
+        .getByRole('alert')
+        .elements()
+        .map((e) => e.textContent.trim()),
+    ).toEqual(['✗ An artist cannot be cleared', '✗ Cut start: invalid time "x"']);
+    await expect.element(field('Artist')).toHaveFocus();
+    await expect.element(field('Artist')).toBeInvalid();
+    await expect.element(field('Cut start')).toBeInvalid();
     await expect.element(dialog()).toBeVisible();
   });
 

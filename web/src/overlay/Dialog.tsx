@@ -50,9 +50,14 @@ export function Dialog({ title, hints, onKey, children }: DialogProps) {
 
   useLayoutEffect(() => {
     const dialog = ref.current;
-    if (dialog !== null && !dialog.contains(document.activeElement)) {
-      dialog.focus({ preventScroll: true });
-    }
+    const settled = setTimeout(() => {
+      if (dialog !== null && !dialog.contains(document.activeElement)) {
+        dialog.focus({ preventScroll: true });
+      }
+    }, 0);
+    return () => {
+      clearTimeout(settled);
+    };
   });
 
   function keyDown(e: KeyboardEvent<HTMLDivElement>): void {

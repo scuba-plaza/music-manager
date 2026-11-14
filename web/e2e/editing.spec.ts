@@ -89,6 +89,29 @@ test('marking two tracks and e sets the album on both with one undo step', async
   expect(history.undo).toBeUndefined();
 });
 
+test('the bulk form says under a field what is wrong with it, and keeps the form open', async ({ page }) => {
+  await openAll(page);
+  await row(page, 'So What').click();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('Space');
+  await page.keyboard.press('e');
+  const form = page.getByRole('dialog', { name: 'Edit 2 marked tracks' });
+  const total = form.getByRole('textbox', { name: 'Tracks on album', exact: true });
+
+  await total.fill('many');
+  await expect(form.getByRole('alert')).toHaveCount(0);
+  await page.keyboard.press('Tab');
+
+  await expect(form.getByRole('alert')).toHaveText(/Tracks on the album must be a whole number/);
+  await expect(total).toHaveAttribute('aria-invalid', 'true');
+  await form.getByRole('textbox', { name: 'Cut start', exact: true }).fill('soon');
+  await page.keyboard.press('Enter');
+
+  await expect(form.getByRole('alert')).toHaveCount(2);
+  await expect(total).toBeFocused();
+  await expect(form).toBeVisible();
+});
+
 test('the bulk form fits the window with one line for each value', async ({ page }) => {
   await openAll(page);
   await row(page, 'So What').click();
@@ -106,9 +129,10 @@ test('the bulk form fits the window with one line for each value', async ({ page
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
   expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
-  const rows = await form.locator('.form .label').evaluateAll((labels) =>
-    labels.map((label) => {
-      const input = label.querySelector('input')?.getBoundingClientRect();
+  const rows = await form.locator('.form .field').evaluateAll((fields) =>
+    fields.map((field) => {
+      const input = field.querySelector('input')?.getBoundingClientRect();
+      const label = field.querySelector('label') ?? field;
       const text = document.createRange();
       text.selectNodeContents(label.firstChild ?? label);
       const words = text.getBoundingClientRect();
