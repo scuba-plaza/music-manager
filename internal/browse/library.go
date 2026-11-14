@@ -46,7 +46,6 @@ func (s Snapshot) tracksFor(ids []string) []manifest.Track {
 
 // Options say what the library view shows.
 type Options struct {
-	// Filter keeps the tracks matching it (the syntax of "mm ls").
 	Filter string
 	// Sort puts the tracks in one flat list in order of this key; empty is the tree.
 	Sort    app.SortKey
@@ -110,7 +109,7 @@ type LibraryView struct {
 
 // Library lays out the library for the given options.
 func Library(s Snapshot, o Options) LibraryView {
-	v := LibraryView{Tracks: len(s.Tracks), Sort: sortView(o.Sort, o.Reverse), Rows: []RowView{}}
+	v := LibraryView{Tracks: len(s.Tracks), Sort: sortView(o.Sort, o.Reverse), Rows: []RowView{}, Playlists: []PlaylistView{}}
 	for _, t := range s.Tracks {
 		if t.Status != manifest.Identified {
 			v.NeedWork++

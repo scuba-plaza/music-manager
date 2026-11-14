@@ -1,0 +1,369 @@
+package launch_test
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+
+	"music-manager/internal/launch"
+	"music-manager/internal/version"
+)
+
+const home = "/home/me"
+
+func noEnv(string) string { return "" }
+
+func libraryEnv(path string) func(string) string {
+	return func(key string) string {
+		if key == "MM_LIBRARY" {
+			return path
+		}
+		return ""
+	}
+}
+
+type probe struct {
+	calls   int
+	options launch.Options
+	err     error
+}
+
+func (p *probe) serve(ctx context.Context, o launch.Options) error {
+	p.calls++
+	p.options = o
+	return p.err
+}
+
+func run(t *testing.T, p *probe, getenv func(string) string, args ...string) (code int, out, errs string) {
+	return runAt(t.TempDir(), p, getenv, args...)
+}
+
+func runAt(home string, p *probe, getenv func(string) string, args ...string) (code int, out, errs string) {
+	var o, e bytes.Buffer
+	code = launch.Run(context.Background(), launch.Env{
+		Args:   args,
+		Getenv: getenv,
+		Home:   home,
+		Out:    &o,
+		Err:    &e,
+		Serve:  p.serve,
+	})
+	return code, o.String(), e.String()
+}
+
+func TestTheDefaultLibraryIsMusicLibrary(t *testing.T) {
+	if got := launch.DefaultLibrary(noEnv, home); got != "/home/me/Music/Library" {
+		t.Errorf("default library %q", got)
+	}
+	if got := launch.DefaultLibrary(libraryEnv("/x"), home); got != "/x" {
+		t.Errorf("library with MM_LIBRARY set %q", got)
+	}
+}
+
+func TestNoArgumentsStartsTheServerOnTheDefaultAddress(t *testing.T) {
+	p := &probe{}
+	dir := t.TempDir()
+	code, _, errs := runAt(dir, p, noEnv)
+	if code != 0 || p.calls != 1 {
+		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
+	}
+	if p.options.Library != filepath.Join(dir, "Music", "Library") || p.options.Addr != "127.0.0.1:7878" || p.options.AddrSet || p.options.NoOpen {
+		t.Errorf("options %+v", p.options)
+	}
+}
+
+func TestAddrAndNoOpenFlagsArePassedOn(t *testing.T) {
+	p := &probe{}
+	code, _, errs := run(t, p, noEnv, "--addr", "127.0.0.1:9000", "--no-open")
+	if code != 0 || p.calls != 1 {
+		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
+	}
+	if p.options.Addr != "127.0.0.1:9000" || !p.options.AddrSet || !p.options.NoOpen {
+		t.Errorf("options %+v", p.options)
+	}
+}
+
+func TestLibraryFlagBeatsTheEnvironment(t *testing.T) {
+	p := &probe{}
+	if code, _, errs := run(t, p, libraryEnv("/from-env"), "--library", "/from-flag"); code != 0 {
+		t.Fatalf("code %d, err %q", code, errs)
+	}
+	if p.options.Library != "/from-flag" {
+		t.Errorf("library %q", p.options.Library)
+	}
+	if code, _, errs := run(t, p, libraryEnv("/from-env")); code != 0 {
+		t.Fatalf("code %d, err %q", code, errs)
+	}
+	if p.options.Library != "/from-env" {
+		t.Errorf("library without the flag %q", p.options.Library)
+	}
+}
+
+func TestVersionFlagPrintsTheVersion(t *testing.T) {
+	p := &probe{}
+	code, out, errs := run(t, p, noEnv, "--version")
+	if code != 0 || p.calls != 0 || errs != "" {
+		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
+	}
+	if want := "mm " + version.String() + "\n"; out != want {
+		t.Errorf("output %q, want %q", out, want)
+	}
+}
+
+func TestUnknownFlagFails(t *testing.T) {
+	for _, flagName := range []string{"wolfgang", "bogus"} {
+		p := &probe{}
+		code, _, errs := run(t, p, noEnv, "--"+flagName)
+		if code != 2 || p.calls != 0 || !strings.Contains(errs, flagName) {
+			t.Errorf("--%s: code %d, calls %d, err %q", flagName, code, p.calls, errs)
+		}
+	}
+}
+
+func TestAnArgumentThatIsNoFlagFails(t *testing.T) {
+	p := &probe{}
+	code, _, errs := run(t, p, noEnv, "extra")
+	if code != 2 || p.calls != 0 || !strings.Contains(errs, `unexpected argument "extra"`) {
+		t.Errorf("code %d, calls %d, err %q", code, p.calls, errs)
+	}
+}
+
+func TestHelpListsTheFlags(t *testing.T) {
+	p := &probe{}
+	code, _, errs := run(t, p, noEnv, "--help")
+	if code != 0 || p.calls != 0 {
+		t.Fatalf("code %d, calls %d", code, p.calls)
+	}
+	for _, name := range []string{"library", "addr", "no-open", "config", "check-config", "version"} {
+		if !strings.Contains(errs, name) {
+			t.Errorf("usage does not mention %s: %q", name, errs)
+		}
+	}
+}
+
+func TestAServerErrorIsReported(t *testing.T) {
+	p := &probe{err: errors.New("address in use")}
+	code, _, errs := run(t, p, noEnv)
+	if code != 1 || errs != "mm: address in use\n" {
+		t.Errorf("code %d, err %q", code, errs)
+	}
+}
+
+const userProfile = `[[profile]]
+name = "my-player"
+latin_names = true
+`
+
+const typoProfile = `[[profile]]
+name = "my-player"
+latin_nmes = true
+`
+
+func writeConfig(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "devices.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func configEnv(key, value string) func(string) string {
+	return func(k string) string {
+		if k == key {
+			return value
+		}
+		return ""
+	}
+}
+
+func profileNames(o launch.Options) []string {
+	if o.Profiles == nil {
+		return nil
+	}
+	var names []string
+	for _, p := range o.Profiles.Profiles() {
+		names = append(names, p.Name)
+	}
+	return names
+}
+
+func TestTheConfigFileGivesTheServerItsProfiles(t *testing.T) {
+	p := &probe{}
+	path := writeConfig(t, userProfile)
+	code, _, errs := run(t, p, noEnv, "--config", path)
+	if code != 0 || p.calls != 1 {
+		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
+	}
+	if got := profileNames(p.options); !slices.Equal(got, []string{"generic", "wolfgang-wmp01", "my-player"}) {
+		t.Errorf("profiles %v", got)
+	}
+	if p.options.Config != path {
+		t.Errorf("config %q, want %q", p.options.Config, path)
+	}
+}
+
+func TestAnInvalidConfigRefusesToStart(t *testing.T) {
+	path := writeConfig(t, typoProfile)
+	for name, args := range map[string][]string{"--config": {"--config", path}, "MM_CONFIG": nil} {
+		p := &probe{}
+		code, _, errs := run(t, p, configEnv("MM_CONFIG", path), args...)
+		if code != 1 || p.calls != 0 || !strings.Contains(errs, path) || !strings.Contains(errs, "latin_nmes") || !strings.Contains(errs, "my-player") {
+			t.Errorf("%s: code %d, calls %d, err %q", name, code, p.calls, errs)
+		}
+	}
+}
+
+func TestCheckConfigPrintsProfilesAndExits(t *testing.T) {
+	p := &probe{}
+	code, out, errs := run(t, p, noEnv, "--config", writeConfig(t, userProfile), "--check-config")
+	if code != 0 || p.calls != 0 || errs != "" {
+		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
+	}
+	if out != "generic\nwolfgang-wmp01\nmy-player\n" {
+		t.Errorf("output %q", out)
+	}
+	path := writeConfig(t, typoProfile)
+	code, out, errs = run(t, p, noEnv, "--config", path, "--check-config")
+	if code != 1 || p.calls != 0 || out != "" || !strings.Contains(errs, path) {
+		t.Errorf("invalid: code %d, calls %d, out %q, err %q", code, p.calls, out, errs)
+	}
+}
+
+func TestAMissingDefaultConfigIsFine(t *testing.T) {
+	dir := t.TempDir()
+	for name, getenv := range map[string]func(string) string{
+		"home":            noEnv,
+		"XDG_CONFIG_HOME": configEnv("XDG_CONFIG_HOME", dir),
+	} {
+		p := &probe{}
+		code, _, errs := run(t, p, getenv)
+		if code != 0 || p.calls != 1 {
+			t.Fatalf("%s: code %d, calls %d, err %q", name, code, p.calls, errs)
+		}
+		if got := profileNames(p.options); !slices.Equal(got, []string{"generic", "wolfgang-wmp01"}) {
+			t.Errorf("%s: profiles %v", name, got)
+		}
+	}
+	p := &probe{}
+	code, out, errs := run(t, p, noEnv, "--check-config")
+	if code != 0 || p.calls != 0 || out != "generic\nwolfgang-wmp01\n" {
+		t.Errorf("check: code %d, calls %d, out %q, err %q", code, p.calls, out, errs)
+	}
+}
+
+func TestAMissingExplicitConfigFails(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "absent.toml")
+	for _, args := range [][]string{{"--config", path}, {"--config", path, "--check-config"}} {
+		p := &probe{}
+		code, _, errs := run(t, p, noEnv, args...)
+		if code != 1 || p.calls != 0 || !strings.Contains(errs, path) {
+			t.Errorf("%v: code %d, calls %d, err %q", args, code, p.calls, errs)
+		}
+	}
+}
+
+func TestAMissingConfigNamedByTheEnvironmentFails(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "absent.toml")
+	for _, args := range [][]string{nil, {"--check-config"}} {
+		p := &probe{}
+		code, _, errs := run(t, p, configEnv("MM_CONFIG", path), args...)
+		if code != 1 || p.calls != 0 || !strings.Contains(errs, path) {
+			t.Errorf("%v: code %d, calls %d, err %q", args, code, p.calls, errs)
+		}
+	}
+}
+
+func writeAt(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAConfigFileNamedByTheEnvironmentGivesTheServerItsProfiles(t *testing.T) {
+	path := writeConfig(t, userProfile)
+	p := &probe{}
+	code, _, errs := run(t, p, configEnv("MM_CONFIG", path))
+	if code != 0 || p.calls != 1 {
+		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
+	}
+	if got := profileNames(p.options); !slices.Equal(got, []string{"generic", "wolfgang-wmp01", "my-player"}) {
+		t.Errorf("profiles %v", got)
+	}
+	if p.options.Config != path {
+		t.Errorf("config %q, want %q", p.options.Config, path)
+	}
+}
+
+func TestTheDefaultConfigFilesAreReadAndAnInvalidOneRefusesToStart(t *testing.T) {
+	root := t.TempDir()
+	xdg := filepath.Join(root, "xdg")
+	home := filepath.Join(root, "home")
+	cases := []struct {
+		name   string
+		getenv func(string) string
+		path   string
+	}{
+		{"XDG_CONFIG_HOME", configEnv("XDG_CONFIG_HOME", xdg), filepath.Join(xdg, "mm", "devices.toml")},
+		{"home", noEnv, filepath.Join(home, ".config", "mm", "devices.toml")},
+	}
+	for _, c := range cases {
+		writeAt(t, c.path, userProfile)
+		p := &probe{}
+		code, _, errs := runAt(home, p, c.getenv)
+		if code != 0 || p.calls != 1 {
+			t.Fatalf("%s: code %d, calls %d, err %q", c.name, code, p.calls, errs)
+		}
+		if got := profileNames(p.options); !slices.Equal(got, []string{"generic", "wolfgang-wmp01", "my-player"}) {
+			t.Errorf("%s: profiles %v", c.name, got)
+		}
+		writeAt(t, c.path, typoProfile)
+		p = &probe{}
+		code, _, errs = runAt(home, p, c.getenv)
+		if code != 1 || p.calls != 0 || !strings.Contains(errs, c.path) || !strings.Contains(errs, "latin_nmes") {
+			t.Errorf("%s invalid: code %d, calls %d, err %q", c.name, code, p.calls, errs)
+		}
+	}
+}
+
+func TestHelpSaysWhichConfigFileMayBeMissing(t *testing.T) {
+	_, _, errs := run(t, &probe{}, noEnv, "--help")
+	for _, want := range []string{"$MM_CONFIG", "must exist"} {
+		if !strings.Contains(errs, want) {
+			t.Errorf("usage does not say %q: %q", want, errs)
+		}
+	}
+}
+
+func TestHelpDoesNotPrintTheRealHomeDirectory(t *testing.T) {
+	_, _, errs := runAt("/home/someone", &probe{}, noEnv, "--help")
+	if strings.Contains(errs, "/home/someone") {
+		t.Errorf("usage leaks the home directory: %q", errs)
+	}
+	if !strings.Contains(errs, "~/Music/Library") {
+		t.Errorf("usage does not show the default library: %q", errs)
+	}
+}
+
+func TestTheServerWritesItsMessagesWhereTheEnvironmentSaysAndKnowsTheLibrary(t *testing.T) {
+	p := &probe{}
+	var o bytes.Buffer
+	code := launch.Run(context.Background(), launch.Env{
+		Args: []string{"--library", "/music"}, Getenv: noEnv, Home: home, Out: &o, Err: &bytes.Buffer{}, Serve: p.serve,
+	})
+	if code != 0 || p.options.Out != &o {
+		t.Errorf("code %d, the server's output is %v, want the environment's", code, p.options.Out)
+	}
+	if p.options.Library != "/music" {
+		t.Errorf("library %q", p.options.Library)
+	}
+}

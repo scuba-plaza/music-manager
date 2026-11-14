@@ -86,10 +86,13 @@ func (s *Server) syncRoutes() {
 	s.mux.HandleFunc("DELETE /api/sync/{plan}", s.syncDrop)
 }
 
+type SyncTargetsView struct {
+	Targets []browse.TargetView `json:"targets"`
+}
+
 func (s *Server) syncTargets(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, map[string]any{
-		"targets":  browse.Targets(s.root(), s.mounts()),
-		"wolfgang": s.wolfgang,
+	writeJSON(w, SyncTargetsView{
+		Targets: browse.Targets(s.root(), s.mounts()),
 	})
 }
 
@@ -108,6 +111,9 @@ func (s *Server) target(library bool, folder string) (path, where string, isLibr
 		return "", "", false, errors.New("write the whole path of the folder, starting with / or ~")
 	}
 	p = filepath.Clean(p)
+	if home, err := os.UserHomeDir(); err == nil && home != "" && sameFolder(p, home) {
+		return "", "", false, errors.New("that is your home folder: pick a folder of its own")
+	}
 	root := s.root()
 	if sameFolder(p, root) {
 		return "", "Library folder", true, nil
@@ -143,9 +149,9 @@ func inside(p, dir string) bool {
 
 func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Library  bool
-		Folder   string
-		Wolfgang bool
+		Library bool
+		Folder  string
+		Profile string
 	}
 	if !read(w, r, &in) {
 		return
@@ -155,9 +161,13 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnprocessableEntity, err)
 		return
 	}
-	var dev device.Target = device.Generic
-	if in.Wolfgang && !isLibrary { // the library folder is always written the standard way
-		dev, where = device.Wolfgang, where+" · Wolfgang WMP01"
+	dev, err := s.syncDevice(isLibrary, in.Profile)
+	if err != nil {
+		fail(w, http.StatusBadRequest, err)
+		return
+	}
+	if dev.Name() != device.Generic.Name() {
+		where += " · " + dev.Profile().Label
 	}
 	v, err := s.jobs.start("sync", func(ctx context.Context, report func(any)) (any, error) {
 		type made struct {
@@ -203,6 +213,16 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, v)
+}
+
+func (s *Server) syncDevice(isLibrary bool, profile string) (device.Target, error) {
+	switch {
+	case isLibrary:
+		return device.Generic, nil
+	case profile != "":
+		return s.profile(profile)
+	}
+	return device.Generic, nil
 }
 
 func newID() (string, error) {

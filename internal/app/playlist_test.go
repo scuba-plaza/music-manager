@@ -281,7 +281,7 @@ func syncedPlaylistLib(t *testing.T) (*app.App, []manifest.Track) {
 func TestSyncWritesAPlaylistTheWolfgangPlayerCanRead(t *testing.T) {
 	a, ts := syncedPlaylistLib(t)
 	target := filepath.Join(t.TempDir(), "player")
-	opts := app.SyncOptions{Target: target, Device: device.Wolfgang}
+	opts := app.SyncOptions{Target: target, Device: wolfgang}
 
 	ops := mustSync(t, a, opts)
 	if len(ops) != 4 { // three tracks and the playlist
@@ -442,7 +442,7 @@ func TestAPlaylistsLatinNameIsSetByHandAndOnlyTheWolfgangFileFollowsIt(t *testin
 	}
 
 	target := filepath.Join(t.TempDir(), "player")
-	mustSync(t, a, app.SyncOptions{Target: target, Device: device.Wolfgang})
+	mustSync(t, a, app.SyncOptions{Target: target, Device: wolfgang})
 	if got := readFile(t, target, "Playlists/Daraseh.m3u"); len(got) == 0 {
 		t.Error("the Wolfgang's playlist is not named by its Latin form")
 	}
@@ -510,5 +510,49 @@ func TestReplacingThePlaylistsKeepsTheirLatinNames(t *testing.T) {
 	m, _ = a.Manifest()
 	if len(m.Playlists) != 1 || m.Playlists[0].NameLatin != "Study" {
 		t.Errorf("playlists = %+v", m.Playlists)
+	}
+}
+
+func TestPlaylistNamesCollideOnAUserProfile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "devices.toml")
+	writeFile(t, path, []byte(`[[profile]]
+name = "my-player"
+latin_names = true
+playlist_ext = ".m3u"
+component_max = 20
+`))
+	registry, err := device.LoadRegistry(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plain := openLib(t)
+	for _, name := range []string{"Road Trip Songs Volume One", "Road Trip Songs Volume Two"} {
+		if err := plain.CreatePlaylist(name); err != nil {
+			t.Fatalf("without the profile the names are two files: %v", err)
+		}
+	}
+
+	a := openLib(t)
+	a.UseProfiles(registry)
+	if a.Profiles() != registry {
+		t.Fatal("the app does not use the registry it was given")
+	}
+	if err := a.CreatePlaylist("Road Trip Songs Volume One"); err != nil {
+		t.Fatal(err)
+	}
+	err = a.CreatePlaylist("Road Trip Songs Volume Two")
+	if err == nil || !strings.Contains(err.Error(), "same file") || !strings.Contains(err.Error(), "Road Trip Songs Volu.m3u") {
+		t.Errorf("err = %v, want a refusal: both are Road Trip Songs Volu.m3u on my-player", err)
+	}
+}
+
+func TestAnAppWithoutProfilesUsesTheBuiltinOnes(t *testing.T) {
+	var names []string
+	for _, p := range openLib(t).Profiles().Profiles() {
+		names = append(names, p.Name)
+	}
+	if !slices.Equal(names, []string{"generic", "wolfgang-wmp01"}) {
+		t.Errorf("profiles %v", names)
 	}
 }

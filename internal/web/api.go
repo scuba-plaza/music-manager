@@ -15,6 +15,7 @@ import (
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
 	"music-manager/internal/coverimg"
+	"music-manager/internal/device"
 )
 
 // snapshot reads the records as they are now.
@@ -40,6 +41,18 @@ func libraryOptions(r *http.Request) (browse.Options, error) {
 	return o, nil
 }
 
+type UnsyncedView struct {
+	Known bool `json:"known"`
+	N     int  `json:"n"`
+}
+
+type LibraryResponse struct {
+	History  browse.HistoryView `json:"history"`
+	Stamp    string             `json:"stamp"`
+	Unsynced UnsyncedView       `json:"unsynced"`
+	View     browse.LibraryView `json:"view"`
+}
+
 func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 	o, err := libraryOptions(r)
 	if err != nil {
@@ -53,11 +66,11 @@ func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	n, known := s.unsynced()
-	writeJSON(w, map[string]any{
-		"stamp":    stamp,
-		"view":     browse.Library(snap, o),
-		"unsynced": map[string]any{"n": n, "known": known},
-		"history":  s.ed.History(),
+	writeJSON(w, LibraryResponse{
+		History:  s.ed.History(),
+		Stamp:    stamp,
+		Unsynced: UnsyncedView{Known: known, N: n},
+		View:     browse.Library(snap, o),
 	})
 }
 
@@ -67,7 +80,14 @@ func (s *Server) track(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, err)
 		return
 	}
-	v, ok := browse.Track(snap, r.PathValue("id"), browse.TrackOptions{Wolfgang: s.wolfgang, CoverInfo: s.describeCover})
+	profile := r.URL.Query().Get("profile")
+	if profile != "" {
+		if _, err := s.profile(profile); err != nil {
+			fail(w, http.StatusBadRequest, err)
+			return
+		}
+	}
+	v, ok := browse.Track(snap, r.PathValue("id"), browse.TrackOptions{CoverInfo: s.describeCover, Profile: profile, Profiles: s.profiles})
 	if !ok {
 		fail(w, http.StatusNotFound, errNotFound)
 		return
@@ -149,4 +169,26 @@ func (s *Server) doctor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, browse.Doctor(snap, found))
+}
+
+type ProfileView struct {
+	Name    string `json:"name"`
+	Label   string `json:"label"`
+	Builtin bool   `json:"builtin"`
+}
+
+func (s *Server) listProfiles(w http.ResponseWriter, r *http.Request) {
+	infos := s.profiles.Profiles()
+	views := make([]ProfileView, len(infos))
+	for i, p := range infos {
+		views[i] = ProfileView{Name: p.Name, Label: p.Label, Builtin: p.Builtin}
+	}
+	writeJSON(w, views)
+}
+
+func (s *Server) profile(name string) (device.Target, error) {
+	if dev, ok := s.profiles.Get(name); ok {
+		return dev, nil
+	}
+	return nil, fmt.Errorf("there is no device profile named %q", name)
 }

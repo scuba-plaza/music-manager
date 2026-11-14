@@ -54,16 +54,26 @@ func (s *Server) editRoutes() {
 	m.HandleFunc("POST /api/redo", s.redo)
 }
 
+type PathView struct {
+	Path string `json:"path"`
+}
+
+type HintView struct {
+	Hint string `json:"hint"`
+}
+
+type ChangeResponse struct {
+	browse.Result
+	History browse.HistoryView `json:"history"`
+}
+
 // answer writes the outcome of a change.
 func (s *Server) answer(w http.ResponseWriter, r browse.Result, err error) {
 	if err != nil {
 		fail(w, http.StatusUnprocessableEntity, err)
 		return
 	}
-	writeJSON(w, struct {
-		browse.Result
-		History browse.History `json:"history"`
-	}{r, s.ed.History()})
+	writeJSON(w, ChangeResponse{r, s.ed.History()})
 }
 
 // read decodes the JSON body of a request.
@@ -124,7 +134,7 @@ func (s *Server) pathPreview(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, errNotFound)
 		return
 	}
-	writeJSON(w, map[string]string{"path": path})
+	writeJSON(w, PathView{Path: path})
 }
 
 func (s *Server) copyable(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +244,7 @@ func (s *Server) groupHint(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, err)
 		return
 	}
-	writeJSON(w, map[string]string{"hint": browse.GroupHint(snap, in.Key, in.Field, in.Text)})
+	writeJSON(w, HintView{Hint: browse.GroupHint(snap, in.Key, in.Field, in.Text)})
 }
 
 type bulkRequest struct {

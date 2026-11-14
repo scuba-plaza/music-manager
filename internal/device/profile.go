@@ -1,0 +1,197 @@
+package device
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"maps"
+	"reflect"
+	"regexp"
+	"slices"
+	"strings"
+
+	"github.com/pelletier/go-toml/v2"
+)
+
+type Profile struct {
+	Name          string `toml:"name"`
+	Label         string `toml:"label"`
+	LatinNames    bool   `toml:"latin_names"`
+	ComponentMax  int    `toml:"component_max"`
+	StemMax       int    `toml:"stem_max"`
+	TagWidth      int    `toml:"tag_width"`
+	LatinGenre    bool   `toml:"latin_genre"`
+	CoverFormat   string `toml:"cover_format"`
+	CoverMaxEdge  int    `toml:"cover_max_edge"`
+	CoverQuality  int    `toml:"cover_quality"`
+	SingleCovers  bool   `toml:"single_covers"`
+	ReplayGain    bool   `toml:"replaygain"`
+	PlaylistExt   string `toml:"playlist_ext"`
+	PlaylistStyle string `toml:"playlist_style"`
+}
+
+const (
+	minComponentMax = 20
+	maxCoverQuality = 100
+)
+
+var profileName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+
+type document struct {
+	Profile []map[string]any `toml:"profile"`
+}
+
+var profileKeys = tomlKeysOf(reflect.TypeFor[Profile]())
+
+func tomlKeysOf(t reflect.Type) map[string]bool {
+	keys := make(map[string]bool, t.NumField())
+	for i := range t.NumField() {
+		keys[t.Field(i).Tag.Get("toml")] = true
+	}
+	return keys
+}
+
+func ParseProfiles(data []byte) ([]Profile, error) {
+	doc, err := decodeDocument(data)
+	if err != nil {
+		return nil, err
+	}
+	profiles := make([]Profile, 0, len(doc.Profile))
+	for position, table := range doc.Profile {
+		p, err := profileFromTable(position, table)
+		if err != nil {
+			return nil, err
+		}
+		if err := p.validate(describeProfile(position, table)); err != nil {
+			return nil, err
+		}
+		profiles = append(profiles, p)
+	}
+	return profiles, nil
+}
+
+func decodeDocument(data []byte) (document, error) {
+	var doc document
+	decoder := toml.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&doc)
+	var unknown *toml.StrictMissingError
+	if errors.As(err, &unknown) {
+		first := unknown.Errors[0]
+		row, column := first.Position()
+		return document{}, fmt.Errorf("line %d, column %d: %s unknown key", row, column, strings.Join(first.Key(), "."))
+	}
+	var invalid *toml.DecodeError
+	if errors.As(err, &invalid) {
+		row, column := invalid.Position()
+		if key := invalid.Key(); len(key) == 1 && key[0] == "profile" && strings.Contains(invalid.Error(), "cannot decode") {
+			return document{}, fmt.Errorf("line %d, column %d: profile must be a [[profile]] table", row, column)
+		}
+		return document{}, fmt.Errorf("line %d, column %d: %s", row, column, invalid.Error())
+	}
+	return doc, err
+}
+
+func profileFromTable(position int, table map[string]any) (Profile, error) {
+	who := describeProfile(position, table)
+	if keys := unknownKeys(table); len(keys) == 1 {
+		return Profile{}, fmt.Errorf("profile %s: %s unknown key", who, keys[0])
+	} else if len(keys) > 1 {
+		return Profile{}, fmt.Errorf("profile %s: %s unknown keys", who, strings.Join(keys, ", "))
+	}
+	p := Profile{
+		ComponentMax:  200,
+		CoverFormat:   "keep",
+		ReplayGain:    true,
+		PlaylistExt:   ".m3u8",
+		PlaylistStyle: "relative",
+	}
+	text, err := toml.Marshal(table)
+	if err == nil {
+		err = toml.Unmarshal(text, &p)
+	}
+	if err != nil {
+		return Profile{}, fmt.Errorf("profile %s: %s", who, describeValueError(err))
+	}
+	if p.Label == "" {
+		p.Label = p.Name
+	}
+	return p, nil
+}
+
+func unknownKeys(table map[string]any) []string {
+	var unknown []string
+	for _, key := range slices.Sorted(maps.Keys(table)) {
+		if !profileKeys[key] {
+			unknown = append(unknown, key)
+		}
+	}
+	return unknown
+}
+
+func describeProfile(position int, table map[string]any) string {
+	if name, ok := table["name"].(string); ok && name != "" {
+		return fmt.Sprintf("%q", name)
+	}
+	return fmt.Sprintf("#%d", position+1)
+}
+
+func describeValueError(err error) string {
+	var invalid *toml.DecodeError
+	if errors.As(err, &invalid) && len(invalid.Key()) > 0 {
+		return strings.Join(invalid.Key(), ".") + " has a value of the wrong type"
+	}
+	return err.Error()
+}
+
+func (p Profile) Validate() error { return p.validate(fmt.Sprintf("%q", p.Name)) }
+
+func (p Profile) validate(who string) error {
+	fail := func(key, problem string, args ...any) error {
+		return fmt.Errorf("profile %s: %s %s", who, key, fmt.Sprintf(problem, args...))
+	}
+	if !profileName.MatchString(p.Name) {
+		return fail("name", "must be lower-case letters, digits and hyphens, starting with a letter or digit")
+	}
+	if p.ComponentMax < minComponentMax {
+		return fail("component_max", "must be at least %d, not %d", minComponentMax, p.ComponentMax)
+	}
+	if p.StemMax < 0 || p.StemMax >= p.ComponentMax {
+		return fail("stem_max", "must be from 0 up to below component_max (%d), not %d", p.ComponentMax, p.StemMax)
+	}
+	if p.TagWidth < 0 {
+		return fail("tag_width", "must not be negative, not %d", p.TagWidth)
+	}
+	if p.TagWidth > 0 && !p.LatinNames {
+		return fail("tag_width", "needs latin_names")
+	}
+	if p.CoverMaxEdge < 0 {
+		return fail("cover_max_edge", "must not be negative, not %d", p.CoverMaxEdge)
+	}
+	if p.CoverQuality < 0 || p.CoverQuality > maxCoverQuality {
+		return fail("cover_quality", "must be from 0 to %d, not %d", maxCoverQuality, p.CoverQuality)
+	}
+	switch p.CoverFormat {
+	case "keep":
+	case "baseline-jpeg":
+		if p.CoverMaxEdge < 1 {
+			return fail("cover_max_edge", "must be at least 1 for baseline-jpeg, not %d", p.CoverMaxEdge)
+		}
+		if p.CoverQuality < 1 || p.CoverQuality > maxCoverQuality {
+			return fail("cover_quality", "must be from 1 to %d for baseline-jpeg, not %d", maxCoverQuality, p.CoverQuality)
+		}
+	default:
+		return fail("cover_format", "must be keep or baseline-jpeg, not %q", p.CoverFormat)
+	}
+	switch p.PlaylistExt {
+	case ".m3u", ".m3u8":
+	default:
+		return fail("playlist_ext", "must be .m3u or .m3u8, not %q", p.PlaylistExt)
+	}
+	switch p.PlaylistStyle {
+	case "relative", "root-backslash":
+	default:
+		return fail("playlist_style", "must be relative or root-backslash, not %q", p.PlaylistStyle)
+	}
+	return nil
+}

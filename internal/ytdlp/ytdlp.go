@@ -35,7 +35,7 @@ func (d *Downloader) Download(ctx context.Context, url, dir string) (app.Downloa
 		"-x", "--audio-format", "mp3", "--audio-quality", "0",
 		"--print-json",
 		"-o", filepath.Join(dir, "%(id)s.%(ext)s"),
-		url)
+		"--", url)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	cmd.WaitDelay = 2 * time.Second // a killed run may leave children holding the pipes

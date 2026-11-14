@@ -237,7 +237,7 @@ func (e *Editor) IdentifyAll(ctx context.Context, each func(IdentifyProgress)) (
 		return p, err
 	}
 	var applied []string
-	_, runErr := e.lib.Identify(ctx, nil, e.source, nil, app.IdentifyOptions{Yes: true, OnResult: func(r app.IdentifyResult) {
+	_, runErr := e.lib.Identify(ctx, nil, e.source, app.IdentifyOptions{OnResult: func(r app.IdentifyResult) {
 		p.Done++
 		switch {
 		case r.Err != nil:

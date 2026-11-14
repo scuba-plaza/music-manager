@@ -40,7 +40,7 @@ func TestAGenericPlaylistIsAnM3U8WithPathsRelativeToIt(t *testing.T) {
 func TestTheWolfgangsPlaylistIsAnM3UWithPathsFromTheRoot(t *testing.T) {
 	p, tracks, paths := playlistFixture()
 	paths["a"] = "Firuz/Hits/03 - Wtni.mp3"
-	name, data := device.Wolfgang.Playlist(p, tracks, paths)
+	name, data := wolfgang.Playlist(p, tracks, paths)
 	if want := "Playlists/Drasa.m3u"; name != want {
 		t.Errorf("name = %q, want %q", name, want)
 	}

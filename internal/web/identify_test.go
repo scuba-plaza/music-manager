@@ -5,18 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"music-manager/internal/app"
+	"music-manager/internal/browse"
 	"music-manager/internal/manifest"
+	"music-manager/internal/web/webtest"
 )
-
-type database struct{ found []app.Candidate }
-
-func (d database) Search(context.Context, app.Query) ([]app.Candidate, error) { return d.found, nil }
-func (d database) CoverFront(context.Context, string) ([]byte, error)         { return nil, nil }
 
 type search struct {
 	Search     string `json:"search"`
@@ -32,7 +30,7 @@ var raw = sendInto
 
 func TestATrackIsLookedUpAndIdentifiedOverHTTP(t *testing.T) {
 	a, ts := seed(t, sample...)
-	srv := start(t, a, WithSource(database{[]app.Candidate{{Title: "Found", Artist: "Someone", Album: "Somewhere", TrackNumber: 3, TrackTotal: 9, Score: 99}}}))
+	srv := start(t, a, WithSource(webtest.FakeSource{Found: []app.Candidate{{Title: "Found", Artist: "Someone", Album: "Somewhere", TrackNumber: 3, TrackTotal: 9, Score: 99}}}))
 	unidentified := ts[3]
 	var s search
 	if code := raw(t, srv.URL, "POST", "/api/tracks/"+unidentified.ID+"/candidates", obj{}, &s); code != 200 || len(s.Candidates) != 1 || s.Search == "" {
@@ -85,7 +83,7 @@ func waitJob(t *testing.T, base, id string) JobView {
 
 func TestEveryTrackThatNeedsWorkIsIdentifiedAsAJob(t *testing.T) {
 	a, _ := seed(t, sample...) // one of the four is not identified
-	srv := start(t, a, WithSource(database{[]app.Candidate{{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 99}}}))
+	srv := start(t, a, WithSource(webtest.FakeSource{Found: []app.Candidate{{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 99}}}))
 
 	events := make(chan string, 20)
 	res, err := http.Get(srv.URL + "/api/events")
@@ -187,4 +185,47 @@ func TestOldTagsAreAdoptedOverHTTP(t *testing.T) {
 		t.Errorf("%d %+v", code, r)
 	}
 	_ = manifest.Identified
+}
+
+func identifiedEverything(t *testing.T, srv *httptest.Server) browse.IdentifyProgress {
+	t.Helper()
+	var v JobView
+	if code := raw(t, srv.URL, "POST", "/api/identify-all", obj{}, &v); code != 200 || v.Kind != "identify" {
+		t.Fatalf("%d %+v", code, v)
+	}
+	done := waitJob(t, srv.URL, v.ID)
+	var progress browse.IdentifyProgress
+	data, _ := json.Marshal(done.Data)
+	if err := json.Unmarshal(data, &progress); err != nil || done.State != jobDone {
+		t.Fatalf("%+v %s %v", done, data, err)
+	}
+	return progress
+}
+
+func TestIdentifyingEverythingLeavesTracksAloneWhoseBestMatchIsWeak(t *testing.T) {
+	a, _ := seed(t, seedTrack{}, seedTrack{})
+	weak := app.Candidate{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 60}
+	srv := start(t, a, WithSource(webtest.FakeSource{Found: []app.Candidate{weak}}))
+
+	p := identifiedEverything(t, srv)
+	if p.Total != 2 || p.Identified != 0 || p.Left != 2 || p.Failed != 0 {
+		t.Errorf("%+v; want both tracks left alone", p)
+	}
+	m, _ := a.Manifest()
+	for _, tr := range m.Tracks {
+		if tr.Status == manifest.Identified {
+			t.Errorf("%s was identified by a match that scores only 60", tr.ID)
+		}
+	}
+}
+
+func TestAFailedLookupIsReportedAndTheOtherTracksAreStillIdentified(t *testing.T) {
+	a, _ := seed(t, seedTrack{}, seedTrack{})
+	found := app.Candidate{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 99}
+	srv := start(t, a, WithSource(webtest.FakeSource{FailFor: "a", Found: []app.Candidate{found}}))
+
+	p := identifiedEverything(t, srv)
+	if p.Total != 2 || p.Identified != 1 || p.Failed != 1 || len(p.Failures) != 1 || !strings.Contains(p.Failures[0], "network down") {
+		t.Errorf("%+v; want one track identified and the failure of the other said", p)
+	}
 }

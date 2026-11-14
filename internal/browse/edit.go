@@ -19,7 +19,7 @@ type Store interface {
 	Manifest() (*manifest.Manifest, error)
 	Candidates(ctx context.Context, id string, src app.MetadataSource, q *app.Query) ([]app.Candidate, error)
 	ApplyCandidate(ctx context.Context, id string, c app.Candidate, src app.MetadataSource) (manifest.Track, error)
-	Identify(ctx context.Context, ids []string, src app.MetadataSource, p app.Prompter, opts app.IdentifyOptions) ([]app.IdentifyResult, error)
+	Identify(ctx context.Context, ids []string, src app.MetadataSource, opts app.IdentifyOptions) ([]app.IdentifyResult, error)
 	Adopt(ids []string) ([]app.AdoptResult, error)
 	Fetch(ctx context.Context, req app.AddRequest, dl app.Downloader) (*app.Draft, error)
 	Finish(ctx context.Context, d *app.Draft, e app.Edit) (manifest.Track, error)
@@ -69,8 +69,8 @@ type change struct {
 // maxHistory is how many changes can be undone.
 const maxHistory = 200
 
-// History says what undo and redo would do now, and what is copied.
-type History struct {
+// HistoryView says what undo and redo would do now, and what is copied.
+type HistoryView struct {
 	Undo string `json:"undo,omitempty"`
 	Redo string `json:"redo,omitempty"`
 	Clip string `json:"clip,omitempty"`
@@ -122,10 +122,10 @@ func (e *Editor) snapshot() (Snapshot, error) {
 }
 
 // History is what undo, redo and paste would do now.
-func (e *Editor) History() History {
+func (e *Editor) History() HistoryView {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	var h History
+	var h HistoryView
 	if n := len(e.undoes); n > 0 {
 		h.Undo = e.undoes[n-1].label
 	}
@@ -181,7 +181,7 @@ func (e *Editor) SetField(id, field, text, second string) (Result, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	f, ok := fieldByKey(field)
-	if !ok || f == fWolfgang || f == fCover || f > fLatinGenre {
+	if !ok || f == fCover || f > fLatinGenre {
 		return Result{}, fmt.Errorf("there is no field %q to edit", field)
 	}
 	s, err := e.snapshot()

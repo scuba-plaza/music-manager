@@ -3,6 +3,7 @@ package app_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"music-manager/internal/app"
@@ -33,7 +34,7 @@ func TestRemoveDeletesTheRecordAndSyncCollectsItsBlobs(t *testing.T) {
 	}
 
 	plan := mustPlan(t, a, app.SyncOptions{})
-	if err := plan.Apply(); err != nil {
+	if err := plan.ApplyWith(nil); err != nil {
 		t.Fatal(err)
 	}
 	if plan.Collected != 2 { // the audio and the cover
@@ -67,7 +68,7 @@ func TestSyncKeepsBlobsSharedAcrossTracksAndTargets(t *testing.T) {
 	a.Remove(ts[0].ID)
 	target := filepath.Join(t.TempDir(), "player")
 	plan := mustPlan(t, a, app.SyncOptions{Target: target})
-	if err := plan.Apply(); err != nil {
+	if err := plan.ApplyWith(nil); err != nil {
 		t.Fatal(err)
 	}
 	if plan.Collected != 1 { // only ts[0]'s audio
@@ -107,5 +108,34 @@ func TestRemoveManyRemovesAllOrNone(t *testing.T) {
 	}
 	if got, err := a.RemoveMany(nil); err != nil || len(got) != 0 {
 		t.Errorf("removing nothing = %v, %v", got, err)
+	}
+}
+
+func TestRemovingWithARepeatedIDRemovesNothing(t *testing.T) {
+	a := libWithTracks(t, 10, 20)
+	ts := tracks(t, a)
+
+	got, err := a.RemoveMany([]string{ts[0].ID, ts[1].ID, ts[0].ID})
+	if err == nil || !strings.Contains(err.Error(), ts[0].ID) {
+		t.Fatalf("RemoveMany = %v, %v; want an error that names the repeated id %s", got, err, ts[0].ID)
+	}
+	if len(got) != 0 {
+		t.Errorf("RemoveMany returned %v together with its error", got)
+	}
+	if left := tracks(t, a); len(left) != 2 {
+		t.Errorf("%d tracks left, want both: the one named once went too", len(left))
+	}
+}
+
+func TestRemovingAnUnknownIDSaysWhichOneAndRemovesNothing(t *testing.T) {
+	a := libWithTracks(t, 10, 20)
+	ts := tracks(t, a)
+
+	_, err := a.RemoveMany([]string{ts[0].ID, "nope"})
+	if err == nil || !strings.Contains(err.Error(), "nope") {
+		t.Fatalf("err = %v, want one that names nope", err)
+	}
+	if left := tracks(t, a); len(left) != 2 {
+		t.Errorf("%d tracks left, want both: the known one went too", len(left))
 	}
 }

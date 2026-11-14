@@ -7,6 +7,8 @@ import (
 	"music-manager/internal/manifest"
 )
 
+const wolfgangWidth = 12
+
 // The player's index keeps 12 characters of an artist and of an album, so what
 // mm writes into the tags has to say its piece within them. These are the
 // rules of the plan, with its worked examples.
@@ -35,7 +37,7 @@ func TestTheArtistTheWolfgangShows(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := device.ArtistName(c.in); got != c.want {
+			if got := device.ArtistName(c.in, wolfgangWidth); got != c.want {
 				t.Errorf("ArtistName(%q) = %q, want %q", c.in, got, c.want)
 			}
 		})
@@ -60,7 +62,7 @@ func TestTheAlbumTheWolfgangShows(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := device.AlbumName(c.in, c.artist); got != c.want {
+			if got := device.AlbumName(c.in, c.artist, wolfgangWidth); got != c.want {
 				t.Errorf("AlbumName(%q, %q) = %q, want %q", c.in, c.artist, got, c.want)
 			}
 		})
@@ -69,16 +71,16 @@ func TestTheAlbumTheWolfgangShows(t *testing.T) {
 
 func TestTheWolfgangShowsTheLatinFormOfTrueNames(t *testing.T) {
 	tr := manifest.Track{Status: manifest.Identified, Title: "وطني", Artist: "فيروز", Album: "روائع عبد الحليم"}
-	artist, album := device.PlayerTags(tr)
+	artist, album := device.PlayerTags(tr, wolfgangWidth)
 	if artist != "Firuz" {
 		t.Errorf("artist = %q, want Firuz", artist)
 	}
-	if len([]rune(album)) > device.PlayerFieldWidth || album == "" {
-		t.Errorf("album = %q, want something of at most %d characters", album, device.PlayerFieldWidth)
+	if len([]rune(album)) > wolfgangWidth || album == "" {
+		t.Errorf("album = %q, want something of at most %d characters", album, wolfgangWidth)
 	}
 
 	single := manifest.Track{Status: manifest.Identified, Title: "Dream of Me and You", Artist: "Max Richter"}
-	if _, album := device.PlayerTags(single); album != "Dream of Me" {
+	if _, album := device.PlayerTags(single, wolfgangWidth); album != "Dream of Me" {
 		t.Errorf("a single's album = %q, want its title shortened as an album", album)
 	}
 }

@@ -17,7 +17,7 @@ func TestSyncWritesTagsTheWholePlayerCanShow(t *testing.T) {
 	identify(t, a, ts[0].ID, "Bahlam Bek", "Abdel Halim Hafez", "Abd El Halim Hafez", 1, 2)
 	identify(t, a, ts[1].ID, "Dream of Me and You", "Max Richter", "", 0, 0)
 	identify(t, a, ts[2].ID, "Dream", "Max Richter", "", 0, 0)
-	mustSync(t, a, app.SyncOptions{Device: device.Wolfgang})
+	mustSync(t, a, app.SyncOptions{Device: wolfgang})
 
 	album := mp3.ReadTagSet(readFile(t, a.Root(), "Abdel Halim Hafez/Abd El Halim Hafez/01 - Bahlam Bek.mp3"))
 	if album.Artist != "A. H. Hafez" || album.Album != "Abd El Halim" {
@@ -57,7 +57,7 @@ func TestPlanSyncCarriesTheWarningsOfItsDevice(t *testing.T) {
 	for _, c := range []struct {
 		dev  device.Target
 		want int
-	}{{device.Generic, 0}, {device.Wolfgang, 1}} {
+	}{{device.Generic, 0}, {wolfgang, 1}} {
 		plan, err := a.PlanSync(app.SyncOptions{Target: t.TempDir(), Device: c.dev})
 		if err != nil {
 			t.Fatal(err)

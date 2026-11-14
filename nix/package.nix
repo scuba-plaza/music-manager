@@ -2,6 +2,7 @@
   lib,
   buildGoModule,
   makeWrapper,
+  frontend,
   yt-dlp,
   ffmpeg,
   xdg-utils,
@@ -20,10 +21,21 @@ buildGoModule {
       ../go.sum
       ../cmd
       ../internal
+      ../web/src/api/types.gen.ts
     ];
   };
 
-  vendorHash = "sha256-rO9TGDpz2aPDK0mS/GwB9JOe/QppXwiOOEmdkdd8J+w=";
+  postPatch = ''
+    mkdir -p internal/web/dist
+    cp -r --no-preserve=mode ${frontend}/. internal/web/dist/
+  '';
+
+  vendorHash = "sha256-pdCnt8lqPiPSipa6KmtSxl8c2YZ32vv4X6tMETZRAQY=";
+
+  excludedPackages = [
+    "e2e-server"
+    "gentypes"
+  ];
 
   env.CGO_ENABLED = "0";
 
@@ -41,11 +53,6 @@ buildGoModule {
   # yt-dlp, is found first.
   postInstall = ''
     wrapProgram $out/bin/mm --suffix PATH : ${lib.makeBinPath [ yt-dlp ffmpeg xdg-utils ]}
-
-    mkdir -p $out/share/bash-completion/completions $out/share/zsh/site-functions $out/share/fish/vendor_completions.d
-    $out/bin/mm completion bash > $out/share/bash-completion/completions/mm
-    $out/bin/mm completion zsh > $out/share/zsh/site-functions/_mm
-    $out/bin/mm completion fish > $out/share/fish/vendor_completions.d/mm.fish
   '';
 
   meta = {

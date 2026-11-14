@@ -1,0 +1,8 @@
+[[profile]]
+name = "my-player"
+label = "My Player"
+latin_names = true
+tag_width = 12
+
+[[profile]]
+name = "plain-player"

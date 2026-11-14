@@ -80,8 +80,6 @@ func sweep(t *testing.T, pattern string, tests bool, allow []string) {
 
 func TestTheLibraryKnowsNoLatinFormsOrPlayerNames(t *testing.T) {
 	sweep(t, `OriginalTitle|OriginalArtist|OriginalAlbum|Ascii(Title|Artist|Album)|(Artist|Title|Album)ASCII\b|PlayerArtist|PlayerAlbum|player_artist|player_album|player-artist|player-album`, true, []string{
-		"internal/cli/cli_test.go",    // the flags of the old names are gone
-		"internal/app/review_test.go", // review files must refuse the old keys
 		"internal/device/boundary_test.go",
 	})
 }
@@ -99,7 +97,6 @@ func TestTheWolfgangIsNamedOnlyWhereItIsChosenOrExplained(t *testing.T) {
 	sweep(t, `(?i)wolfgang|wmp01|wolfang`, false, []string{
 		"internal/device/",
 		"cmd/mm/main.go",                // wires the flag to the web interface
-		"internal/cli/",                 // the --wolfgang flag and its help
 		"internal/browse/",              // the preview tab and the format of a sync
 		"internal/web/",                 // and the option that turns it on
 		"internal/app/playlist.go",      // the names of every device's playlists must not clash

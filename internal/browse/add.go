@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"music-manager/internal/app"
@@ -151,8 +152,19 @@ const maxDrafts = 8
 // CanAdd reports whether tracks can be downloaded.
 func (e *Editor) CanAdd() bool { return e.downloader != nil }
 
-// CleanLink strips the spaces and line breaks that come with a paste.
-func CleanLink(s string) string { return strings.Join(strings.Fields(s), "") }
+// CheckLink strips the spaces and line breaks that come with a paste and says
+// whether what is left is a web link.
+func CheckLink(s string) (string, error) {
+	link := strings.Join(strings.Fields(s), "")
+	if link == "" {
+		return "", errors.New("Paste a link first")
+	}
+	u, err := url.Parse(link)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return "", errors.New("That is not a web link: it should start with http:// or https://")
+	}
+	return link, nil
+}
 
 // Fetch downloads the audio at the link and prepares it to be added. A track
 // that is in the library already comes back as a Duplicate, not an error.
@@ -160,9 +172,9 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 	if e.downloader == nil {
 		return Fetched{}, errors.New("Adding from YouTube is not available: yt-dlp is not set up")
 	}
-	link = CleanLink(link)
-	if link == "" {
-		return Fetched{}, errors.New("Paste a link first")
+	link, err := CheckLink(link)
+	if err != nil {
+		return Fetched{}, err
 	}
 	d, err := e.lib.Fetch(ctx, app.AddRequest{URL: link, Source: e.source}, e.downloader)
 	var dup *app.DuplicateError

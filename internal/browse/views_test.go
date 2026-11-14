@@ -1,11 +1,15 @@
 package browse
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/manifest"
 )
 
@@ -70,15 +74,15 @@ func TestASortedLibraryIsOneListWithAWayBackToTheTree(t *testing.T) {
 	}
 }
 
-func TestATrackHasThreeTabsAndAFourthUnderWolfgang(t *testing.T) {
+func TestATrackHasThreeTabsAndTheDeviceTabOnlyWithAProfile(t *testing.T) {
 	s := snapshot()
 	v, ok := Track(s, "t1", TrackOptions{})
 	if !ok || len(v.Tabs) != 3 || v.Tabs[0].Name != "Details" || v.Tabs[1].Name != "Audio" || v.Tabs[2].Name != "Latin" {
 		t.Fatalf("%+v", v.Tabs)
 	}
-	w, _ := Track(s, "t1", TrackOptions{Wolfgang: true})
-	if len(w.Tabs) != 4 || w.Tabs[3].Wolfgang == nil || len(w.Tabs[3].Wolfgang.Rows) == 0 {
-		t.Errorf("wolfgang tab: %+v", w.Tabs)
+	w, _ := Track(s, "t1", TrackOptions{Profile: "wolfgang-wmp01"})
+	if len(w.Tabs) != 4 || w.Tabs[3].Device == nil || len(w.Tabs[3].Device.Rows) == 0 {
+		t.Errorf("device tab: %+v", w.Tabs)
 	}
 	if _, ok := Track(s, "nope", TrackOptions{}); ok {
 		t.Error("found a track that is not there")
@@ -197,5 +201,134 @@ func TestAPeekFollowsTheFilter(t *testing.T) {
 	artist, ok := Peek(snapshot(), artistKey("Shawn James"), "flow")
 	if !ok || len(artist.List) != 1 || !strings.HasPrefix(artist.Info[0], "1 track") {
 		t.Errorf("%+v", artist)
+	}
+}
+
+func tabWithID(v TrackView, id string) (TabView, int) {
+	for i, tab := range v.Tabs {
+		if tab.ID == id {
+			return tab, i
+		}
+	}
+	return TabView{}, -1
+}
+
+func rowLabels(v *DeviceView) []string {
+	var labels []string
+	for _, r := range v.Rows {
+		labels = append(labels, r.Label)
+	}
+	return labels
+}
+
+func longNamed() Snapshot {
+	s := snapshot()
+	s.Tracks = append(s.Tracks, trk("long", "A Title That Runs On Far Past Twenty", "Fairuz", "Jerusalem in My Heart", 2))
+	return s
+}
+
+func userRegistry(t *testing.T, content string) *device.Registry {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "devices.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, err := device.LoadRegistry(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func TestTheDeviceViewOfTheWolfgangProfileSaysWhatThePlayerShows(t *testing.T) {
+	s := longNamed()
+	v, _ := Track(s, "long", TrackOptions{Profile: "wolfgang-wmp01"})
+	dev, _ := tabWithID(v, "device")
+	if got := strings.Join(rowLabels(dev.Device), ","); got != "Folder,File,Cut,Artist,Album,Genre,Title" {
+		t.Errorf("rows %s", got)
+	}
+	for _, r := range dev.Device.Rows {
+		if r.Label == "Cut" && (len([]rune(r.Value)) != 20 || !strings.Contains(r.Hint, "24 characters") || !strings.Contains(r.Hint, "cut at 20")) {
+			t.Errorf("cut row %+v", r)
+		}
+		if r.Label == "Album" && (r.Value != "Jerusalem" || r.Tail != "· 9 of 12") {
+			t.Errorf("album row %+v", r)
+		}
+	}
+}
+
+func TestTheDeviceTabIsThereOnlyWhenAProfileIsAsked(t *testing.T) {
+	v, _ := Track(snapshot(), "t1", TrackOptions{})
+	if _, at := tabWithID(v, "device"); at != -1 || len(v.Tabs) != 3 {
+		t.Errorf("tabs %+v", v.Tabs)
+	}
+	ids := []string{}
+	w, _ := Track(snapshot(), "t1", TrackOptions{Profile: "generic"})
+	for _, tab := range w.Tabs {
+		ids = append(ids, tab.ID)
+	}
+	if strings.Join(ids, ",") != "details,audio,latin,device" {
+		t.Errorf("tab ids %v", ids)
+	}
+	r := userRegistry(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")
+	if _, ok := Track(snapshot(), "t1", TrackOptions{Profile: "nobody", Profiles: r}); ok {
+		t.Error("an unknown profile previews something")
+	}
+}
+
+func TestTheDevicePreviewOfAProfileWithoutAStemMaxHasNoCutRow(t *testing.T) {
+	r := userRegistry(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")
+	v, _ := Track(longNamed(), "long", TrackOptions{Profile: "my-player", Profiles: r})
+	dev, _ := tabWithID(v, "device")
+	if got := strings.Join(rowLabels(dev.Device), ","); got != "Folder,File,Artist,Album,Genre,Title" {
+		t.Errorf("rows %s", got)
+	}
+	for _, row := range dev.Device.Rows {
+		if row.Label == "Title" && row.Hint != "" {
+			t.Errorf("a name that is not cut has nothing to say about the title: %+v", row)
+		}
+	}
+}
+
+func TestTheDevicePreviewOfAProfileWithoutATagWidthCountsNothing(t *testing.T) {
+	r := userRegistry(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")
+	v, _ := Track(longNamed(), "t4", TrackOptions{Profile: "my-player", Profiles: r})
+	dev, _ := tabWithID(v, "device")
+	for _, row := range dev.Device.Rows {
+		if row.Tail != "" {
+			t.Errorf("row %+v has a tail without a tag width", row)
+		}
+		if row.Label == "Album" && row.Value != "Caught a Black Rabbit" {
+			t.Errorf("album %+v, want it whole", row)
+		}
+	}
+}
+
+func wolfgangDeviceViews() map[string]*DeviceView {
+	s := longNamed()
+	views := map[string]*DeviceView{}
+	for _, tr := range s.Tracks {
+		v, ok := Track(s, tr.ID, TrackOptions{Profile: "wolfgang-wmp01"})
+		if !ok {
+			continue
+		}
+		if dev, at := tabWithID(v, "device"); at >= 0 {
+			views[tr.ID] = dev.Device
+		}
+	}
+	return views
+}
+
+func TestTheDeviceViewOfTheWolfgangProfileIsTheRecordedOne(t *testing.T) {
+	want, err := os.ReadFile("testdata/wolfgang-device.golden.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := json.MarshalIndent(wolfgangDeviceViews(), "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got)+"\n" != string(want) {
+		t.Errorf("the device preview of the Wolfgang changed:\n%s\nwant:\n%s", got, want)
 	}
 }

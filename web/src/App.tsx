@@ -1,0 +1,48 @@
+import { useEffect } from 'react';
+import { Footer } from './components/Footer';
+import { Header } from './components/Header';
+import { Inspector } from './components/Inspector';
+import { Split } from './components/Split';
+import { Tree } from './components/Tree';
+import { installKeys } from './keys/dispatch';
+import { OverlayHost } from './overlay/OverlayHost';
+import { run } from './state/actions';
+import { connect, loadInfo, loadLibrary } from './state/library';
+import { installPictures } from './state/cover';
+import { isTrack } from './state/inspector';
+import { jobEvent } from './state/jobs';
+import { loadProfiles } from './state/profiles';
+import { useApp } from './state/store';
+import './styles/tokens.css';
+import './styles/app.css';
+
+export function App() {
+  const title = useApp((s) => s.lib?.view.sort.title ?? 'Library');
+  const detailTitle = useApp((s) => (s.detail === null || isTrack(s.detail) ? 'Details' : s.detail.title));
+  const busy = useApp((s) => s.busy);
+
+  useEffect(() => {
+    void loadInfo();
+    void loadProfiles();
+    void loadLibrary();
+    return connect(jobEvent);
+  }, []);
+
+  useEffect(() => installKeys(document, run), []);
+
+  useEffect(() => installPictures(document), []);
+
+  return (
+    <div className="app" data-testid="app" aria-busy={busy || undefined}>
+      <Header />
+      <Split
+        leftTitle={title}
+        rightTitle={detailTitle}
+        left={<Tree />}
+        right={<Inspector />}
+      />
+      <Footer />
+      <OverlayHost />
+    </div>
+  );
+}

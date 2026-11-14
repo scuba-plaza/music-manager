@@ -10,10 +10,10 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"music-manager/internal/app"
-	"music-manager/internal/device"
 	"music-manager/internal/mp3"
 	"music-manager/internal/render"
 	"music-manager/internal/testmp3"
@@ -95,7 +95,7 @@ func TestTheWolfgangGetsAPhotoBesideASingleButNoneForAnUnidentifiedTrack(t *test
 	a.SetCover(ts[0].ID, testmp3.JPEG)
 	a.SetCover(ts[1].ID, testmp3.JPEG) // not identified
 	target := filepath.Join(t.TempDir(), "player")
-	ops := mustSync(t, a, app.SyncOptions{Target: target, Device: device.Wolfgang})
+	ops := mustSync(t, a, app.SyncOptions{Target: target, Device: wolfgang})
 	for _, op := range ops {
 		if op.Kind == render.Create && filepath.Ext(op.Path) != ".mp3" && op.Path != "Band/Single.jpg" {
 			t.Errorf("unexpected image file %s", op.Path)
@@ -215,7 +215,7 @@ func TestTheWolfgangGetsEveryCoverAsASmallJPEG(t *testing.T) {
 		t.Fatal(err)
 	}
 	target := filepath.Join(t.TempDir(), "player")
-	mustSync(t, a, app.SyncOptions{Target: target, Device: device.Wolfgang})
+	mustSync(t, a, app.SyncOptions{Target: target, Device: wolfgang})
 
 	file := readFile(t, target, "Band/Album/cover.jpg")
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(file))
@@ -322,5 +322,22 @@ func TestAnEditCanGiveTracksTheCoverAnotherTrackHasAndNeverOneThatIsNotStored(t 
 	}
 	if got := tracks(t, a)[1].CoverSHA256; got != "" {
 		t.Errorf("cover = %q, want none", got)
+	}
+}
+
+func TestACoverThatIsNotAnImageChangesNothing(t *testing.T) {
+	a := libWithTracks(t, 10)
+	id := tracks(t, a)[0].ID
+	if err := a.SetCover(id, testmp3.JPEG); err != nil {
+		t.Fatal(err)
+	}
+	before := tracks(t, a)[0]
+
+	err := a.SetCover(id, []byte("not a picture"))
+	if err == nil || !strings.Contains(err.Error(), "JPEG or PNG") {
+		t.Fatalf("err = %v, want one that says a cover must be a JPEG or PNG image", err)
+	}
+	if after := tracks(t, a)[0]; after.CoverSHA256 != before.CoverSHA256 || !after.UpdatedAt.Equal(before.UpdatedAt) {
+		t.Errorf("a refused cover changed the track: %+v, was %+v", after, before)
 	}
 }

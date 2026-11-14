@@ -31,7 +31,7 @@ func libWithTracks(t *testing.T, frames ...int) *app.App {
 func mustSync(t *testing.T, a *app.App, opts app.SyncOptions) []render.Op {
 	t.Helper()
 	plan := mustPlan(t, a, opts)
-	if err := plan.Apply(); err != nil {
+	if err := plan.ApplyWith(nil); err != nil {
 		t.Fatal(err)
 	}
 	return plan.Ops
@@ -209,6 +209,28 @@ func TestPlanSyncWritesNothing(t *testing.T) {
 	}
 }
 
+func TestSyncLeavesEmptyDirectoriesItDidNotEmpty(t *testing.T) {
+	a := libWithTracks(t, 10)
+	identify(t, a, tracks(t, a)[0].ID, "Song", "Band", "", 0, 0)
+	for _, dir := range []string{"RECORD", "Voice/Old"} {
+		if err := os.MkdirAll(filepath.Join(a.Root(), filepath.FromSlash(dir)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeFile(t, filepath.Join(a.Root(), "Old Tree", "x.mp3"), testmp3.Silent(3))
+
+	mustSync(t, a, app.SyncOptions{Prune: true})
+
+	for _, dir := range []string{"RECORD", "Voice/Old"} {
+		if _, err := os.Stat(filepath.Join(a.Root(), filepath.FromSlash(dir))); err != nil {
+			t.Errorf("%s was removed although the sync never emptied it: %v", dir, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(a.Root(), "Old Tree")); !os.IsNotExist(err) {
+		t.Error("Old Tree was emptied by the sync and should be gone")
+	}
+}
+
 func TestSyncToAnotherTargetLeavesTheLibraryRootAlone(t *testing.T) {
 	a := libWithTracks(t, 10)
 	identify(t, a, tracks(t, a)[0].ID, "Song", "Band", "", 0, 0)
@@ -347,7 +369,7 @@ func TestSyncDoesNotCollectTheFilesOfATrackAddedAfterThePlanWasMade(t *testing.T
 		t.Fatal("the added track has no cover to lose")
 	}
 
-	if err := plan.Apply(); err != nil {
+	if err := plan.ApplyWith(nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(a.AudioPath(added.AudioSHA256)); err != nil {
