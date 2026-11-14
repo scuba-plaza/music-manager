@@ -26,6 +26,5 @@ func Contract() []any {
 		ServerEvents{},
 		SyncData{},
 		SyncTargetsView{},
-		UnsyncedView{},
 	}
 }

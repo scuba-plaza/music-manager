@@ -34,14 +34,14 @@ async function dragDivider(page: Page, to: number): Promise<void> {
 test('the header shows the library folder, the tracks and what waits to sync', async ({ page, request }) => {
   const info = (await (await request.get('/api/info')).json()) as InfoView;
   const { unsynced, view } = (await (await request.get('/api/library')).json()) as LibraryResponse;
-  expect(unsynced.n).toBeGreaterThan(0);
+  expect(unsynced).toBeGreaterThan(0);
 
   await openPage(page, 1200, 800);
 
   const header = page.getByRole('banner');
   await expect(header).toContainText(info.root);
   await expect(header).toContainText(`${String(view.tracks)} tracks · ${String(view.needWork)} need work`);
-  await expect(header.getByRole('button', { name: /to sync/ })).toHaveText(`${String(unsynced.n)} to sync · press s`);
+  await expect(header.getByRole('button', { name: /to sync/ })).toHaveText(`${String(unsynced)} to sync · press s`);
   await expect(page).toHaveTitle(`mm · ${info.root}`);
 });
 

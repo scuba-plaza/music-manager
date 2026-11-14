@@ -112,7 +112,7 @@ func TestTheLibraryComesAsAFlatOpenTree(t *testing.T) {
 			}
 			Tracks, NeedWork, Shown int
 		}
-		Unsynced struct{ N int }
+		Unsynced int
 	}
 	if code := getJSON(t, start(t, a).URL+"/api/library", &got); code != 200 {
 		t.Fatalf("status %d", code)
@@ -750,7 +750,7 @@ func TestEveryResponseDecodesIntoItsNamedType(t *testing.T) {
 		t.Fatalf("%d %+v", code, r)
 	}
 	var lib LibraryResponse
-	if code := answerStrictly(t, srv.URL, "GET", "/api/library", nil, &lib); code != 200 || lib.Stamp == "" || lib.View.Tracks != 4 || lib.View.Shown != 4 || lib.Unsynced != (UnsyncedView{N: 1, Known: true}) || lib.History != (browse.HistoryView{Undo: "change of title"}) {
+	if code := answerStrictly(t, srv.URL, "GET", "/api/library", nil, &lib); code != 200 || lib.Stamp == "" || lib.View.Tracks != 4 || lib.View.Shown != 4 || lib.Unsynced != 1 || lib.History != (browse.HistoryView{Undo: "change of title"}) {
 		t.Errorf("library %d %+v", code, lib)
 	}
 

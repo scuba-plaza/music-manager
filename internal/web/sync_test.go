@@ -117,14 +117,11 @@ func TestSyncingTheLibraryFolderRecordsItAndClearsUndo(t *testing.T) {
 	send(t, srv, "PATCH", "/api/tracks/"+ts[0].ID, obj{"field": "title", "text": "Wanderer II"})
 
 	var lib struct {
-		Unsynced struct {
-			N     int
-			Known bool
-		}
-		History struct{ Undo string }
+		Unsynced int
+		History  struct{ Undo string }
 	}
-	if getJSON(t, srv.URL+"/api/library", &lib); lib.Unsynced.Known || lib.History.Undo == "" {
-		t.Fatalf("%+v", lib)
+	if getJSON(t, srv.URL+"/api/library", &lib); lib.Unsynced != 0 || lib.History.Undo == "" {
+		t.Fatalf("a library never synced has no count to show: %+v", lib)
 	}
 	_, d := planned(t, srv.URL, obj{"library": true})
 	if d.Plan.Where != "Library folder" || d.Plan.Counts.Create != 4 {
@@ -140,14 +137,14 @@ func TestSyncingTheLibraryFolderRecordsItAndClearsUndo(t *testing.T) {
 	after := lib
 	after.History.Undo = ""
 	getJSON(t, srv.URL+"/api/library", &after)
-	if !after.Unsynced.Known || after.Unsynced.N != 0 || after.History.Undo != "" {
+	if after.Unsynced != 0 || after.History.Undo != "" {
 		t.Errorf("after the sync: %+v", after)
 	}
 
 	// edited again (a tag, so that the file keeps its name), then planned: it is written
 	send(t, srv, "PATCH", "/api/tracks/"+ts[0].ID, obj{"field": "genre", "text": "Blues"})
 	getJSON(t, srv.URL+"/api/library", &lib)
-	if lib.Unsynced.N != 1 {
+	if lib.Unsynced != 1 {
 		t.Fatalf("one edit: %+v", lib)
 	}
 	_, d = planned(t, srv.URL, obj{"library": true})
@@ -288,39 +285,6 @@ func TestAPlanNobodyWaitsForIsDropped(t *testing.T) {
 	raw(t, srv.URL, "DELETE", "/api/jobs/"+v.ID, nil, nil)
 	if done := waitJob(t, srv.URL, v.ID); done.State != jobStopped && done.State != jobDone {
 		t.Errorf("%+v", done)
-	}
-}
-
-func TestACountIsFoundForALibraryNeverSynced(t *testing.T) {
-	a, _ := seed(t, sample...)
-	s, srv := syncServer(t, a)
-	var lib struct {
-		Unsynced struct {
-			N     int
-			Known bool
-		}
-	}
-	getJSON(t, srv.URL+"/api/library", &lib)
-	if lib.Unsynced.N != 0 || lib.Unsynced.Known {
-		t.Fatalf("nothing is known before the folder is looked at: %+v", lib)
-	}
-	s.scanUnsynced()
-	getJSON(t, srv.URL+"/api/library", &lib)
-	if lib.Unsynced.N != 4 || lib.Unsynced.Known {
-		t.Errorf("the one scan counts what would be written: %+v", lib)
-	}
-	// a folder that is up to date is recorded as such
-	b, _ := seed(t, sample...)
-	plan, err := b.PlanSync(app.SyncOptions{})
-	if err != nil || plan.ApplyWith(nil) != nil {
-		t.Fatal(err)
-	}
-	os.Remove(filepath.Join(b.Root(), ".mm", "synced.json"))
-	s2, srv2 := syncServer(t, b)
-	s2.scanUnsynced()
-	getJSON(t, srv2.URL+"/api/library", &lib)
-	if lib.Unsynced.N != 0 || !lib.Unsynced.Known {
-		t.Errorf("an up-to-date folder is remembered: %+v", lib)
 	}
 }
 

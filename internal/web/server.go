@@ -37,9 +37,8 @@ type Server struct {
 	jobs *jobs
 	mux  *http.ServeMux
 
-	plans   plans
-	scanned scan
-	mounts  func() []string // the drives to offer; browse.DetectMounts unless a test says otherwise
+	plans  plans
+	mounts func() []string // the drives to offer; browse.DetectMounts unless a test says otherwise
 
 	infoMu    sync.Mutex
 	coverInfo map[string]string
@@ -105,7 +104,6 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	s.jobs.useContext(ctx)
 	go s.watch(ctx)
-	go s.scanUnsynced()
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ln) }()
 	select {

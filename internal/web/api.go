@@ -41,15 +41,10 @@ func libraryOptions(r *http.Request) (browse.Options, error) {
 	return o, nil
 }
 
-type UnsyncedView struct {
-	Known bool `json:"known"`
-	N     int  `json:"n"`
-}
-
 type LibraryResponse struct {
 	History  browse.HistoryView `json:"history"`
 	Stamp    string             `json:"stamp"`
-	Unsynced UnsyncedView       `json:"unsynced"`
+	Unsynced int                `json:"unsynced"`
 	View     browse.LibraryView `json:"view"`
 }
 
@@ -65,11 +60,10 @@ func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, err)
 		return
 	}
-	n, known := s.unsynced()
 	writeJSON(w, LibraryResponse{
 		History:  s.ed.History(),
 		Stamp:    stamp,
-		Unsynced: UnsyncedView{Known: known, N: n},
+		Unsynced: s.unsynced(),
 		View:     browse.Library(snap, o),
 	})
 }

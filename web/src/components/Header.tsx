@@ -41,7 +41,7 @@ export function Header() {
   if (marked > 0) {
     parts.push(`${String(marked)} marked`);
   }
-  const waiting = lib?.unsynced.n ?? 0;
+  const waiting = lib?.unsynced ?? 0;
 
   return (
     <header className="header">

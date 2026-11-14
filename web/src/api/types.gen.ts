@@ -148,7 +148,7 @@ export interface JobView {
 export interface LibraryResponse {
   history: HistoryView;
   stamp: string;
-  unsynced: UnsyncedView;
+  unsynced: number;
   view: LibraryView;
 }
 
@@ -319,11 +319,6 @@ export interface TrackView {
   dates: string;
   about: string;
   reveal: string[];
-}
-
-export interface UnsyncedView {
-  known: boolean;
-  n: number;
 }
 
 export interface WarningView {

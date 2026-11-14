@@ -314,47 +314,10 @@ func (s *Server) syncDrop(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ---- the count in the header
-
-// scan is the count of tracks the library folder lags behind by, for a library
-// that has never been synced. Normally the count is a comparison of records and
-// nothing more; only the first time, when there is nothing to compare with, the
-// folder itself is looked at, once, in the background.
-type scan struct {
-	mu sync.Mutex
-	n  int
-}
-
-// unsynced is the header's count.
-func (s *Server) unsynced() (n int, known bool) {
+func (s *Server) unsynced() int {
 	n, known, err := s.app.Unsynced()
-	if err != nil {
-		return 0, false
+	if err != nil || !known {
+		return 0
 	}
-	if known {
-		return n, true
-	}
-	s.scanned.mu.Lock()
-	defer s.scanned.mu.Unlock()
-	return s.scanned.n, false
-}
-
-// scanUnsynced looks at the library folder once, if nothing says how far behind
-// it is, and tells the pages. A folder that is up to date is remembered as such.
-func (s *Server) scanUnsynced() {
-	if _, known, err := s.app.Unsynced(); err != nil || known {
-		return
-	}
-	plan, err := s.app.PlanSync(app.SyncOptions{})
-	if err != nil {
-		return
-	}
-	if writes := browse.CountOps(plan.Ops).Writes(); writes > 0 {
-		s.scanned.mu.Lock()
-		s.scanned.n = writes
-		s.scanned.mu.Unlock()
-		s.hub.publish("library", fmt.Sprintf("%q", s.stamp()+"scanned"))
-		return
-	}
-	_ = s.app.RecordSynced()
+	return n
 }

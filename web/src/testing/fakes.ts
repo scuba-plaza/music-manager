@@ -55,7 +55,7 @@ export function libraryResponse(stamp = 's1', overrides: Partial<LibraryResponse
   return {
     history: {},
     stamp,
-    unsynced: { known: true, n: 0 },
+    unsynced: 0,
     view: {
       rows: [],
       tracks: 0,

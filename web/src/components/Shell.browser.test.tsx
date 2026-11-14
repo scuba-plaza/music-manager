@@ -19,7 +19,7 @@ function hints(): string[] {
 }
 
 function libraryOf(tracks: number, needWork: number, n: number) {
-  const base = libraryResponse('s1', { unsynced: { known: true, n } });
+  const base = libraryResponse('s1', { unsynced: n });
   const rows = [{ kind: 'track', depth: 0, key: 'track\u001fsowhat', label: 'So What', trackId: 'sowhat', length: '0:02' }];
   return { ...base, view: { ...base.view, rows, tracks, needWork } };
 }
