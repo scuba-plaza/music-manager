@@ -235,6 +235,22 @@ func TestOnlyAFolderThatMakesSenseIsATarget(t *testing.T) {
 	}
 }
 
+func TestTheHomeFolderIsNotATargetEvenWhenTheLibraryLivesElsewhere(t *testing.T) {
+	a, _ := seed(t, sample...)
+	_, srv := syncServer(t, a)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	for _, folder := range []string{home, home + "/", "~"} {
+		var r reply
+		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), "home folder") {
+			t.Errorf("%q: %d %+v, want 422 about the home folder", folder, code, r)
+		}
+	}
+	if _, d := planned(t, srv.URL, obj{"folder": filepath.Join(home, "player")}); d.Plan == nil {
+		t.Errorf("a folder inside the home folder should still be a target: %+v", d)
+	}
+}
+
 func TestOnlyOneSyncGoesOnAtATime(t *testing.T) {
 	a, _ := seed(t, sample...)
 	s, srv := syncServer(t, a)

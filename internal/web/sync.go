@@ -111,6 +111,9 @@ func (s *Server) target(library bool, folder string) (path, where string, isLibr
 		return "", "", false, errors.New("write the whole path of the folder, starting with / or ~")
 	}
 	p = filepath.Clean(p)
+	if home, err := os.UserHomeDir(); err == nil && home != "" && sameFolder(p, home) {
+		return "", "", false, errors.New("that is your home folder: pick a folder of its own")
+	}
 	root := s.root()
 	if sameFolder(p, root) {
 		return "", "Library folder", true, nil
