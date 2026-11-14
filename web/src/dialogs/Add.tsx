@@ -9,7 +9,6 @@ import {
   saveAdd,
   setField,
   showDuplicate,
-  toggleMatch,
   typeLink,
   useAdd,
   type AddKey,
@@ -69,7 +68,7 @@ function Elapsed({ since }: { since: number }) {
 }
 
 export function Add() {
-  const { phase, link, error, started, draft, useMatch, form, existing, pathNote } = useAdd();
+  const { phase, link, error, started, form, existing, pathNote } = useAdd();
   const linkInput = useRef<HTMLInputElement>(null);
   const files = useRef<HTMLInputElement>(null);
   const grid = useRef<HTMLDivElement>(null);
@@ -119,8 +118,6 @@ export function Add() {
       case 'form':
         if (e.key === 'Enter') {
           void saveAdd();
-        } else if (e.key === 'F2') {
-          toggleMatch();
         } else if (e.key === 'Tab') {
           focusBy(e.shiftKey ? -1 : 1);
         } else if (e.key === 'ArrowDown') {
@@ -142,14 +139,8 @@ export function Add() {
     chooseFiles(list);
   }
 
-  const match = draft?.match;
-  const hints =
-    phase === 'form' && match !== undefined
-      ? [...hintsFor.form.slice(0, 2), { keys: 'F2', label: useMatch ? 'ignore the match' : 'use the match' }, ...hintsFor.form.slice(2)]
-      : hintsFor[phase];
-
   return (
-    <Dialog title="Add from YouTube" hints={hints} onKey={onKey}>
+    <Dialog title="Add from YouTube" hints={hintsFor[phase]} onKey={onKey}>
       {phase === 'asking' && (
         <>
           <div className="ask-body">Paste a link to a video or a track:</div>
@@ -210,15 +201,7 @@ export function Add() {
       )}
       {phase === 'form' && (
         <>
-          {match === undefined ? (
-            <div className="dim">No match on MusicBrainz: these are YouTube’s words.</div>
-          ) : useMatch ? (
-            <div className="accent">
-              <bdi dir="auto">{`Matched on MusicBrainz: ${match.artist} - ${match.title} · ${match.album}`}</bdi>
-            </div>
-          ) : (
-            <div className="dim">Ignoring the match: these are YouTube’s words.</div>
-          )}
+          <div className="dim">These are YouTube’s words: change anything before adding.</div>
           <div
             ref={grid}
             className="form"

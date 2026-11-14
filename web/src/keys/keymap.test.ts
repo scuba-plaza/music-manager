@@ -212,7 +212,6 @@ describe('resolve', () => {
       ['tree', ' '], ['tree', 'a', { ctrlKey: true }],
       ['tree', 'e'], ['tree', 'c'], ['tree', 'v'], ['tree', 'd'], ['tree', 'Delete'],
       ['tree', 'J'], ['tree', 'K'], ['tree', 'n'], ['tree', 'p'], ['inspector', 'p'],
-      ['tree', 'i'], ['tree', 'I'], ['tree', 'o'],
       ['tree', 'a'], ['tree', 's'], ['tree', 'D'],
       ['tree', 'u'], ['tree', 'r', { ctrlKey: true }],
       ['inspector', '['], ['inspector', ']'], ['inspector', '{'], ['inspector', '}'], ['inspector', '0'],

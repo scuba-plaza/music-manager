@@ -20,7 +20,6 @@ import (
 	"music-manager/internal/manifest"
 	"music-manager/internal/testmp3"
 	"music-manager/internal/version"
-	"music-manager/internal/web/webtest"
 )
 
 type seedTrack struct {
@@ -96,7 +95,7 @@ func TestInfoSaysWhatTheServerCanDo(t *testing.T) {
 	a, _ := seed(t, sample...)
 	var info map[string]any
 	getJSON(t, start(t, a).URL+"/api/info", &info)
-	if info["canAdd"] != false || info["lookup"] != false {
+	if info["canAdd"] != false {
 		t.Errorf("a server with nothing added: %v", info)
 	}
 }
@@ -733,13 +732,13 @@ func answerStrictly(t *testing.T, base, method, path string, body, into any) int
 func TestEveryResponseDecodesIntoItsNamedType(t *testing.T) {
 	a, ts := seed(t, sample...)
 	drive := t.TempDir()
-	s := New(a, WithSource(webtest.FakeSource{Found: webtest.SoWhat()}))
+	s := New(a)
 	s.mounts = func() []string { return []string{drive} }
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
 
 	var info InfoView
-	if code := answerStrictly(t, srv.URL, "GET", "/api/info", nil, &info); code != 200 || !strings.HasSuffix(info.Root, "lib") || info.Version != version.String() || info.CanAdd || !info.Lookup {
+	if code := answerStrictly(t, srv.URL, "GET", "/api/info", nil, &info); code != 200 || !strings.HasSuffix(info.Root, "lib") || info.Version != version.String() || info.CanAdd {
 		t.Errorf("info %d %+v", code, info)
 	}
 
@@ -781,10 +780,10 @@ func TestEveryResponseDecodesIntoItsNamedType(t *testing.T) {
 	}
 }
 
-func TestTheInfoAnswerHasItsFourKeysInOrder(t *testing.T) {
+func TestTheInfoAnswerHasItsThreeKeysInOrder(t *testing.T) {
 	a, _ := seed(t, sample...)
 	body := readRaw(t, start(t, a).URL, "GET", "/api/info", nil)
-	if !regexp.MustCompile(`^\{"canAdd":(true|false),"lookup":(true|false),"root":"[^"]+","version":"[^"]+"\}\s*$`).Match(body) {
+	if !regexp.MustCompile(`^\{"canAdd":(true|false),"root":"[^"]+","version":"[^"]+"\}\s*$`).Match(body) {
 		t.Errorf("the info answer is %s", body)
 	}
 }

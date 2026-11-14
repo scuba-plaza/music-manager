@@ -5,14 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"music-manager/internal/app"
 	"music-manager/internal/launch"
 	"music-manager/internal/loudness"
-	"music-manager/internal/musicbrainz"
-	"music-manager/internal/version"
 	"music-manager/internal/web"
 	"music-manager/internal/ytdlp"
 )
@@ -33,13 +30,6 @@ func main() {
 }
 
 func serve(ctx context.Context, o launch.Options) error {
-	lookup := musicbrainz.New(userAgent())
-	if url := os.Getenv("MM_MUSICBRAINZ_URL"); url != "" {
-		lookup.BaseURL = strings.TrimRight(url, "/")
-	}
-	if url := os.Getenv("MM_COVERART_URL"); url != "" {
-		lookup.CoverURL = strings.TrimRight(url, "/")
-	}
 	a, err := app.Open(o.Library)
 	if err != nil {
 		return err
@@ -57,14 +47,6 @@ func serve(ctx context.Context, o launch.Options) error {
 			fmt.Fprintln(o.Out, "mm: cannot open a browser:", err)
 		}
 	}
-	server := web.New(a, web.WithSource(lookup), web.WithDownloader(ytdlp.New()), web.WithProfiles(o.Profiles))
+	server := web.New(a, web.WithDownloader(ytdlp.New()), web.WithProfiles(o.Profiles))
 	return server.Serve(ctx, ln)
-}
-
-func userAgent() string {
-	ua := "music-manager/" + version.String()
-	if contact := os.Getenv("MM_CONTACT"); contact != "" {
-		ua += " ( " + contact + " )"
-	}
-	return ua
 }

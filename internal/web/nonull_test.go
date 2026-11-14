@@ -11,7 +11,6 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
-	"music-manager/internal/web/webtest"
 )
 
 func noNullCollections(t *testing.T, label string, body []byte, typ reflect.Type) {
@@ -142,12 +141,11 @@ func TestNoListInAnAnswerIsNull(t *testing.T) {
 	if err := full.CreatePlaylist("Road", ts[0].ID, ts[1].ID); err != nil {
 		t.Fatal(err)
 	}
-	source := WithSource(webtest.FakeSource{Found: []app.Candidate{{Title: "Found", Artist: "Someone", Album: "X", TrackNumber: 1, TrackTotal: 1, Score: 99}}})
 	for _, lib := range []struct {
 		name string
 		app  *app.App
 	}{{"empty", empty}, {"full", full}} {
-		srv := start(t, lib.app, source)
+		srv := start(t, lib.app)
 		check := func(method, path string, body any, typ reflect.Type) []byte {
 			raw := readRaw(t, srv.URL, method, path, body)
 			noNullCollections(t, lib.name+" "+method+" "+path, raw, typ)
@@ -184,9 +182,6 @@ func TestNoListInAnAnswerIsNull(t *testing.T) {
 		} {
 			check("GET", "/api/peek?key="+url.QueryEscape(key), nil, reflect.TypeFor[browse.PeekView]())
 		}
-		check("POST", "/api/tracks/"+ts[3].ID+"/candidates", obj{}, reflect.TypeFor[browse.SearchView]())
-		identify := check("POST", "/api/identify-all", obj{}, reflect.TypeFor[JobView]())
-		noNullCollections(t, "identify-all", jobData(t, srv.URL, identify), reflect.TypeFor[browse.IdentifyProgress]())
 	}
 }
 

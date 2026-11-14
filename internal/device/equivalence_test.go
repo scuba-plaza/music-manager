@@ -63,7 +63,7 @@ func fixtureTracks() []manifest.Track {
 	album := identified("album1", "Nils Frahm", "Spaces", "Says")
 	album.TrackNumber, album.TrackTotal = 3, 10
 	album.Released, album.Genre = "2013-11-15", "Neoclassical"
-	album.SourceURL, album.MBRecordingID, album.MBReleaseID = "https://example.org/says", "rec-1", "rel-1"
+	album.SourceURL = "https://example.org/says"
 	album.TrimStart, album.TrimEnd = 5*time.Second, 7*time.Second
 	single := identified("single", "Max Richter", "", "On the Nature of Daylight")
 	single.Genre = "Ambient"

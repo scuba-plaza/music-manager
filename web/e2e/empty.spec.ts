@@ -39,7 +39,7 @@ test('an empty library shows an empty tree and keys do nothing harmful', async (
   const errors: string[] = [];
   page.on('pageerror', (err) => errors.push(err.message));
   await page.getByRole('tree').focus();
-  for (const key of ['ArrowDown', 'ArrowUp', 'Enter', 'ArrowRight', 'ArrowLeft', '+', '-', 'z', 'Space', 'Control+a', 'e', 'd', 'J', 'K', 'n', 'c', 'v', 'i', 'o', 'p']) {
+  for (const key of ['ArrowDown', 'ArrowUp', 'Enter', 'ArrowRight', 'ArrowLeft', '+', '-', 'z', 'Space', 'Control+a', 'e', 'd', 'J', 'K', 'n', 'c', 'v', 'p']) {
     await page.keyboard.press(key);
     await page.keyboard.press('Escape');
   }

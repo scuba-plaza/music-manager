@@ -44,13 +44,7 @@ func (e *DuplicateError) Error() string {
 
 type AddRequest struct {
 	URL   string
-	Edit  Edit
 	Cover []byte // optional JPEG or PNG
-	// Source, if set, is searched for the track; a confident match replaces
-	// what the download reported as the defaults.
-	Source MetadataSource
-	// OnWarning, if set, hears about problems that do not stop the add.
-	OnWarning func(error)
 }
 
 // Draft is a downloaded track waiting for its details. Its audio is already
@@ -58,24 +52,17 @@ type AddRequest struct {
 // A draft that is never finished leaves a blob that the next sync collects.
 type Draft struct {
 	URL string
-	// Info is what to offer as the defaults for the details: the
-	// MusicBrainz match if there is one, otherwise what the download said.
+	// Info is what the download said, to offer as the defaults for the details.
 	Info Info
-	// Downloaded is what the download itself reported, for when the match is
-	// declined.
-	Downloaded Info
-	// Match is a confident MusicBrainz match, or nil.
-	Match *Candidate
 	// Length is the length of the downloaded audio.
 	Length time.Duration
 
 	staged staged
-	source MetadataSource
 }
 
 // Fetch downloads the audio at req.URL and prepares a Draft, without adding
 // anything to the library. It fails with a *DuplicateError if the audio is
-// already there. Fields set in req.Edit only steer the MusicBrainz search.
+// already there.
 func (a *App) Fetch(ctx context.Context, req AddRequest, dl Downloader) (*Draft, error) {
 	if err := os.MkdirAll(filepath.Join(a.root, ".mm"), 0o755); err != nil {
 		return nil, err
@@ -107,18 +94,12 @@ func (a *App) Fetch(ctx context.Context, req AddRequest, dl Downloader) (*Draft,
 		}
 	}
 
-	draft := &Draft{URL: req.URL, Info: d.Info, Downloaded: d.Info, Length: s.length, staged: s, source: req.Source}
-	if req.Source != nil && (req.Edit.Title == nil || req.Edit.Artist == nil) {
-		if draft.Match = a.lookup(ctx, req, d.Info); draft.Match != nil {
-			draft.Info = infoFrom(*draft.Match)
-		}
-	}
-	return draft, nil
+	return &Draft{URL: req.URL, Info: d.Info, Length: s.length, staged: s}, nil
 }
 
 // Finish records the draft as an identified track with the details in e.
 // Nothing is added if e is invalid or the audio has meanwhile been added.
-func (a *App) Finish(ctx context.Context, d *Draft, e Edit) (manifest.Track, error) {
+func (a *App) Finish(d *Draft, e Edit) (manifest.Track, error) {
 	m, err := a.store.Load()
 	if err != nil {
 		return manifest.Track{}, err
@@ -132,14 +113,6 @@ func (a *App) Finish(ctx context.Context, d *Draft, e Edit) (manifest.Track, err
 	}
 	if t.Status != manifest.Identified {
 		return manifest.Track{}, missingFields(t)
-	}
-	if match := d.Match; match != nil && t.Title == match.Title && t.Artist == match.Artist {
-		t.MBRecordingID, t.MBReleaseID = match.RecordingID, match.ReleaseID
-		if t.CoverSHA256 == "" && d.source != nil {
-			if img, err := d.source.CoverFront(ctx, match.ReleaseID); err == nil && len(img) > 0 {
-				t.CoverSHA256, _ = a.StoreCover(img)
-			}
-		}
 	}
 	var added manifest.Track
 	err = a.store.Update(func(m *manifest.Manifest) error {
@@ -169,39 +142,6 @@ func (a *App) usable(m *manifest.Manifest, d *Draft) error {
 		return errors.New("the downloaded audio was cleared away by a sync before it was added; download it again")
 	}
 	return nil
-}
-
-// lookup searches req.Source for what the download is, returning the best
-// match if it is a confident one. Failures only produce a warning.
-func (a *App) lookup(ctx context.Context, req AddRequest, info Info) *Candidate {
-	q := Query{Title: info.Title, Artist: info.Artist}
-	if q.Artist == "" {
-		q.Artist = strings.TrimSuffix(info.Uploader, " - Topic")
-	}
-	if req.Edit.Title != nil {
-		q.Title = *req.Edit.Title
-	}
-	if req.Edit.Artist != nil {
-		q.Artist = *req.Edit.Artist
-	}
-	cands, err := req.Source.Search(ctx, q)
-	if err != nil {
-		if req.OnWarning != nil {
-			req.OnWarning(fmt.Errorf("lookup failed, using what the download said: %w", err))
-		}
-		return nil
-	}
-	if len(cands) == 0 || cands[0].Score < defaultMinScore {
-		return nil
-	}
-	return &cands[0]
-}
-
-func infoFrom(c Candidate) Info {
-	return Info{
-		Title: c.Title, Artist: c.Artist, Album: c.Album,
-		TrackNumber: c.TrackNumber, TrackTotal: c.TrackTotal, Released: leadingDate(c.Date),
-	}
 }
 
 func missingFields(t manifest.Track) error {

@@ -28,7 +28,6 @@ import (
 // Server is the web interface to one library.
 type Server struct {
 	app        *app.App
-	source     app.MetadataSource
 	downloader app.Downloader
 	profiles   *device.Registry
 	frontend   fs.FS
@@ -47,9 +46,6 @@ type Server struct {
 
 // Option adds a capability to the server.
 type Option func(*Server)
-
-// WithSource lets the server look tracks up in a music database.
-func WithSource(s app.MetadataSource) Option { return func(v *Server) { v.source = s } }
 
 // WithDownloader lets the server add tracks by downloading them.
 func WithDownloader(d app.Downloader) Option { return func(v *Server) { v.downloader = d } }
@@ -73,7 +69,7 @@ func New(a *app.App, opts ...Option) *Server {
 		}
 		s.frontend = dist
 	}
-	s.ed = browse.NewEditor(a, browse.WithSource(s.source), browse.WithDownloader(s.downloader))
+	s.ed = browse.NewEditor(a, browse.WithDownloader(s.downloader))
 	s.routes()
 	return s
 }
@@ -93,8 +89,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/peek", s.peek)
 	s.mux.HandleFunc("GET /api/events", s.hub.serve)
 	s.editRoutes()
-	s.identifyRoutes()
 	s.addRoutes()
+	s.jobRoutes()
 	s.syncRoutes()
 }
 
@@ -156,7 +152,6 @@ func URL(ln net.Listener) string {
 
 type InfoView struct {
 	CanAdd  bool   `json:"canAdd"`
-	Lookup  bool   `json:"lookup"`
 	Root    string `json:"root"`
 	Version string `json:"version"`
 }
@@ -175,7 +170,6 @@ func (s *Server) info(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, InfoView{
 		CanAdd:  s.downloader != nil,
-		Lookup:  s.source != nil,
 		Root:    root,
 		Version: version.String(),
 	})

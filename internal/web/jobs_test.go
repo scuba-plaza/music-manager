@@ -6,6 +6,24 @@ import (
 	"time"
 )
 
+var raw = sendInto
+
+func waitJob(t *testing.T, base, id string) JobView {
+	t.Helper()
+	for i := 0; i < 200; i++ {
+		var v JobView
+		if code := getJSON(t, base+"/api/jobs/"+id, &v); code != 200 {
+			t.Fatalf("job %s: %d", id, code)
+		}
+		if v.State != jobRunning {
+			return v
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	t.Fatal("the job never ended")
+	return JobView{}
+}
+
 func jobEnded(t *testing.T, j *jobs, id string) {
 	t.Helper()
 	for i := 0; i < 400; i++ {

@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"music-manager/internal/app"
 	"music-manager/internal/device"
 	"music-manager/internal/web"
 	"music-manager/internal/web/webtest"
@@ -108,8 +109,7 @@ func (l *seededServers) reset() error {
 	a.UseProfiles(l.profiles)
 	server := web.New(a,
 		web.WithProfiles(l.profiles),
-		web.WithSource(webtest.FakeSource{Found: webtest.SoWhat()}),
-		web.WithDownloader(&webtest.FakeDownloader{}),
+		web.WithDownloader(&webtest.FakeDownloader{Info: app.Info{Title: "So What", Artist: "Miles Davis", Album: "Kind of Blue", TrackNumber: 1, TrackTotal: 5, Released: "1959-08-17"}}),
 		web.WithFrontend(l.frontend),
 	)
 	ln, err := web.Listen("127.0.0.1:0", false)

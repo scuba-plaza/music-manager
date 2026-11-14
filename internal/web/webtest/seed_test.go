@@ -15,7 +15,7 @@ import (
 func describe(t manifest.Track) string {
 	if t.Status != manifest.Identified {
 		h := t.Hint
-		return fmt.Sprintf("%s | %s | %d | %s | %s", h.Artist, h.Album, h.Track, h.Title, t.Status)
+		return fmt.Sprintf("%s | %s | %d | %s | %s", h.Artist, h.Album, h.Track, h.Filename, t.Status)
 	}
 	return fmt.Sprintf("%s | %s | %d | %s | %s", t.Artist, t.Album, t.TrackNumber, t.Title, t.Status)
 }

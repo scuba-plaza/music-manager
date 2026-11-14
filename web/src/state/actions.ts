@@ -4,7 +4,6 @@ import { opensOverlay } from '../overlay/open';
 import { change } from './detail';
 import { runInspector, stopPlaying } from './edit';
 import { loadLibrary } from './library';
-import { runLookup } from './lookup';
 import { runOps } from './ops';
 import { setStatus } from './status';
 import { useApp, type Focus } from './store';
@@ -316,7 +315,7 @@ export function run(action: ActionName): void {
       toggleFocus(focus);
       break;
     default:
-      if (!opensOverlay(action) && !runOps(action) && !runLookup(action)) {
+      if (!opensOverlay(action) && !runOps(action)) {
         runInspector(action);
       }
       break;

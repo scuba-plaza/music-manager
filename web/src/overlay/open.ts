@@ -1,6 +1,8 @@
 import { get } from '../api/client';
 import type { CopyChoice } from '../api/types.gen';
 import type { ActionName } from '../keys/keymap';
+import { openAdd } from '../state/add';
+import { openDoctor } from '../state/doctor';
 import { fail, setStatus } from '../state/status';
 import { useApp } from '../state/store';
 import { openSync } from '../state/sync';
@@ -61,6 +63,12 @@ export function opensOverlay(action: ActionName): boolean {
       return true;
     case 'sync':
       void openSync();
+      return true;
+    case 'add':
+      openAdd();
+      return true;
+    case 'doctor':
+      openDoctor();
       return true;
     default:
       return false;

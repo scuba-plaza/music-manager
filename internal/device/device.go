@@ -47,9 +47,7 @@ func extras(t manifest.Track) map[string]string {
 		return extra
 	}
 	for k, v := range map[string]string{
-		"SOURCE_URL":          t.SourceURL,
-		"MUSICBRAINZ_TRACKID": t.MBRecordingID,
-		"MUSICBRAINZ_ALBUMID": t.MBReleaseID,
+		"SOURCE_URL": t.SourceURL,
 	} {
 		if v != "" {
 			extra[k] = v

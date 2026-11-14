@@ -31,10 +31,8 @@ type AddForm struct {
 	CutEnd   string `json:"cutEnd"`
 }
 
-// addDefaults is what to offer for a downloaded track: what the MusicBrainz
-// match says, if there is one and it is wanted, and otherwise what the
-// download itself reported (taking the uploader of a "- Topic" channel for
-// the artist).
+// addDefaults is what to offer for a downloaded track: what the download
+// reported, taking the uploader of a "- Topic" channel for the artist.
 func addDefaults(info app.Info) AddForm {
 	artist := info.Artist
 	if artist == "" {
@@ -116,21 +114,10 @@ func AddPath(f AddForm) string {
 	}, device.Generic.Layout())
 }
 
-// MatchView is the recording a download was matched with on MusicBrainz.
-type MatchView struct {
-	Artist string `json:"artist"`
-	Title  string `json:"title"`
-	Album  string `json:"album"`
-}
-
 // DraftView is a downloaded track, waiting for its details.
 type DraftView struct {
-	Draft string     `json:"draft"`
-	Match *MatchView `json:"match,omitempty"`
-	// Matched is the form to start from if the match is used, and Downloaded
-	// the form from what the download said; they are the same without a match.
-	Matched    AddForm `json:"matched"`
-	Downloaded AddForm `json:"downloaded"`
+	Draft string  `json:"draft"`
+	Form  AddForm `json:"form"`
 }
 
 // DuplicateView is the track that a download turned out to be already.
@@ -176,7 +163,7 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 	if err != nil {
 		return Fetched{}, err
 	}
-	d, err := e.lib.Fetch(ctx, app.AddRequest{URL: link, Source: e.source}, e.downloader)
+	d, err := e.lib.Fetch(ctx, app.AddRequest{URL: link}, e.downloader)
 	var dup *app.DuplicateError
 	if errors.As(err, &dup) {
 		s, serr := e.snapshot()
@@ -194,12 +181,7 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 	if _, err := rand.Read(raw[:]); err != nil {
 		return Fetched{}, err
 	}
-	v := DraftView{Draft: hex.EncodeToString(raw[:]), Matched: addDefaults(d.Info), Downloaded: addDefaults(d.Downloaded)}
-	if d.Match != nil {
-		v.Match = &MatchView{Artist: d.Match.Artist, Title: d.Match.Title, Album: d.Match.Album}
-	} else {
-		v.Matched = v.Downloaded
-	}
+	v := DraftView{Draft: hex.EncodeToString(raw[:]), Form: addDefaults(d.Info)}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.drafts == nil {
@@ -228,7 +210,7 @@ func (e *Editor) Discard(draft string) {
 }
 
 // Finish adds a downloaded track to the library with the details of the form.
-func (e *Editor) Finish(ctx context.Context, draft string, f AddForm) (Result, error) {
+func (e *Editor) Finish(draft string, f AddForm) (Result, error) {
 	e.mu.Lock()
 	d, ok := e.drafts[draft]
 	e.mu.Unlock()
@@ -240,7 +222,7 @@ func (e *Editor) Finish(ctx context.Context, draft string, f AddForm) (Result, e
 		return Result{}, err
 	}
 	// the library is written without the editor locked: it may take a moment
-	t, err := e.lib.Finish(ctx, d, edit)
+	t, err := e.lib.Finish(d, edit)
 	if err != nil {
 		return Result{}, err
 	}

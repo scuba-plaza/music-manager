@@ -76,9 +76,7 @@ func (s *Server) addFinish(w http.ResponseWriter, r *http.Request) {
 	if !read(w, r, &in) {
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
-	defer cancel()
-	res, err := s.ed.Finish(ctx, in.Draft, in.Form)
+	res, err := s.ed.Finish(in.Draft, in.Form)
 	s.answer(w, res, err)
 }
 

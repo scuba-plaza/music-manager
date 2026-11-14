@@ -38,8 +38,6 @@
         "Length": 188000000000,
         "Extra": {
           "MM_ID": "album1",
-          "MUSICBRAINZ_ALBUMID": "rel-1",
-          "MUSICBRAINZ_TRACKID": "rec-1",
           "SOURCE_URL": "https://example.org/says"
         },
         "Cover": null,
@@ -388,8 +386,6 @@
         "Length": 188000000000,
         "Extra": {
           "MM_ID": "album1",
-          "MUSICBRAINZ_ALBUMID": "rel-1",
-          "MUSICBRAINZ_TRACKID": "rec-1",
           "SOURCE_URL": "https://example.org/says"
         },
         "Cover": null,

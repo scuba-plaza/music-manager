@@ -77,8 +77,12 @@ func Seed(dir string) (*app.App, error) {
 		return nil, err
 	}
 
-	oldTags := testmp3.WithTagsTrack(testmp3.Silent(unidentifiedFrames), "Rough Mix", "Basement Tapes", "Demos", "7")
-	if _, err := ingest("rough-mix", oldTags); err != nil {
+	oldTags := testmp3.WithTagsTrack(testmp3.Silent(unidentifiedFrames), "", "Basement Tapes", "Demos", "7")
+	if _, err := ingest("Rough Mix", oldTags); err != nil {
+		return nil, err
+	}
+
+	if err := a.RecordSynced(); err != nil {
 		return nil, err
 	}
 

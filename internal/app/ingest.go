@@ -6,9 +6,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
+	"music-manager/internal/artist"
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
 )
@@ -86,10 +89,35 @@ func newTrack(s staged, sourceURL string) manifest.Track {
 	}
 }
 
+var fileNameNumber = regexp.MustCompile(`^(\d{1,3})\b`)
+
+func fromOwnTags(t manifest.Track) manifest.Track {
+	h := t.Hint
+	if h.Title == "" || h.Artist == "" {
+		return t
+	}
+	first := artist.First(h.Artist)
+	track := h.Track
+	if track == 0 {
+		if n := fileNameNumber.FindStringSubmatch(h.Filename); n != nil {
+			track, _ = strconv.Atoi(n[1])
+		}
+	}
+	filled, err := applyEdit(t, Edit{
+		Title: &h.Title, Artist: &first, Album: &h.Album,
+		TrackNumber: &track, TrackTotal: &h.Total, Released: &h.Date, Genre: &h.Genre,
+	})
+	if err != nil {
+		return t
+	}
+	return filled
+}
+
 // Ingest adds the MP3 files at the given files or directories to the
-// library as unidentified tracks. The files themselves are left alone. The
-// files are read first and the records only afterwards, so that a long
-// ingest does not keep the records locked from the other mm.
+// library. A file whose own tags give a title and an artist is filled from
+// them; any other is added as unidentified. The files themselves are left
+// alone. The files are read first and the records only afterwards, so that a
+// long ingest does not keep the records locked from the other mm.
 func (a *App) Ingest(paths []string) (IngestReport, error) {
 	var rep IngestReport
 	if _, err := a.store.Load(); err != nil { // not worth reading any file if the records cannot be used
@@ -128,7 +156,7 @@ func (a *App) Ingest(paths []string) (IngestReport, error) {
 			} else if !a.stored(f.s) {
 				rep.Failed = append(rep.Failed, IngestFailure{f.path, errClearedAway})
 			} else {
-				rep.Added = append(rep.Added, m.Add(newTrack(f.s, "")))
+				rep.Added = append(rep.Added, m.Add(fromOwnTags(newTrack(f.s, ""))))
 			}
 		}
 		return nil

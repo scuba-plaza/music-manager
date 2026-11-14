@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,30 +79,120 @@ func TestIngestCreatesUnidentifiedTracksAndStoresAudio(t *testing.T) {
 	}
 }
 
-func TestIngestKeepsOldTagsAndFilenameAsHintsOnly(t *testing.T) {
-	a := openLib(t)
-	src := t.TempDir()
-	writeFile(t, filepath.Join(src, "01 Bahlam Bek.mp3"),
-		testmp3.WithTags(testmp3.Silent(5), "بحلم بيك", "Abdel Halim Hafez", "Rawaeaa"))
-	writeFile(t, filepath.Join(src, "Franz Kafka", "01 - The Metamorphosis.mp3"), testmp3.Silent(6))
+// ingestTagged ingests a file with the given name and old tags.
+func ingestTagged(t *testing.T, a *app.App, name, title, artist, album, track string) manifest.Track {
+	t.Helper()
+	f := filepath.Join(t.TempDir(), name+".mp3")
+	writeFile(t, f, testmp3.WithTagsTrack(testmp3.Silent(20+len(name)), title, artist, album, track))
+	rep, err := a.Ingest([]string{f})
+	if err != nil || len(rep.Added) != 1 {
+		t.Fatalf("ingest %s: %+v, %v", name, rep, err)
+	}
+	return rep.Added[0]
+}
 
-	if _, err := a.Ingest([]string{src}); err != nil {
+func TestIngestFillsTheRecordFromTheFilesOwnTags(t *testing.T) {
+	a := openLib(t)
+	added := ingestTagged(t, a, "01 Bahlam Bek", "بحلم بيك", "Abdel Halim Hafez", "Rawaeaa", "1/6")
+	got := tracks(t, a)[0]
+	for _, tr := range []manifest.Track{added, got} {
+		if tr.Status != manifest.Identified || tr.Title != "بحلم بيك" || tr.Artist != "Abdel Halim Hafez" ||
+			tr.Album != "Rawaeaa" || tr.TrackNumber != 1 || tr.TrackTotal != 6 {
+			t.Errorf("track = %+v", tr)
+		}
+		if tr.Hint != (manifest.Hint{}) {
+			t.Errorf("hint %+v should be gone once the record holds what it said", tr.Hint)
+		}
+	}
+}
+
+func TestIngestFallsBackToTheNumberInTheFileName(t *testing.T) {
+	a := openLib(t)
+	ingestTagged(t, a, "07 - Some Song", "Some Song", "Band", "", "")
+	if got := tracks(t, a)[0]; got.TrackNumber != 7 || got.Album != "" || got.Status != manifest.Identified {
+		t.Errorf("track = %+v", got)
+	}
+}
+
+func TestIngestKeepsAFileThatLacksATitleOrArtistInNeedsWork(t *testing.T) {
+	a := openLib(t)
+	ingestTagged(t, a, "x", "Only A Title", "", "", "")
+	ingestTagged(t, a, "yy", "", "Only An Artist", "", "")
+	untagged := filepath.Join(t.TempDir(), "01 - The Metamorphosis.mp3")
+	writeFile(t, untagged, testmp3.Silent(6))
+	if _, err := a.Ingest([]string{untagged}); err != nil {
 		t.Fatal(err)
+	}
+	for _, tr := range tracks(t, a) {
+		if tr.Status != manifest.Unidentified || tr.Title != "" || tr.Artist != "" || tr.Album != "" {
+			t.Errorf("%+v was filled from tags that are not enough", tr)
+		}
 	}
 	hints := map[string]manifest.Hint{}
 	for _, tr := range tracks(t, a) {
 		hints[tr.Hint.Filename] = tr.Hint
-		if tr.Title != "" || tr.Artist != "" || tr.Album != "" {
-			t.Errorf("old tags leaked into the record: %+v", tr)
+	}
+	if h := hints["x"]; h.Title != "Only A Title" {
+		t.Errorf("what the old tags did say is kept to show: %+v", h)
+	}
+	if h := hints["01 - The Metamorphosis"]; h != (manifest.Hint{Filename: "01 - The Metamorphosis"}) {
+		t.Errorf("hint = %+v", h)
+	}
+}
+
+func TestIngestTakesTheDateTheTagsSaid(t *testing.T) {
+	for _, c := range []struct{ tag, want string }{
+		{"1987", "1987"},
+		{"2015-09-04", "2015-09-04"},
+		{"2015-09-04T10:00:00", "2015-09-04"},
+		{"sometime", ""},
+		{"", ""},
+	} {
+		a := openLib(t)
+		f := filepath.Join(t.TempDir(), "x.mp3")
+		writeFile(t, f, testmp3.WithTextFrames(testmp3.Silent(30),
+			[2]string{"TIT2", "Song"}, [2]string{"TPE1", "Band"}, [2]string{"TDRC", c.tag}))
+		rep, err := a.Ingest([]string{f})
+		if err != nil || len(rep.Added) != 1 {
+			t.Fatalf("%q: %+v, %v", c.tag, rep, err)
+		}
+		if got := tracks(t, a)[0]; got.Released != c.want {
+			t.Errorf("tag %q: released = %q, want %q", c.tag, got.Released, c.want)
 		}
 	}
-	want := map[string]manifest.Hint{
-		"01 Bahlam Bek":          {Title: "بحلم بيك", Artist: "Abdel Halim Hafez", Album: "Rawaeaa", Filename: "01 Bahlam Bek"},
-		"01 - The Metamorphosis": {Filename: "01 - The Metamorphosis"},
+}
+
+func TestIngestTakesTheGenreTheTagsSaid(t *testing.T) {
+	a := openLib(t)
+	f := filepath.Join(t.TempDir(), "x.mp3")
+	writeFile(t, f, testmp3.WithTextFrames(testmp3.Silent(30),
+		[2]string{"TIT2", "Song"}, [2]string{"TPE1", "Band"}, [2]string{"TCON", "(17)Folk"}))
+	if _, err := a.Ingest([]string{f}); err != nil {
+		t.Fatal(err)
 	}
-	for k, w := range want {
-		if hints[k] != w {
-			t.Errorf("hint for %q = %+v, want %+v", k, hints[k], w)
+	if got := tracks(t, a)[0]; got.Genre != "Folk" {
+		t.Errorf("genre = %q, want Folk", got.Genre)
+	}
+}
+
+func TestIngestTakesTheFirstOfSeveralArtistsOnlyWhereTheTagsSaySo(t *testing.T) {
+	cases := []struct{ tag, want string }{
+		{"Fairuz; Ziad Rahbani", "Fairuz"},
+		{"Fairuz\x00Ziad Rahbani", "Fairuz"},
+		{"Nils Frahm feat. Anne Müller", "Nils Frahm"},
+		{"Nils Frahm Feat. Anne Müller", "Nils Frahm"},
+		{"Nils Frahm ft. Anne Müller", "Nils Frahm"},
+		{"Nils Frahm featuring Anne Müller", "Nils Frahm"},
+		{"Simon & Garfunkel", "Simon & Garfunkel"},
+		{"Earth, Wind & Fire", "Earth, Wind & Fire"},
+		{"AC/DC", "AC/DC"},
+		{"Craft Beer Anthem", "Craft Beer Anthem"},
+	}
+	for i, c := range cases {
+		a := openLib(t)
+		ingestTagged(t, a, strings.Repeat("x", i+1), "Song", c.tag, "", "")
+		if got := tracks(t, a)[0].Artist; got != c.want {
+			t.Errorf("tag %q: artist %q, want %q", c.tag, got, c.want)
 		}
 	}
 }

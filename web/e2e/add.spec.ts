@@ -59,7 +59,7 @@ test('a adds from a link, pre-filled, and the path preview shows where it will b
   await expect(dialog().getByRole('textbox', { name: 'Track', exact: true })).toHaveValue('1');
   await expect(dialog().getByRole('textbox', { name: 'Tracks on album' })).toHaveValue('5');
   await expect(dialog().getByRole('textbox', { name: 'Released' })).toHaveValue('1959-08-17');
-  await expect(dialog()).toContainText('Matched on MusicBrainz');
+  await expect(dialog()).toContainText('These are YouTube’s words');
   const path = dialog().locator('.pathline');
   await expect(path).toHaveText(/^Miles Davis\/Kind of Blue\/.*So What\.mp3$/);
 
@@ -70,22 +70,6 @@ test('a adds from a link, pre-filled, and the path preview shows where it will b
   await expect(dialog()).toHaveCount(0);
   await said(page, /^Added/);
   await expect(page.getByRole('banner')).toContainText('7 tracks');
-});
-
-test('F2 ignores the match and uses what the download said', async ({ page, dialog }) => {
-  await openPage(page);
-  await page.keyboard.press('a');
-  await dialog().getByRole('textbox', { name: 'Link' }).fill('https://www.youtube.com/watch?v=abc');
-  await page.keyboard.press('Enter');
-  await expect(dialog().getByRole('textbox', { name: 'Title' })).toHaveValue('So What');
-
-  await page.keyboard.press('F2');
-
-  await expect(dialog()).toContainText('Ignoring the match');
-  await expect(dialog().getByRole('textbox', { name: 'Title' })).toHaveValue('');
-  await page.keyboard.press('Escape');
-  await expect(dialog()).toHaveCount(0);
-  await expect(page.getByRole('banner')).toContainText('6 tracks');
 });
 
 test('a duplicate is flagged', async ({ page, dialog }) => {

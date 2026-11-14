@@ -19,15 +19,12 @@ export interface AddState {
   job: JobView | null;
   started: number;
   draft: DraftView | null;
-  useMatch: boolean;
   form: AddForm;
-  touched: ReadonlySet<AddKey>;
   existing: DuplicateView | null;
   pathNote: string;
 }
 
 const pathPause = 120;
-const defaulted: readonly AddKey[] = ['title', 'artist', 'album', 'track', 'of', 'released'];
 
 function blank(): AddForm {
   return { title: '', artist: '', album: '', track: '', of: '', released: '', genre: '', cutStart: '', cutEnd: '' };
@@ -41,9 +38,7 @@ function fresh(): AddState {
     job: null,
     started: 0,
     draft: null,
-    useMatch: true,
     form: blank(),
-    touched: new Set(),
     existing: null,
     pathNote: '',
   };
@@ -58,16 +53,6 @@ let finished = false;
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
-}
-
-function filled(form: AddForm, values: AddForm, touched: ReadonlySet<AddKey>): AddForm {
-  const next = { ...form };
-  for (const key of defaulted) {
-    if (!touched.has(key)) {
-      next[key] = values[key];
-    }
-  }
-  return next;
 }
 
 function addOpen(): boolean {
@@ -129,14 +114,7 @@ function receive(ended: JobView): void {
   if (draft === undefined) {
     return;
   }
-  const useMatch = draft.match !== undefined;
-  useAdd.setState({
-    phase: 'form',
-    draft,
-    useMatch,
-    touched: new Set(),
-    form: { ...filled(blank(), useMatch ? draft.matched : draft.downloaded, new Set()), genre: '', cutStart: '', cutEnd: '' },
-  });
+  useAdd.setState({ phase: 'form', draft, form: draft.form });
   askForPath();
 }
 
@@ -177,17 +155,7 @@ export function retryAdd(): void {
 }
 
 export function setField(key: AddKey, text: string): void {
-  useAdd.setState((s) => ({ form: { ...s.form, [key]: text }, touched: new Set(s.touched).add(key) }));
-  askForPath();
-}
-
-export function toggleMatch(): void {
-  const { draft, useMatch, form, touched } = useAdd.getState();
-  if (draft?.match === undefined) {
-    return;
-  }
-  const next = !useMatch;
-  useAdd.setState({ useMatch: next, form: filled(form, next ? draft.matched : draft.downloaded, touched) });
+  useAdd.setState((s) => ({ form: { ...s.form, [key]: text } }));
   askForPath();
 }
 

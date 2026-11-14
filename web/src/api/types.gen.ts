@@ -26,11 +26,6 @@ export interface BulkPreview {
   error?: string;
 }
 
-export interface CandidateView {
-  text: string;
-  diff: DiffLine[];
-}
-
 export interface ChangeResponse {
   message?: string;
   reveal?: string;
@@ -61,13 +56,6 @@ export interface DeviceView {
   footnote: string;
 }
 
-export interface DiffLine {
-  label: string;
-  old: string;
-  new: string;
-  same: boolean;
-}
-
 export interface DoctorView {
   problems: ProblemView[];
   errors: number;
@@ -76,9 +64,7 @@ export interface DoctorView {
 
 export interface DraftView {
   draft: string;
-  match?: MatchView;
-  matched: AddForm;
-  downloaded: AddForm;
+  form: AddForm;
 }
 
 export interface DuplicateView {
@@ -121,18 +107,8 @@ export interface HistoryView {
   clip?: string;
 }
 
-export interface IdentifyProgress {
-  total: number;
-  done: number;
-  identified: number;
-  left: number;
-  failed: number;
-  failures: string[];
-}
-
 export interface InfoView {
   canAdd: boolean;
-  lookup: boolean;
   root: string;
   version: string;
 }
@@ -166,12 +142,6 @@ export interface ListRow {
   left: string;
   cols?: string[];
   dim?: boolean;
-}
-
-export interface MatchView {
-  artist: string;
-  title: string;
-  album: string;
 }
 
 export interface OpCounts {
@@ -249,13 +219,6 @@ export interface RowView {
   trackId?: string;
   length?: string;
   editable?: boolean;
-}
-
-export interface SearchView {
-  search: string;
-  title: string;
-  artist: string;
-  candidates: CandidateView[];
 }
 
 export interface ServerEvents {

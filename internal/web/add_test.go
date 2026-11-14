@@ -30,7 +30,7 @@ func TestATrackIsFetchedFromALinkAndAdded(t *testing.T) {
 	var out browse.Fetched
 	data, _ := json.Marshal(done.Data)
 	json.Unmarshal(data, &out)
-	if done.State != jobDone || out.Draft == nil || out.Draft.Matched.Title != "A song" || out.Draft.Matched.Artist != "Some Band" || out.Draft.Matched.Track != "2" {
+	if done.State != jobDone || out.Draft == nil || out.Draft.Form.Title != "A song" || out.Draft.Form.Artist != "Some Band" || out.Draft.Form.Track != "2" {
 		t.Fatalf("%+v %s", done, data)
 	}
 	if len(dl.Calls()) != 1 || dl.Calls()[0] != "https://example.org/watch?v=1" {

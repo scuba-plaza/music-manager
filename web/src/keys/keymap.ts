@@ -33,7 +33,6 @@ export type ActionName =
   | 'moveTrackUp'
   | 'renumber'
   | 'addToPlaylist'
-  | 'identifyAll'
   | 'fieldUp'
   | 'fieldDown'
   | 'previousTabOrBack'
@@ -55,8 +54,6 @@ export type ActionName =
   | 'sortMenu'
   | 'copy'
   | 'paste'
-  | 'identify'
-  | 'adopt'
   | 'add'
   | 'sync'
   | 'doctor'
@@ -134,7 +131,6 @@ export const bindings: readonly Binding[] = [
   { keys: ['K'], scope: 'tree', action: 'moveTrackUp', help: { page: 'Marking', text: 'move a track down / up' } },
   { keys: ['n'], scope: 'tree', action: 'renumber', help: { page: 'Marking', text: 'number an album 1…N' } },
   { keys: ['p'], scope: 'tree', action: 'addToPlaylist', hint: { label: 'playlist' }, help: { page: 'Marking', text: 'add to a playlist' } },
-  { keys: ['I'], scope: 'tree', action: 'identifyAll', help: { page: 'Library', text: 'identify everything' } },
 
   { keys: ['ArrowUp', 'k'], scope: 'inspector', action: 'fieldUp', hint: { label: 'field' }, help: { page: 'Editing', text: 'choose a field' } },
   { keys: ['ArrowDown', 'j'], scope: 'inspector', action: 'fieldDown', hint: { label: 'field' }, help: { page: 'Editing', text: 'choose a field' } },
@@ -181,8 +177,6 @@ export const bindings: readonly Binding[] = [
   { keys: ['/'], scope: 'common', action: 'focusFilter', hint: { label: 'filter', when: inTree }, help: { page: 'Moving', text: 'filter (esc clears it)' } },
   { keys: ['S'], scope: 'common', action: 'sortMenu', hint: { label: 'sort', when: inTree }, help: { page: 'Moving', text: 'sort the list' } },
   { keys: ['a'], scope: 'common', action: 'add', help: { page: 'Library', text: 'add from a YouTube link, or drop files on the page' } },
-  { keys: ['i'], scope: 'common', action: 'identify', help: { page: 'Library', text: 'find it on MusicBrainz' } },
-  { keys: ['o'], scope: 'common', action: 'adopt', help: { page: 'Library', text: "use the file's old tags" } },
   { keys: ['s'], scope: 'common', action: 'sync', help: { page: 'Library', text: 'sync: write the folder' } },
   { keys: ['u'], scope: 'common', action: 'undo', hint: { label: 'undo', when: (s) => Boolean(s.lib?.history.undo) }, help: { page: 'Library', text: 'undo / redo' } },
   { keys: ['ctrl+r'], scope: 'common', action: 'redo', help: { page: 'Library', text: 'undo / redo' } },

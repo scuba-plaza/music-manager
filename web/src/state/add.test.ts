@@ -1,24 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddForm, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
 import { changeResponse, infoView, jsonResponse, memoryStorage, requestsTo, sampleLibrary, stubServer, type StubRoute , urlOf } from '../testing/fakes';
-import { chooseFiles, fetchLink, leaveAdd, openAdd, retryAdd, saveAdd, setField, showDuplicate, toggleMatch, typeLink, useAdd } from './add';
+import { chooseFiles, fetchLink, leaveAdd, openAdd, retryAdd, saveAdd, setField, showDuplicate, typeLink, useAdd } from './add';
 import { jobEvent } from './jobs';
 import { useApp } from './store';
 
 let fetchMock: ReturnType<typeof stubServer>;
 
 const blank: AddForm = { title: '', artist: '', album: '', track: '', of: '', released: '', genre: '', cutStart: '', cutEnd: '' };
-const matched: AddForm = { title: 'So What', artist: 'Miles Davis', album: 'Kind of Blue', track: '1', of: '5', released: '1959-08-17', genre: '', cutStart: '', cutEnd: '' };
-const downloaded: AddForm = { title: 'so what (official)', artist: 'MilesDavisVEVO', album: '', track: '', of: '', released: '', genre: '', cutStart: '', cutEnd: '' };
+const offered: AddForm = { title: 'So What', artist: 'Miles Davis', album: 'Kind of Blue', track: '1', of: '5', released: '1959-08-17', genre: '', cutStart: '', cutEnd: '' };
 
 function draft(over: Partial<DraftView> = {}): DraftView {
-  return { draft: 'd1', match: { artist: 'Miles Davis', title: 'So What', album: 'Kind of Blue' }, matched, downloaded, ...over };
-}
-
-function unmatched(): DraftView {
-  const { match, ...rest } = draft();
-  expect(match).toBeDefined();
-  return { ...rest, matched: downloaded };
+  return { draft: 'd1', form: offered, ...over };
 }
 
 function job(state: string, data?: Fetched, extra: Partial<JobView> = {}): JobView {
@@ -152,36 +145,18 @@ describe('fetching a link', () => {
     expect(requestsTo(fetchMock, 'POST', '/api/add/fetch')).toEqual([{ url: 'https://www.youtube.com/watch?v=abc' }]);
   });
 
-  it('fills the form from the match when MusicBrainz knew the track, and asks where the file would go', async () => {
+  it('fills the form from what the server offered, and asks where the file would go', async () => {
     await fetched({ draft: draft() });
     await vi.waitFor(() => {
       expect(state().phase).toBe('form');
     });
 
-    expect(state()).toMatchObject({ useMatch: true, form: matched, draft: draft() });
+    expect(state()).toMatchObject({ form: offered, draft: draft() });
     await vi.advanceTimersByTimeAsync(120);
     await vi.waitFor(() => {
       expect(state().pathNote).toBe('Miles Davis/Kind of Blue/So What.mp3');
     });
-    expect(requestsTo(fetchMock, 'POST', '/api/add/path')).toEqual([{ form: matched }]);
-  });
-
-  it('fills the form from what the download said when there is no match', async () => {
-    await fetched({ draft: unmatched() });
-    await vi.waitFor(() => {
-      expect(state().phase).toBe('form');
-    });
-
-    expect(state()).toMatchObject({ useMatch: false, form: downloaded });
-  });
-
-  it('leaves the genre and the cuts blank, whatever the draft says', async () => {
-    await fetched({ draft: draft({ matched: { ...matched, genre: 'Jazz', cutStart: '0:05', cutEnd: '0:10' } }) });
-    await vi.waitFor(() => {
-      expect(state().phase).toBe('form');
-    });
-
-    expect(state().form).toMatchObject({ genre: '', cutStart: '', cutEnd: '' });
+    expect(requestsTo(fetchMock, 'POST', '/api/add/path')).toEqual([{ form: offered }]);
   });
 
   it('flags a track that is in the library already, and can show it', async () => {
@@ -304,7 +279,7 @@ describe('the form', () => {
     await vi.waitFor(() => {
       expect(state().pathNote).toBe('Miles Davis/Kind of Blue/So What (take 2).mp3');
     });
-    expect(requestsTo(fetchMock, 'POST', '/api/add/path').at(-1)).toEqual({ form: { ...matched, title: 'So What (take 2)' } });
+    expect(requestsTo(fetchMock, 'POST', '/api/add/path').at(-1)).toEqual({ form: { ...offered, title: 'So What (take 2)' } });
     expect(requestsTo(fetchMock, 'POST', '/api/add/path')).toHaveLength(2);
   });
 
@@ -351,31 +326,6 @@ describe('the form', () => {
     });
   });
 
-  it('F2 swaps the match for what the download said, except in the fields that were typed in', async () => {
-    await inForm();
-    setField('album', 'My Album');
-
-    toggleMatch();
-
-    expect(state().useMatch).toBe(false);
-    expect(state().form).toEqual({ ...downloaded, album: 'My Album' });
-
-    toggleMatch();
-
-    expect(state().useMatch).toBe(true);
-    expect(state().form).toEqual({ ...matched, album: 'My Album' });
-  });
-
-  it('F2 does nothing when there was no match', async () => {
-    await fetched({ draft: unmatched() });
-    await vi.waitFor(() => {
-      expect(state().phase).toBe('form');
-    });
-
-    toggleMatch();
-
-    expect(state()).toMatchObject({ useMatch: false, form: downloaded });
-  });
 });
 
 describe('adding the track', () => {
@@ -396,7 +346,7 @@ describe('adding the track', () => {
 
     await saveAdd();
 
-    expect(requestsTo(fetchMock, 'POST', '/api/add/finish')).toEqual([{ draft: 'd1', form: { ...matched, title: 'So What (take 2)' } }]);
+    expect(requestsTo(fetchMock, 'POST', '/api/add/finish')).toEqual([{ draft: 'd1', form: { ...offered, title: 'So What (take 2)' } }]);
     expect(useApp.getState().overlay).toBeNull();
     expect(useApp.getState().status.text).toBe('Added So What · u undoes it');
     expect(requestsTo(fetchMock, 'DELETE', '/api/add/d1')).toEqual([]);
@@ -555,21 +505,5 @@ describe('with nothing to act on', () => {
     showDuplicate();
 
     expect(useApp.getState().overlay).toEqual({ kind: 'add' });
-  });
-
-  it('F2 asks again where the file would go', async () => {
-    await inForm();
-    await vi.advanceTimersByTimeAsync(120);
-    await vi.waitFor(() => {
-      expect(requestsTo(fetchMock, 'POST', '/api/add/path')).toHaveLength(1);
-    });
-
-    toggleMatch();
-    await vi.advanceTimersByTimeAsync(120);
-
-    await vi.waitFor(() => {
-      expect(requestsTo(fetchMock, 'POST', '/api/add/path')).toHaveLength(2);
-    });
-    expect(requestsTo(fetchMock, 'POST', '/api/add/path').at(-1)).toEqual({ form: downloaded });
   });
 });
