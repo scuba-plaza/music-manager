@@ -72,6 +72,35 @@ test('a adds from a link, pre-filled, and the path preview shows where it will b
   await expect(page.getByRole('banner')).toContainText('7 tracks');
 });
 
+test('the add form says under a field what is wrong with it, and a link that is no link on the link', async ({ page, dialog }) => {
+  await openPage(page);
+  await page.keyboard.press('a');
+  const link = dialog().getByRole('textbox', { name: 'Link' });
+
+  await link.fill('youtube.com/watch?v=abc');
+  await page.keyboard.press('Enter');
+
+  await expect(dialog().getByRole('alert')).toHaveText(/not a web link/);
+  await expect(link).toHaveAttribute('aria-invalid', 'true');
+
+  await link.fill('https://www.youtube.com/watch?v=abc');
+  await page.keyboard.press('Enter');
+  const title = dialog().getByRole('textbox', { name: 'Title' });
+  await expect(title).toHaveValue('So What');
+
+  await title.fill('');
+  await dialog().getByRole('textbox', { name: 'Released' }).fill('soon');
+  await expect(dialog().getByRole('alert')).toHaveText('✗ Title cannot be empty');
+  await page.keyboard.press('Tab');
+  await expect(dialog().getByRole('alert').filter({ hasText: '1999-05-17' })).toContainText('✗ Release date');
+  await page.keyboard.press('Enter');
+
+  await expect(dialog().getByRole('alert')).toHaveCount(2);
+  await expect(title).toBeFocused();
+  await expect(title).toHaveAttribute('aria-invalid', 'true');
+  await expect(dialog()).toBeVisible();
+});
+
 test('a duplicate is flagged', async ({ page, dialog }) => {
   await openPage(page);
 

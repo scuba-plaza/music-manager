@@ -11,10 +11,11 @@ interface FormFieldProps {
   label: string;
   error?: string | undefined;
   hint?: string | undefined;
+  hideLabel?: boolean;
   children: (control: ControlProps) => ReactNode;
 }
 
-export function FormField({ name, label, error, hint, children }: FormFieldProps) {
+export function FormField({ name, label, error, hint, hideLabel = false, children }: FormFieldProps) {
   const base = useId();
   const id = `${base}-${name}`;
   const hintId = `${id}-hint`;
@@ -23,8 +24,8 @@ export function FormField({ name, label, error, hint, children }: FormFieldProps
   const described = [hint === undefined || hint === '' ? '' : hintId, wrong ? errorId : ''].filter((s) => s !== '').join(' ');
 
   return (
-    <div className={wrong ? 'field wrong' : 'field'}>
-      <label className="label" htmlFor={id}>
+    <div className={['field', wrong ? 'wrong' : '', hideLabel ? 'bare' : ''].filter((c) => c !== '').join(' ')}>
+      <label className={hideLabel ? 'sr-only' : 'label'} htmlFor={id}>
         {label}
       </label>
       <div className="control">

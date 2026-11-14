@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"music-manager/internal/app"
 	"music-manager/internal/browse"
 )
 
@@ -60,12 +61,22 @@ func (s *Server) addFetch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, v)
 }
 
+type AddCheck struct {
+	Path   string            `json:"path"`
+	Fields map[string]string `json:"fields,omitempty"`
+}
+
 func (s *Server) addPath(w http.ResponseWriter, r *http.Request) {
 	var in struct{ Form browse.AddForm }
 	if !read(w, r, &in) {
 		return
 	}
-	writeJSON(w, PathView{Path: browse.AddPath(in.Form)})
+	view := AddCheck{Path: browse.AddPath(in.Form)}
+	var fields app.FieldErrors
+	if _, err := in.Form.Edit(); errors.As(err, &fields) {
+		view.Fields = fields
+	}
+	writeJSON(w, view)
 }
 
 func (s *Server) addFinish(w http.ResponseWriter, r *http.Request) {

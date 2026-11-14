@@ -36,7 +36,7 @@ func (v BulkValues) edit() (app.Edit, error) {
 	bad := app.FieldErrors{}
 	if s := strings.TrimSpace(v.Artist); s != "" {
 		if s == clearMark {
-			bad["artist"] = "An artist cannot be cleared"
+			bad.Set("artist", "An artist cannot be cleared")
 		} else {
 			e.Artist = &s
 		}
@@ -54,7 +54,7 @@ func (v BulkValues) edit() (app.Edit, error) {
 			n, err = count(s)
 		}
 		if err != nil {
-			bad["of"] = "Tracks on the album must be a whole number"
+			bad.Set("of", "Tracks on the album must be a whole number")
 		} else {
 			e.TrackTotal = &n
 		}
@@ -64,7 +64,7 @@ func (v BulkValues) edit() (app.Edit, error) {
 			s = ""
 		}
 		if date, err := app.NormalizeDate(s); err != nil {
-			bad["released"] = err.Error()
+			bad.Set("released", err.Error())
 		} else {
 			e.Released = &date
 		}
@@ -90,7 +90,7 @@ func (v BulkValues) edit() (app.Edit, error) {
 		case s == "":
 			continue
 		case strings.ContainsAny(s, "\r\n"):
-			bad[f.key] = f.name + " must be on one line"
+			bad.Set(f.key, f.name+" must be on one line")
 			continue
 		case s == clearMark:
 			s = ""
@@ -111,7 +111,7 @@ func (v BulkValues) edit() (app.Edit, error) {
 		if s != clearMark {
 			var err error
 			if d, err = timecode.Parse(s); err != nil {
-				bad[c.key] = c.name + ": " + err.Error()
+				bad.Set(c.key, c.name+": "+err.Error())
 				continue
 			}
 		}

@@ -1,11 +1,26 @@
 package app
 
-import "fmt"
+import (
+	"fmt"
+	"unicode"
+	"unicode/utf8"
+)
 
 type FieldErrors map[string]string
 
 func Invalid(field, message string) error {
-	return FieldErrors{field: message}
+	e := FieldErrors{}
+	e.Set(field, message)
+	return e
+}
+
+func (e FieldErrors) Set(field, message string) {
+	if message == "" {
+		e[field] = ""
+		return
+	}
+	first, size := utf8.DecodeRuneInString(message)
+	e[field] = string(unicode.ToUpper(first)) + message[size:]
 }
 
 func (e FieldErrors) Error() string {

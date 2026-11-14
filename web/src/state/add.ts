@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { send } from '../api/client';
-import type { AddForm, ChangeResponse, DraftView, DuplicateView, Fetched, JobView, PathView } from '../api/types.gen';
+import { ApiError, send } from '../api/client';
+import type { AddCheck, AddForm, ChangeResponse, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
+import { cleanChecks, firstWrong, left, tried, verdict, type FormChecks } from './form';
 import { loadLibrary } from './library';
 import { setStatus } from './status';
 import { applyChange } from './edit';
@@ -16,6 +17,8 @@ export interface AddState {
   phase: AddPhase;
   link: string;
   error: string;
+  linkError: string;
+  checks: FormChecks;
   job: JobView | null;
   started: number;
   draft: DraftView | null;
@@ -26,6 +29,8 @@ export interface AddState {
 
 const pathPause = 120;
 
+export const addOrder: readonly AddKey[] = ['title', 'artist', 'album', 'track', 'of', 'released', 'genre', 'cutStart', 'cutEnd'];
+
 function blank(): AddForm {
   return { title: '', artist: '', album: '', track: '', of: '', released: '', genre: '', cutStart: '', cutEnd: '' };
 }
@@ -35,6 +40,8 @@ function fresh(): AddState {
     phase: 'asking',
     link: '',
     error: '',
+    linkError: '',
+    checks: cleanChecks(),
     job: null,
     started: 0,
     draft: null,
@@ -64,10 +71,10 @@ function askForPath(): void {
   pathTimer = setTimeout(() => {
     pathNo += 1;
     const mine = pathNo;
-    send<PathView>('POST', '/api/add/path', { form: useAdd.getState().form }).then(
+    send<AddCheck>('POST', '/api/add/path', { form: useAdd.getState().form }).then(
       (res) => {
         if (mine === pathNo) {
-          useAdd.setState({ pathNote: res.path });
+          useAdd.setState((s) => ({ pathNote: res.path, checks: verdict(s.checks, res.fields ?? {}) }));
         }
       },
       () => {
@@ -93,7 +100,7 @@ export function openAdd(): void {
 }
 
 export function typeLink(text: string): void {
-  useAdd.setState({ link: text, error: '' });
+  useAdd.setState({ link: text, linkError: '' });
 }
 
 function fetchedOf(data: unknown): Fetched {
@@ -121,12 +128,12 @@ function receive(ended: JobView): void {
 export function fetchLink(): void {
   const link = useAdd.getState().link.trim();
   if (link === '') {
-    useAdd.setState({ error: 'Paste a link first' });
+    useAdd.setState({ linkError: 'Paste a link first' });
     return;
   }
   attemptNo += 1;
   const mine = attemptNo;
-  useAdd.setState({ phase: 'fetching', link, error: '', job: null, started: Date.now() });
+  useAdd.setState({ phase: 'fetching', link, error: '', linkError: '', job: null, started: Date.now() });
   send<JobView>('POST', '/api/add/fetch', { url: link }).then(
     async (view) => {
       if (mine !== attemptNo) {
@@ -143,9 +150,11 @@ export function fetchLink(): void {
       }
     },
     (err: unknown) => {
-      if (mine === attemptNo) {
-        useAdd.setState({ phase: 'failed', error: messageOf(err) });
+      if (mine !== attemptNo) {
+        return;
       }
+      const linkError = err instanceof ApiError ? err.fields.link : undefined;
+      useAdd.setState(linkError === undefined ? { phase: 'failed', error: messageOf(err) } : { phase: 'asking', linkError });
     },
   );
 }
@@ -159,20 +168,30 @@ export function setField(key: AddKey, text: string): void {
   askForPath();
 }
 
-export async function saveAdd(): Promise<void> {
+export function leaveField(key: AddKey): void {
+  useAdd.setState((s) => ({ checks: left(s.checks, key) }));
+}
+
+export async function saveAdd(): Promise<AddKey | undefined> {
   const { draft, form } = useAdd.getState();
   if (draft === null) {
-    return;
+    return undefined;
   }
   useAdd.setState({ phase: 'saving', error: '' });
   try {
     await applyChange(() => send<ChangeResponse>('POST', '/api/add/finish', { draft: draft.draft, form }));
   } catch (err) {
+    if (err instanceof ApiError && Object.keys(err.fields).length > 0) {
+      useAdd.setState((s) => ({ phase: 'form', checks: tried(verdict(s.checks, err.fields)) }));
+      const first = firstWrong(useAdd.getState().checks, addOrder);
+      return addOrder.find((key) => key === first);
+    }
     useAdd.setState({ phase: 'form', error: messageOf(err) });
-    return;
+    return undefined;
   }
   finished = true;
   useApp.setState({ overlay: null });
+  return undefined;
 }
 
 export function showDuplicate(): void {

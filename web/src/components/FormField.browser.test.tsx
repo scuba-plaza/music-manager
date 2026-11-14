@@ -54,6 +54,19 @@ describe('FormField', () => {
     expect(describedBy).toContain(page.getByRole('alert').element().id);
   });
 
+  test('can keep its label out of sight and still name the input by it', async () => {
+    await render(
+      <div className="form">
+        <FormField name="link" label="Link" hideLabel>
+          {(control) => <input className="edit" type="text" {...control} readOnly value="" />}
+        </FormField>
+      </div>,
+    );
+
+    await expect.element(page.getByRole('textbox', { name: 'Link' })).toBeVisible();
+    expect(document.querySelector('label.label')).toBeNull();
+  });
+
   test('gives two fields on a page ids of their own', async () => {
     await render(
       <div className="form">

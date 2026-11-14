@@ -245,10 +245,27 @@ describe('the add dialog', () => {
 
     await userEvent.keyboard('{Enter}');
 
-    await expect.element(dialog()).toHaveTextContent('Paste a link first');
+    await expect.element(dialog().getByRole('alert')).toHaveTextContent('Paste a link first');
+    await expect.element(field('Link')).toBeInvalid();
     expect(requestsTo(fetchMock, 'POST', '/api/add/fetch')).toEqual([]);
     await userEvent.keyboard('h');
     await expect.element(dialog()).not.toHaveTextContent('Paste a link first');
+    await expect.element(field('Link')).not.toBeInvalid();
+  });
+
+  test('a link the server will not take is said under the link, and the dialog keeps asking', async () => {
+    await open((request) =>
+      request.method === 'POST' && request.url.pathname === '/api/add/fetch'
+        ? jsonResponse({ error: 'That is not a web link', fields: { link: 'That is not a web link: it should start with http:// or https://' } }, 422)
+        : plain(request),
+    );
+
+    await userEvent.keyboard('youtube.com/watch{Enter}');
+
+    await expect.element(dialog().getByRole('alert')).toHaveTextContent('That is not a web link: it should start with http:// or https://');
+    await expect.element(field('Link')).toBeInvalid();
+    await expect.element(field('Link')).toHaveValue('youtube.com/watch');
+    await expect.poll(hints).toEqual(['enter fetch', 'esc close']);
   });
 
   test('the button opens the file chooser, and the chooser itself is out of the tab order', async () => {
@@ -269,7 +286,7 @@ describe('the add dialog', () => {
     await open();
     await userEvent.keyboard('https://youtu.be/x{Enter}');
     await expect.element(dialog()).toHaveTextContent('Downloading… 0s');
-    await expect.element(dialog()).toHaveTextContent('This also looks the track up on MusicBrainz. esc cancels.');
+    await expect.element(dialog()).toHaveTextContent('esc cancels.');
     await expect.poll(hints).toEqual(['esc cancel']);
 
     await vi.advanceTimersByTimeAsync(3000);
@@ -296,7 +313,7 @@ describe('the add dialog', () => {
       dialog()
         .getByRole('textbox')
         .elements()
-        .map((input) => input.getAttribute('aria-label')),
+        .map((input) => (input as HTMLInputElement).labels?.[0]?.textContent ?? input.getAttribute('aria-label')),
     ).toEqual(names);
     await expect.element(field('Title')).toHaveFocus();
     await expect.element(field('Title')).toHaveValue('So What');
@@ -380,6 +397,48 @@ describe('the add dialog', () => {
     await expect.element(dialog()).toHaveTextContent('that file already exists');
     await expect.element(field('Genre')).toHaveValue('Jazz');
     await expect.element(field('Genre')).toHaveFocus();
+  });
+
+  test('a value the server cannot use is said under its field once the field is left, not while it is typed', async () => {
+    await toForm(undefined, (request) => {
+      if (request.method === 'POST' && request.url.pathname === '/api/add/path') {
+        const form = (request.body as { form: AddForm }).form;
+        return jsonResponse({ path: 'x', ...(form.released === 'soon' ? { fields: { released: 'Release date "soon" is not a date: use 1999, 1999-05 or 1999-05-17' } } : {}) });
+      }
+      return plain(request);
+    });
+
+    await userEvent.fill(field('Released'), 'soon');
+    await expect.poll(() => requestsTo(fetchMock, 'POST', '/api/add/path').at(-1)).toMatchObject({ form: { released: 'soon' } });
+    await expect.element(dialog().getByRole('alert')).not.toBeInTheDocument();
+
+    await userEvent.keyboard('{Tab}');
+
+    await expect.element(dialog().getByRole('alert')).toHaveTextContent('Release date "soon" is not a date');
+    await expect.element(field('Released')).toBeInvalid();
+    await expect.element(field('Genre')).not.toBeInvalid();
+  });
+
+  test('enter with fields that are wrong says every one, goes to the first, and the form stays', async () => {
+    await toForm(undefined, (request) =>
+      request.method === 'POST' && request.url.pathname === '/api/add/finish'
+        ? jsonResponse({ error: '2 fields need fixing', fields: { cutEnd: 'Cut end: invalid time "x"', artist: 'Artist cannot be empty' } }, 422)
+        : plain(request),
+    );
+    await userEvent.click(field('Genre'));
+
+    await userEvent.keyboard('{Enter}');
+
+    await expect.element(dialog().getByRole('alert').first()).toBeVisible();
+    expect(
+      dialog()
+        .getByRole('alert')
+        .elements()
+        .map((e) => e.textContent.trim()),
+    ).toEqual(['✗ Artist cannot be empty', '✗ Cut end: invalid time "x"']);
+    await expect.element(field('Artist')).toHaveFocus();
+    await expect.element(field('Cut end')).toBeInvalid();
+    await expect.element(dialog()).toHaveTextContent('These are YouTube’s words');
   });
 
   test('esc on the form forgets the download', async () => {

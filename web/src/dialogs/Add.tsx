@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import type { KeyEventLike } from '../keys/keymap';
+import { FormField } from '../components/FormField';
 import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
 import {
+  addOrder,
   chooseFiles,
   fetchLink,
+  leaveField,
   retryAdd,
   saveAdd,
   setField,
@@ -14,6 +17,7 @@ import {
   type AddKey,
   type AddPhase,
 } from '../state/add';
+import { shownErrors } from '../state/form';
 
 interface Field {
   key: AddKey;
@@ -68,7 +72,8 @@ function Elapsed({ since }: { since: number }) {
 }
 
 export function Add() {
-  const { phase, link, error, started, form, existing, pathNote } = useAdd();
+  const { phase, link, error, linkError, checks, started, form, existing, pathNote } = useAdd();
+  const errors = shownErrors(checks);
   const linkInput = useRef<HTMLInputElement>(null);
   const files = useRef<HTMLInputElement>(null);
   const grid = useRef<HTMLDivElement>(null);
@@ -117,7 +122,11 @@ export function Add() {
         return true;
       case 'form':
         if (e.key === 'Enter') {
-          void saveAdd();
+          void saveAdd().then((wrong) => {
+            if (wrong !== undefined) {
+              inputs()[addOrder.indexOf(wrong)]?.focus();
+            }
+          });
         } else if (e.key === 'Tab') {
           focusBy(e.shiftKey ? -1 : 1);
         } else if (e.key === 'ArrowDown') {
@@ -145,21 +154,24 @@ export function Add() {
         <>
           <div className="ask-body">Paste a link to a video or a track:</div>
           <div className="form">
-            <input
-              ref={linkInput}
-              className="edit"
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="https://www.youtube.com/watch?v=…"
-              aria-label="Link"
-              value={link}
-              onChange={(e) => {
-                typeLink(e.target.value);
-              }}
-            />
+            <FormField name="link" label="Link" error={linkError} hideLabel>
+              {(control) => (
+                <input
+                  {...control}
+                  ref={linkInput}
+                  className="edit"
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="https://www.youtube.com/watch?v=…"
+                  value={link}
+                  onChange={(e) => {
+                    typeLink(e.target.value);
+                  }}
+                />
+              )}
+            </FormField>
           </div>
-          {error !== '' && <Problem text={error} />}
           <div className="buttons">
             <button
               type="button"
@@ -180,7 +192,7 @@ export function Add() {
           <div className="busy">
             Downloading… <Elapsed since={started} />
           </div>
-          <div className="ask-body">This also looks the track up on MusicBrainz. esc cancels.</div>
+          <div className="ask-body">esc cancels.</div>
         </>
       )}
       {phase === 'saving' && <div className="busy">Adding to the library…</div>}
@@ -214,51 +226,68 @@ export function Add() {
           >
             {fields
               .filter((f) => f.key !== 'of')
-              .map((f) => (
-                <label key={f.key} className="label">
-                  {f.label}
-                  {f.key === 'track' ? (
-                    <span className="pair">
+              .map((f) =>
+                f.key === 'track' ? (
+                  <FormField key={f.key} name={f.key} label={f.label} error={[errors.track, errors.of].filter((m) => m !== undefined).join(' ')}>
+                    {(control) => (
+                      <span className="pair">
+                        <input
+                          {...control}
+                          className="edit"
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          aria-invalid={errors.track === undefined ? undefined : true}
+                          value={form.track}
+                          onChange={(e) => {
+                            setField('track', e.target.value);
+                          }}
+                          onBlur={() => {
+                            leaveField('track');
+                          }}
+                        />
+                        <span className="dim"> of </span>
+                        <input
+                          className="edit short"
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          aria-label="Tracks on album"
+                          aria-invalid={errors.of === undefined ? undefined : true}
+                          aria-describedby={control['aria-describedby']}
+                          value={form.of}
+                          onChange={(e) => {
+                            setField('of', e.target.value);
+                          }}
+                          onBlur={() => {
+                            leaveField('of');
+                          }}
+                        />
+                      </span>
+                    )}
+                  </FormField>
+                ) : (
+                  <FormField key={f.key} name={f.key} label={f.label} error={errors[f.key]}>
+                    {(control) => (
                       <input
+                        {...control}
                         className="edit"
                         type="text"
-                        inputMode="numeric"
+                        dir="auto"
                         autoComplete="off"
-                        aria-label="Track"
-                        value={form.track}
+                        spellCheck={false}
+                        value={form[f.key]}
                         onChange={(e) => {
-                          setField('track', e.target.value);
+                          setField(f.key, e.target.value);
+                        }}
+                        onBlur={() => {
+                          leaveField(f.key);
                         }}
                       />
-                      <span className="dim"> of </span>
-                      <input
-                        className="edit short"
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="off"
-                        aria-label="Tracks on album"
-                        value={form.of}
-                        onChange={(e) => {
-                          setField('of', e.target.value);
-                        }}
-                      />
-                    </span>
-                  ) : (
-                    <input
-                      className="edit"
-                      type="text"
-                      dir="auto"
-                      autoComplete="off"
-                      spellCheck={false}
-                      aria-label={f.label}
-                      value={form[f.key]}
-                      onChange={(e) => {
-                        setField(f.key, e.target.value);
-                      }}
-                    />
-                  )}
-                </label>
-              ))}
+                    )}
+                  </FormField>
+                ),
+              )}
           </div>
           <div className="pathrow accent">
             {pathNote !== '' && <span aria-hidden="true">→ </span>}

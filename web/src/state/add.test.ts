@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddForm, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
 import { changeResponse, infoView, jsonResponse, memoryStorage, requestsTo, sampleLibrary, stubServer, type StubRoute , urlOf } from '../testing/fakes';
-import { chooseFiles, fetchLink, leaveAdd, openAdd, retryAdd, saveAdd, setField, showDuplicate, typeLink, useAdd } from './add';
+import { chooseFiles, fetchLink, leaveAdd, leaveField, openAdd, retryAdd, saveAdd, setField, showDuplicate, typeLink, useAdd } from './add';
+import { shownErrors } from './form';
 import { jobEvent } from './jobs';
 import { useApp } from './store';
 
@@ -95,7 +96,7 @@ describe('a', () => {
     openAdd();
 
     expect(useApp.getState().overlay).toEqual({ kind: 'add' });
-    expect(state()).toMatchObject({ phase: 'asking', link: '', error: '', job: null, draft: null });
+    expect(state()).toMatchObject({ phase: 'asking', link: '', error: '', linkError: '', job: null, draft: null });
   });
 
   it('starts again from nothing each time it is opened', async () => {
@@ -114,7 +115,7 @@ describe('a', () => {
 
     fetchLink();
 
-    expect(state()).toMatchObject({ phase: 'asking', error: 'Paste a link first' });
+    expect(state()).toMatchObject({ phase: 'asking', linkError: 'Paste a link first' });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -122,11 +123,11 @@ describe('a', () => {
     serve();
     openAdd();
     fetchLink();
-    expect(state().error).toBe('Paste a link first');
+    expect(state().linkError).toBe('Paste a link first');
 
     typeLink('h');
 
-    expect(state().error).toBe('');
+    expect(state().linkError).toBe('');
   });
 });
 
@@ -197,6 +198,23 @@ describe('fetching a link', () => {
     await vi.waitFor(() => {
       expect(requestsTo(fetchMock, 'POST', '/api/add/fetch')).toHaveLength(2);
     });
+  });
+
+  it('says on the link what is wrong with it when the server will not take it, and keeps asking', async () => {
+    serve(({ method, url }) =>
+      method === 'POST' && url.pathname === '/api/add/fetch'
+        ? jsonResponse({ error: 'That is not a web link', fields: { link: 'That is not a web link: it should start with http:// or https://' } }, 422)
+        : undefined,
+    );
+    openAdd();
+    typeLink('youtube.com/watch?v=1');
+
+    fetchLink();
+
+    await vi.waitFor(() => {
+      expect(state().linkError).toBe('That is not a web link: it should start with http:// or https://');
+    });
+    expect(state()).toMatchObject({ phase: 'asking', error: '' });
   });
 
   it('says why the server would not start the download', async () => {
@@ -283,6 +301,50 @@ describe('the form', () => {
     expect(requestsTo(fetchMock, 'POST', '/api/add/path')).toHaveLength(2);
   });
 
+  it('keeps by field what the server found wrong with the form, and shows a message once its field is left', async () => {
+    await fetched(
+      { draft: draft() },
+      ({ method, url }) =>
+        method === 'POST' && url.pathname === '/api/add/path' ? jsonResponse({ path: 'x', fields: { released: 'Not a date', track: 'Track must be a whole number, or empty' } }) : undefined,
+    );
+    await vi.waitFor(() => {
+      expect(state().phase).toBe('form');
+    });
+    await vi.advanceTimersByTimeAsync(120);
+    await vi.waitFor(() => {
+      expect(state().checks.wrong).toEqual({ released: 'Not a date', track: 'Track must be a whole number, or empty' });
+    });
+    expect(shownErrors(state().checks)).toEqual({});
+
+    leaveField('released');
+
+    expect(shownErrors(state().checks)).toEqual({ released: 'Not a date' });
+  });
+
+  it('keeps no message for a field the server no longer has anything against', async () => {
+    let wrong: Record<string, string> = { released: 'Not a date' };
+    await fetched(
+      { draft: draft() },
+      ({ method, url }) => (method === 'POST' && url.pathname === '/api/add/path' ? jsonResponse({ path: 'x', fields: wrong }) : undefined),
+    );
+    await vi.waitFor(() => {
+      expect(state().phase).toBe('form');
+    });
+    await vi.advanceTimersByTimeAsync(120);
+    await vi.waitFor(() => {
+      expect(state().checks.wrong).toEqual({ released: 'Not a date' });
+    });
+    leaveField('released');
+    wrong = {};
+
+    setField('released', '1959');
+    await vi.advanceTimersByTimeAsync(120);
+
+    await vi.waitFor(() => {
+      expect(shownErrors(state().checks)).toEqual({});
+    });
+  });
+
   it('shows only the latest answer about the path', async () => {
     const answers: ((res: Response) => void)[] = [];
     await fetched(
@@ -360,6 +422,23 @@ describe('adding the track', () => {
     expect(state()).toMatchObject({ phase: 'form', error: 'a track needs a title' });
     expect(useApp.getState().overlay).toEqual({ kind: 'add' });
     expect(useApp.getState().busy).toBe(false);
+  });
+
+  it('shows every field the server found wrong and says which comes first in the form', async () => {
+    await inFormWith(
+      ({ method, url }) =>
+        method === 'POST' && url.pathname === '/api/add/finish'
+          ? jsonResponse({ error: '2 fields need fixing', fields: { cutStart: 'Cut start: invalid time "x"', released: 'Not a date' } }, 422)
+          : undefined,
+      discard,
+    );
+
+    const wrong = await saveAdd();
+
+    expect(wrong).toBe('released');
+    expect(shownErrors(state().checks)).toEqual({ cutStart: 'Cut start: invalid time "x"', released: 'Not a date' });
+    expect(state()).toMatchObject({ phase: 'form', error: '' });
+    expect(useApp.getState().overlay).toEqual({ kind: 'add' });
   });
 
   it('stays in the form without a message when another change is on its way', async () => {

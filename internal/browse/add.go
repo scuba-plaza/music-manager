@@ -154,11 +154,11 @@ func (e *Editor) CanAdd() bool { return e.downloader != nil }
 func CheckLink(s string) (string, error) {
 	link := strings.Join(strings.Fields(s), "")
 	if link == "" {
-		return "", errors.New("Paste a link first")
+		return "", app.Invalid("link", "Paste a link first")
 	}
 	u, err := url.Parse(link)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return "", errors.New("That is not a web link: it should start with http:// or https://")
+		return "", app.Invalid("link", "That is not a web link: it should start with http:// or https://")
 	}
 	return link, nil
 }

@@ -327,12 +327,12 @@ func (d draft) edit() (app.Edit, error) {
 		of, ofErr := count(d.second)
 		bad := app.FieldErrors{}
 		if nErr != nil {
-			bad["track"] = "Track must be a whole number, or empty"
+			bad.Set("track", "Track must be a whole number, or empty")
 		}
 		if ofErr != nil {
-			bad["of"] = "Tracks on the album must be a whole number, or empty"
+			bad.Set("of", "Tracks on the album must be a whole number, or empty")
 		} else if nErr == nil && n > 0 && of > 0 && of < n {
-			bad["of"] = fmt.Sprintf("Tracks on the album cannot be fewer than the track number, %d", n)
+			bad.Set("of", fmt.Sprintf("Tracks on the album cannot be fewer than the track number, %d", n))
 		}
 		if err := bad.OrNil(); err != nil {
 			return e, err

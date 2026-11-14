@@ -87,7 +87,7 @@ func TestAddingNeedsADownloaderAndALink(t *testing.T) {
 		t.Errorf("%d %+v", code, r)
 	}
 	srv := start(t, a, WithDownloader(&webtest.FakeDownloader{}))
-	if code, r := send(t, srv, "POST", "/api/add/fetch", obj{"url": "  "}); code != 422 || !strings.Contains(r.Error, "Paste a link") {
+	if code, r := send(t, srv, "POST", "/api/add/fetch", obj{"url": "  "}); code != 422 || !strings.Contains(r.Error, "Paste a link") || r.Fields["link"] == "" {
 		t.Errorf("%d %+v", code, r)
 	}
 }
@@ -96,7 +96,7 @@ func TestOnlyAWebLinkIsDownloaded(t *testing.T) {
 	a, _ := seed(t, sample...)
 	srv := start(t, a, WithDownloader(&webtest.FakeDownloader{}))
 	for _, link := range []string{"--exec=touch/tmp/x", "-h", "ftp://example.org/a", "file:///etc/passwd", "youtube.com/watch?v=1", "https://", "http:///path"} {
-		if code, r := send(t, srv, "POST", "/api/add/fetch", obj{"url": link}); code != 422 || !strings.Contains(r.Error, "web link") {
+		if code, r := send(t, srv, "POST", "/api/add/fetch", obj{"url": link}); code != 422 || !strings.Contains(r.Error, "web link") || r.Fields["link"] == "" {
 			t.Errorf("%q: %d %+v, want 422 about a web link", link, code, r)
 		}
 	}

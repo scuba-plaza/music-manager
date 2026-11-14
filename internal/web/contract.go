@@ -13,6 +13,7 @@ func Contract() []any {
 		browse.PeekView{},
 		browse.PlanView{},
 		browse.TrackView{},
+		AddCheck{},
 		ChangeResponse{},
 		ErrorView{},
 		HintView{},

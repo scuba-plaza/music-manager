@@ -1,6 +1,7 @@
 package web
 
 import (
+	"strings"
 	"testing"
 
 	"music-manager/internal/app"
@@ -36,6 +37,9 @@ func TestAnAddFormThatIsWrongSaysWhichFieldsAreWrong(t *testing.T) {
 	}
 	if len(r.Fields) != 3 {
 		t.Errorf("%v", r.Fields)
+	}
+	if !strings.HasPrefix(r.Fields["released"], "Release date") {
+		t.Errorf("a message under a field starts with a capital: %q", r.Fields["released"])
 	}
 }
 
@@ -84,5 +88,35 @@ func TestABulkFormThatIsWrongSaysWhichFieldsAreWrong(t *testing.T) {
 
 	if code != 422 || r.Fields["artist"] == "" || r.Fields["of"] == "" || len(r.Fields) != 2 {
 		t.Errorf("%d %+v", code, r)
+	}
+}
+
+func TestTheCheckOfAnAddFormNamesTheWrongFieldsAndSaysWhereTheFileWouldGo(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a, WithDownloader(&webtest.FakeDownloader{Audio: testmp3.Silent(700)}))
+	var wrong struct {
+		Path   string
+		Fields map[string]string
+	}
+
+	form := addForm("soon", "")
+	form["track"] = "x"
+	if code := sendInto(t, srv.URL, "POST", "/api/add/path", obj{"form": form}, &wrong); code != 200 {
+		t.Fatalf("%d", code)
+	}
+
+	if wrong.Fields["released"] == "" || wrong.Fields["track"] == "" || len(wrong.Fields) != 2 || wrong.Path == "" {
+		t.Errorf("%+v", wrong)
+	}
+
+	var right struct {
+		Path   string
+		Fields map[string]string
+	}
+	if code := sendInto(t, srv.URL, "POST", "/api/add/path", obj{"form": addForm("2001", "")}, &right); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	if len(right.Fields) != 0 || right.Path != "Some Band/A song.mp3" {
+		t.Errorf("%+v", right)
 	}
 }
