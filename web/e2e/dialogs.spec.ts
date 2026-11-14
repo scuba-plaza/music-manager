@@ -41,8 +41,8 @@ function row(page: Page, label: string): Locator {
 
 async function onTrack(page: Page, label: string): Promise<void> {
   await openPage(page);
-  await page.keyboard.press('+');
-  await page.keyboard.press('+');
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
   await row(page, label).last().click();
   await expect(row(page, label).last()).toHaveAttribute('aria-selected', 'true');
 }
@@ -187,13 +187,13 @@ test('the help dialog lists every binding by page and ← → turns the pages', 
   await expect(dialog).toHaveCount(0);
 });
 
-test('S then 3 sorts by title into one flat list and choosing the tree goes back to the tree', async ({ page, request }) => {
+test('o then 3 sorts by title into one flat list and choosing the tree goes back to the tree', async ({ page, request }) => {
   const sorted = (await (await request.get('/api/library?sort=title')).json()) as LibraryResponse;
   const titles = sorted.view.rows.map((r) => r.label);
   await openPage(page);
   await page.getByRole('tree').focus();
 
-  await page.keyboard.press('S');
+  await page.keyboard.press('o');
   const dialog = page.getByRole('dialog', { name: 'Sort' });
   await expect(dialog.getByRole('option').nth(3)).toContainText('Title');
   await page.keyboard.press('4');
@@ -206,7 +206,7 @@ test('S then 3 sorts by title into one flat list and choosing the tree goes back
   await row(page, 'So What').click();
   await expect(row(page, 'So What')).toHaveAttribute('aria-selected', 'true');
 
-  await page.keyboard.press('S');
+  await page.keyboard.press('o');
   await page.keyboard.press('1');
 
   await expect(dialog).toHaveCount(0);

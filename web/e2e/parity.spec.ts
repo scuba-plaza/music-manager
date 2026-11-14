@@ -7,8 +7,8 @@ const pixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QD
 async function openAll(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.getByRole('banner')).toContainText('6 tracks');
-  await page.keyboard.press('+');
-  await page.keyboard.press('+');
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
   await expect(row(page, 'So What')).toBeVisible();
 }
 
@@ -46,7 +46,7 @@ async function clipboardOf(page: Page, name: string): Promise<JSHandle<DataTrans
   );
 }
 
-test('] nudges a cut by a second, [ by a tenth, { and } by ten, and 0 clears it', async ({ page }) => {
+test('→ nudges a cut by a tenth and ← takes it back, Shift+→ and Shift+← do the same by a second, and d clears it', async ({ page }) => {
   await openAll(page);
   await intoTrack(page, 'So What');
   await page.keyboard.press('2');
@@ -55,24 +55,25 @@ test('] nudges a cut by a second, [ by a tenth, { and } by ten, and 0 clears it'
   const value = pane(page).getByTestId('value-cutStart');
   const blank = (await value.textContent()) ?? '';
 
-  await page.keyboard.press(']');
+  await page.keyboard.press('ArrowRight');
   await expect(value).not.toHaveText(blank);
   await expect(value).toContainText('1');
+
+  await page.keyboard.press('ArrowLeft');
+  await expect(value).toHaveText(blank);
+
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect(value).not.toHaveText(blank);
   const second = (await value.textContent()) ?? '';
 
-  await page.keyboard.press('[');
+  await page.keyboard.press('Shift+ArrowLeft');
   await expect(value).not.toHaveText(second);
-  const tenth = (await value.textContent()) ?? '';
+  await expect(value).toHaveText(blank);
 
-  await page.keyboard.press('}');
-  await expect(value).not.toHaveText(tenth);
-  const ten = (await value.textContent()) ?? '';
+  await page.keyboard.press('ArrowRight');
+  await expect(value).not.toHaveText(blank);
 
-  await page.keyboard.press('{');
-  await expect(value).not.toHaveText(ten);
-  await expect(value).toHaveText(tenth);
-
-  await page.keyboard.press('0');
+  await page.keyboard.press('d');
   await expect(value).toHaveText(blank);
 });
 
@@ -88,13 +89,18 @@ test('n numbers the album and the tracks follow', async ({ page, request }) => {
   expect(numbers).toEqual(['01', '02']);
 });
 
-test('x on the Cover field removes the cover of the track', async ({ page }) => {
+test('d on the Cover field asks first, and y removes the cover of the track', async ({ page }) => {
   await openAll(page);
   await intoTrack(page, 'So What');
   await pane(page).getByTestId('value-cover').click();
   await expect(pane(page).getByRole('img', { name: 'Cover' })).toBeVisible();
 
-  await page.keyboard.press('x');
+  await page.keyboard.press('d');
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('Remove the cover of “So What”?');
+  await expect(pane(page).getByRole('img', { name: 'Cover' })).toBeVisible();
+  await page.keyboard.press('y');
 
   await said(page, 'Saved');
   await expect(pane(page).getByRole('img', { name: 'Cover' })).toHaveCount(0);
@@ -129,7 +135,7 @@ test('what another program changes shows on the page within a few seconds', asyn
 
 test('click selects, double-click opens, click on a field then again edits, the twist arrow opens at once', async ({ page }) => {
   await openAll(page);
-  await page.keyboard.press('-');
+  await page.keyboard.press('Shift+ArrowLeft');
   await expect(row(page, 'Miles Davis').first()).toBeVisible();
 
   await row(page, 'Miles Davis').first().click();
@@ -154,16 +160,15 @@ test('click selects, double-click opens, click on a field then again edits, the 
   await expect(pane(page).getByRole('textbox', { name: 'Artist' })).toBeFocused();
 });
 
-test('the tab you are on stays when another track is selected', async ({ page }) => {
+test('the fields of another track open on the Details tab, not on the tab that was left', async ({ page }) => {
   await openAll(page);
   await intoTrack(page, 'So What');
   await page.keyboard.press('2');
-  const tab = pane(page).getByRole('tab', { selected: true });
-  const name = await tab.textContent();
+  await expect(pane(page).getByRole('tab', { selected: true })).toHaveText('2 Audio');
 
   await page.keyboard.press('Escape');
   await row(page, 'Giant Steps').last().click();
   await page.keyboard.press('Enter');
 
-  await expect(pane(page).getByRole('tab', { selected: true })).toHaveText(name ?? '');
+  await expect(pane(page).getByRole('tab', { selected: true })).toHaveText('1 Details');
 });

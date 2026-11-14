@@ -1,10 +1,9 @@
 import { Fragment } from 'react';
 import { helpPages, type KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
-import { closeOverlay, useApp } from '../state/store';
+import { useApp } from '../state/store';
 
 const pages = helpPages();
-const closers = new Set(['Escape', '?', 'q', 'Enter']);
 const forward = new Set(['ArrowRight', 'l']);
 const backward = new Set(['ArrowLeft', 'h']);
 const hints = [
@@ -22,11 +21,9 @@ export function Help() {
 
   function onKey(e: KeyEventLike): boolean {
     const n = Number(e.key);
-    if (closers.has(e.key)) {
-      closeOverlay();
-    } else if (forward.has(e.key) || (e.key === 'Tab' && !e.shiftKey)) {
+    if (forward.has(e.key)) {
       turn(page + 1);
-    } else if (backward.has(e.key) || e.key === 'Tab') {
+    } else if (backward.has(e.key)) {
       turn(page - 1);
     } else if (/^[1-9]$/.test(e.key) && n <= pages.length) {
       turn(n - 1);

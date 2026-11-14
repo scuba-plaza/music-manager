@@ -39,7 +39,7 @@ test('an empty library shows an empty tree and keys do nothing harmful', async (
   const errors: string[] = [];
   page.on('pageerror', (err) => errors.push(err.message));
   await page.getByRole('tree').focus();
-  for (const key of ['ArrowDown', 'ArrowUp', 'Enter', 'ArrowRight', 'ArrowLeft', '+', '-', 'z', 'Space', 'Control+a', 'e', 'd', 'J', 'K', 'n', 'c', 'v', 'p']) {
+  for (const key of ['ArrowDown', 'ArrowUp', 'Enter', 'ArrowRight', 'ArrowLeft', 'Shift+ArrowRight', 'Shift+ArrowLeft', 'Space', 'Shift+Space', 'e', 'd', 'Shift+ArrowDown', 'Shift+ArrowUp', 'n', 'c', 'v', 'p']) {
     await page.keyboard.press(key);
     await page.keyboard.press('Escape');
   }
@@ -56,8 +56,8 @@ test('a library without playlists makes p open on the name input', async ({ page
   await removePlaylists(request);
   await page.goto('/');
   await expect(page.getByRole('banner')).toContainText('6 tracks');
-  await page.keyboard.press('+');
-  await page.keyboard.press('+');
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
   await row(page, 'So What').last().click();
 
   await page.keyboard.press('p');
@@ -72,8 +72,8 @@ test('a library without playlists makes p open on the name input', async ({ page
 test('an unidentified track shows its fields and the Needs work group lists it', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('banner')).toContainText('1 need work');
-  await page.keyboard.press('+');
-  await page.keyboard.press('+');
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
   await row(page, 'Needs work').first().click();
   const pane = page.getByRole('region', { name: 'Details' });
 
@@ -92,7 +92,7 @@ test('an empty playlist opens with no rows and d deletes it after asking', async
   expect(took.ok()).toBe(true);
   await page.goto('/');
   await expect(page.getByRole('banner')).toContainText('6 tracks');
-  await page.keyboard.press('+');
+  await page.keyboard.press('Shift+ArrowRight');
   await row(page, 'Late night').first().click();
   await page.keyboard.press('Enter');
   await expect(row(page, 'Late night').first()).toHaveAttribute('aria-selected', 'true');

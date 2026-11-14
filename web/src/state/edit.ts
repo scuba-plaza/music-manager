@@ -1,12 +1,11 @@
 import { getBlob, query, send } from '../api/client';
 import type { ChangeResponse, FieldView, HintView, PathView } from '../api/types.gen';
-import type { ActionName } from '../keys/keymap';
 import { dropDetail, loadDetail } from './detail';
 import { loadLibrary } from './library';
 import { pointRow } from './actions';
 import { fail, setStatus } from './status';
 import { chooseCover, removeCover } from './cover';
-import { chooseTab, currentField, fieldIndex, fieldList, isTrack, moveField, nextTab, nudgeable, previousTabOrBack } from './inspector';
+import { currentField, fieldIndex, fieldList, isTrack, nudgeable } from './inspector';
 import { useApp, type EditState } from './store';
 import { ancestorKeys, rowByKey } from './tree';
 
@@ -172,14 +171,18 @@ function cutField(): { id: string; key: string } | undefined {
   return { id: s.detail.id, key: f.key };
 }
 
-function nudge(more: 1 | -1, big: boolean): void {
+export function nudge(more: 1 | -1, big: boolean): void {
   const cut = cutField();
   if (cut !== undefined) {
     void attempt(() => send<ChangeResponse>('POST', `/api/tracks/${enc(cut.id)}/nudge`, { field: cut.key, more, big }));
   }
 }
 
-function clearField(): void {
+export function clear(): void {
+  if (currentField(useApp.getState())?.key === 'cover') {
+    removeCover();
+    return;
+  }
   const cut = cutField();
   if (cut !== undefined) {
     void attempt(() => send<ChangeResponse>('POST', `/api/tracks/${enc(cut.id)}/clear`, { field: cut.key }));
@@ -195,7 +198,7 @@ export function stopPlaying(): boolean {
   return true;
 }
 
-async function hear(): Promise<void> {
+export async function hear(): Promise<void> {
   const cut = cutField();
   if (cut === undefined || stopPlaying()) {
     return;
@@ -209,7 +212,7 @@ async function hear(): Promise<void> {
       return;
     }
     useApp.setState({ playing: { ...playing, src: URL.createObjectURL(blob) } });
-    setStatus('Playing · p or esc stops');
+    setStatus('Playing · space or esc stops');
   } catch (err) {
     if (useApp.getState().playing === playing) {
       stopPlaying();
@@ -234,53 +237,3 @@ useApp.subscribe((state, previous) => {
     URL.revokeObjectURL(src);
   }
 });
-
-const tabKeys: Partial<Record<ActionName, number>> = { tab1: 0, tab2: 1, tab3: 2, tab4: 3 };
-
-export function runInspector(action: ActionName): void {
-  const tab = tabKeys[action];
-  if (tab !== undefined) {
-    chooseTab(tab);
-    return;
-  }
-  switch (action) {
-    case 'fieldUp':
-      moveField(-1);
-      break;
-    case 'fieldDown':
-      moveField(1);
-      break;
-    case 'nextTab':
-      nextTab();
-      break;
-    case 'previousTabOrBack':
-      previousTabOrBack();
-      break;
-    case 'startEdit':
-      startEdit();
-      break;
-    case 'nudgeDown':
-      nudge(-1, false);
-      break;
-    case 'nudgeUp':
-      nudge(1, false);
-      break;
-    case 'nudgeDownMore':
-      nudge(-1, true);
-      break;
-    case 'nudgeUpMore':
-      nudge(1, true);
-      break;
-    case 'clearField':
-      clearField();
-      break;
-    case 'hear':
-      void hear();
-      break;
-    case 'removeCover':
-      removeCover();
-      break;
-    default:
-      break;
-  }
-}

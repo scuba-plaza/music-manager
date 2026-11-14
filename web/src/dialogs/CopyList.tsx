@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { CopyChoice } from '../api/types.gen';
+import { motionOf, moveTo } from '../keys/dialog';
 import type { KeyEventLike } from '../keys/keymap';
 import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
-import { MenuList, moveIn } from '../overlay/MenuList';
+import { MenuList } from '../overlay/MenuList';
 import { copyAttributes } from '../overlay/confirm';
-import { closeOverlay } from '../state/store';
 
 interface CopyListProps {
   id: string;
@@ -42,12 +42,9 @@ export function CopyList({ id, title, choices }: CopyListProps) {
   }
 
   function onKey(e: KeyEventLike): boolean {
-    if (e.key === 'q') {
-      closeOverlay();
-    } else if (e.key === 'ArrowUp' || e.key === 'k') {
-      setCursor(moveIn(choices.length, cursor, -1));
-    } else if (e.key === 'ArrowDown' || e.key === 'j') {
-      setCursor(moveIn(choices.length, cursor, 1));
+    const motion = motionOf(e);
+    if (motion !== undefined) {
+      setCursor(moveTo(choices.length, cursor, motion));
     } else if (e.key === ' ') {
       toggle(cursor);
     } else if (e.key === 'Enter') {

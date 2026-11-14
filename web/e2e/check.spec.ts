@@ -21,15 +21,15 @@ function row(page: Page, label: string): Locator {
 
 async function openAll(page: Page): Promise<void> {
   await openPage(page);
-  await page.keyboard.press('+');
-  await page.keyboard.press('+');
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
   await expect(row(page, 'Rough Mix')).toBeVisible();
 }
 
 test('D lists the problems and a click moves the cursor to the track', async ({ page, dialog }) => {
   await openAll(page);
 
-  await page.keyboard.press('D');
+  await page.keyboard.press('Shift+v');
 
   await expect(dialog()).toHaveAccessibleName('Library check');
   await expect(dialog()).toContainText('0 errors, 1 warning');

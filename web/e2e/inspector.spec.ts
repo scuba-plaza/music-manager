@@ -26,8 +26,8 @@ async function enterTrack(page: Page, label: string): Promise<void> {
 
 async function intoFields(page: Page, label: string): Promise<void> {
   await openPage(page);
-  await page.keyboard.press('+');
-  await page.keyboard.press('+');
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
   await enterTrack(page, label);
 }
 
@@ -105,7 +105,7 @@ test('the device tab previews the track with the profile chosen', async ({ page 
   await expect(pane(page).getByText('01 - Watani.mp3')).toBeVisible();
 });
 
-test('the inspector takes the whole screen on a narrow window, and ← on the first tab goes back to the tree', async ({ page }, testInfo) => {
+test('the inspector takes the whole screen on a narrow window, and esc goes back to the tree', async ({ page }, testInfo) => {
   await intoFields(page, 'So What');
   const narrow = testInfo.project.name === 'narrow';
 
@@ -118,9 +118,8 @@ test('the inspector takes the whole screen on a narrow window, and ← on the fi
   }
 
   await page.keyboard.press('2');
-  await page.keyboard.press('ArrowLeft');
-  await expect(pane(page).getByRole('tab', { name: '1 Details' })).toHaveAttribute('aria-selected', 'true');
-  await page.keyboard.press('ArrowLeft');
+  await expect(pane(page).getByRole('tab', { name: '2 Audio' })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Escape');
 
   await expect(page.getByRole('tree')).toBeVisible();
   await expect(row(page, 'So What')).toHaveAttribute('aria-selected', 'true');

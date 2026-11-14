@@ -12,8 +12,8 @@ async function openPage(page: Page): Promise<void> {
 
 async function openAll(page: Page): Promise<void> {
   await openPage(page);
-  await page.keyboard.press('+');
-  await page.keyboard.press('+');
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
   await expect(row(page, 'So What')).toBeVisible();
 }
 
@@ -186,7 +186,7 @@ test('d on a playlist asks, and y deletes it', async ({ page, request }) => {
   const ask = page.getByRole('dialog', { name: 'Are you sure?' });
   await expect(ask).toContainText('Delete the playlist “Late night”?');
   await expect(ask).toContainText('Its 1 track stay in the library.');
-  await page.keyboard.press('Enter');
+  await page.keyboard.press('y');
 
   await said(page, 'Deleted the playlist Late night · u undoes it');
   await expect(row(page, 'Late night')).toHaveCount(0);
@@ -194,13 +194,13 @@ test('d on a playlist asks, and y deletes it', async ({ page, request }) => {
   expect(await playlistCount(request, 'Late night')).toBeUndefined();
 });
 
-test('J moves a track down and renumbers', async ({ page }) => {
+test('Shift+↓ moves a track down and renumbers', async ({ page }) => {
   await openAll(page);
   await row(page, 'So What').click();
   await expect(row(page, 'So What').locator('.num')).toHaveText('01');
   await expect(row(page, 'Blue in Green').last().locator('.num')).toHaveText('03');
 
-  await page.keyboard.press('J');
+  await page.keyboard.press('Shift+ArrowDown');
 
   await said(page, 'Moved');
   expect(await labelsAfter(page, 'Kind of Blue', 2)).toEqual(['Blue in Green', 'So What']);
@@ -215,20 +215,20 @@ test('J moves a track down and renumbers', async ({ page }) => {
   await expect(row(page, 'So What').locator('.num')).toHaveText('02');
 });
 
-test('K on the first track of an album says it is the first already', async ({ page }) => {
+test('Shift+↑ on the first track of an album says it is the first already', async ({ page }) => {
   await openAll(page);
   await row(page, 'So What').click();
 
-  await page.keyboard.press('K');
+  await page.keyboard.press('Shift+ArrowUp');
 
   await said(page, 'It is the first track already');
   expect(await labelsAfter(page, 'Kind of Blue', 2)).toEqual(['So What', 'Blue in Green']);
 });
 
-test('u then ctrl+r undoes and redoes', async ({ page }) => {
+test('u then Shift+u undoes and redoes', async ({ page }) => {
   await openAll(page);
   await row(page, 'So What').click();
-  await page.keyboard.press('J');
+  await page.keyboard.press('Shift+ArrowDown');
   await said(page, 'Moved');
 
   await page.keyboard.press('u');
@@ -237,7 +237,7 @@ test('u then ctrl+r undoes and redoes', async ({ page }) => {
   expect(await labelsAfter(page, 'Kind of Blue', 2)).toEqual(['So What', 'Blue in Green']);
   await expect(row(page, 'So What')).toHaveAttribute('aria-selected', 'true');
 
-  await page.keyboard.press('Control+r');
+  await page.keyboard.press('Shift+u');
 
   await said(page, 'Redid: move of a track');
   expect(await labelsAfter(page, 'Kind of Blue', 2)).toEqual(['Blue in Green', 'So What']);
@@ -300,12 +300,12 @@ test('p adds the selected album to Late night and the count becomes 3', async ({
   expect(await playlistCount(request, 'Late night')).toBe(2);
 });
 
-test('p then n makes a new playlist with the track', async ({ page, request }) => {
+test('p then c makes a new playlist with the track', async ({ page, request }) => {
   await openAll(page);
   await row(page, 'So What').click();
 
   await page.keyboard.press('p');
-  await page.keyboard.press('n');
+  await page.keyboard.press('c');
   await page.getByRole('textbox', { name: 'Name of the playlist' }).fill('Road');
   await page.keyboard.press('Enter');
 
@@ -316,7 +316,7 @@ test('p then n makes a new playlist with the track', async ({ page, request }) =
 
 test("renaming an artist to another artist's name says it joins them", async ({ page }) => {
   await openPage(page);
-  await page.keyboard.press('+');
+  await page.keyboard.press('Shift+ArrowRight');
   await row(page, 'John Coltrane').click();
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('region', { name: 'Details' }).getByTestId('value-artist')).toHaveText('John Coltrane');
@@ -404,13 +404,13 @@ test('- in Album turns the marked tracks into singles, and what is left blank st
   await expect(row(page, 'Miles Davis').locator('.right')).toHaveText('2');
 });
 
-test('J in a playlist moves the track down the playlist', async ({ page }) => {
+test('Shift+↓ in a playlist moves the track down the playlist', async ({ page }) => {
   const list = 'A rather long playlist name that goes on and on and on for a while';
   await openAll(page);
   expect(await labelsAfter(page, list, 2)).toEqual(['Giant Steps', 'وطني']);
   await row(page, 'Giant Steps').first().click();
 
-  await page.keyboard.press('J');
+  await page.keyboard.press('Shift+ArrowDown');
 
   await said(page, 'Moved · u undoes it');
   expect(await labelsAfter(page, list, 2)).toEqual(['وطني', 'Giant Steps']);

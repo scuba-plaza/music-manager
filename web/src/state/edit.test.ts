@@ -365,7 +365,7 @@ describe('cuts, gains and fades', () => {
   it('0 clears the field', async () => {
     onCut({ field: 1 });
 
-    run('clearField');
+    run('clear');
 
     await vi.waitFor(() => {
       expect(requestsTo(fetchMock, 'POST', '/api/tracks/sowhat/clear')).toEqual([{ field: 'volume' }]);
@@ -376,7 +376,7 @@ describe('cuts, gains and fades', () => {
     onTrack();
 
     run('nudgeUp');
-    run('clearField');
+    run('clear');
     await Promise.resolve();
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -422,7 +422,7 @@ describe('hearing a cut', () => {
       expect(useApp.getState().playing).toEqual({ id: 'sowhat', field: 'cutStart', src: 'blob:preview' });
     });
     expect(requestsTo(fetchMock, 'GET', '/api/tracks/sowhat/preview?field=cutStart')).toHaveLength(1);
-    expect(useApp.getState().status.text).toBe('Playing · p or esc stops');
+    expect(useApp.getState().status.text).toBe('Playing · space or esc stops');
   });
 
   it('p again stops it and lets the audio go', async () => {

@@ -69,11 +69,11 @@ describe('installKeys', () => {
   it('runs the action of the pane that has focus', async () => {
     const { useApp, ran, send } = await setup();
 
-    const first = send(press('p'));
+    const first = send(press(' '));
     useApp.setState({ focus: 'inspector' });
-    send(press('p'));
+    send(press(' '));
 
-    expect(ran).toEqual(['addToPlaylist', 'hear']);
+    expect(ran).toEqual(['markToggle', 'hear']);
     expect(first.prevented()).toBe(true);
   });
 
@@ -112,13 +112,32 @@ describe('installKeys', () => {
     expect(pressed.map((p) => p.prevented())).toEqual([false, false, false, false]);
   });
 
-  it('ctrl+r, ctrl+a, ctrl+u, ctrl+d resolve when focus is not in an input', async () => {
+  it('the browser keeps ctrl+r, ctrl+a, ctrl+u and ctrl+d: nothing runs and nothing is prevented', async () => {
     const { ran, send } = await setup();
 
     const pressed = ['r', 'a', 'u', 'd'].map((key) => send(press(key, { ctrl: true })));
 
-    expect(ran).toEqual(['redo', 'markAll', 'pageUp', 'pageDown']);
-    expect(pressed.map((p) => p.prevented())).toEqual([true, true, true, true]);
+    expect(ran).toEqual([]);
+    expect(pressed.map((p) => p.prevented())).toEqual([false, false, false, false]);
+  });
+
+  it('Shift is part of the key: Shift+u redoes, Shift+Space marks all, and Shift+Tab is left to the browser', async () => {
+    const { ran, send } = await setup();
+
+    const redo = send(press('U', { shift: true }));
+    const markAll = send(press(' ', { shift: true }));
+    const back = send(press('Tab', { shift: true }));
+
+    expect(ran).toEqual(['redo', 'markAll']);
+    expect([redo.prevented(), markAll.prevented(), back.prevented()]).toEqual([true, true, false]);
+  });
+
+  it('Caps Lock changes nothing: a capital U without Shift is still undo', async () => {
+    const { ran, send } = await setup();
+
+    send(press('U'));
+
+    expect(ran).toEqual(['undo']);
   });
 
   it('the filter box handles only Enter, ArrowDown and Escape', async () => {

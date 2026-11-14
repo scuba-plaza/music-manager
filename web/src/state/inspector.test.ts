@@ -108,31 +108,6 @@ describe('choosing a field', () => {
 });
 
 describe('choosing a tab', () => {
-  it('nextTab turns to the next tab, from the last back to the first, and starts at the first field', () => {
-    onTrack({ field: 2 });
-
-    run('nextTab');
-    expect(useApp.getState()).toMatchObject({ tab: 1, field: 0 });
-
-    run('nextTab');
-    run('nextTab');
-    run('nextTab');
-    expect(useApp.getState().tab).toBe(0);
-  });
-
-  it('previousTabOrBack turns back a tab, and on the first goes back to the tree', () => {
-    onTrack({ tab: 2 });
-
-    run('previousTabOrBack');
-    expect(useApp.getState()).toMatchObject({ tab: 1, focus: 'inspector' });
-
-    run('previousTabOrBack');
-    expect(useApp.getState()).toMatchObject({ tab: 0, focus: 'inspector' });
-
-    run('previousTabOrBack');
-    expect(useApp.getState()).toMatchObject({ tab: 0, focus: 'tree' });
-  });
-
   it('the number keys choose a tab by its number, and a number beyond the tabs does nothing', () => {
     onTrack({ field: 1 });
 
@@ -155,23 +130,20 @@ describe('choosing a tab', () => {
     expect(useApp.getState().edit).toBeNull();
   });
 
-  it('the tab is remembered', () => {
+  it('the tab is not remembered between visits', () => {
     onTrack();
 
     run('tab2');
 
-    expect(localStorage.getItem('mm.tab')).toBe('1');
+    expect(localStorage.getItem('mm.tab')).toBeNull();
   });
 
-  it('an artist has no tabs: the tab keys leave it alone and ← goes back to the tree', () => {
+  it('an artist has no tabs: the tab keys leave it alone', () => {
     useApp.setState({ lib: sampleLibrary(), cursor: keys.miles, detail: artistView(), focus: 'inspector', tab: 0 });
 
-    run('nextTab');
     run('tab2');
-    expect(useApp.getState().tab).toBe(0);
 
-    run('previousTabOrBack');
-    expect(useApp.getState().focus).toBe('tree');
+    expect(useApp.getState().tab).toBe(0);
   });
 });
 
@@ -184,6 +156,17 @@ describe('the other pane', () => {
 
     run('toggleFocus');
     expect(useApp.getState().focus).toBe('tree');
+  });
+
+  it('going into the fields of a track opens the Details tab at its first field, wherever they were left', () => {
+    const track = { lib: sampleLibrary(), cursor: keys.soWhat, expanded: new Set([keys.miles, `album${sep}Miles Davis${sep}Kind of Blue`]) };
+    for (const way of ['toggleFocus', 'open', 'enterRow', 'bulkEdit'] as const) {
+      useApp.setState({ ...track, focus: 'tree', tab: 1, field: 3 });
+
+      run(way);
+
+      expect(useApp.getState(), way).toMatchObject({ focus: 'inspector', tab: 0, field: 0 });
+    }
   });
 
   it('Tab goes into the fields of an artist or a playlist at the first field', () => {

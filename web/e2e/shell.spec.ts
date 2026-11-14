@@ -45,7 +45,7 @@ test('the header shows the library folder, the tracks and what waits to sync', a
   await expect(page).toHaveTitle(`mm · ${info.root}`);
 });
 
-test('below 800px one pane shows at a time: → into the fields shows the right pane and ← returns to the tree', async ({ page, press }) => {
+test('below 800px one pane shows at a time: → into the fields shows the right pane and esc returns to the tree', async ({ page, press }) => {
   await openPage(page, 500);
   const tree = page.getByTestId('tree-pane');
   const fields = page.getByTestId('inspector-pane');
@@ -60,7 +60,7 @@ test('below 800px one pane shows at a time: → into the fields shows the right 
   await expect(tree).toBeHidden();
   expect((await boxOf(fields)).width).toBeGreaterThan(400);
 
-  await press('ArrowLeft');
+  await press('Escape');
 
   await expect(tree).toBeVisible();
   await expect(fields).toBeHidden();

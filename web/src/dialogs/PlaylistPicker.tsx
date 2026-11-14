@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlaylistView } from '../api/types.gen';
+import { motionOf, moveTo } from '../keys/dialog';
 import type { KeyEventLike } from '../keys/keymap';
 import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
-import { MenuList, moveIn } from '../overlay/MenuList';
+import { MenuList } from '../overlay/MenuList';
 import { addToPlaylist } from '../overlay/confirm';
 import { closeOverlay } from '../state/store';
 import { plural } from '../state/text';
@@ -50,6 +51,7 @@ export function PlaylistPicker({ ids, lists }: PlaylistPickerProps) {
   }
 
   function onKey(e: KeyEventLike): boolean {
+    const motion = motionOf(e);
     if (e.key === 'Escape') {
       if (naming && lists.length > 0) {
         name(false);
@@ -60,14 +62,10 @@ export function PlaylistPicker({ ids, lists }: PlaylistPickerProps) {
       pick(cursor);
     } else if (naming) {
       return false;
-    } else if (e.key === 'ArrowUp' || e.key === 'k') {
-      setCursor(moveIn(entries, cursor, -1));
-    } else if (e.key === 'ArrowDown' || e.key === 'j') {
-      setCursor(moveIn(entries, cursor, 1));
-    } else if (e.key === 'n') {
+    } else if (motion !== undefined) {
+      setCursor(moveTo(entries, cursor, motion));
+    } else if (e.key === 'c') {
       name(true);
-    } else if (e.key === 'q') {
-      closeOverlay();
     } else {
       return false;
     }
@@ -81,7 +79,7 @@ export function PlaylistPicker({ ids, lists }: PlaylistPickerProps) {
       ]
     : [
         { keys: 'enter', label: 'add' },
-        { keys: 'n', label: 'new' },
+        { keys: 'c', label: 'new' },
         { keys: 'esc', label: 'close' },
       ];
   const rows = [...lists.map((p) => ({ marker: '', label: p.name, detail: String(p.count) })), { marker: '', label: 'New playlist…', detail: '' }];

@@ -5,8 +5,8 @@ import { expect, test } from './fixtures.ts';
 async function openAll(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.getByRole('banner')).toContainText('6 tracks');
-  await page.keyboard.press('+');
-  await page.keyboard.press('+');
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
   await expect(row(page, 'So What').first()).toBeVisible();
 }
 
@@ -55,7 +55,7 @@ test('sorting by artist puts فيروز among the F, by its Latin form', async (
   await expect(page.getByRole('banner')).toContainText('6 tracks');
   await page.getByRole('tree').focus();
 
-  await page.keyboard.press('S');
+  await page.keyboard.press('o');
   await page.keyboard.press('2');
 
   const labels = page.getByRole('tree').getByRole('treeitem').locator('.label');

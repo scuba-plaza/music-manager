@@ -49,7 +49,7 @@ test('s opens the targets and the library folder has no format row', async ({ pa
   await expect(dialog()).toContainText('Where should the music be written?');
   await expect(format(page)).toHaveCount(0);
   await expect(dialog()).toContainText('the library folder is always written the standard way');
-  await page.keyboard.press('w');
+  await page.keyboard.press('f');
   await expect(format(page)).toHaveCount(0);
 
   await page.keyboard.press('End');
@@ -62,17 +62,17 @@ test('s opens the targets and the library folder has no format row', async ({ pa
   await expect(dialog()).toHaveCount(0);
 });
 
-test('a typed folder offers every profile, generic first, and w goes through them', async ({ page, dialog }) => {
+test('a typed folder offers every profile, generic first, and f goes through them', async ({ page, dialog }) => {
   await openPage(page);
   await page.keyboard.press('s');
   await expect(dialog()).toHaveAccessibleName('Sync');
   await page.keyboard.press('End');
 
-  await page.keyboard.press('w');
+  await page.keyboard.press('f');
   await expect(format(page)).toHaveValue('wolfgang-wmp01');
-  await page.keyboard.press('w');
+  await page.keyboard.press('f');
   await expect(format(page)).toHaveValue('my-player');
-  await page.keyboard.press('w');
+  await page.keyboard.press('f');
   await expect(format(page)).toHaveValue('generic');
 
   await page.keyboard.press('Enter');
@@ -125,10 +125,10 @@ test('strays are removed only after typing delete', async ({ page, dialog }) => 
     const stray = join(dir, 'Old', 'leftover.mp3');
     await writeFile(stray, 'not music');
     await review(page, dir, 'generic');
-    await expect(dialog()).toContainText('Stray files are left alone. p also deletes the strays.');
+    await expect(dialog()).toContainText('Stray files are left alone. d also deletes the strays.');
 
-    await page.keyboard.press('p');
-    await expect(dialog()).toContainText('The files marked − will be deleted. p keeps them.');
+    await page.keyboard.press('d');
+    await expect(dialog()).toContainText('The files marked − will be deleted. d keeps them.');
     await page.keyboard.press('Enter');
 
     const word = dialog().getByRole('textbox', { name: 'Type delete to confirm' });

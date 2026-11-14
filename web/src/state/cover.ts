@@ -4,7 +4,7 @@ import { setStatus } from './status';
 import { attempt } from './edit';
 import { hasMp3, uploadFiles } from './ingest';
 import { currentField, isTrack } from './inspector';
-import { useApp } from './store';
+import { ask, useApp } from './store';
 import { isAlbum, markedIds, rowByKey } from './tree';
 
 export interface CoverTarget {
@@ -71,7 +71,11 @@ export function removeCover(): void {
     setStatus('There is no cover to remove');
     return;
   }
-  void attempt(() => send<ChangeResponse>('DELETE', '/api/cover' + coverQuery(target)));
+  const label = rowByKey(s.lib, s.cursor)?.label ?? '';
+  const head = isTrack(d) ? `Remove the cover of “${label}”?` : `Remove the cover of “${label}” and its tracks?`;
+  ask(head, ['u brings it back.'], 'remove', () => {
+    void attempt(() => send<ChangeResponse>('DELETE', '/api/cover' + coverQuery(target)));
+  });
 }
 
 function pictureIn(files: readonly File[]): File | undefined {

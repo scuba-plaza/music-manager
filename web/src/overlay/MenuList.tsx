@@ -48,7 +48,3 @@ export function MenuList({ label, rows, cursor, onChoose }: MenuListProps) {
     </div>
   );
 }
-
-export function moveIn(length: number, at: number, by: number): number {
-  return Math.min(Math.max(at + by, 0), length - 1);
-}

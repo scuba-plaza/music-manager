@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Progress } from '../components/Progress';
-import type { KeyEventLike } from '../keys/keymap';
+import { motionOf, moveTo, type Motion } from '../keys/dialog';
+import { keyName, type KeyEventLike } from '../keys/keymap';
 import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList } from '../overlay/MenuList';
@@ -14,7 +15,6 @@ import {
   chooseTarget,
   confirmDelete,
   cycleProfile,
-  moveTarget,
   pickTarget,
   progressOf,
   submitFolder,
@@ -28,6 +28,8 @@ import { plural } from '../state/text';
 
 const glyphs: Record<string, string> = { create: '+', update: '~', remove: '−', stray: '!' };
 const warningsShown = 4;
+const pageLines = 10;
+const scrolls: Record<Motion, number> = { up: -1, down: 1, first: -Infinity, last: Infinity };
 
 interface Hint {
   keys: string;
@@ -40,7 +42,7 @@ function hintsFor(phase: SyncPhase, library: boolean, nothingToDo: boolean): rea
       return [
         { keys: '↑↓', label: 'choose' },
         { keys: 'enter', label: 'choose' },
-        ...(library ? [] : [{ keys: 'w', label: 'format' }]),
+        ...(library ? [] : [{ keys: 'f', label: 'format' }]),
         { keys: 'esc', label: 'close' },
       ];
     case 'typing':
@@ -55,8 +57,9 @@ function hintsFor(phase: SyncPhase, library: boolean, nothingToDo: boolean): rea
         ? [{ keys: 'enter', label: 'close' }]
         : [
             { keys: '↑↓', label: 'scroll' },
+            { keys: 'space', label: 'page' },
             { keys: 'enter', label: 'apply' },
-            { keys: 'p', label: 'strays' },
+            { keys: 'd', label: 'strays' },
             { keys: 'esc', label: 'close' },
           ];
     case 'confirming':
@@ -137,22 +140,17 @@ export function Sync() {
 
   function onKey(e: KeyEventLike): boolean {
     const inSelect = document.activeElement instanceof HTMLSelectElement;
+    const onButton = document.activeElement instanceof HTMLButtonElement;
+    const motion = motionOf(e);
+    const name = keyName(e);
     switch (phase) {
       case 'choosing':
         if (inSelect) {
           return false;
         }
-        if (e.key === 'q') {
-          closeOverlay();
-        } else if (e.key === 'ArrowUp' || e.key === 'k') {
-          moveTarget(-1);
-        } else if (e.key === 'ArrowDown' || e.key === 'j') {
-          moveTarget(1);
-        } else if (e.key === 'Home') {
-          chooseTarget(0);
-        } else if (e.key === 'End') {
-          chooseTarget(targets.length - 1);
-        } else if (e.key === 'w') {
+        if (motion !== undefined) {
+          chooseTarget(moveTo(targets.length, cursor, motion));
+        } else if (e.key === 'f') {
           cycleProfile();
         } else if (e.key === 'Enter') {
           pickTarget();
@@ -173,21 +171,13 @@ export function Sync() {
       case 'applying':
         return false;
       case 'reviewing':
-        if (e.key === 'q') {
-          closeOverlay();
-        } else if (e.key === 'ArrowUp' || e.key === 'k') {
-          scroll(-1);
-        } else if (e.key === 'ArrowDown' || e.key === 'j') {
-          scroll(1);
-        } else if (e.key === 'PageUp') {
-          scroll(-10);
-        } else if (e.key === 'PageDown') {
-          scroll(10);
-        } else if (e.key === 'Home') {
-          scroll(-Infinity);
-        } else if (e.key === 'End') {
-          scroll(Infinity);
-        } else if (e.key === 'p' && plan !== null && plan.ops.length > 0) {
+        if (motion !== undefined) {
+          scroll(scrolls[motion]);
+        } else if (name === 'Space' && !onButton) {
+          scroll(pageLines);
+        } else if (name === 'Shift+Space' && !onButton) {
+          scroll(-pageLines);
+        } else if (e.key === 'd' && plan !== null && plan.ops.length > 0) {
           void togglePrune();
         } else if (e.key === 'Enter') {
           applyPlan();
@@ -235,7 +225,7 @@ export function Sync() {
               }
             }}
           />
-          <Format library={library} how="w goes through them" />
+          <Format library={library} how="f goes through them" />
         </>
       )}
       {phase === 'typing' && (
@@ -313,8 +303,8 @@ export function Sync() {
                   {plan.warnings.length > warningsShown && <div className="dim">{`… ${String(plan.warnings.length - warningsShown)} more`}</div>}
                 </>
               )}
-              {plan.counts.stray > 0 && <div className="ask-body">Stray files are left alone. p also deletes the strays.</div>}
-              {plan.counts.stray === 0 && plan.counts.remove > 0 && <div className="warn">The files marked − will be deleted. p keeps them.</div>}
+              {plan.counts.stray > 0 && <div className="ask-body">Stray files are left alone. d also deletes the strays.</div>}
+              {plan.counts.stray === 0 && plan.counts.remove > 0 && <div className="warn">The files marked − will be deleted. d keeps them.</div>}
               {phase === 'confirming' && (
                 <div className="confirm">
                   <span className="warn">{`Type delete to remove ${plural(plan.counts.remove, 'file')}: `}</span>

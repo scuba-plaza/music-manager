@@ -94,10 +94,6 @@ export function chooseTarget(i: number): void {
   useSync.setState((s) => ({ cursor: Math.min(Math.max(i, 0), s.targets.length - 1) }));
 }
 
-export function moveTarget(by: number): void {
-  chooseTarget(useSync.getState().cursor + by);
-}
-
 export function chooseProfile(name: string): void {
   useSync.setState({ profile: name });
 }

@@ -252,35 +252,22 @@ describe('the cursor', () => {
     await userEvent.keyboard('{Home}');
     await expect.poll(cursorLabel).toBe('Playlists');
 
-    await userEvent.keyboard('G');
+    await userEvent.keyboard('{Shift>}g{/Shift}');
     await expect.poll(cursorLabel).toBe('Nina Simone');
 
     await userEvent.keyboard('g');
     await expect.poll(cursorLabel).toBe('Playlists');
   });
 
-  test('PageDown and PageUp, ctrl+d and ctrl+u move by the rows that fit, less one', async () => {
+  test('the page keys and the ctrl keys that were page keys do nothing', async () => {
     openEverything();
-    await showTree(sampleLibrary(), { height: 170 });
+    await showTree();
     await expect.poll(() => rows().length).toBe(18);
-    const tree = page.getByRole('tree').element();
-    const height = rows()[0]?.getBoundingClientRect().height ?? 1;
-    const page1 = Math.floor(tree.clientHeight / height) - 1;
-    expect(page1).toBeGreaterThan(2);
-    expect(page1 * 2).toBeLessThan(rows().length);
-    const index = () => rows().findIndex((row) => row.getAttribute('aria-selected') === 'true');
 
-    await userEvent.keyboard('{PageDown}');
-    await expect.poll(index).toBe(page1);
+    await userEvent.keyboard('{PageDown}{PageUp}');
+    await userEvent.keyboard('{Control>}d{/Control}{Control>}u{/Control}');
 
-    await userEvent.keyboard('{Control>}d{/Control}');
-    await expect.poll(index).toBe(page1 * 2);
-
-    await userEvent.keyboard('{PageUp}');
-    await expect.poll(index).toBe(page1);
-
-    await userEvent.keyboard('{Control>}u{/Control}');
-    await expect.poll(index).toBe(0);
+    await expect.poll(cursorLabel).toBe('Playlists');
   });
 
   test('the row under the cursor is scrolled into view', async () => {
@@ -308,27 +295,6 @@ describe('the cursor', () => {
         const box = tree.getBoundingClientRect();
         const row = rowOf('Playlists').getBoundingClientRect();
         return row.top >= box.top - 1 && row.bottom <= box.bottom + 1;
-      })
-      .toBe(true);
-  });
-
-  test('z puts the cursor row in the middle of the tree', async () => {
-    openEverything();
-    await showTree();
-    await expect.poll(() => rows().length).toBe(18);
-    const tree = page.getByRole('tree').element();
-    const rowHeight = rows()[0]?.getBoundingClientRect().height ?? 1;
-    await userEvent.keyboard('{End}');
-    await userEvent.keyboard('kkkkkkkkk');
-    await expect.poll(cursorLabel).toBe('John Coltrane');
-
-    await userEvent.keyboard('z');
-
-    await expect
-      .poll(() => {
-        const box = tree.getBoundingClientRect();
-        const row = rowOf('John Coltrane').getBoundingClientRect();
-        return Math.abs(row.top + row.height / 2 - (box.top + box.height / 2)) <= rowHeight;
       })
       .toBe(true);
   });
@@ -390,23 +356,23 @@ describe('opening and closing', () => {
     expect(cursorLabel()).toBe('Playlists');
   });
 
-  test('+ and = open one level more, - closes everything', async () => {
+  test('Shift+→ opens one level more and Shift+← closes everything', async () => {
     await showTree();
     await userEvent.keyboard('{Enter}');
     await expect.poll(labels).toContain('Late night');
 
-    await userEvent.keyboard('+');
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}');
     await expect.poll(() => rows().length).toBe(12);
     expect(labels()).toContain('Songs');
     expect(labels()).not.toContain('وطني');
     expect(labels()).not.toContain('Blue in Green');
 
-    await userEvent.keyboard('=');
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}');
     await expect.poll(labels).toContain('وطني');
     expect(labels()).toContain('Feeling Good');
     expect(rows()).toHaveLength(18);
 
-    await userEvent.keyboard('-');
+    await userEvent.keyboard('{Shift>}{ArrowLeft}{/Shift}');
     await expect.poll(labels).toEqual(topLevel);
   });
 
@@ -417,7 +383,7 @@ describe('opening and closing', () => {
     await userEvent.keyboard('kk');
     await expect.poll(cursorLabel).toBe('So What');
 
-    await userEvent.keyboard('-');
+    await userEvent.keyboard('{Shift>}{ArrowLeft}{/Shift}');
 
     await expect.poll(cursorLabel).toBe('Miles Davis');
   });
@@ -537,17 +503,17 @@ describe('marks', () => {
     expect(useApp.getState().marks.size).toBe(0);
   });
 
-  test('ctrl+a marks every track shown, and again takes the marks away', async () => {
+  test('Shift+Space marks every track shown, and again takes the marks away', async () => {
     useApp.setState({ expanded: new Set([milesKey, kindOfBlueKey, 'needs']) });
     await showTree();
 
-    await userEvent.keyboard('{Control>}a{/Control}');
+    await userEvent.keyboard('{Shift>} {/Shift}');
 
     await expect.poll(() => [...useApp.getState().marks].toSorted()).toEqual(['blue', 'rough', 'sowhat']);
     expect(markOf('Rough Mix')).toBe('●');
     expect(markOf('John Coltrane')).toBe('');
 
-    await userEvent.keyboard('{Control>}a{/Control}');
+    await userEvent.keyboard('{Shift>} {/Shift}');
 
     await expect.poll(() => useApp.getState().marks.size).toBe(0);
   });

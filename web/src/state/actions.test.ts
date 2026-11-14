@@ -20,8 +20,6 @@ import * as treeDom from './treeDom';
 import { rowByKey } from './tree';
 
 vi.mock('./treeDom', () => ({
-  pageSize: vi.fn(() => 3),
-  centreCursor: vi.fn(),
   focusFilterBox: vi.fn(),
   leaveFilterBox: vi.fn(),
 }));
@@ -203,13 +201,13 @@ describe('loadLibrary', () => {
 });
 
 describe('run', () => {
-  it('open goes into the fields of a track and previousTabOrBack goes back to the tree', () => {
+  it('open goes into the fields of a track and escape goes back to the tree', () => {
     showSample(keys.rough, { expanded: new Set([keys.needs]) });
 
     run('open');
     expect(useApp.getState().focus).toBe('inspector');
 
-    run('previousTabOrBack');
+    run('escape');
     expect(useApp.getState().focus).toBe('tree');
   });
 
@@ -281,23 +279,6 @@ describe('the cursor', () => {
     run('moveToTop');
 
     expect(cursorLabel()).toBe('Playlists');
-  });
-
-  it('pageDown and pageUp move by the number of rows the tree says fit', () => {
-    run('pageDown');
-    expect(cursorLabel()).toBe('John Coltrane');
-
-    run('pageDown');
-    expect(cursorLabel()).toBe('Nina Simone');
-
-    run('pageUp');
-    expect(cursorLabel()).toBe('فيروز');
-  });
-
-  it('centre asks the tree to scroll the cursor row to the middle', () => {
-    run('centre');
-
-    expect(treeDom.centreCursor).toHaveBeenCalledOnce();
   });
 
   it('a cursor on no row counts from the first row', () => {
@@ -458,13 +439,12 @@ describe('opening and closing', () => {
     expect(expanded()).toEqual([]);
   });
 
-  it('open on a track keeps the field it was on', () => {
+  it('open on a track starts at the first field, whichever field it was on', () => {
     showSample(keys.rough, { expanded: new Set([keys.needs]), field: 2 });
 
     run('open');
 
-    expect(useApp.getState().focus).toBe('inspector');
-    expect(useApp.getState().field).toBe(2);
+    expect(useApp.getState()).toMatchObject({ focus: 'inspector', field: 0, tab: 0 });
   });
 
   it('open on Singles, which has no fields, opens it', () => {
@@ -1066,12 +1046,39 @@ describe('actions that open a dialog', () => {
     expect(useApp.getState().overlay).toEqual({ kind: 'playlist', ids: ['sowhat', 'blue'] });
   });
 
-  it('copy in the fields changes nothing yet', () => {
+  it('copyFrom on a track opens the list of what it has to copy, and says so on anything else', async () => {
+    stubServer(infoView(), sampleLibrary(), {
+      route: ({ method, url }) =>
+        method === 'GET' && url.pathname === '/api/tracks/rough/copyable'
+          ? jsonResponse([{ key: 'artist', label: 'Artist', text: 'Someone', has: true }])
+          : undefined,
+    });
+    showSample(keys.rough, { expanded: new Set([keys.needs]) });
+
+    run('copyFrom');
+
+    await vi.waitFor(() => {
+      expect(useApp.getState().overlay).toEqual({
+        kind: 'copy',
+        id: 'rough',
+        title: 'Rough Mix',
+        choices: [{ key: 'artist', label: 'Artist', text: 'Someone', has: true }],
+      });
+    });
+
+    useApp.setState({ overlay: null });
+    showSample(keys.miles);
+    run('copyFrom');
+    expect(useApp.getState().overlay).toBeNull();
+    expect(useApp.getState().status.text).toBe('Select a track to copy from');
+  });
+
+  it('copyField in the fields of something that is not a track changes nothing', () => {
     showSample(keys.miles);
     useApp.setState({ focus: 'inspector' });
     const before = useApp.getState();
 
-    run('copy');
+    run('copyField');
 
     expect(useApp.getState()).toBe(before);
   });

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { get } from '../api/client';
+import { moveTo, type Motion } from '../keys/dialog';
 import type { DoctorView } from '../api/types.gen';
 import { loadLibrary } from './library';
 import { useApp } from './store';
@@ -45,8 +46,9 @@ export function chooseProblem(i: number): void {
   useDoctor.setState((s) => ({ cursor: Math.min(Math.max(i, 0), Math.max((s.result?.problems.length ?? 0) - 1, 0)) }));
 }
 
-export function moveProblem(by: number): void {
-  chooseProblem(useDoctor.getState().cursor + by);
+export function moveProblem(motion: Motion): void {
+  const { result, cursor } = useDoctor.getState();
+  chooseProblem(moveTo(result?.problems.length ?? 0, cursor, motion));
 }
 
 export function goToProblem(): void {

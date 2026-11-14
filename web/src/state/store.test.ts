@@ -53,14 +53,17 @@ describe('the store', () => {
     expect(storage.data.get('mm.expanded')).toBe('["artist:a","album:b"]');
   });
 
-  it('the tab survives a reload', async () => {
-    vi.stubGlobal('localStorage', memoryStorage());
+  it('the tab is not kept between visits: the fields open on the first one', async () => {
+    const storage = memoryStorage({ 'mm.tab': '2' });
+    vi.stubGlobal('localStorage', storage);
     const first = await freshStore();
 
+    expect(first.getState().tab).toBe(0);
     first.setState({ tab: 2 });
     const second = await freshStore();
 
-    expect(second.getState().tab).toBe(2);
+    expect(second.getState().tab).toBe(0);
+    expect(storage.data.get('mm.tab')).toBe('2');
   });
 
   it('writes nothing for a change to something else', async () => {
@@ -77,24 +80,22 @@ describe('the store', () => {
     vi.stubGlobal('localStorage', deniedStorage());
 
     const store = await freshStore();
-    store.setState({ expanded: new Set(['artist:a']), tab: 3 });
+    store.setState({ expanded: new Set(['artist:a']) });
 
     expect([...store.getState().expanded]).toEqual(['artist:a']);
-    expect(store.getState().tab).toBe(3);
   });
 
   it('starts without trouble where there is no localStorage at all', async () => {
     vi.stubGlobal('localStorage', undefined);
 
     const store = await freshStore();
-    store.setState({ tab: 1 });
+    store.setState({ expanded: new Set(['artist:a']) });
 
-    expect(store.getState().tab).toBe(1);
-    expect([...store.getState().expanded]).toEqual([]);
+    expect([...store.getState().expanded]).toEqual(['artist:a']);
   });
 
   it('falls back to the defaults for what was stored badly', async () => {
-    vi.stubGlobal('localStorage', memoryStorage({ 'mm.expanded': '{"a":1}', 'mm.tab': 'two' }));
+    vi.stubGlobal('localStorage', memoryStorage({ 'mm.expanded': '{"a":1}' }));
 
     const store = await freshStore();
 

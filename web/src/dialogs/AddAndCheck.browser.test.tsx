@@ -81,7 +81,7 @@ describe('the library check', () => {
   async function open(answer: Response | Promise<Response>): Promise<void> {
     await openApp(({ method, url }) => (method === 'GET' && url.pathname === '/api/doctor' ? answer : undefined));
     await onRow(rough);
-    await userEvent.keyboard('D');
+    await userEvent.keyboard('{Shift>}v{/Shift}');
     await expect.element(dialog()).toHaveAccessibleName('Library check');
   }
 

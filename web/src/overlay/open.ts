@@ -1,14 +1,10 @@
 import { get } from '../api/client';
 import type { CopyChoice } from '../api/types.gen';
-import type { ActionName } from '../keys/keymap';
-import { openAdd } from '../state/add';
-import { openDoctor } from '../state/doctor';
 import { fail, setStatus } from '../state/status';
 import { useApp } from '../state/store';
-import { openSync } from '../state/sync';
 import { idsOf, markedIds, rowByKey } from '../state/tree';
 
-function openPlaylistPicker(): void {
+export function openPlaylistPicker(): void {
   const { lib, cursor, marks } = useApp.getState();
   const row = rowByKey(lib, cursor);
   let ids: string[] = [];
@@ -24,7 +20,7 @@ function openPlaylistPicker(): void {
   useApp.setState({ overlay: { kind: 'playlist', ids } });
 }
 
-async function openCopyList(): Promise<void> {
+export async function openCopyList(): Promise<void> {
   const { lib, cursor } = useApp.getState();
   const row = rowByKey(lib, cursor);
   if (row?.kind !== 'track' || row.trackId === undefined) {
@@ -41,36 +37,12 @@ async function openCopyList(): Promise<void> {
   }
 }
 
-export function opensOverlay(action: ActionName): boolean {
-  const { lib, focus } = useApp.getState();
-  switch (action) {
-    case 'help':
-      useApp.setState({ overlay: { kind: 'help' } });
-      return true;
-    case 'sortMenu':
-      if (lib !== null) {
-        useApp.setState({ overlay: { kind: 'sort' } });
-      }
-      return true;
-    case 'addToPlaylist':
-      openPlaylistPicker();
-      return true;
-    case 'copy':
-      if (focus !== 'tree') {
-        return false;
-      }
-      void openCopyList();
-      return true;
-    case 'sync':
-      void openSync();
-      return true;
-    case 'add':
-      openAdd();
-      return true;
-    case 'doctor':
-      openDoctor();
-      return true;
-    default:
-      return false;
+export function openHelp(): void {
+  useApp.setState({ overlay: { kind: 'help' } });
+}
+
+export function openSortMenu(): void {
+  if (useApp.getState().lib !== null) {
+    useApp.setState({ overlay: { kind: 'sort' } });
   }
 }

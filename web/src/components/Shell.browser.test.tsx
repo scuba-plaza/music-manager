@@ -44,7 +44,7 @@ describe('the footer', () => {
   test('the footer shows the hints for the focused pane', async () => {
     await render(<Footer />);
 
-    await expect.poll(hints).toEqual(['↑↓ move', '→ fields', 'space mark', 'e edit', 'd remove', 'p playlist', '/ filter', 'S sort', '? help']);
+    await expect.poll(hints).toEqual(['↑↓ move', '→ fields', 'space mark', 'e edit', 'd remove', 'p playlist', '/ filter', 'o sort', '? help']);
 
     useApp.setState({ focus: 'inspector' });
 
@@ -197,7 +197,7 @@ describe('the application', () => {
     expect(FakeEventSource.instances.filter((stream) => !stream.closed)).toEqual([]);
   });
 
-  test('the arrow keys switch between the panes in a window narrower than 800px', async () => {
+  test('→ and esc switch between the panes in a window narrower than 800px', async () => {
     await page.viewport(500, 700);
     await render(<App />);
     const tree = page.getByTestId('tree-pane');
@@ -210,7 +210,7 @@ describe('the application', () => {
     await expect.element(fields).toBeVisible();
     await expect.element(tree).not.toBeVisible();
 
-    await userEvent.keyboard('{ArrowLeft}');
+    await userEvent.keyboard('{Escape}');
 
     await expect.element(tree).toBeVisible();
     await expect.element(fields).not.toBeVisible();

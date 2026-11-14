@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { SortView } from '../api/types.gen';
+import { motionOf, moveTo } from '../keys/dialog';
 import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
-import { MenuList, moveIn } from '../overlay/MenuList';
+import { MenuList } from '../overlay/MenuList';
 import { chooseSort } from '../overlay/confirm';
 import { closeOverlay } from '../state/store';
 
@@ -28,12 +29,9 @@ export function SortMenu({ sort }: { sort: SortView }) {
 
   function onKey(e: KeyEventLike): boolean {
     const n = Number(e.key);
-    if (e.key === 'q' || e.key === 'S') {
-      closeOverlay();
-    } else if (e.key === 'ArrowUp' || e.key === 'k') {
-      setCursor(moveIn(choices.length, cursor, -1));
-    } else if (e.key === 'ArrowDown' || e.key === 'j') {
-      setCursor(moveIn(choices.length, cursor, 1));
+    const motion = motionOf(e);
+    if (motion !== undefined) {
+      setCursor(moveTo(choices.length, cursor, motion));
     } else if (e.key === 'r') {
       setReverse(!reverse);
     } else if (e.key === 'Enter') {

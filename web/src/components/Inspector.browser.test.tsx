@@ -348,7 +348,7 @@ describe('editing a field', () => {
 });
 
 describe('the tabs of a track', () => {
-  test('the number keys and the arrows turn the tabs, and ← on the first goes back to the tree', async () => {
+  test('the number keys turn the tabs and the arrows do not, and esc goes back to the tree', async () => {
     await showApp();
     await intoFields(keys.soWhat);
     const tab = (name: string) => pane().getByRole('tab', { name });
@@ -356,13 +356,15 @@ describe('the tabs of a track', () => {
     await expect.element(tab('1 Details')).toHaveAttribute('aria-selected', 'true');
     await userEvent.keyboard('3');
     await expect.element(tab('3 Latin')).toHaveAttribute('aria-selected', 'true');
-    await userEvent.keyboard('{ArrowRight}');
+    await userEvent.keyboard('{ArrowRight}{ArrowLeft}');
+    await expect.element(tab('3 Latin')).toHaveAttribute('aria-selected', 'true');
+    await userEvent.keyboard('4');
     await expect.element(tab('4 Device')).toHaveAttribute('aria-selected', 'true');
-    await userEvent.keyboard('{ArrowLeft}{ArrowLeft}{ArrowLeft}');
+    await userEvent.keyboard('1');
     await expect.element(tab('1 Details')).toHaveAttribute('aria-selected', 'true');
     expect(useApp.getState().focus).toBe('inspector');
 
-    await userEvent.keyboard('{ArrowLeft}');
+    await userEvent.keyboard('{Escape}');
     expect(useApp.getState().focus).toBe('tree');
   });
 
@@ -413,7 +415,7 @@ describe('the tabs of a track', () => {
 });
 
 describe('hearing a cut', () => {
-  test('p on a cut starts the preview audio', async () => {
+  test('space on a cut starts the preview audio, and space again stops it', async () => {
     const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
     serve(({ url }) =>
       url.pathname === '/api/tracks/sowhat/preview'
@@ -424,17 +426,17 @@ describe('hearing a cut', () => {
     await intoFields(keys.soWhat);
     await userEvent.keyboard('2');
 
-    await userEvent.keyboard('p');
+    await userEvent.keyboard(' ');
 
     await expect.poll(() => document.querySelector('audio')?.getAttribute('src') ?? '').toMatch(/^blob:/);
     await expect.poll(() => play.mock.calls.length).toBe(1);
     expect(requestsTo(fetchMock, 'GET', '/api/tracks/sowhat/preview?field=cutStart')).toHaveLength(1);
-    await expect.poll(hints).toContain('p stop');
+    await expect.poll(hints).toContain('space stop');
 
-    await userEvent.keyboard('p');
+    await userEvent.keyboard(' ');
 
     await expect.poll(() => document.querySelector('audio')).toBeNull();
-    await expect.poll(hints).toContain('p hear');
+    await expect.poll(hints).toContain('space hear');
   });
 
   test('the preview stops when it has played to its end', async () => {

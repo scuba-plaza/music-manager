@@ -177,7 +177,7 @@ describe('choosing where', () => {
     await expect.element(dialog()).toHaveTextContent('Format Generic · the library folder is always written the standard way');
   });
 
-  test('any other place has the formats to choose from, generic chosen, and w is a hint', async () => {
+  test('any other place has the formats to choose from, generic chosen, and f is a hint', async () => {
     await open();
 
     await userEvent.keyboard('j');
@@ -188,8 +188,8 @@ describe('choosing where', () => {
       ['wolfgang-wmp01', 'Wolfgang WMP01'],
       ['my-player', 'My Player'],
     ]);
-    await expect.element(dialog()).toHaveTextContent('· w goes through them');
-    await expect.poll(hints).toEqual(['↑↓ choose', 'enter choose', 'w format', 'esc close']);
+    await expect.element(dialog()).toHaveTextContent('· f goes through them');
+    await expect.poll(hints).toEqual(['↑↓ choose', 'enter choose', 'f format', 'esc close']);
   });
 
   test('the arrows, j and k, home and end move the choice and stop at the ends', async () => {
@@ -213,17 +213,17 @@ describe('choosing where', () => {
     expect(chosenTarget()).toBe('Library folder');
   });
 
-  test('w goes through the formats, and does nothing for the library folder', async () => {
+  test('f goes through the formats, and does nothing for the library folder', async () => {
     await open();
-    await userEvent.keyboard('w');
+    await userEvent.keyboard('f');
     await expect.element(format()).not.toBeInTheDocument();
     await userEvent.keyboard('j');
 
-    await userEvent.keyboard('w');
+    await userEvent.keyboard('f');
     await expect.element(format()).toHaveValue('wolfgang-wmp01');
-    await userEvent.keyboard('w');
+    await userEvent.keyboard('f');
     await expect.element(format()).toHaveValue('my-player');
-    await userEvent.keyboard('w');
+    await userEvent.keyboard('f');
     await expect.element(format()).toHaveValue('generic');
   });
 
@@ -243,7 +243,7 @@ describe('choosing where', () => {
 
     await userEvent.keyboard('{ArrowDown}');
     await userEvent.keyboard('j');
-    await userEvent.keyboard('w');
+    await userEvent.keyboard('f');
     await userEvent.keyboard('{Enter}');
 
     expect(chosenTarget()).toBe('USB');
@@ -282,7 +282,7 @@ describe('choosing where', () => {
 });
 
 describe('typing a folder', () => {
-  test('asks for the folder, which is focused, with the formats below it and no w hint', async () => {
+  test('asks for the folder, which is focused, with the formats below it and no f hint', async () => {
     await typing();
 
     const folder = dialog().getByRole('textbox', { name: 'Folder' });
@@ -290,7 +290,7 @@ describe('typing a folder', () => {
     await expect.element(folder).toHaveAttribute('dir', 'auto');
     await expect.element(dialog()).toHaveTextContent('Write the music into which folder?');
     await expect.element(format()).toHaveValue('generic');
-    await expect.element(dialog()).not.toHaveTextContent('w goes through them');
+    await expect.element(dialog()).not.toHaveTextContent('f goes through them');
     await expect.poll(hints).toEqual(['enter plan', 'esc back']);
   });
 
@@ -311,12 +311,12 @@ describe('typing a folder', () => {
     expect(useSync.getState().phase).toBe('typing');
   });
 
-  test('w is a letter in the folder, not the format key', async () => {
+  test('f is a letter in the folder, not the format key', async () => {
     await typing();
 
-    await userEvent.keyboard('~/w');
+    await userEvent.keyboard('~/f');
 
-    await expect.element(dialog().getByRole('textbox', { name: 'Folder' })).toHaveValue('~/w');
+    await expect.element(dialog().getByRole('textbox', { name: 'Folder' })).toHaveValue('~/f');
     await expect.element(format()).toHaveValue('generic');
   });
 
@@ -421,7 +421,7 @@ describe('the review', () => {
     expect(items.map((item) => item.querySelector('[role="img"]')?.getAttribute('aria-label'))).toEqual(['create', 'update', 'remove', 'stray']);
     expect(items.map((item) => item.getAttribute('class'))).toEqual(['op create', 'op update', 'op remove', 'op stray']);
     expect(items.map((item) => item.getAttribute('title'))).toEqual(['Artist/Track 1.mp3', 'b.mp3', 'c.mp3', 'd.mp3']);
-    await expect.poll(hints).toEqual(['↑↓ scroll', 'enter apply', 'p strays', 'esc close']);
+    await expect.poll(hints).toEqual(['↑↓ scroll', 'space page', 'enter apply', 'd strays', 'esc close']);
   });
 
   test('names, paths and messages are isolated for right-to-left text', async () => {
@@ -476,31 +476,31 @@ describe('the review', () => {
     expect(dialog().element().querySelector('.warns')).toBeNull();
   });
 
-  test('strays are left alone unless asked, and the button and p ask', async () => {
+  test('strays are left alone unless asked, and the button and d ask', async () => {
     const pruned = plan({ prune: true, ops: [...ops(1), { kind: 'remove', path: 'd.mp3' }], counts: counts({ remove: 1 }) });
     await reviewing({ ops: [...ops(1), { kind: 'stray', path: 'd.mp3' }], counts: counts({ stray: 1 }) }, ({ method, url }) => (method === 'POST' && url.pathname === '/api/sync/p1/prune' ? jsonResponse(pruned) : undefined));
-    await expect.element(dialog()).toHaveTextContent('Stray files are left alone. p also deletes the strays.');
+    await expect.element(dialog()).toHaveTextContent('Stray files are left alone. d also deletes the strays.');
 
     await dialog().getByRole('button', { name: 'Delete the strays' }).click();
 
     await expect.poll(() => requestsTo(fetchMock, 'POST', '/api/sync/p1/prune')).toEqual([{ prune: true }]);
-    await expect.element(dialog()).toHaveTextContent('The files marked − will be deleted. p keeps them.');
+    await expect.element(dialog()).toHaveTextContent('The files marked − will be deleted. d keeps them.');
     await expect.element(dialog()).not.toHaveTextContent('Stray files are left alone');
     await expect.element(dialog().getByRole('button', { name: 'Keep the strays' })).toBeVisible();
   });
 
-  test('p does the same, and does nothing when there is nothing to write', async () => {
+  test('d does the same, and does nothing when there is nothing to write', async () => {
     await reviewing({ ops: [...ops(1), { kind: 'stray', path: 'd.mp3' }], counts: counts({ stray: 1 }) }, ({ method, url }) => (method === 'POST' && url.pathname === '/api/sync/p1/prune' ? jsonResponse(plan({ prune: true, counts: counts({ remove: 1 }) })) : undefined));
 
-    await userEvent.keyboard('p');
+    await userEvent.keyboard('d');
 
     await expect.poll(() => requestsTo(fetchMock, 'POST', '/api/sync/p1/prune')).toEqual([{ prune: true }]);
   });
 
-  test('p is for strays: with nothing to do it asks nothing', async () => {
+  test('d is for strays: with nothing to do it asks nothing', async () => {
     await reviewing({ ops: [], counts: counts({ create: 0 }) });
 
-    await userEvent.keyboard('p');
+    await userEvent.keyboard('d');
 
     expect(requestsTo(fetchMock, 'POST', '/api/sync/p1/prune')).toEqual([]);
   });
@@ -516,12 +516,12 @@ describe('the review', () => {
   test('a refusal to change the strays is shown', async () => {
     await reviewing({ ops: [...ops(1), { kind: 'stray', path: 'd.mp3' }], counts: counts({ stray: 1 }) }, ({ method, url }) => (method === 'POST' && url.pathname === '/api/sync/p1/prune' ? jsonResponse({ error: 'that plan is gone: prepare the sync again' }, 410) : undefined));
 
-    await userEvent.keyboard('p');
+    await userEvent.keyboard('d');
 
     await expect.element(dialog()).toHaveTextContent('that plan is gone: prepare the sync again');
   });
 
-  test('the list scrolls with the arrows, j and k, the page keys and the ends', async () => {
+  test('the list scrolls with the arrows, j and k, space and shift+space, and the ends', async () => {
     await reviewing({ ops: ops(60), counts: counts({ create: 60 }) });
     const list = () => dialog().getByRole('list', { name: 'What would change' }).element();
     const row = () => list().firstElementChild?.getBoundingClientRect().height ?? 0;
@@ -535,13 +535,19 @@ describe('the review', () => {
     expect(Math.abs(list().scrollTop - row())).toBeLessThanOrEqual(1);
     await userEvent.keyboard('{ArrowUp}');
     expect(list().scrollTop).toBe(0);
-    await userEvent.keyboard('{PageDown}');
+    await userEvent.keyboard(' ');
     expect(Math.abs(list().scrollTop - 10 * row())).toBeLessThanOrEqual(1);
-    await userEvent.keyboard('{PageUp}');
+    await userEvent.keyboard('{Shift>} {/Shift}');
+    expect(list().scrollTop).toBe(0);
+    await userEvent.keyboard('{PageDown}');
     expect(list().scrollTop).toBe(0);
     await userEvent.keyboard('{End}');
     expect(list().scrollTop).toBe(list().scrollHeight - list().clientHeight);
     await userEvent.keyboard('{Home}');
+    expect(list().scrollTop).toBe(0);
+    await userEvent.keyboard('{Shift>}g{/Shift}');
+    expect(list().scrollTop).toBe(list().scrollHeight - list().clientHeight);
+    await userEvent.keyboard('g');
     expect(list().scrollTop).toBe(0);
   });
 
@@ -586,7 +592,7 @@ describe('confirming a deletion', () => {
 
   async function confirming(...extra: StubRoute[]): Promise<void> {
     await reviewing(deleting, ...extra);
-    await expect.element(dialog()).toHaveTextContent('The files marked − will be deleted. p keeps them.');
+    await expect.element(dialog()).toHaveTextContent('The files marked − will be deleted. d keeps them.');
     await userEvent.keyboard('{Enter}');
     await expect.element(dialog().getByRole('textbox', { name: 'Type delete to confirm' })).toHaveFocus();
   }
@@ -677,12 +683,12 @@ describe('writing', () => {
     await expect.poll(hints).toEqual([]);
   });
 
-  test('there is nothing to press while it writes', async () => {
+  test('there is nothing to press while it writes but the keys that close the dialog', async () => {
     await applying();
 
     await userEvent.keyboard('{Enter}');
-    await userEvent.keyboard('q');
-    await userEvent.keyboard('p');
+    await userEvent.keyboard('d');
+    await userEvent.keyboard('f');
 
     await expect.element(dialog()).toHaveTextContent('Writing ~/player…');
     expect(requestsTo(fetchMock, 'POST', '/api/sync/p1/apply')).toHaveLength(1);

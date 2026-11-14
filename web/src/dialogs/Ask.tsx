@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { answerOf } from '../keys/dialog';
 import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
 import { closeOverlay } from '../state/store';
@@ -11,34 +11,29 @@ interface AskProps {
 }
 
 export function Ask({ head, body, yes, onYes }: AskProps) {
-  const cancel = useRef<HTMLButtonElement>(null);
-
   function go(): void {
     closeOverlay();
     onYes();
   }
 
   function onKey(e: KeyEventLike): boolean {
-    if (e.key === 'Enter' && document.activeElement === cancel.current) {
-      closeOverlay();
-      return true;
-    }
-    if (e.key === 'y' || e.key === 'Enter') {
+    const answer = answerOf(e);
+    if (answer === 'yes') {
       go();
-      return true;
-    }
-    if (e.key === 'n' || e.key === 'q') {
+    } else if (answer === 'no') {
       closeOverlay();
-      return true;
+    } else {
+      return false;
     }
-    return false;
+    return true;
   }
 
   return (
     <Dialog
       title="Are you sure?"
       hints={[
-        { keys: 'y/enter', label: yes },
+        { keys: 'y', label: yes },
+        { keys: 'n', label: 'no' },
         { keys: 'esc', label: 'close' },
       ]}
       onKey={onKey}
@@ -55,7 +50,7 @@ export function Ask({ head, body, yes, onYes }: AskProps) {
         <button type="button" className="btn primary" onClick={go}>
           {yes}
         </button>
-        <button ref={cancel} type="button" className="btn" onClick={closeOverlay}>
+        <button type="button" className="btn" onClick={closeOverlay}>
           Cancel
         </button>
       </div>

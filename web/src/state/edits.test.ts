@@ -600,7 +600,7 @@ describe('moving and numbering', () => {
   it('moving needs the tree view and the whole album or playlist in view', () => {
     show(keys.soWhat, { lib: library({}, 'title') });
     run('moveTrackDown');
-    expect(status()).toEqual({ text: 'Moving a track needs the tree view · S, then Tree', kind: 'bad' });
+    expect(status()).toEqual({ text: 'Moving a track needs the tree view · o, then Tree', kind: 'bad' });
 
     show(keys.soWhat, { filter: 'so' });
     run('moveTrackUp');
@@ -636,7 +636,7 @@ describe('moving and numbering', () => {
     }
     show(keys.soWhat, { lib: library({}, 'title') });
     run('renumber');
-    expect(status()).toEqual({ text: 'Numbering an album needs the tree view · S, then Tree', kind: 'bad' });
+    expect(status()).toEqual({ text: 'Numbering an album needs the tree view · o, then Tree', kind: 'bad' });
 
     show(keys.soWhat, { filter: 'so' });
     run('renumber');
@@ -749,7 +749,7 @@ describe('copy and paste', () => {
   it('c in the fields of a track copies the field under the cursor', async () => {
     show(keys.soWhat, { focus: 'inspector', detail: soWhat(), field: 3 });
 
-    run('copy');
+    run('copyField');
 
     await vi.waitFor(() => {
       expect(requestsTo(fetchMock, 'POST', '/api/copy')).toEqual([{ id: 'sowhat', field: 'cover' }]);
@@ -759,7 +759,7 @@ describe('copy and paste', () => {
   it('c in the fields of an album copies nothing', async () => {
     show(keys.kindOfBlue, { focus: 'inspector', detail: kindOfBlue() });
 
-    run('copy');
+    run('copyField');
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -830,40 +830,55 @@ describe('covers', () => {
     });
   });
 
-  it('x on the Cover field of a track removes its cover at once', async () => {
+  function asked(): { kind: 'ask'; head: string; body: string[]; yes: string; onYes: () => void } {
+    const overlay = useApp.getState().overlay;
+    if (overlay?.kind !== 'ask') {
+      throw new Error('nothing was asked');
+    }
+    return overlay;
+  }
+
+  it('d on the Cover field of a track asks first, as removing a track does, and removes the cover on yes', async () => {
     show(keys.soWhat, { focus: 'inspector', detail: soWhat(), field: 3 });
 
-    run('removeCover');
+    run('clear');
 
+    expect(asked()).toMatchObject({ head: 'Remove the cover of “So What”?', yes: 'remove' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    asked().onYes();
     await vi.waitFor(() => {
       expect(requestsTo(fetchMock, 'DELETE', '/api/cover?ids=sowhat')).toHaveLength(1);
     });
   });
 
-  it('x on the Cover field of an album removes the covers of its tracks', async () => {
+  it('d on the Cover field of an album asks, then removes the covers of its tracks', async () => {
     show(keys.kindOfBlue, { focus: 'inspector', detail: kindOfBlue(), field: 1 });
 
-    run('removeCover');
+    run('clear');
 
+    expect(asked().head).toBe('Remove the cover of “Kind of Blue” and its tracks?');
+    asked().onYes();
     await vi.waitFor(() => {
       expect(requestsTo(fetchMock, 'DELETE', `/api/cover?${new URLSearchParams({ group: keys.kindOfBlue }).toString()}`)).toHaveLength(1);
     });
   });
 
-  it('x says so when there is no cover to remove', () => {
+  it('d asks nothing and says so when there is no cover to remove', () => {
     show(keys.soWhat, { focus: 'inspector', detail: { ...soWhat(), coverSha: '' }, field: 3 });
 
-    run('removeCover');
+    run('clear');
 
     expect(status().text).toBe('There is no cover to remove');
+    expect(useApp.getState().overlay).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('x leaves any other field alone', () => {
+  it('d leaves a field that cannot be cleared alone', () => {
     show(keys.soWhat, { focus: 'inspector', detail: soWhat(), field: 0 });
 
-    run('removeCover');
+    run('clear');
 
+    expect(useApp.getState().overlay).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

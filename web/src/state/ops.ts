@@ -1,13 +1,12 @@
 import { send } from '../api/client';
 import type { ChangeResponse, LibraryResponse, RowView } from '../api/types.gen';
-import type { ActionName } from '../keys/keymap';
 import { enterFields } from './actions';
 import { setStatus } from './status';
 import { openBulk } from './bulk';
 import { clipboardPicture, pastePicture } from './cover';
 import { attempt } from './edit';
 import { currentField, isTrack } from './inspector';
-import { useApp } from './store';
+import { ask, useApp } from './store';
 import { plural } from './text';
 import { idsOf, isAlbum, isFiltering, isFlat, markedIds, rowByKey } from './tree';
 
@@ -17,10 +16,6 @@ function refuse(text: string): void {
 
 function change(path: string, body?: unknown): void {
   void attempt(() => send<ChangeResponse>('POST', path, body));
-}
-
-function ask(head: string, body: string[], yes: string, onYes: () => void): void {
-  useApp.setState({ overlay: { kind: 'ask', head, body, yes, onYes } });
 }
 
 function cursorRow(): { lib: LibraryResponse; row: RowView } | undefined {
@@ -47,7 +42,7 @@ function titles(rows: readonly RowView[]): Map<string, string> {
   return names;
 }
 
-function bulkEdit(): void {
+export function bulkEdit(): void {
   const at = cursorRow();
   if (at === undefined) {
     return;
@@ -108,7 +103,7 @@ function removeInPlaylist(lib: LibraryResponse, row: RowView, name: string): voi
   }
 }
 
-function remove(): void {
+export function remove(): void {
   const at = cursorRow();
   if (at === undefined) {
     return;
@@ -140,7 +135,7 @@ function remove(): void {
   });
 }
 
-function moveTrack(dir: 1 | -1): void {
+export function moveTrack(dir: 1 | -1): void {
   const at = cursorRow();
   if (at === undefined) {
     return;
@@ -148,7 +143,7 @@ function moveTrack(dir: 1 | -1): void {
   const { lib, row } = at;
   const { filter } = useApp.getState();
   if (isFlat(lib)) {
-    refuse('Moving a track needs the tree view · S, then Tree');
+    refuse('Moving a track needs the tree view · o, then Tree');
     return;
   }
   const list = row.kind === 'track' ? playlistOf(lib, row) : '';
@@ -172,14 +167,14 @@ function moveTrack(dir: 1 | -1): void {
   change('/api/move', { id: row.trackId, dir });
 }
 
-function renumber(): void {
+export function renumber(): void {
   const at = cursorRow();
   if (at === undefined) {
     return;
   }
   const { lib } = at;
   if (isFlat(lib)) {
-    refuse('Numbering an album needs the tree view · S, then Tree');
+    refuse('Numbering an album needs the tree view · o, then Tree');
     return;
   }
   const album = at.row.kind === 'track' ? rowByKey(lib, at.row.parent ?? null) : at.row;
@@ -194,7 +189,7 @@ function renumber(): void {
   change('/api/renumber', { key: album.key });
 }
 
-function history(which: 'undo' | 'redo'): void {
+export function history(which: 'undo' | 'redo'): void {
   const step = useApp.getState().lib?.history[which];
   if (step === undefined || step === '') {
     setStatus(which === 'undo' ? 'Nothing to undo' : 'Nothing to redo');
@@ -203,7 +198,7 @@ function history(which: 'undo' | 'redo'): void {
   change(`/api/${which}`);
 }
 
-async function paste(): Promise<void> {
+export async function paste(): Promise<void> {
   const at = cursorRow();
   const { marks } = useApp.getState();
   const row = at?.row;
@@ -233,44 +228,10 @@ async function paste(): Promise<void> {
   await attempt(() => send<ChangeResponse>('POST', '/api/paste', body));
 }
 
-function copyField(): void {
+export function copyField(): void {
   const s = useApp.getState();
   const f = currentField(s);
   if (isTrack(s.detail) && f !== undefined) {
     change('/api/copy', { id: s.detail.id, field: f.key });
-  }
-}
-
-export function runOps(action: ActionName): boolean {
-  switch (action) {
-    case 'bulkEdit':
-      bulkEdit();
-      return true;
-    case 'remove':
-      remove();
-      return true;
-    case 'moveTrackDown':
-      moveTrack(1);
-      return true;
-    case 'moveTrackUp':
-      moveTrack(-1);
-      return true;
-    case 'renumber':
-      renumber();
-      return true;
-    case 'undo':
-      history('undo');
-      return true;
-    case 'redo':
-      history('redo');
-      return true;
-    case 'paste':
-      void paste();
-      return true;
-    case 'copy':
-      copyField();
-      return true;
-    default:
-      return false;
   }
 }

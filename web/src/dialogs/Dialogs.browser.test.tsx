@@ -179,7 +179,7 @@ describe('the dialog shell', () => {
 
     askFor(vi.fn());
 
-    await expect.poll(hints).toEqual(['y/enter Remove', 'esc close']);
+    await expect.poll(hints).toEqual(['y Remove', 'n no', 'esc close']);
 
     await userEvent.keyboard('{Escape}');
 
@@ -222,7 +222,7 @@ describe('the dialog shell', () => {
 });
 
 describe('ask', () => {
-  test('ask goes ahead only on y or enter', async () => {
+  test('ask goes ahead only on y, and n, esc and q turn it down', async () => {
     await openApp();
     await onRow(soWhat);
     const onYes = vi.fn();
@@ -236,9 +236,11 @@ describe('ask', () => {
       expect(bdi.getAttribute('dir')).toBe('auto');
     }
 
+    await expect.poll(hints).toEqual(['y Remove', 'n no', 'esc close']);
     await userEvent.keyboard('a');
     await userEvent.keyboard('x');
     await userEvent.keyboard('j');
+    await userEvent.keyboard('{Enter}');
     await expect.element(dialog()).toBeVisible();
     expect(onYes).not.toHaveBeenCalled();
 
@@ -246,17 +248,13 @@ describe('ask', () => {
     await expect.element(dialog()).not.toBeInTheDocument();
     expect(onYes).toHaveBeenCalledTimes(1);
 
-    askFor(onYes);
-    await expect.element(dialog()).toBeVisible();
-    await userEvent.keyboard('{Enter}');
-    await expect.element(dialog()).not.toBeInTheDocument();
-    expect(onYes).toHaveBeenCalledTimes(2);
-
-    askFor(onYes);
-    await expect.element(dialog()).toBeVisible();
-    await userEvent.keyboard('{Escape}');
-    await expect.element(dialog()).not.toBeInTheDocument();
-    expect(onYes).toHaveBeenCalledTimes(2);
+    for (const key of ['n', '{Escape}', 'q']) {
+      askFor(onYes);
+      await expect.element(dialog()).toBeVisible();
+      await userEvent.keyboard(key);
+      await expect.element(dialog()).not.toBeInTheDocument();
+      expect(onYes).toHaveBeenCalledTimes(1);
+    }
   });
 
   test('enter on the focused Cancel button cancels and does not go ahead', async () => {
@@ -276,18 +274,21 @@ describe('ask', () => {
 });
 
 describe('help', () => {
-  test('? in the help closes it and does not open it again', async () => {
+  test('? in the help neither closes it nor opens it again, and esc closes it', async () => {
     await openApp();
     await onRow(soWhat);
     await userEvent.keyboard('?');
     await expect.element(dialog()).toBeVisible();
 
     await userEvent.keyboard('?');
+    await expect.element(dialog()).toBeVisible();
+    expect(dialog().elements()).toHaveLength(1);
 
+    await userEvent.keyboard('{Escape}');
     await expect.element(dialog()).not.toBeInTheDocument();
   });
 
-  test('the numbers and tab turn the pages of the help, and the note on stopping mm is under them', async () => {
+  test('the numbers turn the pages of the help and tab does not, and the note on stopping mm is under them', async () => {
     await openApp();
     await onRow(soWhat);
     await userEvent.keyboard('?');
@@ -298,8 +299,8 @@ describe('help', () => {
     await userEvent.keyboard('3');
     await expect.poll(selected).toBe(`3 ${pages[2]?.page ?? ''}`);
     await userEvent.keyboard('{Tab}');
-    await expect.poll(selected).toBe(`4 ${pages[3]?.page ?? ''}`);
-    await userEvent.keyboard('{Tab}');
+    await expect.poll(selected).toBe(`3 ${pages[2]?.page ?? ''}`);
+    await userEvent.keyboard('1');
     await expect.poll(selected).toBe(`1 ${pages[0]?.page ?? ''}`);
     await expect.element(dialog().getByText('Ctrl+C in the terminal where mm runs stops the program.')).toBeVisible();
   });
@@ -334,7 +335,7 @@ describe('the sort menu', () => {
     await openApp();
     await onRow(soWhat);
 
-    await userEvent.keyboard('S');
+    await userEvent.keyboard('o');
 
     await expect.element(dialog()).toHaveAccessibleName('Sort');
     expect(options()).toEqual(['1|Tree|', '2|Artist|A → Z', '3|Album|A → Z', '4|Title|A → Z']);
@@ -349,7 +350,7 @@ describe('the sort menu', () => {
     await openApp();
     await onRow(soWhat);
 
-    await userEvent.keyboard('S');
+    await userEvent.keyboard('o');
     await userEvent.keyboard('r');
 
     await expect.poll(options).toEqual(['1|Tree|', '2|Artist|Z → A', '3|Album|Z → A', '4|Title|Z → A']);
@@ -433,7 +434,7 @@ describe('the copy list', () => {
 });
 
 describe('the playlist picker', () => {
-  test('n turns the picker into a name input', async () => {
+  test('c turns the picker into a name input', async () => {
     await openApp();
     await onRow(soWhat);
 
@@ -442,7 +443,7 @@ describe('the playlist picker', () => {
     await expect.element(dialog()).toHaveAccessibleName('Add to a playlist');
     expect(options()).toEqual(['|Late night|1', `|${longName}|2`, '|New playlist…|']);
 
-    await userEvent.keyboard('n');
+    await userEvent.keyboard('c');
 
     const name = dialog().getByRole('textbox', { name: 'Name of the playlist' });
     await expect.element(name).toHaveFocus();
@@ -456,7 +457,7 @@ describe('the playlist picker', () => {
     await userEvent.keyboard('{Escape}');
     await expect.element(dialog().getByRole('listbox')).toBeVisible();
 
-    await userEvent.keyboard('n');
+    await userEvent.keyboard('c');
     await userEvent.fill(name, 'Road');
     await userEvent.keyboard('{Enter}');
 
@@ -744,7 +745,7 @@ describe('the hints, the vi keys and the clicks of the small dialogs', () => {
     await userEvent.keyboard('?');
     await expect.poll(hints).toEqual(['←→ page', 'esc close']);
     await userEvent.keyboard('{Escape}');
-    await userEvent.keyboard('S');
+    await userEvent.keyboard('o');
     await expect.poll(hints).toEqual(['enter choose', 'r reverse', 'esc close']);
     await userEvent.keyboard('{Escape}');
     await userEvent.keyboard('c');
@@ -769,7 +770,7 @@ describe('the hints, the vi keys and the clicks of the small dialogs', () => {
   test('in the sort menu j and k move, r reverses, a click chooses and q closes it', async () => {
     await openApp();
     await onRow(soWhat);
-    await userEvent.keyboard('S');
+    await userEvent.keyboard('o');
     await expect.element(dialog()).toHaveAccessibleName('Sort');
 
     await userEvent.keyboard('j');
@@ -783,10 +784,26 @@ describe('the hints, the vi keys and the clicks of the small dialogs', () => {
     await expect.element(dialog()).not.toBeInTheDocument();
     await expect.poll(libraryRequests).toContain('/api/library?sort=title&reverse=1');
 
-    await userEvent.keyboard('S');
+    await userEvent.keyboard('o');
     await expect.element(dialog()).toBeVisible();
     await userEvent.keyboard('q');
     await expect.element(dialog()).not.toBeInTheDocument();
+  });
+
+  test('in the sort menu Home and g, End and Shift+g go to the ends', async () => {
+    await openApp();
+    await onRow(soWhat);
+    await userEvent.keyboard('o');
+    await expect.element(dialog()).toHaveAccessibleName('Sort');
+
+    await userEvent.keyboard('{End}');
+    await expect.poll(selectedOption).toContain('Title');
+    await userEvent.keyboard('{Home}');
+    await expect.poll(selectedOption).toContain('Tree');
+    await userEvent.keyboard('{Shift>}g{/Shift}');
+    await expect.poll(selectedOption).toContain('Title');
+    await userEvent.keyboard('g');
+    await expect.poll(selectedOption).toContain('Tree');
   });
 
   test('in the copy list j and k move, a click ticks and unticks, and q closes it', async () => {

@@ -1,10 +1,14 @@
 import type { RowView } from '../api/types.gen';
 import type { ActionName } from '../keys/keymap';
-import { opensOverlay } from '../overlay/open';
+import { openCopyList, openHelp, openPlaylistPicker, openSortMenu } from '../overlay/open';
 import { change } from './detail';
-import { runInspector, stopPlaying } from './edit';
+import { clear, hear, nudge, startEdit, stopPlaying } from './edit';
+import { chooseTab, moveField } from './inspector';
 import { loadLibrary } from './library';
-import { runOps } from './ops';
+import { bulkEdit, copyField, history, moveTrack, paste, remove, renumber } from './ops';
+import { openAdd } from './add';
+import { openDoctor } from './doctor';
+import { openSync } from './sync';
 import { setStatus } from './status';
 import { useApp, type Focus } from './store';
 import {
@@ -17,7 +21,7 @@ import {
   rowByKey,
   visibleRows,
 } from './tree';
-import { centreCursor, focusFilterBox, leaveFilterBox, pageSize } from './treeDom';
+import { focusFilterBox, leaveFilterBox } from './treeDom';
 
 const filterPause = 150;
 
@@ -76,7 +80,7 @@ export function enterFields(row: RowView): boolean {
   if (row.kind !== 'track' && row.editable !== true) {
     return false;
   }
-  useApp.setState(row.kind === 'track' ? { focus: 'inspector' } : { focus: 'inspector', field: 0 });
+  useApp.setState({ focus: 'inspector', tab: 0, field: 0 });
   return true;
 }
 
@@ -250,9 +254,12 @@ function escape(): void {
   }
 }
 
+function assertNever(action: never): never {
+  throw new Error(`no handler for ${String(action)}`);
+}
+
 export function run(action: ActionName): void {
-  const { focus, status } = useApp.getState();
-  if (status.text !== '') {
+  if (useApp.getState().status.text !== '') {
     setStatus('');
   }
   switch (action) {
@@ -262,29 +269,11 @@ export function run(action: ActionName): void {
     case 'moveDown':
       moveBy(1);
       break;
-    case 'pageUp':
-      moveBy(-pageSize());
-      break;
-    case 'pageDown':
-      moveBy(pageSize());
-      break;
     case 'moveToTop':
       moveToEnd('top');
       break;
     case 'moveToBottom':
       moveToEnd('bottom');
-      break;
-    case 'centre':
-      centreCursor();
-      break;
-    case 'open':
-      openRow();
-      break;
-    case 'close':
-      closeRow();
-      break;
-    case 'enterRow':
-      enterRow();
       break;
     case 'openLevel':
       openOneLevel();
@@ -292,33 +281,132 @@ export function run(action: ActionName): void {
     case 'closeAll':
       closeEverything();
       break;
+    case 'open':
+      openRow();
+      break;
+    case 'enterRow':
+      enterRow();
+      break;
+    case 'close':
+      closeRow();
+      break;
     case 'markToggle':
       toggleMark();
       break;
     case 'markAll':
       markAll();
       break;
+    case 'bulkEdit':
+      bulkEdit();
+      break;
+    case 'remove':
+      remove();
+      break;
+    case 'moveTrackDown':
+      moveTrack(1);
+      break;
+    case 'moveTrackUp':
+      moveTrack(-1);
+      break;
+    case 'renumber':
+      renumber();
+      break;
+    case 'addToPlaylist':
+      openPlaylistPicker();
+      break;
+    case 'copyFrom':
+      void openCopyList();
+      break;
+    case 'fieldUp':
+      moveField(-1);
+      break;
+    case 'fieldDown':
+      moveField(1);
+      break;
+    case 'tab1':
+      chooseTab(0);
+      break;
+    case 'tab2':
+      chooseTab(1);
+      break;
+    case 'tab3':
+      chooseTab(2);
+      break;
+    case 'tab4':
+      chooseTab(3);
+      break;
+    case 'startEdit':
+      startEdit();
+      break;
+    case 'clear':
+      clear();
+      break;
+    case 'nudgeDown':
+      nudge(-1, false);
+      break;
+    case 'nudgeUp':
+      nudge(1, false);
+      break;
+    case 'nudgeDownMore':
+      nudge(-1, true);
+      break;
+    case 'nudgeUpMore':
+      nudge(1, true);
+      break;
+    case 'hear':
+      void hear();
+      break;
+    case 'copyField':
+      copyField();
+      break;
+    case 'toggleFocus':
+      toggleFocus(useApp.getState().focus);
+      break;
     case 'focusFilter':
-      focusFilterBox();
-      break;
     case 'filterAccept':
-      leaveFilterBox();
-      break;
     case 'filterClear':
-      leaveFilterBox();
-      setFilter('');
+      runFilter(action);
+      break;
+    case 'sortMenu':
+      openSortMenu();
+      break;
+    case 'add':
+      openAdd();
+      break;
+    case 'sync':
+      void openSync();
+      break;
+    case 'undo':
+      history('undo');
+      break;
+    case 'redo':
+      history('redo');
+      break;
+    case 'doctor':
+      openDoctor();
+      break;
+    case 'paste':
+      void paste();
       break;
     case 'escape':
       escape();
       break;
-    case 'toggleFocus':
-      toggleFocus(focus);
+    case 'help':
+      openHelp();
       break;
     default:
-      if (!opensOverlay(action) && !runOps(action)) {
-        runInspector(action);
-      }
-      break;
+      assertNever(action);
+  }
+}
+
+function runFilter(action: 'focusFilter' | 'filterAccept' | 'filterClear'): void {
+  if (action === 'focusFilter') {
+    focusFilterBox();
+    return;
+  }
+  leaveFilterBox();
+  if (action === 'filterClear') {
+    setFilter('');
   }
 }
 

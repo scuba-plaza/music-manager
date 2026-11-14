@@ -1,4 +1,5 @@
 import { useId, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { closes } from '../keys/dialog';
 import type { Hint, KeyEventLike } from '../keys/keymap';
 import { closeOverlay, useApp } from '../state/store';
 
@@ -8,6 +9,8 @@ export interface DialogProps {
   onKey: (e: KeyEventLike) => boolean;
   children: ReactNode;
 }
+
+const typingTags = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
 
 const tabbable = 'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])';
 
@@ -58,9 +61,10 @@ export function Dialog({ title, hints, onKey, children }: DialogProps) {
     if (native.isComposing || e.ctrlKey || e.metaKey || e.altKey) {
       return;
     }
+    const typing = e.target instanceof HTMLElement && typingTags.has(e.target.tagName);
     if (onKey(native)) {
       e.preventDefault();
-    } else if (e.key === 'Escape') {
+    } else if (closes(native) && !(typing && e.key !== 'Escape')) {
       e.preventDefault();
       closeOverlay();
     } else if (e.key === 'Tab' && ref.current !== null) {

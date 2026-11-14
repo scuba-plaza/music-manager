@@ -12,7 +12,6 @@ import {
   chooseTarget,
   confirmDelete,
   cycleProfile,
-  moveTarget,
   openSync,
   pickTarget,
   progressOf,
@@ -216,14 +215,9 @@ describe('choosing where', () => {
     expect(state().cursor).toBe(2);
     chooseTarget(-3);
     expect(state().cursor).toBe(0);
-    moveTarget(1);
-    expect(state().cursor).toBe(1);
-    moveTarget(-1);
-    moveTarget(-1);
-    expect(state().cursor).toBe(0);
   });
 
-  it('w goes through the profiles in order and round again', () => {
+  it('f goes through the profiles in order and round again', () => {
     chooseTarget(2);
 
     cycleProfile();

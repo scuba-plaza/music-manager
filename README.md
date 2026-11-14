@@ -60,70 +60,11 @@ Adding from a link needs `yt-dlp` (and `ffmpeg`, which yt-dlp uses) on `PATH`; R
 
 ## The web interface
 
-Browse and edit the library: artists, albums and tracks on the left, and on the right whatever the cursor is on: a track's details and its cover, or what is inside an album (its tracks), an artist (its albums and singles), a playlist (its tracks in play order) or the Needs work group (what each track lacks), as the preview column of a file manager does. The page keeps a terminal's look and its keys. Every change is saved at once to `library.json`; the music folder only changes when you sync (`s`), and the header says how many tracks are waiting (`3 to sync`; click it to sync). Press `?` for the list of keys, one page for each kind (`←` `→` or `1`-`4` turn the pages); the bottom line always shows the ones that matter right now.
+Browse and edit the library: artists, albums and tracks on the left, and on the right whatever the cursor is on: a track's details and its cover, or what is inside an album (its tracks), an artist (its albums and singles), a playlist (its tracks in play order) or the Needs work group (what each track lacks), as the preview column of a file manager does. The page is keyboard-first, with titled panes and a bottom line of the keys that apply. Every change is saved at once to `library.json`; the music folder only changes when you sync (`s`), and the header says how many tracks are waiting (`3 to sync`; click it to sync). Press `?` for the list of keys, one page for each kind (`←` `→` or `1`-`4` turn the pages); the bottom line always shows the ones that matter right now.
 
 Several `mm` can work on one library at once, two windows say. A change reads `library.json` as it is at that moment, changes it and writes it back while holding a lock on `library.json.lock`, so no change undoes another; the page notices what the others did within a second or two and shows it. A waiting `mm` carries on within a moment, or says that another `mm` has the library after 30 seconds. If an `mm` is killed, the system lets go of its lock by itself. `library.json.lock` is only a place to lock and can be deleted when no `mm` is running.
 
-The keys, as `?` lists them:
-
-**Moving**
-
-| | |
-|---|---|
-| `↑↓` `k` `j` | move |
-| `PgUp` `PgDn` `ctrl+u` `ctrl+d` | a page at a time |
-| `Home` `End` `g` `G` | top / bottom |
-| `z` | centre the cursor |
-| `+` `=` | open a level |
-| `-` | close all |
-| `→` `l` | into the fields of a track, artist, album or playlist |
-| `enter` | open / close; on a track, into its fields |
-| `←` `h` | close, or up a level |
-| `tab` | the other pane |
-| `/` | filter (esc clears it) |
-| `S` | sort the list |
-| `esc` | back to the tree, or clear the filter, or the marks |
-
-**Editing**
-
-| | |
-|---|---|
-| `↑↓` `k` `j` | choose a field |
-| `←→` `h` `l` | a track's tabs: Details, Audio, Latin, Device; ← on the first goes back to the tree |
-| `1`-`4` | a track's tab by its number (4: Device, when a device profile is chosen) |
-| `enter` | edit it; enter again saves (the cover: choose a file) |
-| `x` | remove the cover |
-| `[` `]` | nudge 0.1 s or 1.5 dB |
-| `{` `}` | nudge 1 s or 6 dB |
-| `0` | no cut, fade or change |
-| `p` | hear 8 s beside it |
-
-**Marking**
-
-| | |
-|---|---|
-| `space` | mark a track (an album marks all its tracks) |
-| `ctrl+a` | mark everything shown |
-| `e` | edit the marked tracks together; with none marked, into the fields |
-| `d` `Del` | remove (asks first); in a playlist, take a track out of it |
-| `J` `K` | move a track down / up |
-| `n` | number an album 1…N |
-| `p` | add to a playlist |
-| `c` | copy the cover, artist, album… of a track |
-| `v` | paste them; ctrl+v with a picture sets the cover |
-
-**Library**
-
-| | |
-|---|---|
-| `I` | identify everything |
-| `a` | add from a YouTube link, or drop files on the page |
-| `i` | find it on MusicBrainz |
-| `o` | use the file's old tags |
-| `s` | sync: write the folder |
-| `u` `ctrl+r` | undo / redo |
-| `D` | check the library |
-| `?` | this help |
+The keys are listed by `?`, one page for each kind, and the bottom line shows the ones that matter right now. Every key is a plain key, or Shift with one: none uses Ctrl, Alt or Meta, so the browser's own shortcuts keep working, and keys do nothing while you type in a box.
 
 What the keys do in more detail:
 

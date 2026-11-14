@@ -55,20 +55,3 @@ export function chooseTab(i: number): void {
   }
   useApp.setState({ tab: i, field: 0, edit: null });
 }
-
-export function nextTab(): void {
-  const { detail, tab } = useApp.getState();
-  if (isTrack(detail)) {
-    chooseTab((tabIndex(detail, tab) + 1) % detail.tabs.length);
-  }
-}
-
-export function previousTabOrBack(): void {
-  const { detail, tab } = useApp.getState();
-  if (isTrack(detail) && tabIndex(detail, tab) > 0) {
-    chooseTab(tabIndex(detail, tab) - 1);
-    return;
-  }
-  useApp.setState({ focus: 'tree' });
-}
-

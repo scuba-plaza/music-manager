@@ -15,11 +15,8 @@ export type HelpPage = 'Moving' | 'Editing' | 'Marking' | 'Library';
 export type ActionName =
   | 'moveUp'
   | 'moveDown'
-  | 'pageUp'
-  | 'pageDown'
   | 'moveToTop'
   | 'moveToBottom'
-  | 'centre'
   | 'openLevel'
   | 'closeAll'
   | 'open'
@@ -33,32 +30,30 @@ export type ActionName =
   | 'moveTrackUp'
   | 'renumber'
   | 'addToPlaylist'
+  | 'copyFrom'
   | 'fieldUp'
   | 'fieldDown'
-  | 'previousTabOrBack'
-  | 'nextTab'
   | 'tab1'
   | 'tab2'
   | 'tab3'
   | 'tab4'
   | 'startEdit'
-  | 'removeCover'
+  | 'clear'
   | 'nudgeDown'
   | 'nudgeUp'
   | 'nudgeDownMore'
   | 'nudgeUpMore'
-  | 'clearField'
   | 'hear'
+  | 'copyField'
   | 'toggleFocus'
   | 'focusFilter'
   | 'sortMenu'
-  | 'copy'
-  | 'paste'
   | 'add'
   | 'sync'
-  | 'doctor'
   | 'undo'
   | 'redo'
+  | 'doctor'
+  | 'paste'
   | 'escape'
   | 'help'
   | 'filterAccept'
@@ -69,7 +64,7 @@ export interface Binding {
   scope: Scope;
   action: ActionName;
   hint?: { label: string | ((s: AppState) => string); when?: (s: AppState) => boolean };
-  help?: { page: HelpPage; text: string };
+  help: { page: HelpPage; text: string };
 }
 
 function onTrack(s: AppState): boolean {
@@ -89,19 +84,17 @@ function canEdit(s: AppState): boolean {
 }
 
 const tabs = { label: 'tabs', when: onTrack };
+const tabHelp = { page: 'Editing', text: "a track's tab by its number: Details, Audio, Latin, Device" } as const;
 const inTree = (s: AppState) => s.focus === 'tree';
 const inInspector = (s: AppState) => s.focus === 'inspector';
 
 export const bindings: readonly Binding[] = [
   { keys: ['ArrowUp', 'k'], scope: 'tree', action: 'moveUp', hint: { label: 'move' }, help: { page: 'Moving', text: 'move' } },
   { keys: ['ArrowDown', 'j'], scope: 'tree', action: 'moveDown', hint: { label: 'move' }, help: { page: 'Moving', text: 'move' } },
-  { keys: ['PageUp', 'ctrl+u'], scope: 'tree', action: 'pageUp', help: { page: 'Moving', text: 'a page at a time' } },
-  { keys: ['PageDown', 'ctrl+d'], scope: 'tree', action: 'pageDown', help: { page: 'Moving', text: 'a page at a time' } },
   { keys: ['Home', 'g'], scope: 'tree', action: 'moveToTop', help: { page: 'Moving', text: 'top / bottom' } },
-  { keys: ['End', 'G'], scope: 'tree', action: 'moveToBottom', help: { page: 'Moving', text: 'top / bottom' } },
-  { keys: ['z'], scope: 'tree', action: 'centre', help: { page: 'Moving', text: 'centre the cursor' } },
-  { keys: ['+', '='], scope: 'tree', action: 'openLevel', help: { page: 'Moving', text: 'open a level' } },
-  { keys: ['-'], scope: 'tree', action: 'closeAll', help: { page: 'Moving', text: 'close all' } },
+  { keys: ['End', 'Shift+g'], scope: 'tree', action: 'moveToBottom', help: { page: 'Moving', text: 'top / bottom' } },
+  { keys: ['Shift+ArrowRight'], scope: 'tree', action: 'openLevel', help: { page: 'Moving', text: 'open the whole tree one more level' } },
+  { keys: ['Shift+ArrowLeft'], scope: 'tree', action: 'closeAll', help: { page: 'Moving', text: 'close the whole tree' } },
   {
     keys: ['ArrowRight', 'l'],
     scope: 'tree',
@@ -111,8 +104,8 @@ export const bindings: readonly Binding[] = [
   },
   { keys: ['Enter'], scope: 'tree', action: 'enterRow', help: { page: 'Moving', text: 'open / close; on a track, into its fields' } },
   { keys: ['ArrowLeft', 'h'], scope: 'tree', action: 'close', help: { page: 'Moving', text: 'close, or up a level' } },
-  { keys: ['space'], scope: 'tree', action: 'markToggle', hint: { label: 'mark' }, help: { page: 'Marking', text: 'mark a track (an album marks all its tracks)' } },
-  { keys: ['ctrl+a'], scope: 'tree', action: 'markAll', help: { page: 'Marking', text: 'mark everything shown' } },
+  { keys: ['Space'], scope: 'tree', action: 'markToggle', hint: { label: 'mark' }, help: { page: 'Marking', text: 'mark a track (an album marks all its tracks)' } },
+  { keys: ['Shift+Space'], scope: 'tree', action: 'markAll', help: { page: 'Marking', text: 'mark every track shown' } },
   {
     keys: ['e'],
     scope: 'tree',
@@ -127,29 +120,18 @@ export const bindings: readonly Binding[] = [
     hint: { label: 'remove' },
     help: { page: 'Marking', text: 'remove (asks first); in a playlist, take a track out of it' },
   },
-  { keys: ['J'], scope: 'tree', action: 'moveTrackDown', help: { page: 'Marking', text: 'move a track down / up' } },
-  { keys: ['K'], scope: 'tree', action: 'moveTrackUp', help: { page: 'Marking', text: 'move a track down / up' } },
+  { keys: ['Shift+ArrowDown'], scope: 'tree', action: 'moveTrackDown', help: { page: 'Marking', text: 'move a track down / up' } },
+  { keys: ['Shift+ArrowUp'], scope: 'tree', action: 'moveTrackUp', help: { page: 'Marking', text: 'move a track down / up' } },
   { keys: ['n'], scope: 'tree', action: 'renumber', help: { page: 'Marking', text: 'number an album 1…N' } },
   { keys: ['p'], scope: 'tree', action: 'addToPlaylist', hint: { label: 'playlist' }, help: { page: 'Marking', text: 'add to a playlist' } },
+  { keys: ['c'], scope: 'tree', action: 'copyFrom', help: { page: 'Marking', text: 'copy the cover, artist, album… of a track' } },
 
   { keys: ['ArrowUp', 'k'], scope: 'inspector', action: 'fieldUp', hint: { label: 'field' }, help: { page: 'Editing', text: 'choose a field' } },
   { keys: ['ArrowDown', 'j'], scope: 'inspector', action: 'fieldDown', hint: { label: 'field' }, help: { page: 'Editing', text: 'choose a field' } },
-  {
-    keys: ['ArrowLeft', 'h'],
-    scope: 'inspector',
-    action: 'previousTabOrBack',
-    help: { page: 'Editing', text: "a track's tabs: Details, Audio, Latin, Device; ← on the first goes back to the tree" },
-  },
-  {
-    keys: ['ArrowRight', 'l'],
-    scope: 'inspector',
-    action: 'nextTab',
-    help: { page: 'Editing', text: "a track's tabs: Details, Audio, Latin, Device; ← on the first goes back to the tree" },
-  },
-  { keys: ['1'], scope: 'inspector', action: 'tab1', hint: tabs, help: { page: 'Editing', text: "a track's tab by its number (4: Device, when a device profile is chosen)" } },
-  { keys: ['2'], scope: 'inspector', action: 'tab2', hint: tabs, help: { page: 'Editing', text: "a track's tab by its number (4: Device, when a device profile is chosen)" } },
-  { keys: ['3'], scope: 'inspector', action: 'tab3', hint: tabs, help: { page: 'Editing', text: "a track's tab by its number (4: Device, when a device profile is chosen)" } },
-  { keys: ['4'], scope: 'inspector', action: 'tab4', hint: tabs, help: { page: 'Editing', text: "a track's tab by its number (4: Device, when a device profile is chosen)" } },
+  { keys: ['1'], scope: 'inspector', action: 'tab1', hint: tabs, help: tabHelp },
+  { keys: ['2'], scope: 'inspector', action: 'tab2', hint: tabs, help: tabHelp },
+  { keys: ['3'], scope: 'inspector', action: 'tab3', hint: tabs, help: tabHelp },
+  { keys: ['4'], scope: 'inspector', action: 'tab4', hint: tabs, help: tabHelp },
   {
     keys: ['Enter'],
     scope: 'inspector',
@@ -157,30 +139,35 @@ export const bindings: readonly Binding[] = [
     hint: { label: (s) => (onCover(s) ? 'choose' : 'edit'), when: canEdit },
     help: { page: 'Editing', text: 'edit it; enter again saves (the cover: choose a file)' },
   },
-  { keys: ['x'], scope: 'inspector', action: 'removeCover', hint: { label: 'remove', when: onCover }, help: { page: 'Editing', text: 'remove the cover' } },
-  { keys: ['['], scope: 'inspector', action: 'nudgeDown', hint: { label: 'nudge', when: onCut }, help: { page: 'Editing', text: 'nudge 0.1 s or 1.5 dB' } },
-  { keys: [']'], scope: 'inspector', action: 'nudgeUp', hint: { label: 'nudge', when: onCut }, help: { page: 'Editing', text: 'nudge 0.1 s or 1.5 dB' } },
-  { keys: ['{'], scope: 'inspector', action: 'nudgeDownMore', help: { page: 'Editing', text: 'nudge 1 s or 6 dB' } },
-  { keys: ['}'], scope: 'inspector', action: 'nudgeUpMore', help: { page: 'Editing', text: 'nudge 1 s or 6 dB' } },
-  { keys: ['0'], scope: 'inspector', action: 'clearField', hint: { label: 'clear', when: onCut }, help: { page: 'Editing', text: 'no cut, fade or change' } },
   {
-    keys: ['p'],
+    keys: ['d', 'Delete'],
+    scope: 'inspector',
+    action: 'clear',
+    hint: { label: (s) => (onCover(s) ? 'remove' : 'clear'), when: (s) => onCover(s) || onCut(s) },
+    help: { page: 'Editing', text: 'remove the cover (asks first); clear a cut, fade or volume' },
+  },
+  { keys: ['ArrowLeft'], scope: 'inspector', action: 'nudgeDown', hint: { label: 'nudge', when: onCut }, help: { page: 'Editing', text: 'nudge 0.1 s or 1.5 dB' } },
+  { keys: ['ArrowRight'], scope: 'inspector', action: 'nudgeUp', hint: { label: 'nudge', when: onCut }, help: { page: 'Editing', text: 'nudge 0.1 s or 1.5 dB' } },
+  { keys: ['Shift+ArrowLeft'], scope: 'inspector', action: 'nudgeDownMore', help: { page: 'Editing', text: 'nudge 1 s or 6 dB' } },
+  { keys: ['Shift+ArrowRight'], scope: 'inspector', action: 'nudgeUpMore', help: { page: 'Editing', text: 'nudge 1 s or 6 dB' } },
+  {
+    keys: ['Space'],
     scope: 'inspector',
     action: 'hear',
     hint: { label: (s) => (s.playing ? 'stop' : 'hear'), when: onCut },
-    help: { page: 'Editing', text: 'hear 8 s beside it' },
+    help: { page: 'Editing', text: 'hear 8 s beside it; again, or esc, stops it' },
   },
+  { keys: ['c'], scope: 'inspector', action: 'copyField', hint: { label: 'copy', when: onTrack }, help: { page: 'Editing', text: 'copy the selected field' } },
 
   { keys: ['Tab'], scope: 'common', action: 'toggleFocus', help: { page: 'Moving', text: 'the other pane' } },
-  { keys: ['c'], scope: 'common', action: 'copy', hint: { label: 'copy', when: (s) => inInspector(s) && onTrack(s) }, help: { page: 'Marking', text: 'copy the cover, artist, album… of a track' } },
   { keys: ['v'], scope: 'common', action: 'paste', hint: { label: 'paste', when: inInspector }, help: { page: 'Marking', text: 'paste them; ctrl+v with a picture sets the cover' } },
   { keys: ['/'], scope: 'common', action: 'focusFilter', hint: { label: 'filter', when: inTree }, help: { page: 'Moving', text: 'filter (esc clears it)' } },
-  { keys: ['S'], scope: 'common', action: 'sortMenu', hint: { label: 'sort', when: inTree }, help: { page: 'Moving', text: 'sort the list' } },
+  { keys: ['o'], scope: 'common', action: 'sortMenu', hint: { label: 'sort', when: inTree }, help: { page: 'Moving', text: 'sort the list' } },
   { keys: ['a'], scope: 'common', action: 'add', help: { page: 'Library', text: 'add from a YouTube link, or drop files on the page' } },
   { keys: ['s'], scope: 'common', action: 'sync', help: { page: 'Library', text: 'sync: write the folder' } },
   { keys: ['u'], scope: 'common', action: 'undo', hint: { label: 'undo', when: (s) => Boolean(s.lib?.history.undo) }, help: { page: 'Library', text: 'undo / redo' } },
-  { keys: ['ctrl+r'], scope: 'common', action: 'redo', help: { page: 'Library', text: 'undo / redo' } },
-  { keys: ['D'], scope: 'common', action: 'doctor', help: { page: 'Library', text: 'check the library' } },
+  { keys: ['Shift+u'], scope: 'common', action: 'redo', help: { page: 'Library', text: 'undo / redo' } },
+  { keys: ['Shift+v'], scope: 'common', action: 'doctor', help: { page: 'Library', text: 'check the library' } },
   {
     keys: ['Escape'],
     scope: 'common',
@@ -208,14 +195,19 @@ const labels: Record<string, string> = {
   Enter: 'enter',
   Escape: 'esc',
   Tab: 'tab',
-  PageUp: 'PgUp',
-  PageDown: 'PgDn',
+  Space: 'space',
   Delete: 'Del',
 };
 
 const arrows = new Set(['↑', '↓', '←', '→']);
 
+const shifted = 'Shift+';
+
 export function keyLabel(key: string): string {
+  if (key.startsWith(shifted)) {
+    const rest = key.slice(shifted.length);
+    return /^[a-z]$/.test(rest) ? rest.toUpperCase() : `${shifted}${keyLabel(rest)}`;
+  }
   return labels[key] ?? key;
 }
 
@@ -232,20 +224,19 @@ function joinKeys(keys: readonly string[]): string {
   return shown.join(' ');
 }
 
-const modifiers = [
-  ['ctrl', 'ctrlKey'],
-  ['alt', 'altKey'],
-  ['meta', 'metaKey'],
-] as const;
-
 export function keyName(e: KeyEventLike): string {
-  const key = e.key === ' ' ? 'space' : e.key;
-  const held = modifiers.filter(([, flag]) => e[flag]).map(([name]) => name);
-  return held.length === 0 ? key : `${held.join('+')}+${key.toLowerCase()}`;
+  const key = e.key === ' ' ? 'Space' : e.key;
+  const letter = /^[a-zA-Z]$/.test(key);
+  const shift = e.shiftKey && (letter || key.length > 1);
+  return `${shift ? shifted : ''}${letter ? key.toLowerCase() : key}`;
+}
+
+function plain(e: KeyEventLike): boolean {
+  return !e.isComposing && !e.ctrlKey && !e.metaKey && !e.altKey;
 }
 
 export function resolve(scope: 'tree' | 'inspector', e: KeyEventLike): ActionName | undefined {
-  if (e.isComposing) {
+  if (!plain(e)) {
     return undefined;
   }
   const name = keyName(e);
@@ -254,7 +245,7 @@ export function resolve(scope: 'tree' | 'inspector', e: KeyEventLike): ActionNam
 }
 
 export function resolveFilter(e: KeyEventLike): ActionName | undefined {
-  if (e.isComposing) {
+  if (!plain(e)) {
     return undefined;
   }
   const name = keyName(e);
@@ -316,10 +307,10 @@ function helpKeys(group: readonly Binding[]): string {
 
 export function helpPages(): readonly { page: HelpPage; rows: readonly { keys: string; text: string }[] }[] {
   return pages.map((page) => {
-    const helped = bindings.filter((b) => b.help?.page === page);
-    const rows = grouped(helped, (a, b) => a.help?.text === b.help?.text).map((group) => ({
+    const helped = bindings.filter((b) => b.help.page === page);
+    const rows = grouped(helped, (a, b) => a.help.text === b.help.text).map((group) => ({
       keys: helpKeys(group),
-      text: group[0]?.help?.text ?? '',
+      text: group[0]?.help.text ?? '',
     }));
     return { page, rows };
   });

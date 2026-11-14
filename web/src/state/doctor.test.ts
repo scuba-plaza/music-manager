@@ -68,7 +68,7 @@ describe('D', () => {
     await vi.waitFor(() => {
       expect(useDoctor.getState().phase).toBe('done');
     });
-    moveProblem(1);
+    moveProblem('down');
     useApp.setState({ overlay: null });
 
     openDoctor();
@@ -112,15 +112,24 @@ describe('choosing a problem', () => {
   it('moves through the problems and stays inside the list', async () => {
     await opened();
 
-    moveProblem(-1);
+    moveProblem('up');
     expect(useDoctor.getState().cursor).toBe(0);
-    moveProblem(1);
-    moveProblem(1);
+    moveProblem('down');
+    moveProblem('down');
     expect(useDoctor.getState().cursor).toBe(1);
     chooseProblem(0);
     expect(useDoctor.getState().cursor).toBe(0);
     chooseProblem(7);
     expect(useDoctor.getState().cursor).toBe(1);
+  });
+
+  it('goes to the first and the last problem', async () => {
+    await opened();
+
+    moveProblem('last');
+    expect(useDoctor.getState().cursor).toBe(1);
+    moveProblem('first');
+    expect(useDoctor.getState().cursor).toBe(0);
   });
 
   it('goes to the track of the problem: the dialog closes and the tree shows the track', async () => {
@@ -146,7 +155,7 @@ describe('choosing a problem', () => {
       expect(useDoctor.getState().phase).toBe('done');
     });
 
-    moveProblem(1);
+    moveProblem('down');
     goToProblem();
 
     expect(useApp.getState().overlay).toEqual({ kind: 'doctor' });

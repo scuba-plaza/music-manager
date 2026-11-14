@@ -27,6 +27,10 @@ export function closeOverlay(): void {
   useApp.setState({ overlay: null });
 }
 
+export function ask(head: string, body: string[], yes: string, onYes: () => void): void {
+  useApp.setState({ overlay: { kind: 'ask', head, body, yes, onYes } });
+}
+
 export interface AppState {
   info: InfoView | null;
   lib: LibraryResponse | null;
@@ -53,7 +57,6 @@ export interface AppState {
 }
 
 const expandedKey = 'mm.expanded';
-const tabKey = 'mm.tab';
 
 export function recall(key: string): string | null {
   try {
@@ -80,11 +83,6 @@ function recallExpanded(): Set<string> {
   }
 }
 
-function recallTab(): number {
-  const tab = Number(recall(tabKey) ?? 0);
-  return Number.isInteger(tab) && tab >= 0 ? tab : 0;
-}
-
 export const useApp = create<AppState>()(() => ({
   info: null,
   lib: null,
@@ -96,7 +94,7 @@ export const useApp = create<AppState>()(() => ({
   marks: new Set(),
   focus: 'tree',
   field: 0,
-  tab: recallTab(),
+  tab: 0,
   detail: null,
   detailError: '',
   edit: null,
@@ -113,8 +111,5 @@ export const useApp = create<AppState>()(() => ({
 useApp.subscribe((state, previous) => {
   if (state.expanded !== previous.expanded) {
     remember(expandedKey, JSON.stringify([...state.expanded]));
-  }
-  if (state.tab !== previous.tab) {
-    remember(tabKey, String(state.tab));
   }
 });

@@ -12,19 +12,6 @@ function filterBox(): HTMLInputElement | null {
   return document.querySelector<HTMLInputElement>(`[${filterBoxAttribute}]`);
 }
 
-export function pageSize(): number {
-  const tree = treeElement();
-  const rowHeight = tree?.querySelector<HTMLElement>('[role="treeitem"]')?.offsetHeight ?? 0;
-  if (tree === null || rowHeight === 0) {
-    return 1;
-  }
-  return Math.max(1, Math.floor(tree.clientHeight / rowHeight) - 1);
-}
-
-export function centreCursor(): void {
-  cursorElement()?.scrollIntoView({ block: 'center' });
-}
-
 export function scrollCursorIntoView(): void {
   cursorElement()?.scrollIntoView({ block: 'nearest' });
 }

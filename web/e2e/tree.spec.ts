@@ -95,23 +95,23 @@ test('enter opens an artist and its albums, and again closes them', async ({ pag
   await expect(row(page, 'Kind of Blue')).toHaveCount(0);
 });
 
-test('+ opens a level and - closes all of it', async ({ page, press }) => {
+test('Shift+→ opens a level and Shift+← closes all of it', async ({ page, press }) => {
   await openPage(page);
   await row(page, 'Miles Davis').click();
   await press('Enter');
   await expect(row(page, 'Kind of Blue')).toBeVisible();
   await expect(row(page, 'Songs')).toHaveCount(0);
 
-  await press('+');
+  await press('Shift+ArrowRight');
   await expect(row(page, 'Songs')).toBeVisible();
   await expect(row(page, 'Rough Mix')).toBeVisible();
   await expect(row(page, 'So What')).toHaveCount(0);
 
-  await press('=');
+  await press('Shift+ArrowRight');
   await expect(row(page, 'So What')).toBeVisible();
   await expect(row(page, 'وطني').first()).toBeVisible();
 
-  await press('-');
+  await press('Shift+ArrowLeft');
   await expect(items(page)).toHaveCount(6);
 });
 
@@ -145,13 +145,13 @@ test('space marks a track and an album marks all its tracks; escape clears the m
   await expect(page.getByRole('banner')).not.toContainText('marked');
 });
 
-test('ctrl+a marks every track that is shown', async ({ page, press }) => {
+test('Shift+Space marks every track that is shown', async ({ page, press }) => {
   await openPage(page);
   await row(page, 'Needs work').dblclick();
   await row(page, 'Miles Davis').dblclick();
   await row(page, 'Kind of Blue').dblclick();
 
-  await press('Control+a');
+  await press('Shift+Space');
 
   await expect(page.getByRole('banner')).toContainText('3 marked');
   await expect(row(page, 'Rough Mix')).toHaveAttribute('data-mark', 'all');
@@ -255,8 +255,8 @@ test('a long playlist name does not push the count out of the pane', async ({ pa
 test('the cursor row is the one that is selected and it stays inside the tree when the cursor runs to the end', async ({ page, press }) => {
   await page.setViewportSize({ width: page.viewportSize()?.width ?? 1200, height: 360 });
   await openPage(page);
-  await press('+');
-  await press('=');
+  await press('Shift+ArrowRight');
+  await press('Shift+ArrowRight');
 
   await press('End');
 

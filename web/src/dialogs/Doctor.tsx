@@ -1,20 +1,15 @@
 import { useLayoutEffect, useRef } from 'react';
+import { motionOf } from '../keys/dialog';
 import type { KeyEventLike } from '../keys/keymap';
 import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
-import { closeOverlay } from '../state/store';
 import { chooseProblem, goToProblem, moveProblem, useDoctor } from '../state/doctor';
 import { plural } from '../state/text';
 
 function onKey(e: KeyEventLike): boolean {
-  if (e.key === 'q') {
-    closeOverlay();
-    return true;
-  }
-  if (e.key === 'ArrowUp' || e.key === 'k') {
-    moveProblem(-1);
-  } else if (e.key === 'ArrowDown' || e.key === 'j') {
-    moveProblem(1);
+  const motion = motionOf(e);
+  if (motion !== undefined) {
+    moveProblem(motion);
   } else if (e.key === 'Enter') {
     goToProblem();
   } else {
