@@ -32,6 +32,11 @@ buildGoModule {
 
   vendorHash = "sha256-pdCnt8lqPiPSipa6KmtSxl8c2YZ32vv4X6tMETZRAQY=";
 
+  excludedPackages = [
+    "e2e-server"
+    "gentypes"
+  ];
+
   env.CGO_ENABLED = "0";
 
   ldflags = [
