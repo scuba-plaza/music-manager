@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -135,6 +136,7 @@ func (p *SyncPlan) WithPrune(prune bool) *SyncPlan {
 // done (progress may be nil). After a sync into the library folder it also
 // records what was synced, for Unsynced.
 func (p *SyncPlan) ApplyWith(progress func(done, total int)) error {
+	var emptied []string
 	for i, op := range p.Ops {
 		if !filepath.IsLocal(filepath.FromSlash(op.Path)) {
 			return fmt.Errorf("refusing to touch %q outside the target", op.Path)
@@ -153,12 +155,13 @@ func (p *SyncPlan) ApplyWith(progress func(done, total int)) error {
 			if err := os.Remove(dest); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return err
 			}
+			emptied = append(emptied, path.Dir(op.Path))
 		}
 		if progress != nil {
 			progress(i+1, len(p.Ops))
 		}
 	}
-	if err := removeEmptyDirs(p.target); err != nil {
+	if err := removeEmptied(p.target, emptied); err != nil {
 		return err
 	}
 	if err := p.collect(); err != nil {
@@ -308,29 +311,28 @@ func writeAtomic(path string, data []byte) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// removeEmptyDirs deletes directories under root that hold nothing, deepest
-// first. The root itself and .mm are kept.
-func removeEmptyDirs(root string) error {
-	var dirs []string
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+func removeEmptied(root string, dirs []string) error {
+	seen := map[string]bool{}
+	var all []string
+	for _, d := range dirs {
+		for d != "." && d != "" && !seen[d] {
+			seen[d] = true
+			all = append(all, d)
+			d = path.Dir(d)
+		}
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(all)))
+	for _, d := range all {
+		full := filepath.Join(root, filepath.FromSlash(d))
+		entries, err := os.ReadDir(full)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
 		if err != nil {
 			return err
 		}
-		if d.IsDir() && path != root {
-			if d.Name() == ".mm" && filepath.Dir(path) == root {
-				return filepath.SkipDir
-			}
-			dirs = append(dirs, path)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	sort.Sort(sort.Reverse(sort.StringSlice(dirs)))
-	for _, d := range dirs {
-		if entries, err := os.ReadDir(d); err == nil && len(entries) == 0 {
-			if err := os.Remove(d); err != nil {
+		if len(entries) == 0 {
+			if err := os.Remove(full); err != nil {
 				return err
 			}
 		}
