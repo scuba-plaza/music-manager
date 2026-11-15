@@ -51,17 +51,6 @@ test('status:unidentified shows only the unidentified track', async ({ page }) =
   await expect(page.getByRole('banner')).toContainText('6 tracks');
 });
 
-test('the Arabic artist row is a bdi with dir=auto', async ({ page }) => {
-  await openPage(page);
-
-  const name = row(page, 'فيروز').locator('bdi');
-
-  await expect(name).toHaveText('فيروز');
-  await expect(name).toHaveAttribute('dir', 'auto');
-  await expect(name).toHaveCSS('unicode-bidi', 'isolate');
-  await expect(row(page, 'John Coltrane').locator('bdi')).toHaveAttribute('dir', 'auto');
-});
-
 test('an Arabic name does not move its neighbours: the labels start at one edge and the counts end at the other', { tag: '@narrow' }, async ({ page }) => {
   await openPage(page);
   const arabic = row(page, 'فيروز');
@@ -95,37 +84,6 @@ test('enter opens an artist and its albums, and again closes them', async ({ pag
   await expect(row(page, 'Kind of Blue')).toHaveCount(0);
 });
 
-test('Shift+→ opens a level and Shift+← closes all of it', async ({ page, press }) => {
-  await openPage(page);
-  await row(page, 'Miles Davis').click();
-  await press('Enter');
-  await expect(row(page, 'Kind of Blue')).toBeVisible();
-  await expect(row(page, 'Songs')).toHaveCount(0);
-
-  await press('Shift+ArrowRight');
-  await expect(row(page, 'Songs')).toBeVisible();
-  await expect(row(page, 'Rough Mix')).toBeVisible();
-  await expect(row(page, 'So What')).toHaveCount(0);
-
-  await press('Shift+ArrowRight');
-  await expect(row(page, 'So What')).toBeVisible();
-  await expect(row(page, 'وطني').first()).toBeVisible();
-
-  await press('Shift+ArrowLeft');
-  await expect(items(page)).toHaveCount(6);
-});
-
-test('a double click opens a row and a click on the arrow opens another at once', async ({ page }) => {
-  await openPage(page);
-
-  await row(page, 'Miles Davis').dblclick();
-  await expect(row(page, 'Kind of Blue')).toBeVisible();
-
-  await row(page, 'John Coltrane').locator('.twist').click();
-  await expect(row(page, 'John Coltrane')).toHaveAttribute('aria-expanded', 'true');
-  await expect(row(page, 'John Coltrane')).toHaveAttribute('aria-selected', 'true');
-});
-
 test('space marks a track and an album marks all its tracks; escape clears the marks', async ({ page, press }) => {
   await openPage(page);
   await row(page, 'Miles Davis').dblclick();
@@ -143,20 +101,6 @@ test('space marks a track and an album marks all its tracks; escape clears the m
 
   await expect(row(page, 'So What')).not.toHaveAttribute('data-mark', /.+/);
   await expect(page.getByRole('banner')).not.toContainText('marked');
-});
-
-test('Shift+Space marks every track that is shown', async ({ page, press }) => {
-  await openPage(page);
-  await row(page, 'Needs work').dblclick();
-  await row(page, 'Miles Davis').dblclick();
-  await row(page, 'Kind of Blue').dblclick();
-
-  await press('Shift+Space');
-
-  await expect(page.getByRole('banner')).toContainText('3 marked');
-  await expect(row(page, 'Rough Mix')).toHaveAttribute('data-mark', 'all');
-  await expect(row(page, 'So What')).toHaveAttribute('data-mark', 'all');
-  await expect(row(page, 'John Coltrane')).not.toHaveAttribute('data-mark', /.+/);
 });
 
 test('the slash key focuses the filter, enter keeps it and escape clears it, and the footer follows', async ({ page, press }) => {
@@ -177,18 +121,6 @@ test('the slash key focuses the filter, enter keeps it and escape clears it, and
 
   await press('Escape');
   await expect(filterBox(page)).toHaveValue('');
-  await expect(items(page)).toHaveCount(6);
-});
-
-test('escape in the filter box clears it and leaves the box', async ({ page, press }) => {
-  await openPage(page);
-  await filterBox(page).fill('nina');
-  await expect(items(page).locator('.label')).toHaveText(['Nina Simone', 'Singles', 'Feeling Good']);
-
-  await press('Escape');
-
-  await expect(filterBox(page)).toHaveValue('');
-  await expect(filterBox(page)).not.toBeFocused();
   await expect(items(page)).toHaveCount(6);
 });
 

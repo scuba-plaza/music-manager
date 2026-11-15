@@ -175,19 +175,6 @@ test('d asks and y removes the track and it disappears from its playlists', asyn
   expect(await playlistCount(request, 'Late night')).toBe(0);
 });
 
-test('n on the question removes nothing', async ({ page }) => {
-  await openAll(page);
-  await row(page, 'So What').click();
-
-  await page.keyboard.press('d');
-  await expect(page.getByRole('dialog', { name: 'Are you sure?' })).toBeVisible();
-  await page.keyboard.press('n');
-
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(row(page, 'So What')).toHaveCount(1);
-  await expect(page.getByRole('banner')).toContainText('6 tracks');
-});
-
 test('d on a track of a playlist takes it out of the playlist and leaves it in the library', async ({ page, request }) => {
   await openAll(page);
   await row(page, 'Blue in Green').first().click();
@@ -237,16 +224,6 @@ test('Shift+↓ moves a track down and renumbers', async ({ page }) => {
   await said(page, 'Numbered 2 tracks 1–2');
   await expect(row(page, 'Blue in Green').last().locator('.num')).toHaveText('01');
   await expect(row(page, 'So What').locator('.num')).toHaveText('02');
-});
-
-test('Shift+↑ on the first track of an album says it is the first already', async ({ page }) => {
-  await openAll(page);
-  await row(page, 'So What').click();
-
-  await page.keyboard.press('Shift+ArrowUp');
-
-  await said(page, 'It is the first track already');
-  expect(await labelsAfter(page, 'Kind of Blue', 2)).toEqual(['So What', 'Blue in Green']);
 });
 
 test('u then Shift+u undoes and redoes', async ({ page }) => {

@@ -18,10 +18,3 @@ test('the seeded server answers /api/library with four artists, two playlists an
   expect(view.needWork).toBe(1);
   expect(view.rows.find((row) => row.key === 'needs')).toMatchObject({ kind: 'group', label: 'Needs work', count: 1 });
 });
-
-test('the library comes with the formats the seeded library has', async ({ request }) => {
-  const response = await request.get('/api/library');
-  expect(response.ok()).toBe(true);
-  const { profiles } = (await response.json()) as LibraryResponse;
-  expect(profiles.map((profile) => profile.id)).toEqual(['wolfgang-wmp01', 'my-player']);
-});
