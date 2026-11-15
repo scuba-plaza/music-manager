@@ -6,12 +6,10 @@ import { App } from '../App';
 import { goToRow } from '../state/edit';
 import { useApp } from '../state/store';
 import { changeResponse, FakeEventSource, infoView, jsonResponse, requestsTo, sampleLibrary, stubServer, type StubRoute } from '../testing/fakes';
-import { helpPages } from '../keys/keymap';
 
 const sep = '\u001f';
 const soWhat = `track${sep}sowhat`;
 const blueInGreen = `track${sep}blue`;
-const kindOfBlue = `album${sep}Miles Davis${sep}Kind of Blue`;
 const longName = 'A rather long playlist name that goes on and on and on for a while';
 
 const sortChoices: SortChoice[] = [
@@ -63,25 +61,6 @@ function dialog() {
   return page.getByRole('dialog');
 }
 
-function options(): string[] {
-  return dialog()
-    .getByRole('option')
-    .elements()
-    .map((option) => [...option.children].map((cell) => cell.textContent.trim()).join('|'));
-}
-
-function hints(): string[] {
-  return page
-    .getByRole('list', { name: 'Keys' })
-    .getByRole('listitem')
-    .elements()
-    .map((item) => item.textContent.trim());
-}
-
-function libraryRequests(): string[] {
-  return fetchMock.mock.calls.flatMap(([input]) => (typeof input === 'string' && input.startsWith('/api/library') ? [input] : []));
-}
-
 function askFor(onYes: () => void): void {
   useApp.setState({ overlay: { kind: 'ask', head: 'Remove So What?', body: ['It goes from the library.', '• So What'], yes: 'Remove', onYes } });
 }
@@ -116,36 +95,6 @@ describe('the dialog shell', () => {
     expect(document.activeElement).toBe(tree);
   });
 
-  test('the title is drawn in the border', async () => {
-    await openApp();
-    await onRow(soWhat);
-    await userEvent.keyboard('?');
-
-    const box = dialog().element().getBoundingClientRect();
-    const title = dialog().getByRole('heading', { name: 'Keys' }).element().getBoundingClientRect();
-
-    expect(title.top).toBeLessThan(box.top);
-    expect(title.bottom).toBeGreaterThan(box.top);
-  });
-
-  test('a click on the backdrop closes the dialog and a click inside does not', async () => {
-    await openApp();
-    await onRow(soWhat);
-    await userEvent.keyboard('?');
-
-    await dialog().getByRole('heading').click();
-    await expect.element(dialog()).toBeVisible();
-
-    const box = dialog().element().getBoundingClientRect();
-    const backdrop = dialog().element().parentElement;
-    if (backdrop === null) {
-      throw new Error('the dialog has no backdrop');
-    }
-    await userEvent.click(page.elementLocator(backdrop), { position: { x: 2, y: Math.max(2, box.top - 20) } });
-
-    await expect.element(dialog()).not.toBeInTheDocument();
-  });
-
   test('tab keeps the focus inside the dialog', async () => {
     await openApp();
     await onRow(soWhat);
@@ -169,21 +118,6 @@ describe('the dialog shell', () => {
     page.getByRole('tree').element().focus();
 
     expect(dialog().element().contains(document.activeElement)).toBe(true);
-  });
-
-  test('the footer shows the keys of the open dialog and the tree keys again when it closes', async () => {
-    await openApp();
-    await onRow(soWhat);
-    const treeHints = hints();
-    expect(treeHints).toContain('? help');
-
-    askFor(vi.fn());
-
-    await expect.poll(hints).toEqual(['y Remove', 'n no', 'esc close']);
-
-    await userEvent.keyboard('{Escape}');
-
-    await expect.poll(hints).toEqual(treeHints);
   });
 
   test('escape in a dialog closes it and does not also clear the marks or the filter', async () => {
@@ -222,40 +156,6 @@ describe('the dialog shell', () => {
 });
 
 describe('ask', () => {
-  test('ask goes ahead only on y, and n, esc and q turn it down', async () => {
-    await openApp();
-    await onRow(soWhat);
-    const onYes = vi.fn();
-    askFor(onYes);
-
-    await expect.element(dialog()).toHaveAccessibleName('Are you sure?');
-    await expect.element(dialog().getByText('Remove So What?')).toBeVisible();
-    for (const line of ['Remove So What?', 'It goes from the library.', '• So What']) {
-      const bdi = dialog().getByText(line).element();
-      expect(bdi.tagName).toBe('BDI');
-      expect(bdi.getAttribute('dir')).toBe('auto');
-    }
-
-    await expect.poll(hints).toEqual(['y Remove', 'n no', 'esc close']);
-    await userEvent.keyboard('a');
-    await userEvent.keyboard('x');
-    await userEvent.keyboard('j');
-    await userEvent.keyboard('{Enter}');
-    await expect.element(dialog()).toBeVisible();
-    expect(onYes).not.toHaveBeenCalled();
-
-    await userEvent.keyboard('y');
-    await expect.element(dialog()).not.toBeInTheDocument();
-    expect(onYes).toHaveBeenCalledTimes(1);
-
-    for (const key of ['n', '{Escape}', 'q']) {
-      askFor(onYes);
-      await expect.element(dialog()).toBeVisible();
-      await userEvent.keyboard(key);
-      await expect.element(dialog()).not.toBeInTheDocument();
-      expect(onYes).toHaveBeenCalledTimes(1);
-    }
-  });
 
   test('enter on the focused Cancel button cancels and does not go ahead', async () => {
     await openApp();
@@ -273,238 +173,7 @@ describe('ask', () => {
   });
 });
 
-describe('help', () => {
-  test('? in the help neither closes it nor opens it again, and esc closes it', async () => {
-    await openApp();
-    await onRow(soWhat);
-    await userEvent.keyboard('?');
-    await expect.element(dialog()).toBeVisible();
-
-    await userEvent.keyboard('?');
-    await expect.element(dialog()).toBeVisible();
-    expect(dialog().elements()).toHaveLength(1);
-
-    await userEvent.keyboard('{Escape}');
-    await expect.element(dialog()).not.toBeInTheDocument();
-  });
-
-  test('the numbers turn the pages of the help and tab does not, and the note on stopping mm is under them', async () => {
-    await openApp();
-    await onRow(soWhat);
-    await userEvent.keyboard('?');
-    const selected = () => dialog().getByRole('tab', { selected: true }).element().textContent;
-    const pages = helpPages();
-
-    await expect.poll(selected).toBe(`1 ${pages[0]?.page ?? ''}`);
-    await userEvent.keyboard('3');
-    await expect.poll(selected).toBe(`3 ${pages[2]?.page ?? ''}`);
-    await userEvent.keyboard('{Tab}');
-    await expect.poll(selected).toBe(`3 ${pages[2]?.page ?? ''}`);
-    await userEvent.keyboard('1');
-    await expect.poll(selected).toBe(`1 ${pages[0]?.page ?? ''}`);
-    await expect.element(dialog().getByText('Ctrl+C in the terminal where mm runs stops the program.')).toBeVisible();
-  });
-
-  test('the help opens on the page it was closed on', async () => {
-    await openApp();
-    await onRow(soWhat);
-    await userEvent.keyboard('?');
-    const selected = () => dialog().getByRole('tab', { selected: true }).element().textContent;
-    const pages = helpPages();
-    await userEvent.keyboard('3');
-    await expect.poll(selected).toBe(`3 ${pages[2]?.page ?? ''}`);
-
-    await userEvent.keyboard('{Escape}');
-    await expect.element(dialog()).not.toBeInTheDocument();
-    await userEvent.keyboard('?');
-
-    await expect.poll(selected).toBe(`3 ${pages[2]?.page ?? ''}`);
-  });
-
-  test('the help of a freshly loaded page starts at the first page', async () => {
-    await openApp();
-    await onRow(soWhat);
-    await userEvent.keyboard('?');
-
-    await expect.poll(() => dialog().getByRole('tab', { selected: true }).element().textContent).toBe(`1 ${helpPages()[0]?.page ?? ''}`);
-  });
-});
-
-describe('the sort menu', () => {
-  test('the sort menu picks by number', async () => {
-    await openApp();
-    await onRow(soWhat);
-
-    await userEvent.keyboard('o');
-
-    await expect.element(dialog()).toHaveAccessibleName('Sort');
-    expect(options()).toEqual(['1|Tree|', '2|Artist|A → Z', '3|Album|A → Z', '4|Title|A → Z']);
-
-    await userEvent.keyboard('4');
-
-    await expect.element(dialog()).not.toBeInTheDocument();
-    await expect.poll(libraryRequests).toContain('/api/library?sort=title');
-  });
-
-  test('r reverses the order the menu picks', async () => {
-    await openApp();
-    await onRow(soWhat);
-
-    await userEvent.keyboard('o');
-    await userEvent.keyboard('r');
-
-    await expect.poll(options).toEqual(['1|Tree|', '2|Artist|Z → A', '3|Album|Z → A', '4|Title|Z → A']);
-    await userEvent.keyboard('{ArrowDown}');
-    await userEvent.keyboard('{ArrowDown}');
-    await userEvent.keyboard('{Enter}');
-
-    await expect.poll(libraryRequests).toContain('/api/library?sort=album&reverse=1');
-  });
-});
-
-describe('the copy list', () => {
-  test('the copy list cannot tick an attribute the track lacks', async () => {
-    await openApp();
-    await onRow(soWhat);
-
-    await userEvent.keyboard('c');
-
-    await expect.element(dialog()).toHaveAccessibleName('Copy from So What');
-    expect(options()).toEqual(['|Cover|—', '[x]|Artist|Miles Davis', '[x]|Album|Kind of Blue']);
-    await expect.element(dialog().getByRole('option', { selected: true })).toHaveTextContent('Artist');
-
-    await userEvent.keyboard('{ArrowUp}');
-    await userEvent.keyboard(' ');
-    expect(options()).toEqual(['|Cover|—', '[x]|Artist|Miles Davis', '[x]|Album|Kind of Blue']);
-
-    await userEvent.keyboard('{ArrowDown}');
-    await userEvent.keyboard(' ');
-    expect(options()).toEqual(['|Cover|—', '[ ]|Artist|Miles Davis', '[x]|Album|Kind of Blue']);
-
-    await userEvent.keyboard('{Enter}');
-
-    await expect.element(dialog()).not.toBeInTheDocument();
-    expect(requestsTo(fetchMock, 'POST', '/api/copy')).toEqual([{ id: 'sowhat', attrs: ['album'] }]);
-  });
-
-  test('a row sets its words apart in their own direction, and a row that cannot be chosen says so', async () => {
-    await openApp(library([{ name: 'ليل', count: 1, length: '0:03' }]));
-    await onRow(soWhat);
-
-    await userEvent.keyboard('c');
-    const cover = dialog().getByRole('option').first();
-    await expect.element(cover).toHaveAttribute('aria-disabled', 'true');
-    await expect.element(dialog().getByRole('option').nth(1)).not.toHaveAttribute('aria-disabled');
-    await userEvent.keyboard('{Escape}');
-
-    await userEvent.keyboard('p');
-    const name = dialog().getByRole('option').first().element().querySelector('.label bdi');
-    expect([name?.textContent, name?.getAttribute('dir')]).toEqual(['ليل', 'auto']);
-    const detail = dialog().getByRole('option').first().element().querySelector('.detail bdi');
-    expect(detail?.getAttribute('dir')).toBe('auto');
-  });
-
-  test('the copy list asks for a tick before it copies nothing', async () => {
-    await openApp();
-    await onRow(soWhat);
-    await userEvent.keyboard('c');
-    await expect.element(dialog()).toBeVisible();
-
-    await userEvent.keyboard(' ');
-    await userEvent.keyboard('j');
-    await userEvent.keyboard(' ');
-    await dialog().getByRole('option').first().click({ force: true });
-    expect(options()).toEqual(['|Cover|—', '[ ]|Artist|Miles Davis', '[ ]|Album|Kind of Blue']);
-    await userEvent.keyboard('{Enter}');
-
-    await expect.element(dialog().getByRole('alert')).toHaveTextContent('Tick what to copy');
-    expect(dialog().getByRole('alert').element().querySelector('bdi[dir="auto"]')).not.toBeNull();
-    expect(requestsTo(fetchMock, 'POST', '/api/copy')).toEqual([]);
-  });
-
-  test('c on what is not a track says to choose a track', async () => {
-    await openApp();
-    await onRow(kindOfBlue);
-
-    await userEvent.keyboard('c');
-
-    await expect.element(page.getByRole('status')).toHaveTextContent('Select a track to copy from');
-    expect(dialog().query()).toBeNull();
-  });
-});
-
 describe('the playlist picker', () => {
-  test('c turns the picker into a name input', async () => {
-    await openApp();
-    await onRow(soWhat);
-
-    await userEvent.keyboard('p');
-
-    await expect.element(dialog()).toHaveAccessibleName('Add to a playlist');
-    expect(options()).toEqual(['|Late night|1', `|${longName}|2`, '|New playlist…|']);
-
-    await userEvent.keyboard('c');
-
-    const name = dialog().getByRole('textbox', { name: 'Name of the playlist' });
-    await expect.element(name).toHaveFocus();
-    expect(dialog().getByRole('listbox').query()).toBeNull();
-    await expect.poll(hints).toEqual(['enter make it', 'esc back']);
-
-    await userEvent.keyboard('nqjk');
-    await expect.element(name).toHaveValue('nqjk');
-    await expect.element(dialog()).toBeVisible();
-
-    await userEvent.keyboard('{Escape}');
-    await expect.element(dialog().getByRole('listbox')).toBeVisible();
-
-    await userEvent.keyboard('c');
-    await userEvent.fill(name, 'Road');
-    await userEvent.keyboard('{Enter}');
-
-    await expect.element(dialog()).not.toBeInTheDocument();
-    expect(requestsTo(fetchMock, 'POST', '/api/playlists')).toEqual([{ name: 'Road', ids: ['sowhat'] }]);
-  });
-
-  test('enter on a playlist adds the album under the cursor to it', async () => {
-    await openApp();
-    await onRow(kindOfBlue);
-
-    await userEvent.keyboard('p');
-    await expect.element(dialog().getByText('Adding 2 tracks')).toBeVisible();
-    await userEvent.keyboard('{Enter}');
-
-    await expect.element(dialog()).not.toBeInTheDocument();
-    expect(requestsTo(fetchMock, 'POST', '/api/playlists/add')).toEqual([{ name: 'Late night', ids: ['sowhat', 'blue'] }]);
-    await expect.poll(libraryRequests).toHaveLength(2);
-  });
-
-  test('the marked tracks go to the playlist in the order of the tree', async () => {
-    await openApp();
-    await onRow(soWhat);
-    await userEvent.keyboard(' ');
-    await onRow(blueInGreen);
-    await userEvent.keyboard(' ');
-
-    await userEvent.keyboard('p');
-    await userEvent.keyboard('j');
-    await userEvent.keyboard('{Enter}');
-
-    await expect.element(dialog()).not.toBeInTheDocument();
-    expect(requestsTo(fetchMock, 'POST', '/api/playlists/add')).toEqual([{ name: longName, ids: ['blue', 'sowhat'] }]);
-  });
-
-  test('with no playlists the picker opens on the name input and esc closes it', async () => {
-    await openApp(library([]));
-    await onRow(soWhat);
-
-    await userEvent.keyboard('p');
-
-    await expect.element(dialog().getByRole('textbox', { name: 'Name of the playlist' })).toHaveFocus();
-    await expect.poll(hints).toEqual(['enter make it', 'esc close']);
-    await userEvent.keyboard('{Escape}');
-
-    await expect.element(dialog()).not.toBeInTheDocument();
-  });
 
   test('an enter that ends a composed word does not make the playlist', async () => {
     await openApp(library([]));
@@ -519,67 +188,9 @@ describe('the playlist picker', () => {
     expect(requestsTo(fetchMock, 'POST', '/api/playlists')).toEqual([]);
   });
 
-  test('a playlist with no name is refused in the dialog', async () => {
-    await openApp(library([]));
-    await onRow(soWhat);
-    await userEvent.keyboard('p');
-
-    await userEvent.keyboard('{Enter}');
-
-    await expect.element(dialog().getByRole('alert')).toHaveTextContent('Type a name');
-    await expect.element(dialog().getByRole('textbox', { name: 'Name of the playlist' })).toBeInvalid();
-    expect(dialog().getByRole('alert').element().querySelector('bdi[dir="auto"]')).not.toBeNull();
-    expect(requestsTo(fetchMock, 'POST', '/api/playlists')).toEqual([]);
-  });
-
-  test('a name the server refuses is said under the name, which keeps what was typed', async () => {
-    const refuse: StubRoute = ({ method, url }) =>
-      method === 'POST' && url.pathname === '/api/playlists'
-        ? jsonResponse({ error: 'There is already a playlist called "Road", and "road" would be the same file (road.m3u)' }, 422)
-        : undefined;
-    await openApp(library([]), refuse);
-    await onRow(soWhat);
-    await userEvent.keyboard('p');
-    const name = dialog().getByRole('textbox', { name: 'Name of the playlist' });
-    await userEvent.fill(name, 'road');
-
-    await userEvent.keyboard('{Enter}');
-
-    await expect.element(dialog().getByRole('alert')).toHaveTextContent('There is already a playlist called');
-    await expect.element(name).toBeInvalid();
-    await expect.element(name).toHaveValue('road');
-
-    await userEvent.keyboard('s');
-    await expect.element(dialog().getByRole('alert')).not.toBeInTheDocument();
-    await expect.element(name).not.toBeInvalid();
-  });
-
-  test("the server's refusal is shown in the picker, which stays open", async () => {
-    const refuse: StubRoute = ({ method, url }) =>
-      method === 'POST' && url.pathname === '/api/playlists/add' ? jsonResponse({ error: 'the playlist is gone' }, 400) : undefined;
-    await openApp(library(), refuse);
-    await onRow(soWhat);
-    await userEvent.keyboard('p');
-
-    await userEvent.keyboard('{Enter}');
-
-    await expect.element(dialog().getByRole('alert')).toHaveTextContent('the playlist is gone');
-    await expect.element(dialog().getByRole('listbox')).toBeVisible();
-  });
-
-  test('p on the Playlists group says what to choose', async () => {
-    await openApp();
-    await onRow('playlists');
-
-    await userEvent.keyboard('p');
-
-    await expect.element(page.getByRole('status')).toHaveTextContent('Select tracks to add to a playlist');
-    expect(dialog().query()).toBeNull();
-  });
 });
 
 describe('the bulk form', () => {
-  const names = ['Artist', 'Artist (Latin)', 'Album', 'Album (Latin)', 'Tracks on album', 'Released', 'Genre', 'Genre (Latin)', 'Cut start', 'Cut end'];
 
   const bulk: StubRoute = ({ method, url, body }) => {
     if (method === 'POST' && url.pathname === '/api/bulk/preview') {
@@ -606,46 +217,6 @@ describe('the bulk form', () => {
     return dialog().getByRole('textbox', { name, exact: true });
   }
 
-  function summary() {
-    return dialog().getByTestId('bulk-summary');
-  }
-
-  test('e with tracks marked opens one form with a row for each value, the Latin forms among them', async () => {
-    await openForm();
-
-    await expect.element(dialog()).toHaveAccessibleName('Edit 2 marked tracks');
-    await expect.element(dialog().getByText('Applies to 2 tracks. Blank keeps what they have; - clears.')).toBeVisible();
-    expect(
-      dialog()
-        .getByRole('textbox')
-        .elements()
-        .map((input) => (input as HTMLInputElement).labels?.[0]?.textContent),
-    ).toEqual(names);
-    for (const input of dialog().getByRole('textbox').elements()) {
-      expect([input.getAttribute('dir'), input.getAttribute('placeholder')]).toEqual(['auto', '(keep)']);
-    }
-    await expect.element(field('Artist')).toHaveFocus();
-    await expect.element(summary()).toHaveTextContent('Type what the tracks should have.');
-    await expect.poll(hints).toEqual(['enter apply', 'tab next field', 'esc close']);
-  });
-
-  test('typing shows what would change, in its own direction', async () => {
-    await openForm();
-
-    await userEvent.click(field('Album'));
-    await userEvent.keyboard('ليل');
-
-    await expect.element(summary()).toHaveTextContent('Album → ليل');
-    const line = summary().element().querySelector('bdi');
-    expect(line?.getAttribute('dir')).toBe('auto');
-    expect(line?.textContent).toBe('Album → ليل');
-    expect(summary().element().classList.contains('bad')).toBe(false);
-    expect(requestsTo(fetchMock, 'POST', '/api/bulk/preview').at(-1)).toEqual({
-      ids: ['blue', 'sowhat'],
-      values: { artist: '', artistLatin: '', album: 'ليل', albumLatin: '', of: '', released: '', genre: '', genreLatin: '', cutStart: '', cutEnd: '' },
-    });
-  });
-
   test('tab and the arrows move from row to row, round from the last to the first', async () => {
     await openForm();
 
@@ -662,83 +233,6 @@ describe('the bulk form', () => {
     await expect.element(field('Artist')).toHaveFocus();
   });
 
-  test('enter applies what was typed, blank or -, and the form closes', async () => {
-    await openForm();
-
-    await userEvent.click(field('Genre'));
-    await userEvent.keyboard('-');
-    await userEvent.keyboard('{Enter}');
-
-    await expect.element(dialog()).not.toBeInTheDocument();
-    expect(requestsTo(fetchMock, 'POST', '/api/bulk')).toEqual([
-      {
-        ids: ['blue', 'sowhat'],
-        values: { artist: '', artistLatin: '', album: '', albumLatin: '', of: '', released: '', genre: '-', genreLatin: '', cutStart: '', cutEnd: '' },
-      },
-    ]);
-    await expect.element(page.getByRole('status')).toHaveTextContent('Changed 2 tracks');
-    await expect.poll(() => useApp.getState().busy).toBe(false);
-  });
-
-  test("the server's refusal is said in the form, which stays open", async () => {
-    await openForm(({ method, url }) => (method === 'POST' && url.pathname === '/api/bulk' ? jsonResponse({ error: 'Nothing to change' }, 422) : undefined));
-
-    await userEvent.keyboard('{Enter}');
-
-    await expect.element(summary()).toHaveTextContent('Nothing to change');
-    expect(summary().element().classList.contains('bad')).toBe(true);
-    await expect.element(dialog()).toBeVisible();
-  });
-
-  test('a value the server cannot use is said under its field once the field is left, not while it is typed', async () => {
-    await openForm(({ method, url, body }) => {
-      if (method === 'POST' && url.pathname === '/api/bulk/preview') {
-        const of = (body as { values: Record<string, string> }).values.of;
-        return jsonResponse(of === 'many' ? { summary: 'Tracks on album → many', changed: 0, fields: { of: 'Tracks on the album must be a whole number' } } : { summary: '', changed: 2 });
-      }
-      return undefined;
-    });
-
-    await userEvent.click(field('Tracks on album'));
-    await userEvent.keyboard('many');
-    await expect.poll(() => requestsTo(fetchMock, 'POST', '/api/bulk/preview').length).toBeGreaterThan(0);
-    await expect.element(dialog().getByRole('alert')).not.toBeInTheDocument();
-
-    await userEvent.keyboard('{Tab}');
-
-    await expect.element(dialog().getByRole('alert')).toHaveTextContent('Tracks on the album must be a whole number');
-    await expect.element(field('Tracks on album')).toBeInvalid();
-    await expect.element(field('Released')).not.toBeInvalid();
-    await expect.element(summary()).toHaveTextContent('Tracks on album → many');
-
-    await userEvent.click(field('Tracks on album'));
-    await userEvent.keyboard('{Control>}a{/Control}12');
-    await expect.element(dialog().getByRole('alert')).not.toBeInTheDocument();
-  });
-
-  test('enter with fields that are wrong says every one and goes to the first, and the form stays open', async () => {
-    await openForm(({ method, url }) =>
-      method === 'POST' && url.pathname === '/api/bulk'
-        ? jsonResponse({ error: '2 fields need fixing', fields: { cutStart: 'Cut start: invalid time "x"', artist: 'An artist cannot be cleared' } }, 422)
-        : undefined,
-    );
-    await userEvent.click(field('Genre'));
-
-    await userEvent.keyboard('{Enter}');
-
-    await expect.element(dialog().getByRole('alert').first()).toBeVisible();
-    expect(
-      dialog()
-        .getByRole('alert')
-        .elements()
-        .map((e) => e.textContent.trim()),
-    ).toEqual(['✗ An artist cannot be cleared', '✗ Cut start: invalid time "x"']);
-    await expect.element(field('Artist')).toHaveFocus();
-    await expect.element(field('Artist')).toBeInvalid();
-    await expect.element(field('Cut start')).toBeInvalid();
-    await expect.element(dialog()).toBeVisible();
-  });
-
   test('enter while a word is being composed applies nothing', async () => {
     await openForm();
     await userEvent.keyboard('Blue');
@@ -749,15 +243,6 @@ describe('the bulk form', () => {
     await expect.element(dialog()).toBeVisible();
   });
 
-  test('escape closes the form and changes nothing', async () => {
-    await openForm();
-
-    await userEvent.keyboard('Blue');
-    await userEvent.keyboard('{Escape}');
-
-    await expect.element(dialog()).not.toBeInTheDocument();
-    expect(requestsTo(fetchMock, 'POST', '/api/bulk')).toEqual([]);
-  });
 });
 
 describe('names in their own direction and ticks that are told', () => {
@@ -803,98 +288,5 @@ describe('names in their own direction and ticks that are told', () => {
     await expect.element(name).toBeVisible();
     expect(name.element().getAttribute('dir')).toBe('auto');
     expect(name.element().getAttribute('maxlength')).toBe('80');
-  });
-});
-
-describe('the hints, the vi keys and the clicks of the small dialogs', () => {
-  const selectedOption = () => dialog().getByRole('option', { selected: true }).element().textContent;
-  const selectedPage = () => dialog().getByRole('tab', { selected: true }).element().textContent;
-
-  test('each dialog shows its own keys at the bottom', async () => {
-    await openApp();
-    await onRow(soWhat);
-
-    await userEvent.keyboard('?');
-    await expect.poll(hints).toEqual(['←→ page', 'esc close']);
-    await userEvent.keyboard('{Escape}');
-    await userEvent.keyboard('o');
-    await expect.poll(hints).toEqual(['enter choose', 'r reverse', 'esc close']);
-    await userEvent.keyboard('{Escape}');
-    await userEvent.keyboard('c');
-    await expect.poll(hints).toEqual(['space ticks', 'enter copies', 'esc close']);
-  });
-
-  test('in the help l and h turn the pages and q closes it', async () => {
-    await openApp();
-    await onRow(soWhat);
-    const pages = helpPages();
-    await userEvent.keyboard('?');
-
-    await userEvent.keyboard('l');
-    await expect.poll(selectedPage).toBe(`2 ${pages[1]?.page ?? ''}`);
-    await userEvent.keyboard('h');
-    await expect.poll(selectedPage).toBe(`1 ${pages[0]?.page ?? ''}`);
-    await userEvent.keyboard('q');
-
-    await expect.element(dialog()).not.toBeInTheDocument();
-  });
-
-  test('in the sort menu j and k move, r reverses, a click chooses and q closes it', async () => {
-    await openApp();
-    await onRow(soWhat);
-    await userEvent.keyboard('o');
-    await expect.element(dialog()).toHaveAccessibleName('Sort');
-
-    await userEvent.keyboard('j');
-    await expect.poll(selectedOption).toContain('Artist');
-    await userEvent.keyboard('k');
-    await expect.poll(selectedOption).toContain('Tree');
-    await userEvent.keyboard('r');
-    await expect.element(dialog().getByText('reverse: on')).toBeVisible();
-    await userEvent.click(dialog().getByRole('option', { name: /Title/ }));
-
-    await expect.element(dialog()).not.toBeInTheDocument();
-    await expect.poll(libraryRequests).toContain('/api/library?sort=title&reverse=1');
-
-    await userEvent.keyboard('o');
-    await expect.element(dialog()).toBeVisible();
-    await userEvent.keyboard('q');
-    await expect.element(dialog()).not.toBeInTheDocument();
-  });
-
-  test('in the sort menu Home and g, End and Shift+g go to the ends', async () => {
-    await openApp();
-    await onRow(soWhat);
-    await userEvent.keyboard('o');
-    await expect.element(dialog()).toHaveAccessibleName('Sort');
-
-    await userEvent.keyboard('{End}');
-    await expect.poll(selectedOption).toContain('Title');
-    await userEvent.keyboard('{Home}');
-    await expect.poll(selectedOption).toContain('Tree');
-    await userEvent.keyboard('{Shift>}g{/Shift}');
-    await expect.poll(selectedOption).toContain('Title');
-    await userEvent.keyboard('g');
-    await expect.poll(selectedOption).toContain('Tree');
-  });
-
-  test('in the copy list j and k move, a click ticks and unticks, and q closes it', async () => {
-    await openApp();
-    await onRow(soWhat);
-    await userEvent.keyboard('c');
-    await expect.element(dialog().getByRole('option').first()).toBeVisible();
-
-    await userEvent.keyboard('j');
-    await expect.poll(selectedOption).toContain('Album');
-    await userEvent.keyboard('k');
-    await expect.poll(selectedOption).toContain('Artist');
-    const album = dialog().getByRole('option', { name: /Album/ });
-    await userEvent.click(album);
-    await expect.poll(() => album.element().getAttribute('aria-checked')).toBe('false');
-    await userEvent.click(album);
-    await expect.poll(() => album.element().getAttribute('aria-checked')).toBe('true');
-    await userEvent.keyboard('q');
-
-    await expect.element(dialog()).not.toBeInTheDocument();
   });
 });

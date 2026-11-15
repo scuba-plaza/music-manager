@@ -81,6 +81,27 @@ test('a release date that is no date is said under the box, with the shapes a da
   await page.keyboard.press('Escape');
 });
 
+test('a total below the track number is said under the total, and the track number is left alone', async ({ page }) => {
+  await intoFields(page, 'So What');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  const number = pane(page).getByRole('textbox', { name: 'Track', exact: true });
+  const total = pane(page).getByRole('textbox', { name: 'Tracks on album' });
+
+  await number.fill('5');
+  await total.fill('3');
+  await page.keyboard.press('Enter');
+
+  await expect(pane(page).getByRole('alert')).toContainText('cannot be fewer than the track number');
+  await expect(total).toHaveAttribute('aria-invalid', 'true');
+  await expect(number).not.toHaveAttribute('aria-invalid', 'true');
+  await total.fill('9');
+  await expect(pane(page).getByRole('alert')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+});
+
 test('the Latin tab shows a hand-set form as normal text and a worked-out one as dim', async ({ page }) => {
   await intoFields(page, 'وطني');
 

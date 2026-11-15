@@ -42,6 +42,13 @@ test('a format is made with its mistakes said on the boxes, then it is there to 
   const longest = dialog().getByLabel('Longest name', { exact: true });
   await expect(name).toBeFocused();
 
+  const width = dialog().getByLabel('Artist and album width');
+  const side = dialog().getByLabel('Longest side', { exact: true });
+  await expect(width).toBeDisabled();
+  await expect(dialog().getByText('Needs Latin letters only')).toBeVisible();
+  await expect(side).toBeDisabled();
+  await expect(dialog().getByText('Only when covers are converted')).toHaveCount(2);
+
   await page.keyboard.press('Tab');
   await expect(dialog().getByRole('alert')).toHaveText(/Name cannot be empty/);
   await expect(name).toHaveAttribute('aria-invalid', 'true');
@@ -56,7 +63,8 @@ test('a format is made with its mistakes said on the boxes, then it is there to 
 
   await longest.fill('90');
   await dialog().getByLabel('Latin letters only').check();
-  await dialog().getByLabel('Artist and album width').fill('12');
+  await expect(width).toBeEnabled();
+  await width.fill('12');
   await page.keyboard.press('Enter');
 
   await expect(names(page)).toHaveText(['Generic', 'Wolfgang WMP01', 'My Player', 'Car']);
