@@ -27,12 +27,27 @@ func Open(root string) (*App, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, err
 	}
-	return &App{
+	a := &App{
 		root:   root,
 		store:  manifest.NewStore(filepath.Join(root, "library.json")),
 		audio:  blobstore.New(filepath.Join(root, ".mm", "audio"), ".mp3"),
 		covers: blobstore.New(filepath.Join(root, ".mm", "covers"), ".img"),
-	}, nil
+	}
+	if m, err := a.store.Load(); err == nil && m.FromVersion2 {
+		if err := a.store.Update(fillFromHints); err != nil {
+			return nil, err
+		}
+	}
+	return a, nil
+}
+
+func fillFromHints(m *manifest.Manifest) error {
+	for i, t := range m.Tracks {
+		if t.Status == manifest.Unidentified {
+			m.Tracks[i] = fromOwnTags(t)
+		}
+	}
+	return nil
 }
 
 // UseLoudness makes sync measure how loud each track is, with meter, and write

@@ -55,14 +55,12 @@ type Track struct {
 	// GainSteps makes the track louder (or, below zero, quieter) by this many
 	// steps of 1.505 dB. FadeIn and FadeOut are stretches of the original
 	// audio over which the sound rises from nothing or falls to nothing.
-	GainSteps     int       `json:"gain_steps,omitempty"`
-	FadeIn        Span      `json:"fade_in,omitzero"`
-	FadeOut       Span      `json:"fade_out,omitzero"`
-	CoverSHA256   string    `json:"cover_sha256"`
-	MBRecordingID string    `json:"mb_recording_id"`
-	MBReleaseID   string    `json:"mb_release_id"`
-	AddedAt       time.Time `json:"added_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	GainSteps   int       `json:"gain_steps,omitempty"`
+	FadeIn      Span      `json:"fade_in,omitzero"`
+	FadeOut     Span      `json:"fade_out,omitzero"`
+	CoverSHA256 string    `json:"cover_sha256"`
+	AddedAt     time.Time `json:"added_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Span is a stretch of a track's original audio; the zero value is none.
@@ -101,6 +99,8 @@ type Manifest struct {
 	Tracks    []Track    `json:"tracks"`
 	Playlists []Playlist `json:"playlists,omitempty"`
 	Profiles  []Profile  `json:"profiles,omitempty"`
+
+	FromVersion2 bool `json:"-"`
 }
 
 // Store keeps the records in one file. Reading is free; every change to the
@@ -129,14 +129,16 @@ func (s *Store) Load() (*Manifest, error) {
 	if err := json.Unmarshal(data, &f); err != nil {
 		return nil, fmt.Errorf("%s: %w", s.path, err)
 	}
+	legacy := false
 	switch f.Version {
 	case schemaVersion:
 	case legacyVersion:
+		legacy = true
 		f.Profiles = []Profile{WolfgangWMP01}
 	default:
 		return nil, fmt.Errorf("%s: unsupported library version %d (want %d)", s.path, f.Version, schemaVersion)
 	}
-	return &Manifest{Tracks: f.Tracks, Playlists: f.Playlists, Profiles: f.Profiles}, nil
+	return &Manifest{Tracks: f.Tracks, Playlists: f.Playlists, Profiles: f.Profiles, FromVersion2: legacy}, nil
 }
 
 // save writes the manifest atomically: the data goes to a temp file that is
