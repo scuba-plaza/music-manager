@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { ApiError, send } from '../api/client';
-import type { AddCheck, AddForm, ChangeResponse, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
+import type { AddCheck, AddForm, ChangeResponse, DraftCoverView, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
 import { cleanChecks, firstWrong, left, tried, verdict, type FormChecks } from './form';
 import { loadLibrary } from './library';
 import { setStatus } from './status';
@@ -18,6 +18,8 @@ export interface AddState {
   link: string;
   error: string;
   linkError: string;
+  cover: string;
+  coverError: string;
   checks: FormChecks;
   job: JobView | null;
   started: number;
@@ -41,6 +43,8 @@ function fresh(): AddState {
     link: '',
     error: '',
     linkError: '',
+    cover: '',
+    coverError: '',
     checks: cleanChecks(),
     job: null,
     started: 0,
@@ -121,7 +125,7 @@ function receive(ended: JobView): void {
   if (draft === undefined) {
     return;
   }
-  useAdd.setState({ phase: 'form', draft, form: draft.form });
+  useAdd.setState({ phase: 'form', draft, form: draft.form, cover: draft.cover, coverError: '' });
   askForPath();
 }
 
@@ -166,6 +170,34 @@ export function retryAdd(): void {
 export function setField(key: AddKey, text: string): void {
   useAdd.setState((s) => ({ form: { ...s.form, [key]: text } }));
   askForPath();
+}
+
+const enc = encodeURIComponent;
+
+export async function chooseDraftCover(file: File): Promise<void> {
+  const { draft } = useAdd.getState();
+  if (draft === null) {
+    return;
+  }
+  try {
+    const res = await send<DraftCoverView>('PUT', `/api/add/${enc(draft.draft)}/cover`, file);
+    useAdd.setState({ cover: res.cover, coverError: '' });
+  } catch (err) {
+    useAdd.setState({ coverError: messageOf(err) });
+  }
+}
+
+export async function removeDraftCover(): Promise<void> {
+  const { draft } = useAdd.getState();
+  if (draft === null) {
+    return;
+  }
+  try {
+    const res = await send<DraftCoverView>('DELETE', `/api/add/${enc(draft.draft)}/cover`);
+    useAdd.setState({ cover: res.cover, coverError: '' });
+  } catch (err) {
+    useAdd.setState({ coverError: messageOf(err) });
+  }
 }
 
 export function leaveField(key: AddKey): void {

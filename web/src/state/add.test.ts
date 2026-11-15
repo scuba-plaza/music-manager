@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddForm, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
 import { changeResponse, infoView, jsonResponse, memoryStorage, requestsTo, sampleLibrary, stubServer, type StubRoute , urlOf } from '../testing/fakes';
-import { chooseFiles, fetchLink, leaveAdd, leaveField, openAdd, retryAdd, saveAdd, setField, showDuplicate, typeLink, useAdd } from './add';
+import { chooseDraftCover, chooseFiles, fetchLink, leaveAdd, leaveField, openAdd, removeDraftCover, retryAdd, saveAdd, setField, showDuplicate, typeLink, useAdd } from './add';
 import { shownErrors } from './form';
 import { jobEvent } from './jobs';
 import { useApp } from './store';
@@ -12,7 +12,7 @@ const blank: AddForm = { title: '', artist: '', album: '', track: '', of: '', re
 const offered: AddForm = { title: 'So What', artist: 'Miles Davis', album: 'Kind of Blue', track: '1', of: '5', released: '1959-08-17', genre: '', cutStart: '', cutEnd: '' };
 
 function draft(over: Partial<DraftView> = {}): DraftView {
-  return { draft: 'd1', form: offered, ...over };
+  return { draft: 'd1', form: offered, note: 'From YouTube Music metadata: change anything before adding.', cover: 'c1', ...over };
 }
 
 function job(state: string, data?: Fetched, extra: Partial<JobView> = {}): JobView {
@@ -388,6 +388,56 @@ describe('the form', () => {
     });
   });
 
+});
+
+describe('the cover of the download', () => {
+  const putCover = (sha: string): StubRoute => ({ method, url }) =>
+    method === 'PUT' && url.pathname === '/api/add/d1/cover' ? jsonResponse({ cover: sha }) : undefined;
+
+  it('is the one YouTube gave, shown with the note about the details', async () => {
+    await inForm();
+
+    expect(state()).toMatchObject({ cover: 'c1', draft: { note: 'From YouTube Music metadata: change anything before adding.' } });
+  });
+
+  it('is replaced by a picture chosen, and what the server says is the cover', async () => {
+    await fetched({ draft: draft() }, putCover('c2'));
+    await vi.waitFor(() => {
+      expect(state().phase).toBe('form');
+    });
+    const picture = new File([new Uint8Array([1, 2, 3])], 'cover.png', { type: 'image/png' });
+
+    await chooseDraftCover(picture);
+
+    expect(state().cover).toBe('c2');
+    expect(state().coverError).toBe('');
+    expect(fetchMock.mock.calls.some(([input, init]) => urlOf(input) === '/api/add/d1/cover' && init?.method === 'PUT' && init.body instanceof File)).toBe(true);
+  });
+
+  it('keeps the old cover and says why when the picture is refused', async () => {
+    await fetched({ draft: draft() }, ({ method, url }) =>
+      method === 'PUT' && url.pathname === '/api/add/d1/cover' ? jsonResponse({ error: 'A cover must be a JPEG or PNG image' }, 415) : undefined,
+    );
+    await vi.waitFor(() => {
+      expect(state().phase).toBe('form');
+    });
+
+    await chooseDraftCover(new File(['text'], 'a.txt', { type: 'text/plain' }));
+
+    expect(state()).toMatchObject({ cover: 'c1', coverError: 'A cover must be a JPEG or PNG image' });
+  });
+
+  it('is taken away on request', async () => {
+    await fetched({ draft: draft() }, ({ method, url }) => (method === 'DELETE' && url.pathname === '/api/add/d1/cover' ? jsonResponse({ cover: '' }) : undefined));
+    await vi.waitFor(() => {
+      expect(state().phase).toBe('form');
+    });
+
+    await removeDraftCover();
+
+    expect(state().cover).toBe('');
+    expect(requestsTo(fetchMock, 'DELETE', '/api/add/d1/cover')).toEqual([null]);
+  });
 });
 
 describe('adding the track', () => {

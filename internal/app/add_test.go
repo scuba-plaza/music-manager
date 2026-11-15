@@ -18,6 +18,7 @@ import (
 type fakeDownloader struct {
 	audio []byte
 	info  app.Info
+	cover []byte
 	err   error
 	calls []string // URLs asked for
 	dirs  []string // where the file was put
@@ -33,7 +34,7 @@ func (f *fakeDownloader) Download(ctx context.Context, url, dir string) (app.Dow
 	if err := os.WriteFile(path, f.audio, 0o644); err != nil {
 		return app.Downloaded{}, err
 	}
-	return app.Downloaded{Path: path, Info: f.info}, nil
+	return app.Downloaded{Path: path, Info: f.info, Cover: f.cover}, nil
 }
 
 func newDownloader() *fakeDownloader {
@@ -169,22 +170,51 @@ func TestAddFailuresLeaveTheLibraryUntouched(t *testing.T) {
 			t.Error("track added")
 		}
 	})
-	t.Run("cover that is not an image", func(t *testing.T) {
-		a, dl := openLib(t), newDownloader()
-		if _, err := add(a, app.AddRequest{URL: "u", Cover: []byte("text")}, app.Edit{}, dl); err == nil {
-			t.Error("accepted a text cover")
-		}
-		if len(tracks(t, a)) != 0 {
-			t.Error("track added")
-		}
-	})
 }
 
 func TestAddStoresAGivenCover(t *testing.T) {
 	a, dl := openLib(t), newDownloader()
-	got, err := add(a, app.AddRequest{URL: "u", Cover: testmp3.JPEG}, app.Edit{}, dl)
+	dl.cover = testmp3.JPEG
+	got, err := add(a, app.AddRequest{URL: "u"}, app.Edit{}, dl)
 	if err != nil || got.CoverSHA256 == "" {
 		t.Errorf("track %+v, err %v", got, err)
+	}
+}
+
+func TestACoverThatIsNoImageIsLeftOutAndTheDownloadStillWorks(t *testing.T) {
+	a, dl := openLib(t), newDownloader()
+	dl.cover = []byte("<html>not a picture</html>")
+
+	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "u"}, dl)
+
+	if err != nil || d.CoverSHA() != "" {
+		t.Errorf("cover %q, err %v", d.CoverSHA(), err)
+	}
+}
+
+func TestTheCoverOfADraftCanBeReplacedAndTakenAwayBeforeItIsAdded(t *testing.T) {
+	a, dl := openLib(t), newDownloader()
+	dl.cover = testmp3.JPEG
+	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "u"}, dl)
+	if err != nil || d.CoverSHA() == "" {
+		t.Fatalf("%q %v", d.CoverSHA(), err)
+	}
+	fetched := d.CoverSHA()
+
+	if err := a.SetDraftCover(d, testmp3.PNG); err != nil || d.CoverSHA() == "" || d.CoverSHA() == fetched {
+		t.Errorf("replaced: %q (was %q) %v", d.CoverSHA(), fetched, err)
+	}
+	if err := a.SetDraftCover(d, []byte("nope")); err == nil {
+		t.Error("something that is no image became the cover")
+	}
+	a.RemoveDraftCover(d)
+
+	if d.CoverSHA() != "" {
+		t.Errorf("still %q", d.CoverSHA())
+	}
+	got, err := a.Finish(d, app.Edit{Title: strp("T"), Artist: strp("A")})
+	if err != nil || got.CoverSHA256 != "" {
+		t.Errorf("a track added with no cover has %q (%v)", got.CoverSHA256, err)
 	}
 }
 
@@ -223,7 +253,8 @@ func TestFetchRefusesADuplicate(t *testing.T) {
 
 func TestFinishSavesTheTrackWithTheGivenDetails(t *testing.T) {
 	a, dl := openLib(t), newDownloader()
-	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "https://youtu.be/x", Cover: testmp3.JPEG}, dl)
+	dl.cover = testmp3.JPEG
+	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "https://youtu.be/x"}, dl)
 	if err != nil {
 		t.Fatal(err)
 	}

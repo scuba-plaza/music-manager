@@ -18,6 +18,7 @@ const DuplicateLink = "https://www.youtube.com/watch?v=duplicate"
 type FakeDownloader struct {
 	Audio []byte
 	Info  app.Info
+	Cover []byte
 
 	mu    sync.Mutex
 	calls []string
@@ -38,7 +39,7 @@ func (d *FakeDownloader) Download(_ context.Context, url, dir string) (app.Downl
 	if err := os.WriteFile(path, audio, 0o644); err != nil {
 		return app.Downloaded{}, err
 	}
-	return app.Downloaded{Path: path, Info: d.Info}, nil
+	return app.Downloaded{Path: path, Info: d.Info, Cover: d.Cover}, nil
 }
 
 func (d *FakeDownloader) Calls() []string {

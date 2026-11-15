@@ -36,6 +36,7 @@ done
 if [ "$FAKE_EXIT" != "0" ]; then echo "ERROR: Video unavailable" >&2; exit "$FAKE_EXIT"; fi
 file=$(printf '%s' "$out" | sed 's/%(id)s/vid123/; s/%(ext)s/mp3/')
 cp "$FAKE_FIXTURE" "$file"
+if [ -n "$FAKE_THUMB" ]; then cp "$FAKE_THUMB" "${file%.mp3}.jpg"; fi
 cat "$FAKE_JSON"
 `
 	if err := os.WriteFile(filepath.Join(dir, "yt-dlp"), []byte(script), 0o755); err != nil {
@@ -46,6 +47,7 @@ cat "$FAKE_JSON"
 	t.Setenv("FAKE_FIXTURE", fixture)
 	t.Setenv("FAKE_JSON", jsonFile)
 	t.Setenv("FAKE_EXIT", string(rune('0'+exit)))
+	t.Setenv("FAKE_THUMB", "")
 	return argsFile
 }
 
@@ -66,7 +68,7 @@ func TestDownloadRunsYtDlpForAudioAndReportsTheMetadata(t *testing.T) {
 	if _, err := os.Stat(got.Path); err != nil {
 		t.Error(err)
 	}
-	want := app.Info{Title: "Real Track", Artist: "The Artist", Uploader: "Channel", Album: "The Album", TrackNumber: 5}
+	want := app.Info{Title: "Real Track", Artist: "The Artist", Uploader: "Channel", Album: "The Album", TrackNumber: 5, Source: app.FromMetadata}
 	if got.Info != want {
 		t.Errorf("Info = %+v, want %+v", got.Info, want)
 	}
@@ -206,5 +208,40 @@ func TestDownloadKeepsTheArtistFieldWhenThereIsNoList(t *testing.T) {
 	}
 	if got.Info.Artist != "Earth, Wind & Fire" {
 		t.Errorf("Artist = %q, want it untouched", got.Info.Artist)
+	}
+}
+
+func TestDownloadAsksForTheThumbnailAsAJpegAndReturnsItAsTheCover(t *testing.T) {
+	argsFile := fakeBin(t, musicJSON, 0)
+	thumb := filepath.Join(t.TempDir(), "thumb.jpg")
+	if err := os.WriteFile(thumb, testmp3.JPEG, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FAKE_THUMB", thumb)
+
+	got, err := ytdlp.New().Download(context.Background(), "https://youtu.be/vid123", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(got.Cover) != string(testmp3.JPEG) {
+		t.Errorf("the cover is %d bytes, want the thumbnail of %d", len(got.Cover), len(testmp3.JPEG))
+	}
+	raw, _ := os.ReadFile(argsFile)
+	args := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	for _, must := range []string{"--write-thumbnail", "--convert-thumbnails", "jpg"} {
+		if !contains(args, must) {
+			t.Errorf("args %v lack %s", args, must)
+		}
+	}
+}
+
+func TestADownloadWithNoThumbnailHasNoCoverAndIsNotAnError(t *testing.T) {
+	fakeBin(t, musicJSON, 0)
+
+	got, err := ytdlp.New().Download(context.Background(), "https://youtu.be/vid123", t.TempDir())
+
+	if err != nil || got.Cover != nil {
+		t.Errorf("%v %d", err, len(got.Cover))
 	}
 }

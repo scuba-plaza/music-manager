@@ -59,7 +59,11 @@ test('a adds from a link, pre-filled, and the path preview shows where it will b
   await expect(dialog().getByRole('textbox', { name: 'Track', exact: true })).toHaveValue('1');
   await expect(dialog().getByRole('textbox', { name: 'Tracks on album' })).toHaveValue('5');
   await expect(dialog().getByRole('textbox', { name: 'Released' })).toHaveValue('1959-08-17');
-  await expect(dialog()).toContainText('These are YouTube’s words');
+  await expect(dialog().getByRole('textbox', { name: 'Genre' })).toHaveValue('Jazz');
+  await expect(dialog()).toContainText('From YouTube Music metadata');
+  const cover = dialog().getByRole('img', { name: 'Cover' });
+  await expect(cover).toBeVisible();
+  await expect.poll(() => cover.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   const path = dialog().locator('.pathline');
   await expect(path).toHaveText(/^Miles Davis\/Kind of Blue\/.*So What\.mp3$/);
   await expect.poll(() => path.evaluate((el) => getComputedStyle(el, '::before').content)).toBe('none');
@@ -100,6 +104,26 @@ test('the add form says under a field what is wrong with it, and a link that is 
   await expect(title).toBeFocused();
   await expect(title).toHaveAttribute('aria-invalid', 'true');
   await expect(dialog()).toBeVisible();
+});
+
+test('the cover from YouTube can be taken away before the track is added, and the track has none', async ({ page, dialog, request }) => {
+  await openPage(page);
+  await page.keyboard.press('a');
+  await dialog().getByRole('textbox', { name: 'Link' }).fill('https://www.youtube.com/watch?v=abc');
+  await page.keyboard.press('Enter');
+  await dialog().getByRole('textbox', { name: 'Title' }).fill('A Song Without A Cover');
+  await expect(dialog().getByRole('img', { name: 'Cover' })).toBeVisible();
+
+  await dialog().getByRole('button', { name: 'Remove cover' }).click();
+
+  await expect(dialog().getByRole('img', { name: 'Cover' })).toHaveCount(0);
+  await expect(dialog().getByRole('button', { name: 'Add a cover…' })).toBeVisible();
+  await dialog().getByRole('textbox', { name: 'Title' }).press('Enter');
+  await said(page, /^Added/);
+  const { view } = (await (await request.get('/api/library')).json()) as { view: { rows: { label: string; trackId?: string }[] } };
+  const added = view.rows.find((r) => r.label === 'A Song Without A Cover');
+  const track = (await (await request.get(`/api/tracks/${added?.trackId ?? ''}`)).json()) as { coverSha?: string };
+  expect(track.coverSha ?? '').toBe('');
 });
 
 test('a duplicate is flagged', async ({ page, dialog }) => {

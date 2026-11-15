@@ -67,9 +67,15 @@ export interface DoctorView {
   warnings: number;
 }
 
+export interface DraftCoverView {
+  cover: string;
+}
+
 export interface DraftView {
   draft: string;
   form: AddForm;
+  note: string;
+  cover: string;
 }
 
 export interface DuplicateView {

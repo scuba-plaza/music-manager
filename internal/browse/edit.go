@@ -19,6 +19,8 @@ type Store interface {
 	Manifest() (*manifest.Manifest, error)
 	Fetch(ctx context.Context, req app.AddRequest, dl app.Downloader) (*app.Draft, error)
 	Finish(d *app.Draft, e app.Edit) (manifest.Track, error)
+	SetDraftCover(d *app.Draft, image []byte) error
+	RemoveDraftCover(d *app.Draft)
 	Edit(id string, e app.Edit) (manifest.Track, error)
 	EditMany(edits map[string]app.Edit) (map[string]manifest.Track, error)
 	Renumber(ids []string) (map[string]manifest.Track, error)

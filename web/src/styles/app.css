@@ -557,6 +557,16 @@ input.edit.short {
   background: var(--bg);
 }
 
+.coverrow .cover-box {
+  margin-block: 0.4rem 0.2rem;
+  margin-inline: 0;
+}
+
+.coverrow .cover-box img {
+  max-width: min(100%, 9rem);
+  max-height: 9rem;
+}
+
 .pathline {
   color: var(--accent);
   overflow-wrap: anywhere;

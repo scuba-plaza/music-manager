@@ -186,7 +186,7 @@ describe('the add dialog', () => {
   const names = ['Title', 'Artist', 'Album', 'Track', 'Tracks on album', 'Released', 'Genre', 'Cut start', 'Cut end'];
 
   function draft(over: Partial<DraftView> = {}): DraftView {
-    return { draft: 'd1', form: offered, ...over };
+    return { draft: 'd1', form: offered, note: 'From YouTube Music metadata: change anything before adding.', cover: 'c1', ...over };
   }
 
   function job(state: string, data?: unknown, error?: string): JobView {
@@ -322,7 +322,7 @@ describe('the add dialog', () => {
     await expect.element(field('Track')).toHaveValue('1');
     await expect.element(field('Tracks on album')).toHaveValue('5');
     await expect.element(field('Released')).toHaveValue('1959-08-17');
-    await expect.element(dialog()).toHaveTextContent('These are YouTube’s words');
+    await expect.element(dialog()).toHaveTextContent('From YouTube Music metadata');
     await expect.poll(hints).toEqual(['enter add', 'tab next field', 'esc close']);
     for (const name of ['Title', 'Artist', 'Album', 'Released', 'Genre', 'Cut start', 'Cut end']) {
       await expect.element(field(name)).toHaveAttribute('dir', 'auto');
@@ -345,7 +345,13 @@ describe('the add dialog', () => {
     await userEvent.keyboard('{Shift>}{Tab}{/Shift}');
     await expect.element(field('Album')).toHaveFocus();
     await userEvent.keyboard('{ArrowUp}{ArrowUp}{ArrowUp}');
+    await expect.element(dialog().getByRole('button', { name: 'Remove cover' })).toHaveFocus();
+    await userEvent.keyboard('{ArrowUp}{ArrowUp}');
     await expect.element(field('Cut end')).toHaveFocus();
+    await userEvent.keyboard('{Tab}');
+    await expect.element(dialog().getByRole('button', { name: 'Replace cover…' })).toHaveFocus();
+    await userEvent.keyboard('{Tab}');
+    await expect.element(dialog().getByRole('button', { name: 'Remove cover' })).toHaveFocus();
     await userEvent.keyboard('{Tab}');
     await expect.element(field('Title')).toHaveFocus();
   });
@@ -438,7 +444,80 @@ describe('the add dialog', () => {
     ).toEqual(['✗ Artist cannot be empty', '✗ Cut end: invalid time "x"']);
     await expect.element(field('Artist')).toHaveFocus();
     await expect.element(field('Cut end')).toBeInvalid();
-    await expect.element(dialog()).toHaveTextContent('These are YouTube’s words');
+    await expect.element(dialog()).toHaveTextContent('From YouTube Music metadata');
+  });
+
+  test('the note says where the details came from, and the form says it is the guess of the page when it is', async () => {
+    await toForm({ draft: draft({ note: 'Guessed from the video title: check the artist and the title.' }) });
+
+    await expect.element(dialog()).toHaveTextContent('Guessed from the video title: check the artist and the title.');
+  });
+
+  test('the cover YouTube gave is shown, capped, with buttons to replace and to remove it', async () => {
+    await toForm();
+
+    const img = dialog().getByRole('img', { name: 'Cover' });
+    await expect.element(img).toBeVisible();
+    expect(img.element().getAttribute('src')).toBe('/api/add/d1/cover?v=c1');
+    const box = img.element().getBoundingClientRect();
+    expect(box.height).toBeLessThanOrEqual(22 * 16 + 2);
+    expect(box.width).toBeLessThanOrEqual(22 * 16 + 2);
+    await expect.element(dialog().getByRole('button', { name: 'Replace cover…' })).toBeVisible();
+    await expect.element(dialog().getByRole('button', { name: 'Remove cover' })).toBeVisible();
+  });
+
+  test('remove takes the cover away, and the button to add one comes in its place', async () => {
+    await toForm(undefined, (request) =>
+      request.method === 'DELETE' && request.url.pathname === '/api/add/d1/cover' ? jsonResponse({ cover: '' }) : plain(request),
+    );
+
+    await dialog().getByRole('button', { name: 'Remove cover' }).click();
+
+    await expect.element(dialog().getByRole('img', { name: 'Cover' })).not.toBeInTheDocument();
+    await expect.element(dialog().getByRole('button', { name: 'Add a cover…' })).toBeVisible();
+    await expect.element(dialog().getByRole('button', { name: 'Remove cover' })).not.toBeInTheDocument();
+    expect(requestsTo(fetchMock, 'DELETE', '/api/add/d1/cover')).toEqual([null]);
+  });
+
+  test('a picture chosen replaces the cover and shows at once', async () => {
+    await toForm(undefined, (request) =>
+      request.method === 'PUT' && request.url.pathname === '/api/add/d1/cover' ? jsonResponse({ cover: 'c2' }) : plain(request),
+    );
+    const chooser = dialog().getByLabelText('Cover picture').element() as HTMLInputElement;
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([new Uint8Array([1, 2, 3])], 'cover.png', { type: 'image/png' }));
+
+    chooser.files = transfer.files;
+    chooser.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await expect.poll(() => dialog().getByRole('img', { name: 'Cover' }).element().getAttribute('src')).toBe('/api/add/d1/cover?v=c2');
+  });
+
+  test('a picture the server refuses is said under the cover and the old one stays', async () => {
+    await toForm(undefined, (request) =>
+      request.method === 'PUT' && request.url.pathname === '/api/add/d1/cover' ? jsonResponse({ error: 'A cover must be a JPEG or PNG image' }, 415) : plain(request),
+    );
+    const chooser = dialog().getByLabelText('Cover picture').element() as HTMLInputElement;
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['text'], 'a.txt', { type: 'text/plain' }));
+
+    chooser.files = transfer.files;
+    chooser.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await expect.element(dialog().getByRole('alert')).toHaveTextContent('A cover must be a JPEG or PNG image');
+    expect(dialog().getByRole('img', { name: 'Cover' }).element().getAttribute('src')).toBe('/api/add/d1/cover?v=c1');
+  });
+
+  test('enter on a button of the cover presses it and does not add the track', async () => {
+    await toForm(undefined, (request) =>
+      request.method === 'DELETE' && request.url.pathname === '/api/add/d1/cover' ? jsonResponse({ cover: '' }) : plain(request),
+    );
+    dialog().getByRole('button', { name: 'Remove cover' }).element().focus();
+
+    await userEvent.keyboard('{Enter}');
+
+    await expect.element(dialog().getByRole('button', { name: 'Add a cover…' })).toBeVisible();
+    expect(requestsTo(fetchMock, 'POST', '/api/add/finish')).toEqual([]);
   });
 
   test('esc on the form forgets the download', async () => {

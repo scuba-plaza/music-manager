@@ -5,9 +5,11 @@ import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
 import {
   addOrder,
+  chooseDraftCover,
   chooseFiles,
   fetchLink,
   leaveField,
+  removeDraftCover,
   retryAdd,
   saveAdd,
   setField,
@@ -72,15 +74,21 @@ function Elapsed({ since }: { since: number }) {
 }
 
 export function Add() {
-  const { phase, link, error, linkError, checks, started, form, existing, pathNote } = useAdd();
+  const { phase, link, error, linkError, checks, started, form, existing, pathNote, draft, cover, coverError } = useAdd();
   const errors = shownErrors(checks);
   const linkInput = useRef<HTMLInputElement>(null);
   const files = useRef<HTMLInputElement>(null);
+  const picture = useRef<HTMLInputElement>(null);
   const grid = useRef<HTMLDivElement>(null);
+  const whole = useRef<HTMLDivElement>(null);
   const focusAt = useRef(0);
 
   function inputs(): HTMLInputElement[] {
     return [...(grid.current?.querySelectorAll('input') ?? [])];
+  }
+
+  function controls(): HTMLElement[] {
+    return [...(whole.current?.querySelectorAll<HTMLElement>('.form input, .coverrow button') ?? [])];
   }
 
   useEffect(() => {
@@ -92,7 +100,7 @@ export function Add() {
   }, [phase]);
 
   function focusBy(by: number): void {
-    const all = inputs();
+    const all = controls();
     const at = Math.max(
       0,
       all.findIndex((input) => input === document.activeElement),
@@ -121,6 +129,9 @@ export function Add() {
         retryAdd();
         return true;
       case 'form':
+        if (e.key === 'Enter' && document.activeElement instanceof HTMLButtonElement) {
+          return false;
+        }
         if (e.key === 'Enter') {
           void saveAdd().then((wrong) => {
             if (wrong !== undefined) {
@@ -146,6 +157,14 @@ export function Add() {
   function chosen(e: ChangeEvent<HTMLInputElement>): void {
     const list = [...(e.target.files ?? [])];
     chooseFiles(list);
+  }
+
+  function pictured(e: ChangeEvent<HTMLInputElement>): void {
+    const [first] = [...(e.target.files ?? [])];
+    e.target.value = '';
+    if (first !== undefined) {
+      void chooseDraftCover(first);
+    }
   }
 
   return (
@@ -213,7 +232,8 @@ export function Add() {
       )}
       {phase === 'form' && (
         <>
-          <div className="dim">These are YouTube’s words: change anything before adding.</div>
+          <div className="dim">{draft?.note ?? ''}</div>
+          <div ref={whole}>
           <div
             ref={grid}
             className="form"
@@ -288,6 +308,38 @@ export function Add() {
                   </FormField>
                 ),
               )}
+          </div>
+          <div className="coverrow">
+            {cover !== '' && draft !== null && (
+              <div className="cover-box">
+                <img src={`/api/add/${encodeURIComponent(draft.draft)}/cover?v=${cover.slice(0, 16)}`} alt="Cover" />
+              </div>
+            )}
+            <div className="buttons">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  picture.current?.click();
+                }}
+              >
+                {cover === '' ? 'Add a cover…' : 'Replace cover…'}
+              </button>
+              {cover !== '' && (
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    void removeDraftCover();
+                  }}
+                >
+                  Remove cover
+                </button>
+              )}
+              <input ref={picture} type="file" accept="image/jpeg,image/png" className="sr-only" tabIndex={-1} aria-label="Cover picture" onChange={pictured} />
+            </div>
+            {coverError !== '' && <Problem text={coverError} />}
+          </div>
           </div>
           <div className="pathrow accent">
             {pathNote !== '' && <span aria-hidden="true">→ </span>}

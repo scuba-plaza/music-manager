@@ -12,6 +12,14 @@ import (
 	"music-manager/internal/manifest"
 )
 
+// InfoSource says how much a download's details can be trusted.
+type InfoSource string
+
+const (
+	FromMetadata InfoSource = "metadata"
+	FromTitle    InfoSource = "title"
+)
+
 // Info is what the downloader learned about a download.
 type Info struct {
 	Title       string
@@ -22,12 +30,19 @@ type Info struct {
 	TrackTotal  int
 	// Released is when the track came out, if the source says: 1999, 1999-05 or 1999-05-17.
 	Released string
+	Genre    string
+	// Source is FromMetadata when the source named the artist, FromTitle when
+	// the artist and the title were told apart from one title, and empty when
+	// the source gave only a title.
+	Source InfoSource
 }
 
 // Downloaded is an MP3 file fetched by a Downloader.
 type Downloaded struct {
 	Path string
 	Info Info
+	// Cover is the picture the source has for the track, a JPEG or a PNG, if it has one.
+	Cover []byte
 }
 
 // Downloader fetches the audio at a URL as an MP3 file into dir.
@@ -43,8 +58,7 @@ func (e *DuplicateError) Error() string {
 }
 
 type AddRequest struct {
-	URL   string
-	Cover []byte // optional JPEG or PNG
+	URL string
 }
 
 // Draft is a downloaded track waiting for its details. Its audio is already
@@ -59,6 +73,19 @@ type Draft struct {
 
 	staged staged
 }
+
+func (d *Draft) CoverSHA() string { return d.staged.coverSHA }
+
+func (a *App) SetDraftCover(d *Draft, image []byte) error {
+	sha, err := a.StoreCover(image)
+	if err != nil {
+		return err
+	}
+	d.staged.coverSHA = sha
+	return nil
+}
+
+func (a *App) RemoveDraftCover(d *Draft) { d.staged.coverSHA = "" }
 
 // Fetch downloads the audio at req.URL and prepares a Draft, without adding
 // anything to the library. It fails with a *DuplicateError if the audio is
@@ -88,10 +115,8 @@ func (a *App) Fetch(ctx context.Context, req AddRequest, dl Downloader) (*Draft,
 	if dup, ok := m.FindByAudio(s.sha); ok {
 		return nil, &DuplicateError{ID: dup.ID}
 	}
-	if len(req.Cover) > 0 {
-		if s.coverSHA, err = a.StoreCover(req.Cover); err != nil {
-			return nil, err
-		}
+	if sha, err := a.StoreCover(d.Cover); err == nil && sha != "" {
+		s.coverSHA = sha
 	}
 
 	return &Draft{URL: req.URL, Info: d.Info, Length: s.length, staged: s}, nil

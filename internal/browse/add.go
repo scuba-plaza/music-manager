@@ -42,7 +42,20 @@ func addDefaults(info app.Info) AddForm {
 	return AddForm{
 		Title: info.Title, Artist: artist, Album: info.Album,
 		Track: numberText(info.TrackNumber), Of: numberText(info.TrackTotal), Released: info.Released,
+		Genre: info.Genre,
 	}
+}
+
+func addNote(info app.Info) string {
+	switch {
+	case info.Source == app.FromTitle:
+		return "Guessed from the video title: check the artist and the title."
+	case info.Source == app.FromMetadata || info.Artist != "":
+		return "From YouTube Music metadata: change anything before adding."
+	case strings.TrimSpace(info.Uploader) != "":
+		return "Guessed from the channel name: check the artist."
+	}
+	return "YouTube gave only a title: fill in the rest."
 }
 
 // Edit turns the form into the details of the track.
@@ -128,6 +141,8 @@ func AddPath(f AddForm) string {
 type DraftView struct {
 	Draft string  `json:"draft"`
 	Form  AddForm `json:"form"`
+	Note  string  `json:"note"`
+	Cover string  `json:"cover"`
 }
 
 // DuplicateView is the track that a download turned out to be already.
@@ -142,6 +157,8 @@ type Fetched struct {
 	Draft     *DraftView     `json:"draft,omitempty"`
 	Duplicate *DuplicateView `json:"duplicate,omitempty"`
 }
+
+var ErrDraftGone = errors.New("That download is gone: fetch the link again")
 
 // maxDrafts is how many downloads wait to be added; the oldest are forgotten.
 const maxDrafts = 8
@@ -191,7 +208,7 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 	if _, err := rand.Read(raw[:]); err != nil {
 		return Fetched{}, err
 	}
-	v := DraftView{Draft: hex.EncodeToString(raw[:]), Form: addDefaults(d.Info)}
+	v := DraftView{Draft: hex.EncodeToString(raw[:]), Form: addDefaults(d.Info), Note: addNote(d.Info), Cover: d.CoverSHA()}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.drafts == nil {
@@ -204,6 +221,43 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 	e.drafts[v.Draft] = d
 	e.draftOrder = append(e.draftOrder, v.Draft)
 	return Fetched{Draft: &v}, nil
+}
+
+// DraftCover is the stored cover of a draft, by its SHA, or "" if it has none.
+func (e *Editor) DraftCover(draft string) (string, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	d, ok := e.drafts[draft]
+	if !ok {
+		return "", false
+	}
+	return d.CoverSHA(), true
+}
+
+// ReplaceDraftCover gives a draft the picture as its cover, and returns its SHA.
+func (e *Editor) ReplaceDraftCover(draft string, image []byte) (string, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	d, ok := e.drafts[draft]
+	if !ok {
+		return "", ErrDraftGone
+	}
+	if err := e.lib.SetDraftCover(d, image); err != nil {
+		return "", err
+	}
+	return d.CoverSHA(), nil
+}
+
+// RemoveDraftCover takes the cover of a draft away.
+func (e *Editor) RemoveDraftCover(draft string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	d, ok := e.drafts[draft]
+	if !ok {
+		return ErrDraftGone
+	}
+	e.lib.RemoveDraftCover(d)
+	return nil
 }
 
 // Discard forgets a draft that is not going to be added.
@@ -225,7 +279,7 @@ func (e *Editor) Finish(draft string, f AddForm) (Result, error) {
 	d, ok := e.drafts[draft]
 	e.mu.Unlock()
 	if !ok {
-		return Result{}, errors.New("That download is gone: fetch the link again")
+		return Result{}, ErrDraftGone
 	}
 	edit, err := f.Edit()
 	if err != nil {

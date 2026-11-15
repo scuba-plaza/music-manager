@@ -19,6 +19,7 @@ func Contract() []any {
 		manifest.Profile{},
 		AddCheck{},
 		ChangeResponse{},
+		DraftCoverView{},
 		ErrorView{},
 		HintView{},
 		InfoView{},

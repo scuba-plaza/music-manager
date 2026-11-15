@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
+	"music-manager/internal/coverimg"
 )
 
 // downloadTimeout bounds a download, in case it never ends.
@@ -27,6 +29,9 @@ func (s *Server) addRoutes() {
 	s.mux.HandleFunc("POST /api/add/path", s.addPath)
 	s.mux.HandleFunc("POST /api/add/finish", s.addFinish)
 	s.mux.HandleFunc("DELETE /api/add/{draft}", s.addDiscard)
+	s.mux.HandleFunc("GET /api/add/{draft}/cover", s.draftCover)
+	s.mux.HandleFunc("PUT /api/add/{draft}/cover", s.draftCoverPut)
+	s.mux.HandleFunc("DELETE /api/add/{draft}/cover", s.draftCoverDelete)
 	s.mux.HandleFunc("POST /api/ingest", s.ingest)
 }
 
@@ -206,4 +211,55 @@ func plural(n int, word string) string {
 		return "1 " + word
 	}
 	return fmt.Sprintf("%d %ss", n, word)
+}
+
+type DraftCoverView struct {
+	Cover string `json:"cover"`
+}
+
+func (s *Server) draftCover(w http.ResponseWriter, r *http.Request) {
+	sha, ok := s.ed.DraftCover(r.PathValue("draft"))
+	if !ok || sha == "" {
+		fail(w, http.StatusNotFound, errNotFound)
+		return
+	}
+	data, err := os.ReadFile(s.app.CoverPath(sha))
+	if err != nil {
+		fail(w, http.StatusNotFound, errNotFound)
+		return
+	}
+	kind := coverimg.Sniff(data)
+	if kind == "" {
+		fail(w, http.StatusUnsupportedMediaType, errors.New("the cover is not a JPEG or PNG image"))
+		return
+	}
+	w.Header().Set("Content-Type", kind)
+	w.Header().Set("ETag", `"`+sha+`"`)
+	w.Header().Set("Cache-Control", "no-store")
+	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
+}
+
+func (s *Server) draftCoverPut(w http.ResponseWriter, r *http.Request) {
+	data, ok := picture(w, r)
+	if !ok {
+		return
+	}
+	sha, err := s.ed.ReplaceDraftCover(r.PathValue("draft"), data)
+	if errors.Is(err, browse.ErrDraftGone) {
+		fail(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		fail(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	writeJSON(w, DraftCoverView{Cover: sha})
+}
+
+func (s *Server) draftCoverDelete(w http.ResponseWriter, r *http.Request) {
+	if err := s.ed.RemoveDraftCover(r.PathValue("draft")); err != nil {
+		fail(w, http.StatusNotFound, err)
+		return
+	}
+	writeJSON(w, DraftCoverView{})
 }
