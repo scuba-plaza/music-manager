@@ -22,6 +22,6 @@ export default defineConfig({
   },
   projects: [
     { name: 'desktop', use: { viewport: { width: 1200, height: 800 } } },
-    { name: 'narrow', use: { viewport: { width: 500, height: 700 } } },
+    { name: 'narrow', grep: /@narrow/, use: { viewport: { width: 500, height: 700 } } },
   ],
 });

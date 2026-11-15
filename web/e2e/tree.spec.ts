@@ -62,7 +62,7 @@ test('the Arabic artist row is a bdi with dir=auto', async ({ page }) => {
   await expect(row(page, 'John Coltrane').locator('bdi')).toHaveAttribute('dir', 'auto');
 });
 
-test('an Arabic name does not move its neighbours: the labels start at one edge and the counts end at the other', async ({ page }) => {
+test('an Arabic name does not move its neighbours: the labels start at one edge and the counts end at the other', { tag: '@narrow' }, async ({ page }) => {
   await openPage(page);
   const arabic = row(page, 'فيروز');
   const latin = row(page, 'John Coltrane');
@@ -237,7 +237,7 @@ test('nothing is asked of the server while an input method composes, and the tex
   expect(asked[0]).toContain('q=nina');
 });
 
-test('a long playlist name does not push the count out of the pane', async ({ page }) => {
+test('a long playlist name does not push the count out of the pane', { tag: '@narrow' }, async ({ page }) => {
   await openPage(page);
   await row(page, 'Playlists').dblclick();
   const long = row(page, 'A rather long playlist name');
@@ -252,7 +252,7 @@ test('a long playlist name does not push the count out of the pane', async ({ pa
   await expect(long.locator('.right')).toHaveText('2');
 });
 
-test('the cursor row is the one that is selected and it stays inside the tree when the cursor runs to the end', async ({ page, press }) => {
+test('the cursor row is the one that is selected and it stays inside the tree when the cursor runs to the end', { tag: '@narrow' }, async ({ page, press }) => {
   await page.setViewportSize({ width: page.viewportSize()?.width ?? 1200, height: 360 });
   await openPage(page);
   await press('Shift+ArrowRight');

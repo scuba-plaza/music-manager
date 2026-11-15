@@ -146,7 +146,7 @@ test('the device tab previews the track with the profile chosen', async ({ page 
   await expect(pane(page).getByText('01 - Watani.mp3')).toBeVisible();
 });
 
-test('the inspector takes the whole screen on a narrow window, and esc goes back to the tree', async ({ page }, testInfo) => {
+test('the inspector takes the whole screen on a narrow window, and esc goes back to the tree', { tag: '@narrow' }, async ({ page }, testInfo) => {
   await intoFields(page, 'So What');
   const narrow = testInfo.project.name === 'narrow';
 

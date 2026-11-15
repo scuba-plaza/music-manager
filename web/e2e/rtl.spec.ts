@@ -26,7 +26,7 @@ async function box(target: Locator): Promise<{ x: number; width: number }> {
   return found;
 }
 
-test('Arabic rows keep dir=auto and the count column does not move', async ({ page }) => {
+test('Arabic rows keep dir=auto and the count column does not move', { tag: '@narrow' }, async ({ page }) => {
   await openAll(page);
 
   for (const [arabic, latin] of [
@@ -63,7 +63,7 @@ test('sorting by artist puts فيروز among the F, by its Latin form', async (
   await expect(labels).toHaveText(sorted.view.rows.map((r) => r.label));
 });
 
-test('a mixed Latin and Arabic title does not reorder its neighbours', async ({ page, request }) => {
+test('a mixed Latin and Arabic title does not reorder its neighbours', { tag: '@narrow' }, async ({ page, request }) => {
   const { view } = (await (await request.get('/api/library')).json()) as LibraryResponse;
   const giant = view.rows.find((r) => r.kind === 'track' && r.label === 'Giant Steps');
   const title = 'Hello وطني world';

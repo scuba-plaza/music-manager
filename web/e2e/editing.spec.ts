@@ -112,7 +112,7 @@ test('the bulk form says under a field what is wrong with it, and keeps the form
   await expect(form).toBeVisible();
 });
 
-test('the bulk form fits the window with one line for each value', async ({ page }) => {
+test('the bulk form fits the window with one line for each value', { tag: '@narrow' }, async ({ page }) => {
   await openAll(page);
   await row(page, 'So What').click();
   await page.keyboard.press('Space');

@@ -96,7 +96,7 @@ function near(a: number, b: number): boolean {
   return Math.abs(a - b) <= 1;
 }
 
-test('the playlist picker rows line up', async ({ page }) => {
+test('the playlist picker rows line up', { tag: '@narrow' }, async ({ page }) => {
   await onTrack(page, 'So What');
 
   await page.keyboard.press('p');
