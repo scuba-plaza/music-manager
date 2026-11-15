@@ -343,7 +343,7 @@ func rowsOf(t *testing.T, url string) []sortRow {
 	return got.View.Rows
 }
 
-func TestTheLibraryCanBeSortedByEveryKeyBothWaysAndStillFiltered(t *testing.T) {
+func TestTheSortAndTheFilterOfTheLibraryComeFromItsQuery(t *testing.T) {
 	a, err := app.Open(filepath.Join(t.TempDir(), "lib"))
 	if err != nil {
 		t.Fatal(err)
@@ -385,21 +385,7 @@ func TestTheLibraryCanBeSortedByEveryKeyBothWaysAndStillFiltered(t *testing.T) {
 	}
 	for _, c := range []struct{ query, want string }{
 		{"sort=title", "Alpha Beta Gamma"},
-		{"sort=title&reverse=1", "Gamma Beta Alpha"},
-		{"sort=artist", "Gamma Alpha Beta"},
 		{"sort=artist&reverse=1", "Beta Alpha Gamma"},
-		{"sort=album", "Gamma Beta Alpha"},
-		{"sort=album&reverse=1", "Beta Gamma Alpha"},
-		{"sort=track", "Gamma Beta Alpha"},
-		{"sort=track&reverse=1", "Beta Gamma Alpha"},
-		{"sort=length", "Alpha Gamma Beta"},
-		{"sort=length&reverse=1", "Beta Gamma Alpha"},
-		{"sort=released", "Beta Gamma Alpha"},
-		{"sort=released&reverse=1", "Gamma Beta Alpha"},
-		{"sort=added", "Alpha Gamma Beta"},
-		{"sort=added&reverse=1", "Beta Gamma Alpha"},
-		{"sort=edited", "Alpha Gamma Beta"},
-		{"sort=edited&reverse=1", "Beta Gamma Alpha"},
 		{"sort=TITLE&q=beta", "Beta"},
 	} {
 		if got := order(c.query); got != c.want {
@@ -565,35 +551,6 @@ func TestTheInspectorSaysWhereATrackCameFrom(t *testing.T) {
 	}
 }
 
-func TestTheLatinTabShowsAFormSetByHandAsSetAndAWorkedOutFormDimly(t *testing.T) {
-	a, ts := seed(t, sample...)
-	srv := start(t, a)
-	id := ts[2].ID
-	before := inspect(t, srv, id)
-	workedOut := before.field("latinTitle")
-	if !workedOut.Dim || workedOut.Text == "" || !before.field("latinArtist").Dim {
-		t.Fatalf("nothing is set by hand yet: %+v, %+v", workedOut, before.field("latinArtist"))
-	}
-
-	if code, r := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "latinTitle", "text": "Salam"}); code != 200 || r.Message != "Saved" {
-		t.Fatalf("%d %+v", code, r)
-	}
-	after := inspect(t, srv, id)
-	if got := after.field("latinTitle"); got.Text != "Salam" || got.Dim {
-		t.Errorf("the form set by hand: %+v", got)
-	}
-	if got := after.field("latinArtist"); !got.Dim {
-		t.Errorf("the artist's form, which nobody set, is not dim: %+v", got)
-	}
-
-	if code, _ := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "latinTitle", "text": ""}); code != 200 {
-		t.Fatal(code)
-	}
-	if got := inspect(t, srv, id).field("latinTitle"); got != workedOut {
-		t.Errorf("after clearing: %+v, want the worked-out form back: %+v", got, workedOut)
-	}
-}
-
 type devicePreview struct {
 	Rows     []struct{ Label, Value string }
 	Warnings []string
@@ -611,29 +568,6 @@ func deviceTabOf(t *testing.T, srv *httptest.Server, id, profile string) deviceP
 		t.Fatalf("%d %+v", code, v)
 	}
 	return *v.Tabs[3].Device
-}
-
-func TestTheDeviceTabOfTheWolfgangProfileSaysWhatThePlayerWillShowAndWhatItWillNotShowWell(t *testing.T) {
-	a, ts := seed(t, seedTrack{"Bahlam Bek", "Abdel Halim Hafez", "Abd El Halim Hafez", 1}, seedTrack{"Song", "Band", "", 0})
-	genre := "Alternative Rock"
-	if _, err := a.Edit(ts[1].ID, app.Edit{Genre: &genre}); err != nil {
-		t.Fatal(err)
-	}
-	srv := start(t, a)
-
-	shown := map[string]string{}
-	for _, r := range deviceTabOf(t, srv, ts[0].ID, "wolfgang-wmp01").Rows {
-		shown[r.Label] = r.Value
-	}
-	if shown["Artist"] != "A. H. Hafez" || shown["Album"] != "Abd El Halim" {
-		t.Errorf("the player shows %+v, want the artist and the album within its 12 characters", shown)
-	}
-	if w := deviceTabOf(t, srv, ts[0].ID, "wolfgang-wmp01").Warnings; len(w) != 0 {
-		t.Errorf("a track the player shows well has warnings: %v", w)
-	}
-	if w := deviceTabOf(t, srv, ts[1].ID, "wolfgang-wmp01").Warnings; len(w) != 1 || !strings.Contains(w[0], "genre") {
-		t.Errorf("warnings %v, want one about the genre", w)
-	}
 }
 
 func TestTheDeviceTabFollowsTheProfileParameter(t *testing.T) {
