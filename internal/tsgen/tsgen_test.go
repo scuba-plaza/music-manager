@@ -130,33 +130,22 @@ export interface Shelf {
 `)
 }
 
+type StringKeys struct {
+	ByName map[string]string `json:"byName"`
+}
+
 type IntKeys struct {
 	ByNumber map[int]string `json:"byNumber"`
 }
 
-func TestAMapWithIntegerKeysIsARecordBecauseJSONWritesTheKeysAsStrings(t *testing.T) {
-	check(t, generate(t, IntKeys{}), generated+`
-export interface IntKeys {
-  byNumber: Record<string, string>;
+func TestOnlyAMapWithStringKeysCanBecomeARecord(t *testing.T) {
+	check(t, generate(t, StringKeys{}), generated+`
+export interface StringKeys {
+  byName: Record<string, string>;
 }
 `)
-	raw, err := json.Marshal(IntKeys{ByNumber: map[int]string{3: "c"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := `{"byNumber":{"3":"c"}}`; string(raw) != want {
-		t.Errorf("encoding/json writes %s, want %s", raw, want)
-	}
-}
-
-type FloatKeys struct {
-	ByWeight map[float64]string `json:"byWeight"`
-}
-
-func TestAMapWithKeysJSONCannotWriteIsAnError(t *testing.T) {
-	_, err := Generate(FloatKeys{})
-	if err == nil || !strings.Contains(err.Error(), "FloatKeys.ByWeight") {
-		t.Fatalf("want an error naming FloatKeys.ByWeight, got %v", err)
+	if _, err := Generate(IntKeys{}); err == nil || !strings.Contains(err.Error(), "IntKeys.ByNumber") {
+		t.Fatalf("want an error naming IntKeys.ByNumber, got %v", err)
 	}
 }
 
@@ -326,16 +315,19 @@ func TestTwoTypesOfOneNameAreAnError(t *testing.T) {
 
 type Odd struct {
 	Weird string `json:"x-y"`
-	Count int    `json:"count,string"`
 }
 
-func TestNamesThatAreNotIdentifiersAreQuoted(t *testing.T) {
-	check(t, generate(t, Odd{}), generated+`
-export interface Odd {
-  "x-y": string;
-  count: string;
+type Quoted struct {
+	Count int `json:"count,string"`
 }
-`)
+
+func TestWhatTheGeneratorCannotWriteIsAnErrorNotAGuess(t *testing.T) {
+	if _, err := Generate(Odd{}); err == nil || !strings.Contains(err.Error(), "Odd.Weird") {
+		t.Errorf("a name that is no identifier: %v", err)
+	}
+	if _, err := Generate(Quoted{}); err == nil || !strings.Contains(err.Error(), "Quoted.Count") {
+		t.Errorf("the string option: %v", err)
+	}
 }
 
 type Required struct {
@@ -359,28 +351,6 @@ export interface Holder {
 		t.Fatal(err)
 	}
 	if want := `{"name":""}`; string(raw) != want {
-		t.Errorf("encoding/json writes %s, want %s", raw, want)
-	}
-}
-
-type Counted struct {
-	Plays *int  `json:"plays,string"`
-	Flag  *bool `json:"flag,string,omitempty"`
-}
-
-func TestAQuotedPointerIsAStringBecauseJSONQuotesWhatItPointsAt(t *testing.T) {
-	check(t, generate(t, Counted{}), generated+`
-export interface Counted {
-  plays: string | null;
-  flag?: string;
-}
-`)
-	n := 5
-	raw, err := json.Marshal(Counted{Plays: &n})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := `{"plays":"5"}`; string(raw) != want {
 		t.Errorf("encoding/json writes %s, want %s", raw, want)
 	}
 }

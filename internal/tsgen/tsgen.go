@@ -4,11 +4,11 @@ import (
 	"cmp"
 	"encoding"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -110,7 +110,7 @@ func (g *generator) declaration(t reflect.Type) (string, error) {
 		}
 		name := f.name
 		if !identifier.MatchString(name) {
-			name = strconv.Quote(name)
+			return "", fmt.Errorf("%s.%s: %q cannot become a field name", f.owner.Name(), f.goName, name)
 		}
 		if f.optional {
 			name += "?"
@@ -123,19 +123,7 @@ func (g *generator) declaration(t reflect.Type) (string, error) {
 
 func (g *generator) fieldType(f field) (string, error) {
 	if f.quoted {
-		scalar := f.typ
-		if scalar.Kind() == reflect.Pointer {
-			scalar = scalar.Elem()
-		}
-		switch scalar.Kind() {
-		case reflect.Bool, reflect.String, reflect.Float32, reflect.Float64,
-			reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			if f.typ.Kind() == reflect.Pointer && !f.optional {
-				return "string | null", nil
-			}
-			return "string", nil
-		}
+		return "", errors.New("the string option of a json tag is not supported")
 	}
 	expr, nullable, err := g.expr(f.typ)
 	if err != nil {
@@ -190,10 +178,7 @@ func (g *generator) expr(t reflect.Type) (string, bool, error) {
 		elem, err := g.element(t.Elem())
 		return elem + "[]", false, err
 	case reflect.Map:
-		switch t.Key().Kind() {
-		case reflect.String, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		default:
+		if t.Key().Kind() != reflect.String {
 			return "", false, fmt.Errorf("a map with %v keys cannot become a Record", t.Key())
 		}
 		value, nullable, err := g.expr(t.Elem())
