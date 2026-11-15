@@ -40,7 +40,7 @@
           packages = with pkgs; [
             go
             nodejs
-            pnpm_10
+            pnpm
             yt-dlp
             ffmpeg
             playwright-driver.browsers
