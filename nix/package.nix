@@ -56,7 +56,7 @@ buildGoModule {
   '';
 
   meta = {
-    description = "Manage a music library for an MP3 player: download from YouTube, tag from MusicBrainz, render a clean folder";
+    description = "Manage a music library for an MP3 player: download from YouTube, edit the tags, render a clean folder";
     mainProgram = "mm";
     platforms = [ "x86_64-linux" "aarch64-linux" ];
   };
