@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { ChangeResponse, FieldView, InfoView, LibraryResponse, PeekView, ProfileView, RowView, TrackView } from '../api/types.gen';
+import type { ChangeResponse, FieldView, InfoView, LibraryResponse, PeekView, Profile, RowView, TrackView } from '../api/types.gen';
 
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -54,6 +54,7 @@ export function infoView(overrides: Partial<InfoView> = {}): InfoView {
 export function libraryResponse(stamp = 's1', overrides: Partial<LibraryResponse> = {}): LibraryResponse {
   return {
     history: {},
+    profiles: [],
     stamp,
     unsynced: 0,
     view: {
@@ -193,6 +194,7 @@ export function sampleLibrary(stamp = 's1'): LibraryResponse {
   const rows = sampleRows();
   return {
     ...base,
+    profiles: sampleProfiles(),
     view: { ...base.view, rows, tracks: 6, needWork: 1, shown: rows.filter((row) => row.trackId !== undefined).length },
   };
 }
@@ -248,11 +250,40 @@ export function peekViewFor(row: RowView): PeekView {
 }
 
 
-export function sampleProfiles(): ProfileView[] {
+export function sampleProfiles(): Profile[] {
   return [
-    { name: 'generic', label: 'Generic', builtin: true },
-    { name: 'wolfgang-wmp01', label: 'Wolfgang WMP01', builtin: true },
-    { name: 'my-player', label: 'My Player', builtin: false },
+    {
+      id: 'wolfgang-wmp01',
+      name: 'Wolfgang WMP01',
+      latin_names: true,
+      component_max: 100,
+      stem_max: 20,
+      tag_width: 12,
+      latin_genre: true,
+      cover_format: 'baseline-jpeg',
+      cover_max_edge: 480,
+      cover_quality: 85,
+      single_covers: true,
+      replaygain: false,
+      playlist_ext: '.m3u',
+      playlist_style: 'root-backslash',
+    },
+    {
+      id: 'my-player',
+      name: 'My Player',
+      latin_names: true,
+      component_max: 200,
+      stem_max: 0,
+      tag_width: 12,
+      latin_genre: false,
+      cover_format: 'keep',
+      cover_max_edge: 0,
+      cover_quality: 0,
+      single_covers: false,
+      replaygain: true,
+      playlist_ext: '.m3u8',
+      playlist_style: 'relative',
+    },
   ];
 }
 
@@ -291,7 +322,6 @@ export type StubRoute = (request: StubRequest) => Response | Promise<Response> |
 
 export interface StubOptions {
   route?: StubRoute;
-  profiles?: ProfileView[];
 }
 
 function bodyOf(init: RequestInit | undefined): unknown {
@@ -312,9 +342,6 @@ function answer(request: StubRequest, info: InfoView, library: LibraryResponse, 
   if (reading && target.pathname === '/api/info') {
     return jsonResponse(info);
   }
-  if (reading && target.pathname === '/api/profiles') {
-    return jsonResponse(options.profiles ?? sampleProfiles());
-  }
   if (reading && target.pathname === '/api/library') {
     const narrowed = narrowRows(rows, target.searchParams.get('q') ?? '');
     const shown = narrowed.filter((row) => row.trackId !== undefined).length;
@@ -324,8 +351,8 @@ function answer(request: StubRequest, info: InfoView, library: LibraryResponse, 
   if (reading && track) {
     const found = rows.find((row) => row.trackId === decodeURIComponent(track[1] ?? ''));
     const profile = target.searchParams.get('profile');
-    if (profile !== null && !(options.profiles ?? sampleProfiles()).some((p) => p.name === profile)) {
-      return jsonResponse({ error: `there is no device profile named "${profile}"` }, 400);
+    if (profile !== null && profile !== 'generic' && !library.profiles.some((p) => p.id === profile)) {
+      return jsonResponse({ error: `there is no format with the id "${profile}"` }, 400);
     }
     if (!found) {
       return jsonResponse({ error: 'not found' }, 404);

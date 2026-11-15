@@ -1,4 +1,4 @@
-import type { LibraryResponse, ProfileView } from '../src/api/types.gen.ts';
+import type { LibraryResponse } from '../src/api/types.gen.ts';
 import { expect, test } from './fixtures.ts';
 
 test('the seeded server answers /api/library with four artists, two playlists and one unidentified track', async ({ request }) => {
@@ -19,9 +19,9 @@ test('the seeded server answers /api/library with four artists, two playlists an
   expect(view.rows.find((row) => row.key === 'needs')).toMatchObject({ kind: 'group', label: 'Needs work', count: 1 });
 });
 
-test('/api/profiles lists generic, wolfgang-wmp01 and my-player', async ({ request }) => {
-  const response = await request.get('/api/profiles');
+test('the library comes with the formats the seeded library has', async ({ request }) => {
+  const response = await request.get('/api/library');
   expect(response.ok()).toBe(true);
-  const profiles = (await response.json()) as ProfileView[];
-  expect(profiles.map((profile) => profile.name)).toEqual(['generic', 'wolfgang-wmp01', 'my-player']);
+  const { profiles } = (await response.json()) as LibraryResponse;
+  expect(profiles.map((profile) => profile.id)).toEqual(['wolfgang-wmp01', 'my-player']);
 });

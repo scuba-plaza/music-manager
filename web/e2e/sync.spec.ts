@@ -105,7 +105,7 @@ test('choosing wolfgang-wmp01 shows its warnings in the review', async ({ page, 
   });
 });
 
-test('a profile from the user’s devices.toml appears and is the one that is planned', async ({ page, dialog }) => {
+test('a format of the library appears in the list and is the one that is planned', async ({ page, dialog }) => {
   await openPage(page);
 
   await inFolder(async (dir) => {

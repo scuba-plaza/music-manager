@@ -171,7 +171,6 @@ describe('the application', () => {
     await render(<App />);
     await expect.element(page.getByRole('banner')).toHaveTextContent('/music/library');
     await expect.poll(() => useApp.getState().detail).not.toBeNull();
-    await expect.poll(() => useApp.getState().profiles).not.toEqual([]);
     const app = page.getByTestId('app');
     await expect.element(app).not.toHaveAttribute('aria-busy');
 

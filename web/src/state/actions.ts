@@ -8,6 +8,7 @@ import { loadLibrary } from './library';
 import { bulkEdit, copyField, history, moveTrack, paste, remove, renumber } from './ops';
 import { openAdd } from './add';
 import { openDoctor } from './doctor';
+import { openFormats } from './formats';
 import { openSync } from './sync';
 import { setStatus } from './status';
 import { useApp, type Focus } from './store';
@@ -375,6 +376,9 @@ export function run(action: ActionName): void {
       break;
     case 'sync':
       void openSync();
+      break;
+    case 'formats':
+      openFormats();
       break;
     case 'undo':
       history('undo');

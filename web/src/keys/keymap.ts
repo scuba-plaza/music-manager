@@ -50,6 +50,7 @@ export type ActionName =
   | 'sortMenu'
   | 'add'
   | 'sync'
+  | 'formats'
   | 'undo'
   | 'redo'
   | 'doctor'
@@ -165,6 +166,7 @@ export const bindings: readonly Binding[] = [
   { keys: ['o'], scope: 'common', action: 'sortMenu', hint: { label: 'sort', when: inTree }, help: { page: 'Moving', text: 'sort the list' } },
   { keys: ['a'], scope: 'common', action: 'add', help: { page: 'Library', text: 'add from a YouTube link, or drop files on the page' } },
   { keys: ['s'], scope: 'common', action: 'sync', help: { page: 'Library', text: 'sync: write the folder' } },
+  { keys: ['f'], scope: 'common', action: 'formats', help: { page: 'Library', text: 'formats: how each player is written; make, change, delete' } },
   { keys: ['u'], scope: 'common', action: 'undo', hint: { label: 'undo', when: (s) => Boolean(s.lib?.history.undo) }, help: { page: 'Library', text: 'undo / redo' } },
   { keys: ['Shift+u'], scope: 'common', action: 'redo', help: { page: 'Library', text: 'undo / redo' } },
   { keys: ['Shift+v'], scope: 'common', action: 'doctor', help: { page: 'Library', text: 'check the library' } },

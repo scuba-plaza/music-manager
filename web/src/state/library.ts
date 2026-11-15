@@ -4,6 +4,7 @@ import type { InfoView, JobView, LibraryResponse } from '../api/types.gen';
 import { change, loadDetail } from './detail';
 import { fail } from './status';
 import { useApp } from './store';
+import { previewChoice } from './profiles';
 import { ancestorKeys, rowByKey, trackRowKey } from './tree';
 
 export async function loadInfo(): Promise<void> {
@@ -66,6 +67,7 @@ export async function loadLibrary(options: LibraryOptions = {}): Promise<void> {
     const revealed = options.reveal === undefined ? followed : revealTrack(lib, followed.expanded, followed.cursor, options.reveal);
     change({
       lib,
+      profile: previewChoice(lib.profiles, state.profile),
       sort: { key: lib.view.sort.key, reverse: lib.view.sort.reverse },
       marks: filter.trim() === '' ? withoutGoneTracks(state.marks, lib) : state.marks,
       expanded: revealed.expanded,

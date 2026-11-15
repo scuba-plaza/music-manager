@@ -155,3 +155,42 @@ func TestChangingAFormatAfterAPlanDoesNotChangeWhatThePlanWrites(t *testing.T) {
 		t.Errorf("%d tracks written", mp3s)
 	}
 }
+
+func TestTheCheckOfAFormatNamesTheWrongSettingsAndStoresNothing(t *testing.T) {
+	a, _ := seed(t)
+	srv := start(t, a)
+	form := playerForm("")
+	form["component_max"] = 5
+
+	var wrong struct{ Fields map[string]string }
+	if code := sendInto(t, srv.URL, "POST", "/api/profiles/check", form, &wrong); code != 200 || wrong.Fields["name"] == "" || wrong.Fields["component_max"] == "" || len(wrong.Fields) != 2 {
+		t.Errorf("%d %+v", code, wrong)
+	}
+	var right struct{ Fields map[string]string }
+	if code := sendInto(t, srv.URL, "POST", "/api/profiles/check", playerForm("Car"), &right); code != 200 || len(right.Fields) != 0 {
+		t.Errorf("%d %+v", code, right)
+	}
+	if got := profilesOf(t, srv.URL); len(got) != 1 {
+		t.Errorf("the check stored something: %+v", got)
+	}
+}
+
+func TestTheCheckOfAFormatLetsItKeepItsOwnName(t *testing.T) {
+	a, _ := seed(t)
+	srv := start(t, a)
+	own := playerForm("Wolfgang WMP01")
+	own["id"] = "wolfgang-wmp01"
+	own["component_max"] = 100
+
+	var edited, other struct{ Fields map[string]string }
+	sendInto(t, srv.URL, "POST", "/api/profiles/check", own, &edited)
+	own["id"] = ""
+	sendInto(t, srv.URL, "POST", "/api/profiles/check", own, &other)
+
+	if len(edited.Fields) != 0 {
+		t.Errorf("a format is its own name: %+v", edited.Fields)
+	}
+	if other.Fields["name"] == "" {
+		t.Errorf("a new format cannot take that name: %+v", other.Fields)
+	}
+}

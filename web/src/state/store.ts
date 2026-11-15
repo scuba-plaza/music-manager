@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CopyChoice, InfoView, LibraryResponse, PeekView, ProfileView, TrackView } from '../api/types.gen';
+import type { CopyChoice, InfoView, LibraryResponse, PeekView, TrackView } from '../api/types.gen';
 import type { Hint } from '../keys/keymap';
 
 export type Focus = 'tree' | 'inspector';
@@ -13,7 +13,8 @@ export type OverlayState =
   | { kind: 'bulk'; ids: string[]; head: string }
   | { kind: 'add' }
   | { kind: 'doctor' }
-  | { kind: 'sync' };
+  | { kind: 'sync' }
+  | { kind: 'formats' };
 
 export interface EditState {
   field: number;
@@ -48,7 +49,6 @@ export interface AppState {
   detailError: string;
   edit: EditState | null;
   playing: { id: string; field: string; src?: string } | null;
-  profiles: ProfileView[];
   profile: string;
   status: { text: string; kind: '' | 'bad' | 'good' };
   overlay: OverlayState | null;
@@ -100,7 +100,6 @@ export const useApp = create<AppState>()(() => ({
   detailError: '',
   edit: null,
   playing: null,
-  profiles: [],
   profile: '',
   status: { text: '', kind: '' },
   overlay: null,

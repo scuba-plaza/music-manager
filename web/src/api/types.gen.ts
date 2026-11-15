@@ -222,6 +222,10 @@ export interface Profile {
   playlist_style: string;
 }
 
+export interface ProfileCheck {
+  fields?: Record<string, string>;
+}
+
 export interface RowView {
   kind: string;
   depth: number;

@@ -427,7 +427,7 @@ describe('the tabs of a track', () => {
     const device = pane().getByRole('tab', { name: /Device$/ });
     await device.click();
     await expect.element(device).toHaveAttribute('aria-selected', 'true');
-    const profile = pane().getByRole('combobox', { name: 'Profile' });
+    const profile = pane().getByRole('combobox', { name: 'Format' });
 
     await expect.element(profile).toHaveValue('wolfgang-wmp01');
     await expect.element(pane().getByText('wolfgang-wmp01/Folder')).toBeVisible();

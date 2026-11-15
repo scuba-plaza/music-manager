@@ -29,11 +29,6 @@ const targets: TargetView[] = [
   { label: 'USB', path: '/media/me/USB', kind: 'drive' },
 ];
 
-const profiles = [
-  { name: 'generic', label: 'Generic', builtin: true },
-  { name: 'wolfgang-wmp01', label: 'Wolfgang WMP01', builtin: true },
-  { name: 'my-player', label: 'My Player', builtin: false },
-];
 
 function counts(over: Partial<OpCounts> = {}): OpCounts {
   return { create: 1, update: 0, stray: 0, remove: 0, ...over };
@@ -81,7 +76,7 @@ function routes(...all: StubRoute[]): StubRoute {
 
 function serve(...extra: StubRoute[]): void {
   fetchMock = stubServer(infoView(), sampleLibrary(), { route: routes(...extra, served) });
-  useApp.setState({ lib: sampleLibrary(), profiles });
+  useApp.setState({ lib: sampleLibrary() });
 }
 
 function state() {
@@ -237,7 +232,7 @@ describe('choosing where', () => {
   });
 
   it('w does nothing without profiles', () => {
-    useApp.setState({ profiles: [] });
+    useApp.setState({ lib: { ...sampleLibrary(), profiles: [] } });
     chooseTarget(1);
 
     cycleProfile();

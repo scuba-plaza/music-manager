@@ -1,27 +1,26 @@
-import { get } from '../api/client';
-import type { ProfileView } from '../api/types.gen';
+import type { Profile } from '../api/types.gen';
 import { loadDetail } from './detail';
-import { fail } from './status';
-import { isTrack } from './inspector';
 import { useApp } from './store';
 
-const generic = 'generic';
+export const genericId = 'generic';
 
-export async function loadProfiles(): Promise<void> {
-  try {
-    const profiles = await get<ProfileView[]>('/api/profiles');
-    const { profile, detail } = useApp.getState();
-    const chosen = profiles.some((p) => p.name === profile) ? profile : (profiles.find((p) => p.name !== generic)?.name ?? '');
-    useApp.setState({ profiles, profile: chosen });
-    if (chosen !== profile && isTrack(detail)) {
-      await loadDetail();
-    }
-  } catch (err) {
-    fail(err);
-  }
+export interface FormatChoice {
+  id: string;
+  name: string;
 }
 
-export async function chooseProfile(name: string): Promise<void> {
-  useApp.setState({ profile: name });
+export function previewChoice(stored: readonly Profile[], current: string): string {
+  if (stored.length === 0) {
+    return '';
+  }
+  return current === genericId || stored.some((p) => p.id === current) ? current : (stored[0]?.id ?? '');
+}
+
+export function formatChoices(stored: readonly Profile[]): FormatChoice[] {
+  return [{ id: genericId, name: 'Generic' }, ...stored.map((p) => ({ id: p.id, name: p.name }))];
+}
+
+export async function chooseProfile(id: string): Promise<void> {
+  useApp.setState({ profile: id });
   await loadDetail();
 }

@@ -3,6 +3,7 @@ import { Ask } from '../dialogs/Ask';
 import { BulkForm } from '../dialogs/BulkForm';
 import { CopyList } from '../dialogs/CopyList';
 import { Doctor } from '../dialogs/Doctor';
+import { Formats } from '../dialogs/Formats';
 import { Help } from '../dialogs/Help';
 import { PlaylistPicker } from '../dialogs/PlaylistPicker';
 import { SortMenu } from '../dialogs/SortMenu';
@@ -34,5 +35,7 @@ export function OverlayHost() {
       return <Doctor />;
     case 'sync':
       return <Sync />;
+    case 'formats':
+      return <Formats />;
   }
 }

@@ -113,7 +113,7 @@ test('the device tab previews the track with the profile chosen', async ({ page 
   await intoFields(page, 'وطني');
 
   await pane(page).locator('[data-tab="device"]').click();
-  const profile = pane(page).getByRole('combobox', { name: 'Profile' });
+  const profile = pane(page).getByRole('combobox', { name: 'Format' });
   await expect(profile).toHaveValue('wolfgang-wmp01');
   await expect(pane(page).getByText('01 - Watani.mp3')).toBeVisible();
 

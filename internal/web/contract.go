@@ -24,6 +24,7 @@ func Contract() []any {
 		InfoView{},
 		JobView{},
 		LibraryResponse{},
+		ProfileCheck{},
 		PathView{},
 		ServerEvents{},
 		SyncData{},

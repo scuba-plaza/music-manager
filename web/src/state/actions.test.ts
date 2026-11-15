@@ -819,7 +819,7 @@ describe('loadLibrary for the tree', () => {
 
     await loadLibrary();
 
-    expect(requestedUrls()).toEqual(['/api/library', '/api/tracks/rough']);
+    expect(requestedUrls()).toEqual(['/api/library', '/api/tracks/rough?profile=wolfgang-wmp01']);
     expect(useApp.getState().detail).toMatchObject({ id: 'rough' });
   });
 

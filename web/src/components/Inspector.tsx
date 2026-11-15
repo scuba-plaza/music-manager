@@ -1,13 +1,15 @@
 import { useEffect, useId, useRef } from 'react';
-import type { DeviceView, PeekView, TrackView } from '../api/types.gen';
+import type { DeviceView, PeekView, Profile, TrackView } from '../api/types.gen';
 import { fail } from '../state/status';
 import { coverChooserAttribute, coverChosen } from '../state/cover';
 import { goToRow, stopPlaying } from '../state/edit';
 import { chooseTab, isTrack, tabIndex } from '../state/inspector';
-import { chooseProfile } from '../state/profiles';
+import { chooseProfile, formatChoices } from '../state/profiles';
 import { useApp } from '../state/store';
 import { Cover } from './Cover';
 import { Fields } from './Fields';
+
+const noFormats: Profile[] = [];
 
 function Name({ text }: { text: string }) {
   return <bdi dir="auto">{text}</bdi>;
@@ -15,12 +17,12 @@ function Name({ text }: { text: string }) {
 
 function Device({ view }: { view: DeviceView }) {
   const id = useId();
-  const profiles = useApp((s) => s.profiles);
+  const stored = useApp((s) => s.lib?.profiles ?? noFormats);
   const profile = useApp((s) => s.profile);
   return (
     <div className="fields device">
       <label className="label" htmlFor={id}>
-        Profile
+        Format
       </label>
       <div className="value">
         <select
@@ -31,9 +33,9 @@ function Device({ view }: { view: DeviceView }) {
             void chooseProfile(e.target.value);
           }}
         >
-          {profiles.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.label}
+          {formatChoices(stored).map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
             </option>
           ))}
         </select>

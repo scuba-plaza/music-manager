@@ -7,7 +7,7 @@ import { goToRow } from '../state/edit';
 import { jobEvent } from '../state/jobs';
 import { useApp } from '../state/store';
 import { useSync } from '../state/sync';
-import { FakeEventSource, infoView, jsonResponse, requestsTo, sampleLibrary, sampleProfiles, stubServer, type StubRoute } from '../testing/fakes';
+import { FakeEventSource, infoView, jsonResponse, requestsTo, sampleLibrary, stubServer, type StubRoute } from '../testing/fakes';
 
 const sep = '\u001f';
 const soWhat = `track${sep}sowhat`;
@@ -19,11 +19,6 @@ const targets: TargetView[] = [
   { label: 'USB', path: '/media/me/USB', kind: 'drive' },
 ];
 
-const profiles = [
-  { name: 'generic', label: 'Generic', builtin: true },
-  { name: 'wolfgang-wmp01', label: 'Wolfgang WMP01', builtin: true },
-  { name: 'my-player', label: 'My Player', builtin: false },
-];
 
 function counts(over: Partial<OpCounts> = {}): OpCounts {
   return { create: 1, update: 0, stray: 0, remove: 0, ...over };
@@ -102,10 +97,9 @@ function routes(...all: StubRoute[]): StubRoute {
 }
 
 async function openApp(...extra: StubRoute[]): Promise<void> {
-  fetchMock = stubServer(infoView(), sampleLibrary(), { route: routes(...extra, served), profiles: sampleProfiles() });
+  fetchMock = stubServer(infoView(), sampleLibrary(), { route: routes(...extra, served) });
   await render(<App />);
   await expect.element(page.getByRole('treeitem').first()).toBeVisible();
-  useApp.setState({ profiles });
   goToRow(soWhat);
   page.getByRole('tree').element().focus();
   await expect.element(page.getByRole('tree').getByRole('treeitem', { selected: true })).toBeVisible();

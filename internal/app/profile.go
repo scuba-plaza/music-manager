@@ -39,6 +39,18 @@ func (a *App) Format(id string) (device.Target, error) {
 	return nil, fmt.Errorf("there is no format with the id %q: %w", id, ErrNoFormat)
 }
 
+func (a *App) CheckProfile(p manifest.Profile) (FieldErrors, error) {
+	m, err := a.store.Load()
+	if err != nil {
+		return nil, err
+	}
+	var fields FieldErrors
+	if err := check(tidy(p), m.Profiles, p.ID); err != nil {
+		errors.As(err, &fields)
+	}
+	return fields, nil
+}
+
 func (a *App) CreateProfile(p manifest.Profile) (manifest.Profile, error) {
 	p = tidy(p)
 	err := a.store.Update(func(m *manifest.Manifest) error {

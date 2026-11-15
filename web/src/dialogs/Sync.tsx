@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import type { Profile } from '../api/types.gen';
 import { FormField } from '../components/FormField';
 import { Progress } from '../components/Progress';
 import { motionOf, moveTo, type Motion } from '../keys/dialog';
@@ -6,6 +7,7 @@ import { keyName, type KeyEventLike } from '../keys/keymap';
 import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList } from '../overlay/MenuList';
+import { formatChoices } from '../state/profiles';
 import { closeOverlay } from '../state/store';
 import { useApp } from '../state/store';
 import {
@@ -76,8 +78,10 @@ function hintsFor(phase: SyncPhase, library: boolean, nothingToDo: boolean): rea
   }
 }
 
+const noFormats: Profile[] = [];
+
 function Format({ library, how }: { library: boolean; how: string }) {
-  const profiles = useApp((s) => s.profiles);
+  const stored = useApp((s) => s.lib?.profiles ?? noFormats);
   const profile = useSync((s) => s.profile);
   if (library) {
     return (
@@ -98,9 +102,9 @@ function Format({ library, how }: { library: boolean; how: string }) {
           chooseProfile(e.target.value);
         }}
       >
-        {profiles.map((p) => (
-          <option key={p.name} value={p.name}>
-            {p.label}
+        {formatChoices(stored).map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
           </option>
         ))}
       </select>

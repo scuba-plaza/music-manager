@@ -15,7 +15,8 @@ import {
 import { run } from './actions';
 import { loadDetail } from './detail';
 import { applyChange, cancelEdit, chooseField, saveEdit, startEdit, stopPlaying, typeEdit } from './edit';
-import { chooseProfile, loadProfiles } from './profiles';
+import { loadLibrary } from './library';
+import { chooseProfile } from './profiles';
 import { useApp } from './store';
 
 vi.mock('./treeDom', () => ({
@@ -523,7 +524,7 @@ describe('hearing a cut', () => {
 });
 
 describe('the details of what the cursor is on', () => {
-  it('a track is asked for with the device profile chosen', async () => {
+  it('a track is asked for with the format chosen', async () => {
     onTrack({ profile: 'my-player' });
 
     await loadDetail();
@@ -544,31 +545,41 @@ describe('the details of what the cursor is on', () => {
   });
 });
 
-describe('the device profiles', () => {
-  it('the first profile that is not the generic one is chosen at first', async () => {
-    await loadProfiles();
+describe('the formats that come with the library', () => {
+  it('the first format of the library is previewed at first', async () => {
+    await loadLibrary();
 
     expect(useApp.getState().profile).toBe('wolfgang-wmp01');
-    expect(useApp.getState().profiles.map((p) => p.name)).toEqual(['generic', 'wolfgang-wmp01', 'my-player']);
   });
 
-  it('a profile chosen before is kept', async () => {
+  it('a format chosen before is kept while the library still has it', async () => {
     useApp.setState({ profile: 'my-player' });
 
-    await loadProfiles();
+    await loadLibrary();
 
     expect(useApp.getState().profile).toBe('my-player');
   });
 
-  it('the details of a track shown are read again with the profile', async () => {
-    onTrack();
+  it('a format the library no longer has is replaced by its first, and with none there is no preview', async () => {
+    useApp.setState({ profile: 'gone' });
+    await loadLibrary();
+    expect(useApp.getState().profile).toBe('wolfgang-wmp01');
 
-    await loadProfiles();
+    fetchMock = stubServer(infoView(), { ...sampleLibrary(), profiles: [] });
+    await loadLibrary();
 
-    expect(requestsTo(fetchMock, 'GET', '/api/tracks/sowhat?profile=wolfgang-wmp01')).toHaveLength(1);
+    expect(useApp.getState().profile).toBe('');
   });
 
-  it('choosing a profile reads the details again with it', async () => {
+  it('the details of a track shown are read again with the format', async () => {
+    onTrack();
+
+    await loadLibrary();
+
+    expect(requestsTo(fetchMock, 'GET', '/api/tracks/sowhat?profile=wolfgang-wmp01').length).toBeGreaterThan(0);
+  });
+
+  it('choosing a format reads the details again with it', async () => {
     onTrack({ profile: 'wolfgang-wmp01' });
 
     await chooseProfile('my-player');

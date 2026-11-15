@@ -11,7 +11,6 @@ import { connect, loadInfo, loadLibrary } from './state/library';
 import { installPictures } from './state/cover';
 import { isTrack } from './state/inspector';
 import { jobEvent } from './state/jobs';
-import { loadProfiles } from './state/profiles';
 import { useApp } from './state/store';
 import './styles/tokens.css';
 import './styles/app.css';
@@ -23,7 +22,6 @@ export function App() {
 
   useEffect(() => {
     void loadInfo();
-    void loadProfiles();
     void loadLibrary();
     return connect(jobEvent);
   }, []);

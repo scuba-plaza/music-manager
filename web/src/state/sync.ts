@@ -4,6 +4,7 @@ import type { JobView, PlanView, SyncData, SyncTargetsView, TargetView } from '.
 import { loadLibrary } from './library';
 import { fail, setStatus } from './status';
 import { follow, stopJob } from './jobs';
+import { formatChoices, genericId } from './profiles';
 import { useApp } from './store';
 
 export type SyncPhase = 'choosing' | 'typing' | 'planning' | 'reviewing' | 'confirming' | 'applying' | 'finished' | 'failed';
@@ -24,7 +25,7 @@ export interface SyncState {
   confirm: string;
 }
 
-export const genericProfile = 'generic';
+export const genericProfile = genericId;
 
 const anotherFolder: TargetView = { label: 'Another folder…', path: '', kind: 'folder' };
 const stopped = 'The sync was stopped.';
@@ -106,7 +107,7 @@ export function cycleProfile(): void {
   if (isLibraryTarget()) {
     return;
   }
-  const names = useApp.getState().profiles.map((p) => p.name);
+  const names = formatChoices(useApp.getState().lib?.profiles ?? []).map((p) => p.id);
   const at = names.indexOf(useSync.getState().profile);
   const next = names[(at + 1) % names.length];
   if (next !== undefined) {
