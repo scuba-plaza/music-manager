@@ -325,10 +325,12 @@ describe('typing a folder', () => {
 
     await userEvent.keyboard('{Enter}');
 
-    await expect.element(dialog()).toHaveTextContent('Type the folder to write into');
+    await expect.element(dialog().getByRole('alert')).toHaveTextContent('Type the folder to write into');
+    await expect.element(dialog().getByRole('textbox', { name: 'Folder' })).toBeInvalid();
     expect(requestsTo(fetchMock, 'POST', '/api/sync/plan')).toEqual([]);
     await userEvent.keyboard('~');
     await expect.element(dialog()).not.toHaveTextContent('Type the folder to write into');
+    await expect.element(dialog().getByRole('textbox', { name: 'Folder' })).not.toBeInvalid();
   });
 
   test('enter plans the folder with the chosen format', async () => {
@@ -350,11 +352,16 @@ describe('typing a folder', () => {
   });
 
   test('a folder the server refuses stays for correction, with the reason', async () => {
-    await typing(({ method, url }) => (method === 'POST' && url.pathname === '/api/sync/plan' ? jsonResponse({ error: 'that folder holds the library' }, 422) : undefined));
+    await typing(({ method, url }) =>
+      method === 'POST' && url.pathname === '/api/sync/plan'
+        ? jsonResponse({ error: 'That folder holds the library', fields: { folder: 'That folder holds the library' } }, 422)
+        : undefined,
+    );
 
     await userEvent.keyboard('~{Enter}');
 
-    await expect.element(dialog()).toHaveTextContent('that folder holds the library');
+    await expect.element(dialog().getByRole('alert')).toHaveTextContent('That folder holds the library');
+    await expect.element(dialog().getByRole('textbox', { name: 'Folder' })).toBeInvalid();
     await expect.element(dialog().getByRole('textbox', { name: 'Folder' })).toHaveValue('~');
     await expect.element(dialog().getByRole('textbox', { name: 'Folder' })).toHaveFocus();
   });
@@ -608,12 +615,20 @@ describe('confirming a deletion', () => {
     expect(requestsTo(fetchMock, 'POST', '/api/sync/p1/apply')).toEqual([]);
   });
 
-  test('another word is wiped and nothing is written', async () => {
+  test('another word stays, is said to be wrong, and nothing is written', async () => {
     await confirming();
     await userEvent.keyboard('delet{Enter}');
 
-    await expect.element(dialog().getByRole('textbox', { name: 'Type delete to confirm' })).toHaveValue('');
+    const word = dialog().getByRole('textbox', { name: 'Type delete to confirm' });
+    await expect.element(word).toHaveValue('delet');
+    await expect.element(word).toBeInvalid();
+    await expect.element(dialog().getByRole('alert')).toHaveTextContent('Type the word delete, exactly, to go ahead');
     expect(requestsTo(fetchMock, 'POST', '/api/sync/p1/apply')).toEqual([]);
+
+    await userEvent.keyboard('e');
+
+    await expect.element(word).not.toBeInvalid();
+    await expect.element(dialog().getByRole('alert')).not.toBeInTheDocument();
   });
 
   test('the word writes, and sends the word', async () => {

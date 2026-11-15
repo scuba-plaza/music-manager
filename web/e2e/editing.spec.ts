@@ -324,6 +324,22 @@ test('p adds the selected album to Late night and the count becomes 3', async ({
   expect(await playlistCount(request, 'Late night')).toBe(2);
 });
 
+test('a playlist with no name is refused under the name', async ({ page }) => {
+  await openAll(page);
+  await row(page, 'So What').click();
+
+  await page.keyboard.press('p');
+  await page.keyboard.press('c');
+  await page.keyboard.press('Enter');
+
+  const dialog = page.getByRole('dialog');
+  const name = dialog.getByRole('textbox', { name: 'Name of the playlist' });
+  await expect(dialog.getByRole('alert')).toHaveText(/Type a name/);
+  await expect(name).toHaveAttribute('aria-invalid', 'true');
+  await name.fill('Road');
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+});
+
 test('p then c makes a new playlist with the track', async ({ page, request }) => {
   await openAll(page);
   await row(page, 'So What').click();

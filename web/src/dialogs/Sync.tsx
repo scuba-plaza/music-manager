@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { FormField } from '../components/FormField';
 import { Progress } from '../components/Progress';
 import { motionOf, moveTo, type Motion } from '../keys/dialog';
 import { keyName, type KeyEventLike } from '../keys/keymap';
@@ -109,7 +110,7 @@ function Format({ library, how }: { library: boolean; how: string }) {
 }
 
 export function Sync() {
-  const { phase, targets, cursor, folder, error, where, job, plan, summary, confirm } = useSync();
+  const { phase, targets, cursor, folder, folderError, confirmError, error, where, job, plan, summary, confirm } = useSync();
   const folderInput = useRef<HTMLInputElement>(null);
   const confirmInput = useRef<HTMLInputElement>(null);
   const ops = useRef<HTMLDivElement>(null);
@@ -232,23 +233,24 @@ export function Sync() {
         <>
           <div className="ask-body">Write the music into which folder?</div>
           <div className="form">
-            <label className="label">
-              Folder
-              <input
-                ref={folderInput}
-                className="edit"
-                type="text"
-                dir="auto"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="~/Music/player"
-                aria-label="Folder"
-                value={folder}
-                onChange={(e) => {
-                  typeFolder(e.target.value);
-                }}
-              />
-            </label>
+            <FormField name="folder" label="Folder" error={folderError}>
+              {(control) => (
+                <input
+                  {...control}
+                  ref={folderInput}
+                  className="edit"
+                  type="text"
+                  dir="auto"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="~/Music/player"
+                  value={folder}
+                  onChange={(e) => {
+                    typeFolder(e.target.value);
+                  }}
+                />
+              )}
+            </FormField>
           </div>
           <Format library={false} how="" />
           {error !== '' && <Problem text={error} />}
@@ -308,18 +310,22 @@ export function Sync() {
               {phase === 'confirming' && (
                 <div className="confirm">
                   <span className="warn">{`Type delete to remove ${plural(plan.counts.remove, 'file')}: `}</span>
-                  <input
-                    ref={confirmInput}
-                    className="edit short"
-                    type="text"
-                    autoComplete="off"
-                    spellCheck={false}
-                    aria-label="Type delete to confirm"
-                    value={confirm}
-                    onChange={(e) => {
-                      typeConfirm(e.target.value);
-                    }}
-                  />
+                  <FormField name="confirm" label="Type delete to confirm" error={confirmError} hideLabel>
+                    {(control) => (
+                      <input
+                        {...control}
+                        ref={confirmInput}
+                        className="edit short"
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        value={confirm}
+                        onChange={(e) => {
+                          typeConfirm(e.target.value);
+                        }}
+                      />
+                    )}
+                  </FormField>
                 </div>
               )}
             </>

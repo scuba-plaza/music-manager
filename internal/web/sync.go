@@ -105,31 +105,31 @@ func (s *Server) target(library bool, folder string) (path, where string, isLibr
 	}
 	p := browse.CleanPath(folder)
 	if p == "" {
-		return "", "", false, errors.New("type the folder to write into")
+		return "", "", false, app.Invalid("folder", "type the folder to write into")
 	}
 	if !filepath.IsAbs(p) {
-		return "", "", false, errors.New("write the whole path of the folder, starting with / or ~")
+		return "", "", false, app.Invalid("folder", "write the whole path of the folder, starting with / or ~")
 	}
 	p = filepath.Clean(p)
 	if home, err := os.UserHomeDir(); err == nil && home != "" && sameFolder(p, home) {
-		return "", "", false, errors.New("that is your home folder: pick a folder of its own")
+		return "", "", false, app.Invalid("folder", "that is your home folder: pick a folder of its own")
 	}
 	root := s.root()
 	if sameFolder(p, root) {
 		return "", "Library folder", true, nil
 	}
 	if inside(p, root) {
-		return "", "", false, errors.New("that folder is inside the library folder: pick another one, or the library folder itself")
+		return "", "", false, app.Invalid("folder", "that folder is inside the library folder: pick another one, or the library folder itself")
 	}
 	if inside(root, p) {
-		return "", "", false, errors.New("that folder holds the library: pick a folder of its own")
+		return "", "", false, app.Invalid("folder", "that folder holds the library: pick a folder of its own")
 	}
 	switch info, err := os.Stat(p); {
 	case err == nil && !info.IsDir():
-		return "", "", false, fmt.Errorf("%s is a file, not a folder", browse.Tilde(p))
+		return "", "", false, app.Invalid("folder", fmt.Sprintf("%s is a file, not a folder", browse.Tilde(p)))
 	case err != nil:
 		if parent, perr := os.Stat(filepath.Dir(p)); perr != nil || !parent.IsDir() {
-			return "", "", false, fmt.Errorf("%s is not there, and neither is the folder it would be made in", browse.Tilde(p))
+			return "", "", false, app.Invalid("folder", fmt.Sprintf("%s is not there, and neither is the folder it would be made in", browse.Tilde(p)))
 		}
 	}
 	return p, browse.Tilde(p), false, nil

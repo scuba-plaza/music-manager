@@ -164,6 +164,14 @@ describe('typing in a field', () => {
     expect(useApp.getState().edit).toMatchObject({ text: 'So When', second: '7', error: '' });
   });
 
+  it('typing also wipes what was said about the fields', () => {
+    onTrack({ edit: { field: 0, text: 'So What', wrong: { title: 'Title cannot be empty' } } });
+
+    typeEdit('text', 'So When');
+
+    expect(useApp.getState().edit).toEqual({ field: 0, text: 'So When', error: '', wrong: {} });
+  });
+
   it('cancelEdit closes the field and sends nothing', () => {
     onTrack({ edit: { field: 0, text: 'So When' } });
 
@@ -216,6 +224,24 @@ describe('saving a field', () => {
 
     expect(useApp.getState().edit).toEqual({ field: 0, text: '', error: 'The title cannot be empty' });
     expect(useApp.getState().busy).toBe(false);
+  });
+
+  it('a refusal that names fields is kept by field, with no general message, and the field stays open', async () => {
+    serve(({ method }) =>
+      method === 'PATCH'
+        ? jsonResponse({ error: '2 fields need fixing', fields: { track: 'Track must be a whole number, or empty', of: 'Tracks on the album must be a whole number, or empty' } }, 422)
+        : undefined,
+    );
+    onTrack({ edit: { field: 3, text: 'x', second: 'y' } });
+
+    await saveEdit();
+
+    expect(useApp.getState().edit).toEqual({
+      field: 3,
+      text: 'x',
+      second: 'y',
+      wrong: { track: 'Track must be a whole number, or empty', of: 'Tracks on the album must be a whole number, or empty' },
+    });
   });
 
   it('saving what was there sends nothing and closes the field', async () => {

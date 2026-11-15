@@ -149,7 +149,7 @@ describe('s', () => {
     await opened();
 
     expect(useApp.getState().overlay).toEqual({ kind: 'sync' });
-    expect(state()).toMatchObject({ phase: 'choosing', cursor: 0, profile: 'generic', folder: '', error: '', plan: null, job: null });
+    expect(state()).toMatchObject({ phase: 'choosing', cursor: 0, profile: 'generic', folder: '', error: '', folderError: '', confirmError: '', plan: null, job: null });
     expect(state().targets).toEqual([...targets, { label: 'Another folder…', path: '', kind: 'folder' }]);
   });
 
@@ -262,11 +262,11 @@ describe('choosing where', () => {
   });
 
   it('the typed folder keeps what was typed and drops an old complaint', () => {
-    useSync.setState({ error: 'old' });
+    useSync.setState({ error: 'old', folderError: 'old' });
 
     typeFolder('~/player');
 
-    expect(state()).toMatchObject({ folder: '~/player', error: '' });
+    expect(state()).toMatchObject({ folder: '~/player', error: '', folderError: '' });
   });
 
   it('esc in the folder goes back to the targets', () => {
@@ -284,7 +284,7 @@ describe('choosing where', () => {
 
     submitFolder();
 
-    expect(state().error).toBe('Type the folder to write into');
+    expect(state()).toMatchObject({ folderError: 'Type the folder to write into', error: '' });
     expect(state().phase).toBe('typing');
     expect(sent('/api/sync/plan')).toEqual([]);
   });
@@ -421,8 +421,12 @@ describe('planning', () => {
     });
   });
 
-  it('a plan the server refuses for a typed folder goes back to the folder with the reason', async () => {
-    await opened(({ method, url }) => (method === 'POST' && url.pathname === '/api/sync/plan' ? jsonResponse({ error: 'that folder holds the library' }, 422) : undefined));
+  it('a plan the server refuses for a typed folder goes back to the folder, with the reason on the folder', async () => {
+    await opened(({ method, url }) =>
+      method === 'POST' && url.pathname === '/api/sync/plan'
+        ? jsonResponse({ error: 'That folder holds the library', fields: { folder: 'That folder holds the library' } }, 422)
+        : undefined,
+    );
     chooseTarget(2);
     pickTarget();
     typeFolder('~');
@@ -430,7 +434,20 @@ describe('planning', () => {
     submitFolder();
 
     await vi.waitFor(() => {
-      expect(state()).toMatchObject({ phase: 'typing', error: 'that folder holds the library' });
+      expect(state()).toMatchObject({ phase: 'typing', folderError: 'That folder holds the library', error: '' });
+    });
+  });
+
+  it('a plan the server refuses for a typed folder for a reason that is not about the folder says it apart from the folder', async () => {
+    await opened(({ method, url }) => (method === 'POST' && url.pathname === '/api/sync/plan' ? jsonResponse({ error: 'a sync is going on already' }, 409) : undefined));
+    chooseTarget(2);
+    pickTarget();
+    typeFolder('~/player');
+
+    submitFolder();
+
+    await vi.waitFor(() => {
+      expect(state()).toMatchObject({ phase: 'typing', folderError: '', error: 'a sync is going on already' });
     });
   });
 
@@ -648,15 +665,19 @@ describe('applying', () => {
     });
   });
 
-  it('typing something else than delete starts the word again', async () => {
+  it('typing something else than delete keeps what was typed and says so, until typing goes on', async () => {
     await reviewing({ counts: counts({ remove: 1 }) });
     applyPlan();
     typeConfirm('delet');
 
     confirmDelete();
 
-    expect(state()).toMatchObject({ phase: 'confirming', confirm: '' });
+    expect(state()).toMatchObject({ phase: 'confirming', confirm: 'delet', confirmError: 'Type the word delete, exactly, to go ahead' });
     expect(sent('/api/sync/p1/apply')).toEqual([]);
+
+    typeConfirm('delete');
+
+    expect(state()).toMatchObject({ confirm: 'delete', confirmError: '' });
   });
 
   it('typing delete, with spaces around it, writes and sends the word', async () => {

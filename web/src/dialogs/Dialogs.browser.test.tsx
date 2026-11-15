@@ -527,8 +527,31 @@ describe('the playlist picker', () => {
     await userEvent.keyboard('{Enter}');
 
     await expect.element(dialog().getByRole('alert')).toHaveTextContent('Type a name');
+    await expect.element(dialog().getByRole('textbox', { name: 'Name of the playlist' })).toBeInvalid();
     expect(dialog().getByRole('alert').element().querySelector('bdi[dir="auto"]')).not.toBeNull();
     expect(requestsTo(fetchMock, 'POST', '/api/playlists')).toEqual([]);
+  });
+
+  test('a name the server refuses is said under the name, which keeps what was typed', async () => {
+    const refuse: StubRoute = ({ method, url }) =>
+      method === 'POST' && url.pathname === '/api/playlists'
+        ? jsonResponse({ error: 'There is already a playlist called "Road", and "road" would be the same file (road.m3u)' }, 422)
+        : undefined;
+    await openApp(library([]), refuse);
+    await onRow(soWhat);
+    await userEvent.keyboard('p');
+    const name = dialog().getByRole('textbox', { name: 'Name of the playlist' });
+    await userEvent.fill(name, 'road');
+
+    await userEvent.keyboard('{Enter}');
+
+    await expect.element(dialog().getByRole('alert')).toHaveTextContent('There is already a playlist called');
+    await expect.element(name).toBeInvalid();
+    await expect.element(name).toHaveValue('road');
+
+    await userEvent.keyboard('s');
+    await expect.element(dialog().getByRole('alert')).not.toBeInTheDocument();
+    await expect.element(name).not.toBeInvalid();
   });
 
   test("the server's refusal is shown in the picker, which stays open", async () => {

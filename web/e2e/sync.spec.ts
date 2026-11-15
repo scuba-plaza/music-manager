@@ -117,6 +117,28 @@ test('a profile from the user’s devices.toml appears and is the one that is pl
   });
 });
 
+test('a folder that makes no sense is said under the folder, and typing takes the message away', async ({ page, dialog }) => {
+  await openPage(page);
+  await page.keyboard.press('s');
+  await expect(dialog()).toHaveAccessibleName('Sync');
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  const folder = dialog().getByRole('textbox', { name: 'Folder' });
+
+  await page.keyboard.press('Enter');
+  await expect(dialog().getByRole('alert')).toHaveText(/Type the folder to write into/);
+  await expect(folder).toHaveAttribute('aria-invalid', 'true');
+
+  await folder.fill('player');
+  await expect(dialog().getByRole('alert')).toHaveCount(0);
+  await page.keyboard.press('Enter');
+
+  await expect(dialog().getByRole('alert')).toHaveText(/whole path/i);
+  await expect(folder).toHaveAttribute('aria-invalid', 'true');
+  await expect(folder).toHaveValue('player');
+  await expect(folder).toBeFocused();
+});
+
 test('strays are removed only after typing delete', async ({ page, dialog }) => {
   await openPage(page);
 
@@ -136,7 +158,9 @@ test('strays are removed only after typing delete', async ({ page, dialog }) => 
     await expect(dialog()).toContainText('Type delete to remove 1 file');
     await word.fill('delet');
     await page.keyboard.press('Enter');
-    await expect(word).toHaveValue('');
+    await expect(word).toHaveValue('delet');
+    await expect(word).toHaveAttribute('aria-invalid', 'true');
+    await expect(dialog().getByRole('alert')).toHaveText(/Type the word delete, exactly/);
     expect(existsSync(stray)).toBe(true);
 
     await word.fill('delete');

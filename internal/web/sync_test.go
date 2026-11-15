@@ -219,7 +219,7 @@ func TestOnlyAFolderThatMakesSenseIsATarget(t *testing.T) {
 	}
 	for folder, want := range cases {
 		var r reply
-		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), want) {
+		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), want) || !strings.Contains(strings.ToLower(r.Fields["folder"]), want) {
 			t.Errorf("%q: %d %+v, want %q", folder, code, r, want)
 		}
 	}
@@ -239,7 +239,7 @@ func TestTheHomeFolderIsNotATargetEvenWhenTheLibraryLivesElsewhere(t *testing.T)
 	t.Setenv("HOME", home)
 	for _, folder := range []string{home, home + "/", "~"} {
 		var r reply
-		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), "home folder") {
+		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Fields["folder"]), "home folder") {
 			t.Errorf("%q: %d %+v, want 422 about the home folder", folder, code, r)
 		}
 	}
@@ -298,7 +298,7 @@ func TestAFolderInsideALibraryGivenByARelativePathIsStillRefused(t *testing.T) {
 	abs, _ := filepath.Abs("lib")
 	for folder, want := range map[string]string{filepath.Join(abs, "card"): "inside the library folder", filepath.Dir(abs): "holds the library"} {
 		var r reply
-		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), want) {
+		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), want) || !strings.Contains(strings.ToLower(r.Fields["folder"]), want) {
 			t.Errorf("%q: %d %+v, want %q", folder, code, r, want)
 		}
 	}

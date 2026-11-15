@@ -268,6 +268,50 @@ describe('editing a field', () => {
     await expect.element(pane().getByRole('alert')).not.toBeInTheDocument();
   });
 
+  test('what the server says is wrong is said under the box that is wrong, which is marked invalid', async () => {
+    serve(({ method }) =>
+      method === 'PATCH'
+        ? jsonResponse({ error: '2 fields need fixing', fields: { track: 'Track must be a whole number, or empty', of: 'Tracks on the album must be a whole number, or empty' } }, 422)
+        : undefined,
+    );
+    await showApp();
+    await intoFields(keys.soWhat);
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    const number = pane().getByRole('textbox', { name: 'Track', exact: true });
+    const total = pane().getByRole('textbox', { name: 'Tracks on album' });
+    await userEvent.fill(number, 'x');
+    await userEvent.fill(total, 'y');
+
+    await userEvent.keyboard('{Enter}');
+
+    await expect.element(pane().getByRole('alert').first()).toBeVisible();
+    expect(
+      pane()
+        .getByRole('alert')
+        .elements()
+        .map((e) => e.textContent.trim()),
+    ).toEqual(['✗ Track must be a whole number, or empty', '✗ Tracks on the album must be a whole number, or empty']);
+    await expect.element(number).toBeInvalid();
+    await expect.element(total).toBeInvalid();
+
+    await userEvent.fill(total, '9');
+    await expect.element(pane().getByRole('alert')).not.toBeInTheDocument();
+  });
+
+  test('a message about one box leaves the other box alone', async () => {
+    serve(({ method }) => (method === 'PATCH' ? jsonResponse({ error: 'x', fields: { of: 'Tracks on the album cannot be fewer than the track number, 5' } }, 422) : undefined));
+    await showApp();
+    await intoFields(keys.soWhat);
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+
+    await userEvent.fill(pane().getByRole('textbox', { name: 'Track', exact: true }), '5');
+    await userEvent.fill(pane().getByRole('textbox', { name: 'Tracks on album' }), '3');
+    await userEvent.keyboard('{Enter}');
+
+    await expect.element(pane().getByRole('textbox', { name: 'Tracks on album' })).toBeInvalid();
+    await expect.element(pane().getByRole('textbox', { name: 'Track', exact: true })).not.toBeInvalid();
+  });
+
   test('enter while a word is being composed does not save', async () => {
     await showApp();
     await intoFields(keys.soWhat);

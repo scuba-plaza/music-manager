@@ -21,6 +21,7 @@ export interface EditState {
   second?: string;
   note?: string;
   error?: string;
+  wrong?: Readonly<Record<string, string>>;
 }
 
 export function closeOverlay(): void {

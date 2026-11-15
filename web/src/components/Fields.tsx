@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, type KeyboardEvent } from 'react';
+import { Fragment, useEffect, useId, useRef, type KeyboardEvent } from 'react';
 import type { BarView, FieldView } from '../api/types.gen';
 import { cancelEdit, chooseField, saveEdit, typeEdit } from '../state/edit';
 import { fieldIndex, nudgeable } from '../state/inspector';
@@ -8,9 +8,12 @@ interface EditorProps {
   field: FieldView;
   edit: EditState;
   second: boolean;
+  describedBy: string | undefined;
 }
 
-function Editor({ field, edit, second }: EditorProps) {
+function Editor({ field, edit, second, describedBy }: EditorProps) {
+  const wrong = edit.wrong ?? {};
+  const generic = edit.error !== undefined && edit.error !== '';
   const first = useRef<HTMLInputElement>(null);
   const other = useRef<HTMLInputElement>(null);
 
@@ -47,6 +50,8 @@ function Editor({ field, edit, second }: EditorProps) {
       autoComplete="off"
       spellCheck={false}
       aria-label={field.label}
+      aria-invalid={generic || wrong[field.key] !== undefined ? true : undefined}
+      aria-describedby={describedBy}
       placeholder={field.mixed === true ? '(mixed)' : undefined}
       value={edit.text}
       onChange={(e) => {
@@ -69,6 +74,8 @@ function Editor({ field, edit, second }: EditorProps) {
         inputMode="numeric"
         autoComplete="off"
         aria-label="Tracks on album"
+        aria-invalid={wrong.of !== undefined ? true : undefined}
+        aria-describedby={describedBy}
         value={edit.second ?? ''}
         onChange={(e) => {
           typeEdit('second', e.target.value);
@@ -122,6 +129,9 @@ export function Fields({ fields, bar, numbers }: FieldsProps) {
   const focus = useApp((s) => s.focus);
   const index = useApp(fieldIndex);
   const edit = useApp((s) => s.edit);
+  const base = useId();
+  const said = edit === null ? [] : [...new Set([...Object.values(edit.wrong ?? {}), ...(edit.error === undefined || edit.error === '' ? [] : [edit.error])])];
+  const errorIds = said.map((_, n) => `${base}-error-${String(n)}`);
 
   return (
     <div className="fields">
@@ -140,7 +150,7 @@ export function Fields({ fields, bar, numbers }: FieldsProps) {
             </div>
             {editing ? (
               <div className="value cur editing" data-testid={`value-${f.key}`}>
-                <Editor field={f} edit={edit} second={numbers && f.key === 'track'} />
+                <Editor field={f} edit={edit} second={numbers && f.key === 'track'} describedBy={errorIds.length === 0 ? undefined : errorIds.join(' ')} />
               </div>
             ) : (
               <div className={classes.join(' ')} data-testid={`value-${f.key}`} onClick={choose}>
@@ -153,11 +163,14 @@ export function Fields({ fields, bar, numbers }: FieldsProps) {
                 <bdi dir="auto">{edit.note}</bdi>
               </div>
             )}
-            {cur && editing && edit.error !== undefined && edit.error !== '' && (
-              <div className="span bad" role="alert">
-                {edit.error}
-              </div>
-            )}
+            {cur &&
+              editing &&
+              said.map((message, n) => (
+                <div key={message} id={errorIds[n]} className="span field-error" role="alert">
+                  <span aria-hidden="true">✗ </span>
+                  <bdi dir="auto">{message}</bdi>
+                </div>
+              ))}
             {f.key === 'cutEnd' && bar !== undefined && (
               <>
                 <div className="label">Kept</div>

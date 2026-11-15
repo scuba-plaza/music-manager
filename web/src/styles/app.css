@@ -566,6 +566,10 @@ input.edit.short {
   content: '→ ';
 }
 
+.pathrow .pathline::before {
+  content: none;
+}
+
 .foot {
   color: var(--dim);
   overflow-wrap: anywhere;
@@ -896,6 +900,7 @@ input.edit.short {
   border-color: var(--accent);
 }
 
+input.edit[aria-invalid='true'],
 .form input.edit[aria-invalid='true'],
 .form input.edit[aria-invalid='true']:focus {
   border-color: var(--bad);

@@ -57,8 +57,28 @@ test('a refused title stays open with the reason under it', async ({ page }) => 
 
   await expect(pane(page).getByRole('alert')).not.toBeEmpty();
   await expect(pane(page).getByRole('textbox', { name: 'Title' })).toBeVisible();
+  await expect(pane(page).getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'true');
   await page.keyboard.press('Escape');
   await expect(pane(page).getByTestId('value-title')).toHaveText('So What');
+});
+
+test('a release date that is no date is said under the box, with the shapes a date may have', async ({ page }) => {
+  await intoFields(page, 'So What');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  const released = pane(page).getByRole('textbox', { name: 'Released' });
+
+  await released.fill('soon');
+  await page.keyboard.press('Enter');
+
+  await expect(pane(page).getByRole('alert')).toContainText('1999-05-17');
+  await expect(released).toHaveAttribute('aria-invalid', 'true');
+  await released.fill('1959');
+  await expect(pane(page).getByRole('alert')).toHaveCount(0);
+  await page.keyboard.press('Escape');
 });
 
 test('the Latin tab shows a hand-set form as normal text and a worked-out one as dim', async ({ page }) => {

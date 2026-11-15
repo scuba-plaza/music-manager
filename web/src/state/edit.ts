@@ -1,4 +1,4 @@
-import { getBlob, query, send } from '../api/client';
+import { ApiError, getBlob, query, send } from '../api/client';
 import type { ChangeResponse, FieldView, HintView, PathView } from '../api/types.gen';
 import { dropDetail, loadDetail } from './detail';
 import { loadLibrary } from './library';
@@ -109,7 +109,7 @@ export function startEdit(): void {
 }
 
 export function typeEdit(which: 'text' | 'second', text: string): void {
-  updateEdit(which === 'text' ? { text, error: '' } : { second: text, error: '' });
+  updateEdit(which === 'text' ? { text, error: '', wrong: {} } : { second: text, error: '', wrong: {} });
   clearTimeout(noteTimer);
   noteTimer = setTimeout(() => {
     void showNote();
@@ -145,7 +145,9 @@ export async function saveEdit(): Promise<void> {
   try {
     await applyChange(saveCall(f, edit));
   } catch (err) {
-    if (err instanceof Error && err.message !== '') {
+    if (err instanceof ApiError && Object.keys(err.fields).length > 0) {
+      updateEdit({ wrong: err.fields });
+    } else if (err instanceof Error && err.message !== '') {
       updateEdit({ error: err.message });
     }
     return;

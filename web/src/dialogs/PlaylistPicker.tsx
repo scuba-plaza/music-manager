@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PlaylistView } from '../api/types.gen';
 import { motionOf, moveTo } from '../keys/dialog';
 import type { KeyEventLike } from '../keys/keymap';
+import { FormField } from '../components/FormField';
 import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList } from '../overlay/MenuList';
@@ -88,22 +89,26 @@ export function PlaylistPicker({ ids, lists }: PlaylistPickerProps) {
     <Dialog title="Add to a playlist" hints={hints} onKey={onKey}>
       <div className="ask-body">{`Adding ${plural(ids.length, 'track')}`}</div>
       {naming ? (
-        <input
-          ref={input}
-          className="edit"
-          type="text"
-          dir="auto"
-          maxLength={80}
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="name of the playlist"
-          aria-label="Name of the playlist"
-          value={typed}
-          onChange={(e) => {
-            setTyped(e.target.value);
-            setError('');
-          }}
-        />
+        <FormField name="name" label="Name of the playlist" error={error} hideLabel>
+          {(control) => (
+            <input
+              {...control}
+              ref={input}
+              className="edit"
+              type="text"
+              dir="auto"
+              maxLength={80}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="name of the playlist"
+              value={typed}
+              onChange={(e) => {
+                setTyped(e.target.value);
+                setError('');
+              }}
+            />
+          )}
+        </FormField>
       ) : (
         <MenuList
           label="Playlists"
@@ -115,9 +120,7 @@ export function PlaylistPicker({ ids, lists }: PlaylistPickerProps) {
           }}
         />
       )}
-      {error !== '' && (
-        <Problem text={error} />
-      )}
+      {!naming && error !== '' && <Problem text={error} />}
     </Dialog>
   );
 }

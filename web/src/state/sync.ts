@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { get, send } from '../api/client';
+import { ApiError, get, send } from '../api/client';
 import type { JobView, PlanView, SyncData, SyncTargetsView, TargetView } from '../api/types.gen';
 import { loadLibrary } from './library';
 import { fail, setStatus } from './status';
@@ -14,6 +14,8 @@ export interface SyncState {
   cursor: number;
   profile: string;
   folder: string;
+  folderError: string;
+  confirmError: string;
   error: string;
   where: string;
   job: JobView | null;
@@ -34,6 +36,8 @@ function fresh(): SyncState {
     cursor: 0,
     profile: genericProfile,
     folder: '',
+    folderError: '',
+    confirmError: '',
     error: '',
     where: '',
     job: null,
@@ -111,7 +115,7 @@ export function cycleProfile(): void {
 }
 
 export function typeFolder(text: string): void {
-  useSync.setState({ folder: text, error: '' });
+  useSync.setState({ folder: text, folderError: '', error: '' });
 }
 
 export function backToChoosing(): void {
@@ -128,7 +132,7 @@ export function pickTarget(): void {
 
 export function submitFolder(): void {
   if (useSync.getState().folder.trim() === '') {
-    useSync.setState({ error: 'Type the folder to write into' });
+    useSync.setState({ folderError: 'Type the folder to write into' });
     return;
   }
   void startPlan();
@@ -143,7 +147,7 @@ async function startPlan(): Promise<void> {
   const typed = picked.kind === 'folder';
   const library = picked.kind === 'library';
   const mine = session;
-  useSync.setState({ phase: 'planning', error: '', where: typed ? folder.trim() : picked.label, job: null });
+  useSync.setState({ phase: 'planning', error: '', folderError: '', where: typed ? folder.trim() : picked.label, job: null });
   let started: JobView;
   try {
     started = await send<JobView>('POST', '/api/sync/plan', {
@@ -153,7 +157,10 @@ async function startPlan(): Promise<void> {
     });
   } catch (err) {
     if (mine === session) {
-      useSync.setState({ phase: typed ? 'typing' : 'failed', error: messageOf(err) });
+      const folderError = typed && err instanceof ApiError ? err.fields.folder : undefined;
+      useSync.setState(
+        folderError === undefined ? { phase: typed ? 'typing' : 'failed', error: messageOf(err) } : { phase: 'typing', folderError },
+      );
     }
     return;
   }
@@ -209,14 +216,14 @@ export function applyPlan(): void {
     return;
   }
   if (plan.counts.remove > 0) {
-    useSync.setState({ phase: 'confirming', confirm: '', error: '' });
+    useSync.setState({ phase: 'confirming', confirm: '', confirmError: '', error: '' });
     return;
   }
   void writePlan();
 }
 
 export function typeConfirm(text: string): void {
-  useSync.setState({ confirm: text });
+  useSync.setState({ confirm: text, confirmError: '' });
 }
 
 export function confirmDelete(): void {
@@ -224,7 +231,7 @@ export function confirmDelete(): void {
     void writePlan();
     return;
   }
-  useSync.setState({ confirm: '' });
+  useSync.setState({ confirmError: 'Type the word delete, exactly, to go ahead' });
 }
 
 export function backToReview(): void {

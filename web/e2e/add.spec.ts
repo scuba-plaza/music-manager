@@ -62,6 +62,7 @@ test('a adds from a link, pre-filled, and the path preview shows where it will b
   await expect(dialog()).toContainText('These are YouTube’s words');
   const path = dialog().locator('.pathline');
   await expect(path).toHaveText(/^Miles Davis\/Kind of Blue\/.*So What\.mp3$/);
+  await expect.poll(() => path.evaluate((el) => getComputedStyle(el, '::before').content)).toBe('none');
 
   await dialog().getByRole('textbox', { name: 'Title' }).fill('So What (alternate take)');
   await expect(path).toHaveText(/So What \(alternate take\)\.mp3$/);
