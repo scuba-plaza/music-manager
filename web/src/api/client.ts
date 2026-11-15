@@ -1,0 +1,128 @@
+import type { ErrorView } from './types.gen';
+
+const unreachable = 'Cannot reach mm. Is it still running?';
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly fields: Readonly<Record<string, string>>;
+
+  constructor(message: string, status = 0, fields: Readonly<Record<string, string>> = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.fields = fields;
+  }
+}
+
+type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+
+function isAbort(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError';
+}
+
+function isErrorBody(data: unknown): data is ErrorView {
+  return typeof data === 'object' && data !== null && 'error' in data && typeof data.error === 'string' && data.error !== '';
+}
+
+function fieldsOf(data: ErrorView): Record<string, string> {
+  const raw: unknown = data.fields;
+  const out: Record<string, string> = {};
+  if (typeof raw === 'object' && raw !== null) {
+    for (const [key, text] of Object.entries(raw)) {
+      if (typeof text === 'string' && text !== '') {
+        out[key] = text;
+      }
+    }
+  }
+  return out;
+}
+
+const unreadable = 'mm gave an answer the page cannot read.';
+
+async function readBody(res: Response): Promise<unknown> {
+  const type = res.headers.get('Content-Type') ?? '';
+  if (!type.includes('json')) {
+    if ((await res.text()) === '') {
+      return null;
+    }
+    throw new ApiError(unreadable, res.status);
+  }
+  try {
+    const data: unknown = await res.json();
+    return data;
+  } catch {
+    throw new ApiError(unreadable, res.status);
+  }
+}
+
+async function errorBody(res: Response): Promise<unknown> {
+  try {
+    return await readBody(res);
+  } catch {
+    return null;
+  }
+}
+
+async function failure(res: Response): Promise<ApiError> {
+  const data = await errorBody(res);
+  if (isErrorBody(data)) {
+    return new ApiError(data.error, res.status, fieldsOf(data));
+  }
+  const text = res.statusText === '' ? `Request failed (${String(res.status)})` : `${String(res.status)} ${res.statusText}`;
+  return new ApiError(text, res.status);
+}
+
+async function request(method: Method, path: string, body?: unknown, signal?: AbortSignal): Promise<Response> {
+  const headers: Record<string, string> = { 'X-MM': '1' };
+  const init: RequestInit = { method, headers };
+  if (signal) {
+    init.signal = signal;
+  }
+  if (body instanceof FormData || body instanceof Blob) {
+    init.body = body;
+  } else if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  let res: Response;
+  try {
+    res = await fetch(path, init);
+  } catch (err) {
+    if (isAbort(err)) {
+      throw err;
+    }
+    throw new ApiError(unreachable);
+  }
+  if (!res.ok) {
+    throw await failure(res);
+  }
+  return res;
+}
+
+async function call<T>(method: Method, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  return (await readBody(await request(method, path, body, signal))) as T;
+}
+
+export async function getBlob(path: string): Promise<Blob> {
+  return (await request('GET', path)).blob();
+}
+
+export function get<T>(path: string, init?: { signal?: AbortSignal }): Promise<T> {
+  return call<T>('GET', path, undefined, init?.signal);
+}
+
+export function send<T>(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body?: unknown, init?: { signal?: AbortSignal }): Promise<T> {
+  return call<T>(method, path, body, init?.signal);
+}
+
+export function query(params: Record<string, string | number | boolean | null | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === false || value === '') {
+      continue;
+    }
+    q.set(key, value === true ? '1' : String(value));
+  }
+  const text = q.toString();
+  return text === '' ? '' : `?${text}`;
+}

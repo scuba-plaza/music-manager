@@ -2,19 +2,23 @@ package web
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"music-manager/internal/app"
+	"music-manager/internal/browse"
 	"music-manager/internal/manifest"
 	"music-manager/internal/testmp3"
+	"music-manager/internal/version"
 )
 
 type seedTrack struct {
@@ -25,10 +29,7 @@ type seedTrack struct {
 // seed adds identified tracks (one real audio file each) to a fresh library.
 func seed(t *testing.T, specs ...seedTrack) (*app.App, []manifest.Track) {
 	t.Helper()
-	a, err := app.Open(filepath.Join(t.TempDir(), "lib"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	a := openFresh(t)
 	src := t.TempDir()
 	for i, s := range specs {
 		name := filepath.Join(src, string(rune('a'+i))+".mp3")
@@ -53,8 +54,20 @@ func seed(t *testing.T, specs ...seedTrack) (*app.App, []manifest.Track) {
 			t.Fatal(err)
 		}
 	}
+	if _, err := a.CreateProfile(manifest.WolfgangWMP01); err != nil {
+		t.Fatal(err)
+	}
 	m, _ = a.Manifest()
 	return a, m.Tracks
+}
+
+func openFresh(t *testing.T) *app.App {
+	t.Helper()
+	a, err := app.Open(filepath.Join(t.TempDir(), "lib"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a
 }
 
 func start(t *testing.T, a *app.App, opts ...Option) *httptest.Server {
@@ -86,36 +99,12 @@ var sample = []seedTrack{
 	{"", "", "", 0}, // not identified
 }
 
-func TestThePageIsServed(t *testing.T) {
-	a, _ := seed(t, sample...)
-	srv := start(t, a)
-	res, err := http.Get(srv.URL + "/")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
-	if res.StatusCode != 200 || !strings.Contains(string(body), "<title>mm</title>") {
-		t.Errorf("status %d, body %.80q", res.StatusCode, body)
-	}
-	for _, p := range []string{"/app.css", "/js/main.js"} {
-		if r, err := http.Get(srv.URL + p); err != nil || r.StatusCode != 200 {
-			t.Errorf("%s: %v %v", p, r, err)
-		}
-	}
-}
-
 func TestInfoSaysWhatTheServerCanDo(t *testing.T) {
 	a, _ := seed(t, sample...)
 	var info map[string]any
 	getJSON(t, start(t, a).URL+"/api/info", &info)
-	if info["canAdd"] != false || info["lookup"] != false || info["wolfgang"] != false {
+	if info["canAdd"] != false {
 		t.Errorf("a server with nothing added: %v", info)
-	}
-	var full map[string]any
-	getJSON(t, start(t, a, WithWolfgang(), WithSource(nil)).URL+"/api/info", &full)
-	if full["wolfgang"] != true {
-		t.Errorf("wolfgang not on: %v", full)
 	}
 }
 
@@ -130,7 +119,7 @@ func TestTheLibraryComesAsAFlatOpenTree(t *testing.T) {
 			}
 			Tracks, NeedWork, Shown int
 		}
-		Unsynced struct{ N int }
+		Unsynced int
 	}
 	if code := getJSON(t, start(t, a).URL+"/api/library", &got); code != 200 {
 		t.Fatalf("status %d", code)
@@ -337,4 +326,381 @@ func TestThePageIsToldWhenTheLibraryChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	wait("library")
+}
+
+type sortRow struct {
+	Kind, TrackID, Right string
+}
+
+func rowsOf(t *testing.T, url string) []sortRow {
+	t.Helper()
+	var got struct {
+		View struct{ Rows []sortRow }
+	}
+	if code := getJSON(t, url, &got); code != 200 {
+		t.Fatalf("%s: status %d", url, code)
+	}
+	return got.View.Rows
+}
+
+func TestTheSortAndTheFilterOfTheLibraryComeFromItsQuery(t *testing.T) {
+	a, err := app.Open(filepath.Join(t.TempDir(), "lib"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	titleOfID := map[string]string{}
+	for _, s := range []struct {
+		frames                        int
+		title, artist, album, release string
+		track                         int
+	}{
+		{300, "Beta", "Zed", "Second", "2001", 2},
+		{200, "Gamma", "Abe", "First", "1999-05", 1},
+		{100, "Alpha", "Mo", "", "", 0},
+	} {
+		file := filepath.Join(t.TempDir(), "song.mp3")
+		if err := os.WriteFile(file, testmp3.Silent(s.frames), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		rep, err := a.Ingest([]string{file})
+		if err != nil || len(rep.Added) != 1 {
+			t.Fatalf("%+v, %v", rep, err)
+		}
+		tr, err := a.Edit(rep.Added[0].ID, app.Edit{Title: &s.title, Artist: &s.artist, Album: &s.album, Released: &s.release, TrackNumber: &s.track})
+		if err != nil {
+			t.Fatal(err)
+		}
+		titleOfID[tr.ID] = s.title
+	}
+	srv := start(t, a)
+	order := func(query string) string {
+		var titles []string
+		for _, r := range rowsOf(t, srv.URL+"/api/library?"+query) {
+			if r.Kind != "track" {
+				t.Fatalf("%s: a %s row in a sorted list", query, r.Kind)
+			}
+			titles = append(titles, titleOfID[r.TrackID])
+		}
+		return strings.Join(titles, " ")
+	}
+	for _, c := range []struct{ query, want string }{
+		{"sort=title", "Alpha Beta Gamma"},
+		{"sort=artist&reverse=1", "Beta Alpha Gamma"},
+		{"sort=TITLE&q=beta", "Beta"},
+	} {
+		if got := order(c.query); got != c.want {
+			t.Errorf("?%s: %s, want %s", c.query, got, c.want)
+		}
+	}
+}
+
+func TestSortingByADateShowsTheDateBesideEachTrack(t *testing.T) {
+	a, ts := seed(t, sample...)
+	released := "1999-05"
+	if _, err := a.Edit(ts[0].ID, app.Edit{Released: &released}); err != nil {
+		t.Fatal(err)
+	}
+	srv := start(t, a)
+	var shown []string
+	for _, r := range rowsOf(t, srv.URL+"/api/library?sort=released") {
+		shown = append(shown, r.Right)
+	}
+	if got := strings.Join(shown, "|"); got != "1999-05|—|—|—" {
+		t.Errorf("beside the tracks: %s, want the date and a dash for each without one", got)
+	}
+	for _, r := range rowsOf(t, srv.URL+"/api/library?sort=title") {
+		if r.Right != "" {
+			t.Errorf("a date beside a track sorted by its title: %q", r.Right)
+		}
+	}
+}
+
+func TestASortKeyThatDoesNotExistSaysWhichDo(t *testing.T) {
+	a, _ := seed(t, sample...)
+	var r reply
+	if code := sendInto(t, start(t, a).URL, "GET", "/api/library?sort=colour", nil, &r); code != 400 {
+		t.Fatalf("status %d", code)
+	}
+	for _, key := range []string{"artist", "released", "edited"} {
+		if !strings.Contains(r.Error, key) {
+			t.Errorf("the error %q does not list %s", r.Error, key)
+		}
+	}
+}
+
+type inspectorField struct {
+	Key, Text string
+	Dim       bool
+}
+
+type inspected struct {
+	Tabs []struct {
+		Name   string
+		Fields []inspectorField
+	}
+	Dates, About string
+}
+
+func (v inspected) field(key string) inspectorField {
+	for _, tab := range v.Tabs {
+		for _, f := range tab.Fields {
+			if f.Key == key {
+				return f
+			}
+		}
+	}
+	return inspectorField{Key: "missing: " + key}
+}
+
+func inspect(t *testing.T, srv *httptest.Server, id string) inspected {
+	t.Helper()
+	var v inspected
+	if code := getJSON(t, srv.URL+"/api/tracks/"+id, &v); code != 200 {
+		t.Fatalf("inspector of %s: status %d", id, code)
+	}
+	return v
+}
+
+func trackIDsOf(t *testing.T, srv *httptest.Server, query string) []string {
+	t.Helper()
+	var ids []string
+	for _, r := range rowsOf(t, srv.URL+"/api/library?q="+query) {
+		if r.TrackID != "" {
+			ids = append(ids, r.TrackID)
+		}
+	}
+	return ids
+}
+
+func TestAGenreIsSetOverHTTPAndFoundByTheGenreFilter(t *testing.T) {
+	a, ts := seed(t, sample...)
+	srv := start(t, a)
+	id := ts[0].ID
+
+	if code, r := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "genre", "text": "Neoclassical"}); code != 200 || r.Message != "Saved" {
+		t.Fatalf("%d %+v", code, r)
+	}
+	if got := inspect(t, srv, id).field("genre").Text; got != "Neoclassical" {
+		t.Errorf("the inspector shows the genre %q", got)
+	}
+	if got := trackIDsOf(t, srv, "genre:neo"); len(got) != 1 || got[0] != id {
+		t.Errorf("genre:neo finds %v, want only %s", got, id)
+	}
+	if got := trackIDsOf(t, srv, "genre:folk"); len(got) != 0 {
+		t.Errorf("genre:folk finds %v", got)
+	}
+
+	if code, _ := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "genre", "text": ""}); code != 200 {
+		t.Fatal(code)
+	}
+	if got := inspect(t, srv, id).field("genre").Text; got != "" {
+		t.Errorf("a cleared genre is still shown: %q", got)
+	}
+	if got := trackIDsOf(t, srv, "genre:neo"); len(got) != 0 {
+		t.Errorf("genre:neo still finds %v after the genre was cleared", got)
+	}
+}
+
+func TestTheInspectorSaysWhenATrackWasReleasedAddedAndEdited(t *testing.T) {
+	a, ts := seed(t, sample...)
+	srv := start(t, a)
+	id := ts[0].ID
+
+	if code, r := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "released", "text": "1999-05"}); code != 200 || r.Message != "Saved" {
+		t.Fatalf("%d %+v", code, r)
+	}
+	v := inspect(t, srv, id)
+	if got := v.field("released").Text; got != "1999-05" {
+		t.Errorf("released %q", got)
+	}
+	m, _ := a.Manifest()
+	stored, _ := m.Get(id)
+	want := "added " + app.SortValue(stored, app.SortAdded) + " · edited " + app.SortValue(stored, app.SortEdited)
+	if v.Dates != want {
+		t.Errorf("dates %q, want %q", v.Dates, want)
+	}
+	if !regexp.MustCompile(`^added \d{4}-\d{2}-\d{2} · edited \d{4}-\d{2}-\d{2}$`).MatchString(v.Dates) {
+		t.Errorf("dates %q are not two days", v.Dates)
+	}
+
+	if code, _ := send(t, srv, "PATCH", "/api/tracks/"+id, obj{"field": "released", "text": ""}); code != 200 {
+		t.Fatal(code)
+	}
+	if got := inspect(t, srv, id).field("released").Text; got != "" {
+		t.Errorf("a cleared date is still shown: %q", got)
+	}
+}
+
+func TestTheInspectorSaysWhereATrackCameFrom(t *testing.T) {
+	a, ts := seed(t, sample...)
+	srv := start(t, a)
+	id := ts[0].ID
+	link, none := "https://www.youtube.com/watch?v=abc123", ""
+
+	if _, err := a.Edit(id, app.Edit{SourceURL: &link}); err != nil {
+		t.Fatal(err)
+	}
+	if got := inspect(t, srv, id).About; !strings.Contains(got, "from "+link) {
+		t.Errorf("about %q does not say where the track is from", got)
+	}
+	if _, err := a.Edit(id, app.Edit{SourceURL: &none}); err != nil {
+		t.Fatal(err)
+	}
+	if got := inspect(t, srv, id).About; strings.Contains(got, "from") {
+		t.Errorf("about %q still says where the track is from", got)
+	}
+}
+
+type devicePreview struct {
+	Rows     []struct{ Label, Value string }
+	Warnings []string
+}
+
+func deviceTabOf(t *testing.T, srv *httptest.Server, id, profile string) devicePreview {
+	t.Helper()
+	var v struct {
+		Tabs []struct {
+			Name   string
+			Device *devicePreview
+		}
+	}
+	if code := getJSON(t, srv.URL+"/api/tracks/"+id+"?profile="+profile, &v); code != 200 || len(v.Tabs) != 4 || v.Tabs[3].Name != "Device" || v.Tabs[3].Device == nil {
+		t.Fatalf("%d %+v", code, v)
+	}
+	return *v.Tabs[3].Device
+}
+
+func TestTheDeviceTabFollowsTheProfileParameter(t *testing.T) {
+	a, ts := seed(t, seedTrack{"Bahlam Bek Ya Habibi Forever", "Abdel Halim Hafez", "Abd El Halim Hafez", 1})
+	if _, err := a.CreateProfile(manifest.Profile{Name: "My Player", LatinNames: true, ComponentMax: 200, CoverFormat: "keep", ReplayGain: true, PlaylistExt: ".m3u8", PlaylistStyle: "relative"}); err != nil {
+		t.Fatal(err)
+	}
+	srv := start(t, a)
+	type tab struct {
+		ID     string
+		Name   string
+		Device *devicePreview
+	}
+	tabsFor := func(query string) (int, []tab) {
+		var v struct{ Tabs []tab }
+		code := getJSON(t, srv.URL+"/api/tracks/"+ts[0].ID+query, &v)
+		return code, v.Tabs
+	}
+	rows := func(p *devicePreview) map[string]string {
+		shown := map[string]string{}
+		for _, r := range p.Rows {
+			shown[r.Label] = r.Value
+		}
+		return shown
+	}
+
+	_, plain := tabsFor("")
+	if len(plain) != 3 {
+		t.Fatalf("without a profile there are three tabs: %+v", plain)
+	}
+
+	_, wolfgang := tabsFor("?profile=wolfgang-wmp01")
+	if len(wolfgang) != 4 || wolfgang[3].ID != "device" || wolfgang[3].Device == nil {
+		t.Fatalf("tabs %+v", wolfgang)
+	}
+	if got := rows(wolfgang[3].Device); got["Artist"] != "A. H. Hafez" || got["Cut"] == "" {
+		t.Errorf("the Wolfgang preview %+v", got)
+	}
+
+	_, mine := tabsFor("?profile=my-player")
+	if got := rows(mine[3].Device); got["Artist"] != "Abdel Halim Hafez" || got["Cut"] != "" {
+		t.Errorf("the my-player preview %+v", got)
+	}
+
+	var r reply
+	if code := getJSON(t, srv.URL+"/api/tracks/"+ts[0].ID+"?profile=nobody", &r); code != 400 || !strings.Contains(r.Error, `"nobody"`) {
+		t.Errorf("unknown profile: %d %+v", code, r)
+	}
+}
+
+func answerStrictly(t *testing.T, base, method, path string, body, into any) int {
+	t.Helper()
+	var in io.Reader
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		in = bytes.NewReader(raw)
+	}
+	req, err := http.NewRequest(method, base+path, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-MM", "1")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	dec := json.NewDecoder(res.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(into); err != nil {
+		t.Fatalf("%s %s: %v", method, path, err)
+	}
+	return res.StatusCode
+}
+
+func TestEveryResponseDecodesIntoItsNamedType(t *testing.T) {
+	a, ts := seed(t, sample...)
+	drive := t.TempDir()
+	s := New(a)
+	s.mounts = func() []string { return []string{drive} }
+	srv := httptest.NewServer(s.Handler())
+	t.Cleanup(srv.Close)
+
+	var info InfoView
+	if code := answerStrictly(t, srv.URL, "GET", "/api/info", nil, &info); code != 200 || !strings.HasSuffix(info.Root, "lib") || info.Version != version.String() || info.CanAdd {
+		t.Errorf("info %d %+v", code, info)
+	}
+
+	if err := a.RecordSynced(); err != nil {
+		t.Fatal(err)
+	}
+	if code, r := send(t, srv, "PATCH", "/api/tracks/"+ts[0].ID, obj{"field": "title", "text": "Wanderer II"}); code != 200 {
+		t.Fatalf("%d %+v", code, r)
+	}
+	var lib LibraryResponse
+	if code := answerStrictly(t, srv.URL, "GET", "/api/library", nil, &lib); code != 200 || lib.Stamp == "" || lib.View.Tracks != 4 || lib.View.Shown != 4 || lib.Unsynced != 1 || lib.History != (browse.HistoryView{Undo: "change of title"}) {
+		t.Errorf("library %d %+v", code, lib)
+	}
+
+	var targets SyncTargetsView
+	if code := answerStrictly(t, srv.URL, "GET", "/api/sync/targets", nil, &targets); code != 200 || len(targets.Targets) != 2 || targets.Targets[0].Kind != "library" || targets.Targets[1].Kind != "drive" || targets.Targets[1].Path != drive {
+		t.Errorf("targets %d %+v", code, targets)
+	}
+
+	form := obj{"title": "A song", "artist": "Some Band", "album": "Record", "track": "2", "of": "9", "released": "", "genre": "", "cutStart": "", "cutEnd": ""}
+	var added PathView
+	if code := answerStrictly(t, srv.URL, "POST", "/api/add/path", obj{"form": form}, &added); code != 200 || added != (PathView{Path: "Some Band/Record/02 - A song.mp3"}) {
+		t.Errorf("add path %d %+v", code, added)
+	}
+
+	var typed PathView
+	if code := answerStrictly(t, srv.URL, "POST", "/api/tracks/"+ts[1].ID+"/path", obj{"field": "title", "text": "Flow II"}, &typed); code != 200 || typed != (PathView{Path: "Shawn James/Shadows/02 - Flow II.mp3"}) {
+		t.Errorf("track path %d %+v", code, typed)
+	}
+
+	var hint HintView
+	if code := answerStrictly(t, srv.URL, "POST", "/api/group/hint", obj{"key": "artist\x1fShawn James", "field": "artist", "text": "داود القَيسي"}, &hint); code != 200 || hint != (HintView{Hint: "joins the artist داود القَيسي (1 track)"}) {
+		t.Errorf("group hint %d %+v", code, hint)
+	}
+
+	var failed ErrorView
+	if code := answerStrictly(t, srv.URL, "GET", "/api/library?sort=nope", nil, &failed); code != 400 || !strings.HasPrefix(failed.Error, "Cannot sort by") {
+		t.Errorf("error %d %+v", code, failed)
+	}
+}
+
+func TestTheInfoAnswerHasItsThreeKeysInOrder(t *testing.T) {
+	a, _ := seed(t, sample...)
+	body := readRaw(t, start(t, a).URL, "GET", "/api/info", nil)
+	if !regexp.MustCompile(`^\{"canAdd":(true|false),"root":"[^"]+","version":"[^"]+"\}\s*$`).Match(body) {
+		t.Errorf("the info answer is %s", body)
+	}
 }

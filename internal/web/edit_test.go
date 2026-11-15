@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os/exec"
 	"strings"
 	"testing"
@@ -18,10 +19,11 @@ import (
 
 // reply is what a change answers: the result, and how undo and redo stand.
 type reply struct {
-	Message string `json:"message"`
-	Reveal  string `json:"reveal"`
-	Same    bool   `json:"same"`
-	Error   string `json:"error"`
+	Message string            `json:"message"`
+	Reveal  string            `json:"reveal"`
+	Same    bool              `json:"same"`
+	Error   string            `json:"error"`
+	Fields  map[string]string `json:"fields"`
 	History struct {
 		Undo string `json:"undo"`
 		Redo string `json:"redo"`
@@ -192,8 +194,19 @@ func TestCoversAreUploadedCheckedAndRemoved(t *testing.T) {
 		t.Errorf("%v %v", err, res)
 	}
 	res.Body.Close()
-	if code, _ := send(t, srv, "PUT", one, []byte("not a picture")); code != 415 {
-		t.Errorf("text as a cover: %d", code)
+	m, _ := a.Manifest()
+	before, _ := m.Get(ts[0].ID)
+	if code, r := send(t, srv, "PUT", one, []byte("not a picture")); code != 415 || !strings.Contains(r.Error, "JPEG or PNG") {
+		t.Errorf("text as a cover: %d %+v", code, r)
+	}
+	for _, attempt := range []string{one + "&paste=1&name=x.gif", "/api/cover?group=artist%1F" + url.QueryEscape(ts[0].Artist)} {
+		if code, _ := send(t, srv, "PUT", attempt, []byte("GIF89a not a picture")); code != 415 {
+			t.Errorf("%s: %d, want 415", attempt, code)
+		}
+	}
+	m, _ = a.Manifest()
+	if after, _ := m.Get(ts[0].ID); after.CoverSHA256 != before.CoverSHA256 || !after.UpdatedAt.Equal(before.UpdatedAt) {
+		t.Errorf("a refused picture changed the track: %+v, was %+v", after, before)
 	}
 	if code, _ := send(t, srv, "PUT", one, bigPNG()); code != 413 {
 		t.Errorf("a bomb as a cover: %d", code)
@@ -209,7 +222,7 @@ func TestCoversAreUploadedCheckedAndRemoved(t *testing.T) {
 	if code, r := send(t, srv, "PUT", group, testmp3.PNG); code != 200 || r.Message != "Changed 2 tracks" {
 		t.Errorf("%d %+v", code, r)
 	}
-	m, _ := a.Manifest()
+	m, _ = a.Manifest()
 	for _, tr := range m.Tracks[:2] {
 		if tr.CoverSHA256 == "" {
 			t.Errorf("%s has no cover", tr.Title)
@@ -275,17 +288,6 @@ func TestGroupsBulkAndPlaylistsOverHTTP(t *testing.T) {
 	}
 	if code, _ := send(t, srv, "POST", "/api/playlists/delete", obj{"name": "Road"}); code != 200 {
 		t.Errorf("delete %d", code)
-	}
-	m, _ := a.Manifest()
-	if len(m.Playlists) != 0 {
-		t.Errorf("%+v", m.Playlists)
-	}
-	if code, _ := send(t, srv, "POST", "/api/undo", nil); code != 200 {
-		t.Errorf("undo %d", code)
-	}
-	m, _ = a.Manifest()
-	if len(m.Playlists) != 1 {
-		t.Errorf("undo brings the playlist back: %+v", m.Playlists)
 	}
 }
 

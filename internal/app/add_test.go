@@ -18,6 +18,7 @@ import (
 type fakeDownloader struct {
 	audio []byte
 	info  app.Info
+	cover []byte
 	err   error
 	calls []string // URLs asked for
 	dirs  []string // where the file was put
@@ -33,45 +34,7 @@ func (f *fakeDownloader) Download(ctx context.Context, url, dir string) (app.Dow
 	if err := os.WriteFile(path, f.audio, 0o644); err != nil {
 		return app.Downloaded{}, err
 	}
-	return app.Downloaded{Path: path, Info: f.info}, nil
-}
-
-// scriptedPrompter answers by question key and records what was asked.
-type scriptedPrompter struct {
-	answers  map[string]string // missing key: accept the default
-	asked    []string
-	defaults map[string]string
-	abort    bool
-	choice   int      // index Choose returns
-	options  []string // what Choose was last offered
-}
-
-func (p *scriptedPrompter) Choose(title string, options []string) (int, error) {
-	if p.abort {
-		return 0, app.ErrAborted
-	}
-	p.options = options
-	return p.choice, nil
-}
-
-func (p *scriptedPrompter) Ask(q app.Question) (string, error) {
-	if p.abort {
-		return "", app.ErrAborted
-	}
-	p.asked = append(p.asked, q.Key)
-	if p.defaults == nil {
-		p.defaults = map[string]string{}
-	}
-	p.defaults[q.Key] = q.Default
-	if a, ok := p.answers[q.Key]; ok {
-		if q.Validate != nil {
-			if err := q.Validate(a); err != nil {
-				return "", errors.New("scripted answer rejected: " + err.Error())
-			}
-		}
-		return a, nil
-	}
-	return q.Default, nil
+	return app.Downloaded{Path: path, Info: f.info, Cover: f.cover}, nil
 }
 
 func newDownloader() *fakeDownloader {
@@ -83,17 +46,49 @@ func newDownloader() *fakeDownloader {
 
 func strp(s string) *string { return &s }
 
-func TestAddWithEverythingGivenNeverAsksAndRecordsTheSource(t *testing.T) {
-	a, dl, p := openLib(t), newDownloader(), &scriptedPrompter{}
-	got, err := a.Add(context.Background(), app.AddRequest{
-		URL:  "https://youtu.be/xyz",
-		Edit: app.Edit{Title: strp("وطني"), Artist: strp("فيروز"), Album: strp("Hits"), TrackNumber: ptr(3), TrackTotal: ptr(12), Released: strp("1999-05"), Genre: strp(""), TrimStart: ptr(time.Second), TrimEnd: ptr(0 * time.Second)},
-	}, dl, p)
+// add fetches a link and adds it with what the download said for every detail
+// not given, the way the page's form is filled in.
+func add(a *app.App, req app.AddRequest, given app.Edit, dl app.Downloader) (manifest.Track, error) {
+	d, err := a.Fetch(context.Background(), req, dl)
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	return a.Finish(d, withDefaults(given, d.Info))
+}
+
+func withDefaults(given app.Edit, info app.Info) app.Edit {
+	e := given
+	artist := info.Artist
+	if artist == "" {
+		artist = strings.TrimSuffix(info.Uploader, " - Topic")
+	}
+	text := func(dst **string, v string) {
+		if *dst == nil {
+			v = strings.TrimSpace(v)
+			*dst = &v
+		}
+	}
+	count := func(dst **int, n int) {
+		if *dst == nil && n > 0 {
+			*dst = &n
+		}
+	}
+	text(&e.Title, info.Title)
+	text(&e.Artist, artist)
+	text(&e.Album, info.Album)
+	count(&e.TrackNumber, info.TrackNumber)
+	count(&e.TrackTotal, info.TrackTotal)
+	text(&e.Released, info.Released)
+	text(&e.Genre, "")
+	return e
+}
+
+func TestAddRecordsTheDetailsGivenAndTheSource(t *testing.T) {
+	a, dl := openLib(t), newDownloader()
+	got, err := add(a, app.AddRequest{URL: "https://youtu.be/xyz"},
+		app.Edit{Title: strp("وطني"), Artist: strp("فيروز"), Album: strp("Hits"), TrackNumber: ptr(3), TrackTotal: ptr(12), Released: strp("1999-05"), Genre: strp(""), TrimStart: ptr(time.Second), TrimEnd: ptr(0 * time.Second)}, dl)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if len(p.asked) != 0 {
-		t.Errorf("asked %v although everything was given", p.asked)
 	}
 	if got.Status != manifest.Identified || got.SourceURL != "https://youtu.be/xyz" ||
 		got.Title != "وطني" || got.Artist != "فيروز" || got.Album != "Hits" ||
@@ -111,9 +106,9 @@ func TestAddWithEverythingGivenNeverAsksAndRecordsTheSource(t *testing.T) {
 	}
 }
 
-func TestAddWithoutPrompterFallsBackToTheDownloadMetadata(t *testing.T) {
+func TestAddFallsBackToTheDownloadMetadata(t *testing.T) {
 	a, dl := openLib(t), newDownloader()
-	got, err := a.Add(context.Background(), app.AddRequest{URL: "u"}, dl, nil)
+	got, err := add(a, app.AddRequest{URL: "u"}, app.Edit{}, dl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,151 +117,43 @@ func TestAddWithoutPrompterFallsBackToTheDownloadMetadata(t *testing.T) {
 	}
 }
 
-func TestAddWithoutPrompterReportsWhatIsMissing(t *testing.T) {
+func TestAddReportsWhatIsMissing(t *testing.T) {
 	a, dl := openLib(t), newDownloader()
 	dl.info = app.Info{Title: "Only A Title"}
-	_, err := a.Add(context.Background(), app.AddRequest{URL: "u"}, dl, nil)
-	if err == nil || !strings.Contains(err.Error(), "artist") || strings.Contains(err.Error(), "title") {
-		t.Fatalf("err = %v, want one naming only the missing artist", err)
+	_, err := add(a, app.AddRequest{URL: "u"}, app.Edit{}, dl)
+	if err == nil || err.Error() != "missing artist" {
+		t.Fatalf("err = %v, want exactly %q", err, "missing artist")
 	}
 	if len(tracks(t, a)) != 0 {
 		t.Error("a track was added despite the error")
 	}
 
-	// A flag fills the gap.
-	if _, err := a.Add(context.Background(), app.AddRequest{URL: "u", Edit: app.Edit{Artist: strp("Band")}}, dl, nil); err != nil {
-		t.Errorf("with --artist: %v", err)
+	if _, err := add(a, app.AddRequest{URL: "u"}, app.Edit{Artist: strp("Band")}, dl); err != nil {
+		t.Errorf("with an artist given: %v", err)
 	}
 }
 
-func TestAddAsksEachFieldWithDefaultsFromTheDownload(t *testing.T) {
+func TestAddRefusesADuplicate(t *testing.T) {
 	a, dl := openLib(t), newDownloader()
-	p := &scriptedPrompter{answers: map[string]string{
-		"title": "وطني", "artist": "فيروز", "album": "", "track": "7", "of": "9", "trim-start": "0:01.5", "trim-end": "",
-	}}
-	got, err := a.Add(context.Background(), app.AddRequest{URL: "u"}, dl, p)
+	first, err := add(a, app.AddRequest{URL: "u1"}, app.Edit{}, dl)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantAsked := []string{"title", "artist", "album", "track", "of", "released", "genre", "trim-start", "trim-end"}
-	if strings.Join(p.asked, ",") != strings.Join(wantAsked, ",") {
-		t.Errorf("asked %v, want %v", p.asked, wantAsked)
-	}
-	for k, want := range map[string]string{"title": "Song Title", "artist": "Some Band", "album": "Yt Album", "track": "4"} {
-		if p.defaults[k] != want {
-			t.Errorf("default for %s = %q, want %q", k, p.defaults[k], want)
-		}
-	}
-	if got.Title != "وطني" || got.Artist != "فيروز" || got.Album != "" ||
-		got.TrackNumber != 7 || got.TrackTotal != 9 || got.TrimStart != 1500*time.Millisecond || got.TrimEnd != 0 {
-		t.Errorf("track = %+v", got)
-	}
-}
-
-func TestAddOnlyAsksForFieldsNotGivenAsFlags(t *testing.T) {
-	a, dl, p := openLib(t), newDownloader(), &scriptedPrompter{}
-	_, err := a.Add(context.Background(), app.AddRequest{URL: "u",
-		Edit: app.Edit{Title: strp("Given"), Album: strp(""), TrimEnd: ptr(0 * time.Second)}}, dl, p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := "artist,track,of,released,genre,trim-start"; strings.Join(p.asked, ",") != want {
-		t.Errorf("asked %v, want %s", p.asked, want)
-	}
-}
-
-func TestAddNeverAsksForALatinForm(t *testing.T) {
-	a, dl, p := openLib(t), newDownloader(), &scriptedPrompter{}
-	dl.info = app.Info{Title: "سأرجع", Artist: "فيروز"}
-	if _, err := a.Add(context.Background(), app.AddRequest{URL: "u"}, dl, p); err != nil {
-		t.Fatal(err)
-	}
-	for _, k := range p.asked {
-		if strings.HasSuffix(k, "-ascii") {
-			t.Errorf("asked for %s", k)
-		}
-	}
-}
-
-func TestAddAnswerValidation(t *testing.T) {
-	a, dl, p := openLib(t), newDownloader(), &scriptedPrompter{}
-	var questions []app.Question
-	rec := recordingPrompter{inner: p, got: &questions}
-	if _, err := a.Add(context.Background(), app.AddRequest{URL: "u"}, dl, rec); err != nil {
-		t.Fatal(err)
-	}
-	by := map[string]app.Question{}
-	for _, q := range questions {
-		by[q.Key] = q
-	}
-	check := func(key, value string, wantOK bool) {
-		t.Helper()
-		err := by[key].Validate(value)
-		if (err == nil) != wantOK {
-			t.Errorf("%s validate(%q) = %v, want ok=%v", key, value, err, wantOK)
-		}
-	}
-	check("title", "", false)
-	check("title", "x", true)
-	check("artist", "  ", false)
-	check("album", "", true)
-	check("track", "3", true)
-	check("track", "", true)
-	check("track", "-1", false)
-	check("track", "abc", false)
-	check("trim-start", "1:30", true)
-	check("trim-start", "", true)
-	check("trim-start", "1:99", false)
-	if !by["title"].Required || !by["artist"].Required || by["album"].Required {
-		t.Error("only title and artist are required")
-	}
-}
-
-type recordingPrompter struct {
-	inner app.Prompter
-	got   *[]app.Question
-}
-
-func (r recordingPrompter) Choose(title string, options []string) (int, error) {
-	return r.inner.Choose(title, options)
-}
-
-func (r recordingPrompter) Ask(q app.Question) (string, error) {
-	*r.got = append(*r.got, q)
-	return r.inner.Ask(q)
-}
-
-func TestAddRefusesADuplicateBeforeAskingAnything(t *testing.T) {
-	a, dl, p := openLib(t), newDownloader(), &scriptedPrompter{}
-	first, err := a.Add(context.Background(), app.AddRequest{URL: "u1"}, dl, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = a.Add(context.Background(), app.AddRequest{URL: "u2"}, dl, p)
+	_, err = add(a, app.AddRequest{URL: "u2"}, app.Edit{}, dl)
 	var dup *app.DuplicateError
 	if !errors.As(err, &dup) || dup.ID != first.ID {
 		t.Fatalf("err = %v, want a DuplicateError for %s", err, first.ID)
 	}
-	if len(p.asked) != 0 || len(tracks(t, a)) != 1 {
-		t.Errorf("asked %v, %d tracks", p.asked, len(tracks(t, a)))
+	if len(tracks(t, a)) != 1 {
+		t.Errorf("%d tracks", len(tracks(t, a)))
 	}
 }
 
 func TestAddFailuresLeaveTheLibraryUntouched(t *testing.T) {
-	ctx := context.Background()
 	t.Run("download fails", func(t *testing.T) {
 		a, dl := openLib(t), newDownloader()
 		dl.err = errors.New("video unavailable")
-		if _, err := a.Add(ctx, app.AddRequest{URL: "u"}, dl, nil); err == nil || !strings.Contains(err.Error(), "video unavailable") {
-			t.Errorf("err = %v", err)
-		}
-		if len(tracks(t, a)) != 0 {
-			t.Error("track added")
-		}
-	})
-	t.Run("user aborts", func(t *testing.T) {
-		a, dl := openLib(t), newDownloader()
-		if _, err := a.Add(ctx, app.AddRequest{URL: "u"}, dl, &scriptedPrompter{abort: true}); !errors.Is(err, app.ErrAborted) {
+		if _, err := add(a, app.AddRequest{URL: "u"}, app.Edit{}, dl); err == nil || !strings.Contains(err.Error(), "video unavailable") {
 			t.Errorf("err = %v", err)
 		}
 		if len(tracks(t, a)) != 0 {
@@ -275,18 +162,9 @@ func TestAddFailuresLeaveTheLibraryUntouched(t *testing.T) {
 	})
 	t.Run("trims longer than the track", func(t *testing.T) {
 		a, dl := openLib(t), newDownloader() // 2.6s long
-		_, err := a.Add(ctx, app.AddRequest{URL: "u", Edit: app.Edit{TrimStart: ptr(5 * time.Second)}}, dl, nil)
+		_, err := add(a, app.AddRequest{URL: "u"}, app.Edit{TrimStart: ptr(5 * time.Second)}, dl)
 		if err == nil {
 			t.Error("accepted a 5s trim of a 2.6s track")
-		}
-		if len(tracks(t, a)) != 0 {
-			t.Error("track added")
-		}
-	})
-	t.Run("cover that is not an image", func(t *testing.T) {
-		a, dl := openLib(t), newDownloader()
-		if _, err := a.Add(ctx, app.AddRequest{URL: "u", Cover: []byte("text")}, dl, nil); err == nil {
-			t.Error("accepted a text cover")
 		}
 		if len(tracks(t, a)) != 0 {
 			t.Error("track added")
@@ -296,78 +174,47 @@ func TestAddFailuresLeaveTheLibraryUntouched(t *testing.T) {
 
 func TestAddStoresAGivenCover(t *testing.T) {
 	a, dl := openLib(t), newDownloader()
-	got, err := a.Add(context.Background(), app.AddRequest{URL: "u", Cover: testmp3.JPEG}, dl, nil)
+	dl.cover = testmp3.JPEG
+	got, err := add(a, app.AddRequest{URL: "u"}, app.Edit{}, dl)
 	if err != nil || got.CoverSHA256 == "" {
 		t.Errorf("track %+v, err %v", got, err)
 	}
 }
 
-func TestAddUsesAConfidentMatchAsDefaultsAndRecordsItsIDs(t *testing.T) {
+func TestACoverThatIsNoImageIsLeftOutAndTheDownloadStillWorks(t *testing.T) {
 	a, dl := openLib(t), newDownloader()
-	dl.info = app.Info{Title: "Dream 3 (Official Video)", Uploader: "Some Channel"}
-	src := &fakeSource{
-		results: map[string][]app.Candidate{"Dream 3 (Official Video)|Some Channel": {dream3}},
-		covers:  map[string][]byte{"rel-1": testmp3.JPEG},
-	}
-	got, err := a.Add(context.Background(), app.AddRequest{URL: "u", Source: src}, dl, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Title != "Dream 3" || got.Artist != "Max Richter" || got.Album != "From Sleep" || got.TrackNumber != 1 || got.TrackTotal != 7 ||
-		got.MBRecordingID != "rec-1" || got.MBReleaseID != "rel-1" || got.CoverSHA256 == "" {
-		t.Errorf("track = %+v", got)
+	dl.cover = []byte("<html>not a picture</html>")
+
+	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "u"}, dl)
+
+	if err != nil || d.CoverSHA() != "" {
+		t.Errorf("cover %q, err %v", d.CoverSHA(), err)
 	}
 }
 
-func TestAddIgnoresWeakMatchesAndMatchesTheUserOverrode(t *testing.T) {
-	ctx := context.Background()
-	weak := dream3
-	weak.Score = 70
-	src := &fakeSource{results: map[string][]app.Candidate{"Song Title|Some Band": {weak}}}
+func TestTheCoverOfADraftCanBeReplacedAndTakenAwayBeforeItIsAdded(t *testing.T) {
 	a, dl := openLib(t), newDownloader()
-	got, err := a.Add(ctx, app.AddRequest{URL: "u", Source: src}, dl, nil)
-	if err != nil || got.Title != "Song Title" || got.MBRecordingID != "" {
-		t.Errorf("weak match used: %+v, %v", got, err)
+	dl.cover = testmp3.JPEG
+	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "u"}, dl)
+	if err != nil || d.CoverSHA() == "" {
+		t.Fatalf("%q %v", d.CoverSHA(), err)
 	}
+	fetched := d.CoverSHA()
 
-	// The user keeps the artist but changes the title: it is not that recording any more.
-	src = &fakeSource{results: map[string][]app.Candidate{"Song Title|Some Band": {dream3}}}
-	a2 := openLib(t)
-	p := &scriptedPrompter{answers: map[string]string{"title": "My Own Title"}}
-	got, err = a2.Add(ctx, app.AddRequest{URL: "u", Source: src}, dl, p)
-	if err != nil || got.Title != "My Own Title" || got.MBRecordingID != "" {
-		t.Errorf("overridden match kept its ids: %+v, %v", got, err)
+	if err := a.SetDraftCover(d, testmp3.PNG); err != nil || d.CoverSHA() == "" || d.CoverSHA() == fetched {
+		t.Errorf("replaced: %q (was %q) %v", d.CoverSHA(), fetched, err)
 	}
-	if p.defaults["title"] != "Dream 3" {
-		t.Errorf("the match should have been the offered default, got %q", p.defaults["title"])
+	if err := a.SetDraftCover(d, []byte("nope")); err == nil {
+		t.Error("something that is no image became the cover")
 	}
-}
+	a.RemoveDraftCover(d)
 
-func TestAddWarnsButCarriesOnWhenTheLookupFails(t *testing.T) {
-	a, dl := openLib(t), newDownloader()
-	src := &fakeSource{errs: map[string]error{"Song Title|Some Band": errors.New("offline")}}
-	var warned []error
-	got, err := a.Add(context.Background(), app.AddRequest{URL: "u", Source: src, OnWarning: func(e error) { warned = append(warned, e) }}, dl, nil)
-	if err != nil || got.Title != "Song Title" {
-		t.Fatalf("%+v, %v", got, err)
+	if d.CoverSHA() != "" {
+		t.Errorf("still %q", d.CoverSHA())
 	}
-	if len(warned) != 1 || !strings.Contains(warned[0].Error(), "offline") {
-		t.Errorf("warnings = %v", warned)
-	}
-}
-
-func TestAddKeepsTheArtistAsTheMatchWritesIt(t *testing.T) {
-	dl := newDownloader()
-	dl.info = app.Info{Title: "سأرجع", Uploader: "Fairuz"}
-	arabic := app.Candidate{RecordingID: "r", ReleaseID: "l", Title: "سأرجع", Artist: "فيروز", Album: "Al Quds", Score: 100}
-	src := &fakeSource{results: map[string][]app.Candidate{"سأرجع|Fairuz": {arabic}}}
-
-	for name, p := range map[string]app.Prompter{"non-interactive": nil, "interactive": &scriptedPrompter{}} {
-		lib := openLib(t)
-		got, err := lib.Add(context.Background(), app.AddRequest{URL: "u", Source: src}, dl, p)
-		if err != nil || got.Artist != "فيروز" {
-			t.Errorf("%s: %+v, %v", name, got, err)
-		}
+	got, err := a.Finish(d, app.Edit{Title: strp("T"), Artist: strp("A")})
+	if err != nil || got.CoverSHA256 != "" {
+		t.Errorf("a track added with no cover has %q (%v)", got.CoverSHA256, err)
 	}
 }
 
@@ -377,7 +224,7 @@ func TestFetchPreparesADraftWithoutAddingAnything(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.URL != "https://youtu.be/x" || d.Info != dl.info || d.Downloaded != dl.info || d.Match != nil {
+	if d.URL != "https://youtu.be/x" || d.Info != dl.info {
 		t.Errorf("draft = %+v", d)
 	}
 	if diff := d.Length - 2612*time.Millisecond; diff < -time.Millisecond || diff > time.Millisecond {
@@ -391,25 +238,9 @@ func TestFetchPreparesADraftWithoutAddingAnything(t *testing.T) {
 	}
 }
 
-func TestFetchOffersAConfidentMatchAndKeepsWhatTheDownloadSaid(t *testing.T) {
-	a, dl := openLib(t), newDownloader()
-	dl.info = app.Info{Title: "Dream 3 (Official Video)", Uploader: "Some Channel"}
-	src := &fakeSource{results: map[string][]app.Candidate{"Dream 3 (Official Video)|Some Channel": {dream3}}}
-	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "u", Source: src}, dl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.Match == nil || d.Match.ReleaseID != "rel-1" || d.Info.Title != "Dream 3" || d.Info.Album != "From Sleep" || d.Info.TrackNumber != 1 {
-		t.Errorf("draft = %+v", d)
-	}
-	if d.Downloaded.Title != "Dream 3 (Official Video)" {
-		t.Errorf("Downloaded = %+v; the original report should be kept so a match can be declined", d.Downloaded)
-	}
-}
-
 func TestFetchRefusesADuplicate(t *testing.T) {
 	a, dl := openLib(t), newDownloader()
-	first, err := a.Add(context.Background(), app.AddRequest{URL: "u1"}, dl, nil)
+	first, err := add(a, app.AddRequest{URL: "u1"}, app.Edit{}, dl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,27 +253,26 @@ func TestFetchRefusesADuplicate(t *testing.T) {
 
 func TestFinishSavesTheTrackWithTheGivenDetails(t *testing.T) {
 	a, dl := openLib(t), newDownloader()
-	src := &fakeSource{results: map[string][]app.Candidate{"Song Title|Some Band": {dream3}}, covers: map[string][]byte{"rel-1": testmp3.JPEG}}
-	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "https://youtu.be/x", Source: src}, dl)
+	dl.cover = testmp3.JPEG
+	d, err := a.Fetch(context.Background(), app.AddRequest{URL: "https://youtu.be/x"}, dl)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := a.Finish(context.Background(), d, app.Edit{
+	got, err := a.Finish(d, app.Edit{
 		Title: strp("Dream 3"), Artist: strp("Max Richter"), Album: strp("From Sleep"), TrackNumber: ptr(1), TrackTotal: ptr(7),
 		TrimStart: ptr(time.Second),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != manifest.Identified || got.SourceURL != "https://youtu.be/x" || got.TrimStart != time.Second ||
-		got.MBRecordingID != "rec-1" || got.MBReleaseID != "rel-1" || got.CoverSHA256 == "" {
+	if got.Status != manifest.Identified || got.SourceURL != "https://youtu.be/x" || got.TrimStart != time.Second || got.CoverSHA256 == "" {
 		t.Errorf("track = %+v", got)
 	}
 	if saved := tracks(t, a); len(saved) != 1 || saved[0].ID != got.ID {
 		t.Errorf("manifest = %+v", saved)
 	}
 	// A second Finish of the same draft must not add the audio twice.
-	_, err = a.Finish(context.Background(), d, app.Edit{Title: strp("Again"), Artist: strp("Band")})
+	_, err = a.Finish(d, app.Edit{Title: strp("Again"), Artist: strp("Band")})
 	var dup *app.DuplicateError
 	if !errors.As(err, &dup) || len(tracks(t, a)) != 1 {
 		t.Errorf("second finish: err %v, %d tracks", err, len(tracks(t, a)))
@@ -459,7 +289,7 @@ func TestFinishFailuresAddNothing(t *testing.T) {
 		"no artist":     {Title: strp("T"), Artist: strp("")},
 		"trims too big": {Title: strp("T"), Artist: strp("A"), TrimStart: ptr(time.Hour)},
 	} {
-		if _, err := a.Finish(context.Background(), d, e); err == nil {
+		if _, err := a.Finish(d, e); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
 	}
@@ -468,89 +298,34 @@ func TestFinishFailuresAddNothing(t *testing.T) {
 	}
 }
 
-func TestAddOffersTheReleaseDateOfTheMatchAndTakesWhatIsTyped(t *testing.T) {
+func TestAddTakesTheReleaseDateTheDownloadSaidUnlessOneIsGiven(t *testing.T) {
 	dl := newDownloader()
-	dl.info = app.Info{Title: "Dream 3 (Official Video)", Uploader: "Some Channel"}
-	src := &fakeSource{results: map[string][]app.Candidate{"Dream 3 (Official Video)|Some Channel": {dream3}}}
-	ctx := context.Background()
+	dl.info = app.Info{Title: "Dream 3", Uploader: "Some Channel", Released: "2015-09-04"}
 
-	// Without a prompter the match's date is simply taken.
-	got, err := openLib(t).Add(ctx, app.AddRequest{URL: "u", Source: src}, dl, nil)
+	got, err := add(openLib(t), app.AddRequest{URL: "u"}, app.Edit{}, dl)
 	if err != nil || got.Released != "2015-09-04" {
-		t.Errorf("non-interactive: released %q, %v", got.Released, err)
+		t.Errorf("released %q, %v", got.Released, err)
 	}
 
-	// With one, it is the default and can be replaced.
-	for answer, want := range map[string]string{"": "2015-09-04", "2014": "2014"} {
-		p := &scriptedPrompter{answers: map[string]string{}}
-		if answer != "" {
-			p.answers["released"] = answer
-		}
-		got, err := openLib(t).Add(ctx, app.AddRequest{URL: "u", Source: src}, dl, p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if p.defaults["released"] != "2015-09-04" {
-			t.Errorf("default = %q", p.defaults["released"])
-		}
-		if got.Released != want {
-			t.Errorf("answer %q: released %q, want %q", answer, got.Released, want)
-		}
+	got, err = add(openLib(t), app.AddRequest{URL: "u"}, app.Edit{Released: strp("1999")}, dl)
+	if err != nil || got.Released != "1999" {
+		t.Errorf("given: released %q, %v", got.Released, err)
 	}
-
-	// A given date is never asked about, and a bad one stops the add.
-	p := &scriptedPrompter{}
-	got, err = openLib(t).Add(ctx, app.AddRequest{URL: "u", Source: src, Edit: app.Edit{Released: strp("1999")}}, dl, p)
-	if err != nil || got.Released != "1999" || strings.Contains(strings.Join(p.asked, ","), "released") {
-		t.Errorf("given: released %q, asked %v, %v", got.Released, p.asked, err)
-	}
-	if _, err := openLib(t).Add(ctx, app.AddRequest{URL: "u", Edit: app.Edit{Released: strp("soon")}}, dl, nil); err == nil {
+	if _, err := add(openLib(t), app.AddRequest{URL: "u"}, app.Edit{Released: strp("soon")}, dl); err == nil {
 		t.Error("an invalid date was accepted")
 	}
 }
 
-func TestAddValidatesTheReleaseDateAnswer(t *testing.T) {
-	a, dl, p := openLib(t), newDownloader(), &scriptedPrompter{}
-	var questions []app.Question
-	if _, err := a.Add(context.Background(), app.AddRequest{URL: "u"}, dl, recordingPrompter{inner: p, got: &questions}); err != nil {
-		t.Fatal(err)
-	}
-	var released app.Question
-	for _, q := range questions {
-		if q.Key == "released" {
-			released = q
-		}
-	}
-	if released.Validate == nil || released.Required {
-		t.Fatalf("question = %+v", released)
-	}
-	for in, ok := range map[string]bool{"": true, "1999": true, "1999-05": true, "1999-05-17": true, "99": false, "May 1999": false} {
-		if err := released.Validate(in); (err == nil) != ok {
-			t.Errorf("validate(%q) = %v, want ok=%v", in, err, ok)
-		}
-	}
-}
-
-func TestAddAsksForAGenreUnlessOneIsGiven(t *testing.T) {
+func TestAddTakesTheGenreGivenAndNoneOtherwise(t *testing.T) {
 	a, dl := openLib(t), newDownloader()
-	p := &scriptedPrompter{answers: map[string]string{"genre": "  Folk "}}
-	got, err := a.Add(context.Background(), app.AddRequest{URL: "u"}, dl, p)
-	if err != nil || got.Genre != "Folk" {
-		t.Errorf("answered: genre %q, %v", got.Genre, err)
-	}
-	if p.defaults["genre"] != "" {
-		t.Errorf("default genre = %q, want none", p.defaults["genre"])
+	got, err := add(a, app.AddRequest{URL: "u"}, app.Edit{Genre: strp("Anthem")}, dl)
+	if err != nil || got.Genre != "Anthem" {
+		t.Errorf("given: genre %q, %v", got.Genre, err)
 	}
 
-	p = &scriptedPrompter{}
-	got, err = openLib(t).Add(context.Background(), app.AddRequest{URL: "u", Edit: app.Edit{Genre: strp("Anthem")}}, dl, p)
-	if err != nil || got.Genre != "Anthem" || strings.Contains(strings.Join(p.asked, ","), "genre") {
-		t.Errorf("given: genre %q, asked %v, %v", got.Genre, p.asked, err)
-	}
-
-	got, err = openLib(t).Add(context.Background(), app.AddRequest{URL: "u"}, dl, nil)
+	got, err = add(openLib(t), app.AddRequest{URL: "u"}, app.Edit{}, dl)
 	if err != nil || got.Genre != "" {
-		t.Errorf("non-interactive: genre %q, %v", got.Genre, err)
+		t.Errorf("none given: genre %q, %v", got.Genre, err)
 	}
 }
 
@@ -562,7 +337,7 @@ func TestFinishRefusesADraftWhoseAudioASyncCollectedMeanwhile(t *testing.T) {
 	}
 	mustSync(t, a, app.SyncOptions{}) // no record holds the draft's audio yet, so a sync collects it
 
-	_, err = a.Finish(context.Background(), d, app.Edit{Title: strp("Song"), Artist: strp("Band")})
+	_, err = a.Finish(d, app.Edit{Title: strp("Song"), Artist: strp("Band")})
 	if err == nil || !strings.Contains(err.Error(), "download it again") {
 		t.Fatalf("err = %v, want one that says to download it again", err)
 	}

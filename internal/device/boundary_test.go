@@ -80,8 +80,6 @@ func sweep(t *testing.T, pattern string, tests bool, allow []string) {
 
 func TestTheLibraryKnowsNoLatinFormsOrPlayerNames(t *testing.T) {
 	sweep(t, `OriginalTitle|OriginalArtist|OriginalAlbum|Ascii(Title|Artist|Album)|(Artist|Title|Album)ASCII\b|PlayerArtist|PlayerAlbum|player_artist|player_album|player-artist|player-album`, true, []string{
-		"internal/cli/cli_test.go",    // the flags of the old names are gone
-		"internal/app/review_test.go", // review files must refuse the old keys
 		"internal/device/boundary_test.go",
 	})
 }
@@ -89,8 +87,9 @@ func TestTheLibraryKnowsNoLatinFormsOrPlayerNames(t *testing.T) {
 func TestOnlyTheNamedPlacesMakeLatinForms(t *testing.T) {
 	sweep(t, `translit\.`, false, []string{
 		"internal/translit/", "internal/device/",
-		"internal/manifest/",      // the search finds a name by its Latin form
-		"internal/app/sort.go",    // names sort by their Latin form
+		"internal/manifest/",   // the search finds a name by its Latin form
+		"internal/app/sort.go", // names sort by their Latin form
+		"internal/app/profile.go",
 		"internal/browse/rows.go", // and so do the lists
 	})
 }
@@ -98,12 +97,9 @@ func TestOnlyTheNamedPlacesMakeLatinForms(t *testing.T) {
 func TestTheWolfgangIsNamedOnlyWhereItIsChosenOrExplained(t *testing.T) {
 	sweep(t, `(?i)wolfgang|wmp01|wolfang`, false, []string{
 		"internal/device/",
-		"cmd/mm/main.go",                // wires the flag to the web interface
-		"internal/cli/",                 // the --wolfgang flag and its help
-		"internal/browse/",              // the preview tab and the format of a sync
-		"internal/web/",                 // and the option that turns it on
-		"internal/app/playlist.go",      // the names of every device's playlists must not clash
+		"internal/web/webtest/",
 		"internal/coverimg/coverimg.go", // says why baseline JPEGs exist
+		"internal/manifest/",
 	})
 }
 
@@ -112,6 +108,7 @@ func TestOnlyTheDeviceWritesWhatTheWolfgangReads(t *testing.T) {
 		"internal/device/",
 		"internal/testmp3/",    // a test helper that makes covers the way the player wants them
 		"internal/app/sync.go", // knows which extensions are media, to report strays
+		"internal/manifest/",
 	})
 }
 

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,7 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"music-manager/internal/app"
 	"music-manager/internal/browse"
+	"music-manager/internal/coverimg"
 )
 
 // downloadTimeout bounds a download, in case it never ends.
@@ -26,6 +29,9 @@ func (s *Server) addRoutes() {
 	s.mux.HandleFunc("POST /api/add/path", s.addPath)
 	s.mux.HandleFunc("POST /api/add/finish", s.addFinish)
 	s.mux.HandleFunc("DELETE /api/add/{draft}", s.addDiscard)
+	s.mux.HandleFunc("GET /api/add/{draft}/cover", s.draftCover)
+	s.mux.HandleFunc("PUT /api/add/{draft}/cover", s.draftCoverPut)
+	s.mux.HandleFunc("DELETE /api/add/{draft}/cover", s.draftCoverDelete)
 	s.mux.HandleFunc("POST /api/ingest", s.ingest)
 }
 
@@ -40,8 +46,8 @@ func (s *Server) addFetch(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnprocessableEntity, errors.New("adding from YouTube is not available: yt-dlp is not set up"))
 		return
 	}
-	if browse.CleanLink(in.URL) == "" {
-		fail(w, http.StatusUnprocessableEntity, errors.New("paste a link first"))
+	if _, err := browse.CheckLink(in.URL); err != nil {
+		fail(w, http.StatusUnprocessableEntity, err)
 		return
 	}
 	v, err := s.jobs.start("add", func(ctx context.Context, _ func(any)) (any, error) {
@@ -60,12 +66,22 @@ func (s *Server) addFetch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, v)
 }
 
+type AddCheck struct {
+	Path   string            `json:"path"`
+	Fields map[string]string `json:"fields,omitempty"`
+}
+
 func (s *Server) addPath(w http.ResponseWriter, r *http.Request) {
 	var in struct{ Form browse.AddForm }
 	if !read(w, r, &in) {
 		return
 	}
-	writeJSON(w, map[string]string{"path": browse.AddPath(in.Form)})
+	view := AddCheck{Path: browse.AddPath(in.Form)}
+	var fields app.FieldErrors
+	if _, err := in.Form.Edit(); errors.As(err, &fields) {
+		view.Fields = fields
+	}
+	writeJSON(w, view)
 }
 
 func (s *Server) addFinish(w http.ResponseWriter, r *http.Request) {
@@ -76,9 +92,7 @@ func (s *Server) addFinish(w http.ResponseWriter, r *http.Request) {
 	if !read(w, r, &in) {
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
-	defer cancel()
-	res, err := s.ed.Finish(ctx, in.Draft, in.Form)
+	res, err := s.ed.Finish(in.Draft, in.Form)
 	s.answer(w, res, err)
 }
 
@@ -197,4 +211,55 @@ func plural(n int, word string) string {
 		return "1 " + word
 	}
 	return fmt.Sprintf("%d %ss", n, word)
+}
+
+type DraftCoverView struct {
+	Cover string `json:"cover"`
+}
+
+func (s *Server) draftCover(w http.ResponseWriter, r *http.Request) {
+	sha, ok := s.ed.DraftCover(r.PathValue("draft"))
+	if !ok || sha == "" {
+		fail(w, http.StatusNotFound, errNotFound)
+		return
+	}
+	data, err := os.ReadFile(s.app.CoverPath(sha))
+	if err != nil {
+		fail(w, http.StatusNotFound, errNotFound)
+		return
+	}
+	kind := coverimg.Sniff(data)
+	if kind == "" {
+		fail(w, http.StatusUnsupportedMediaType, errors.New("the cover is not a JPEG or PNG image"))
+		return
+	}
+	w.Header().Set("Content-Type", kind)
+	w.Header().Set("ETag", `"`+sha+`"`)
+	w.Header().Set("Cache-Control", "no-store")
+	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
+}
+
+func (s *Server) draftCoverPut(w http.ResponseWriter, r *http.Request) {
+	data, ok := picture(w, r)
+	if !ok {
+		return
+	}
+	sha, err := s.ed.ReplaceDraftCover(r.PathValue("draft"), data)
+	if errors.Is(err, browse.ErrDraftGone) {
+		fail(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		fail(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	writeJSON(w, DraftCoverView{Cover: sha})
+}
+
+func (s *Server) draftCoverDelete(w http.ResponseWriter, r *http.Request) {
+	if err := s.ed.RemoveDraftCover(r.PathValue("draft")); err != nil {
+		fail(w, http.StatusNotFound, err)
+		return
+	}
+	writeJSON(w, DraftCoverView{})
 }

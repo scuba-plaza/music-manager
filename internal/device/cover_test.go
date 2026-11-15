@@ -43,7 +43,7 @@ func TestAGenericTargetKeepsTheCoverAsItWasGiven(t *testing.T) {
 }
 
 func TestTheWolfgangGetsABaselineJPEGThatFitsItsScreen(t *testing.T) {
-	data, mime, err := device.Wolfgang.Cover(bigPNG(t))
+	data, mime, err := wolfgang.Cover(bigPNG(t))
 	if err != nil || mime != "image/jpeg" {
 		t.Fatalf("%q, %v", mime, err)
 	}
@@ -62,14 +62,14 @@ func TestTheNameOfTheCoverFileFollowsWhatIsWritten(t *testing.T) {
 	}{
 		{device.Generic, "image/jpeg", "cover.jpg", false},
 		{device.Generic, "image/png", "cover.png", false},
-		{device.Wolfgang, "image/jpeg", "cover.jpg", true},
-		{device.Wolfgang, "image/png", "cover.jpg", true}, // it is shrunk to a JPEG
+		{wolfgang, "image/jpeg", "cover.jpg", true},
+		{wolfgang, "image/png", "cover.jpg", true}, // it is shrunk to a JPEG
 	} {
 		if got := c.dev.CoverFile(c.stored); got != c.want {
-			t.Errorf("%s.CoverFile(%s) = %q, want %q", c.dev.Name(), c.stored, got, c.want)
+			t.Errorf("%s.CoverFile(%s) = %q, want %q", c.dev.ID(), c.stored, got, c.want)
 		}
 		if got := c.dev.SingleCovers(); got != c.singleToo {
-			t.Errorf("%s.SingleCovers() = %v, want %v", c.dev.Name(), got, c.singleToo)
+			t.Errorf("%s.SingleCovers() = %v, want %v", c.dev.ID(), got, c.singleToo)
 		}
 	}
 }

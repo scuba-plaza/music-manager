@@ -137,7 +137,7 @@ func describe(t *testing.T, root string, ids map[string]string) string {
 // changes the output on purpose, the golden is regenerated with -update and the
 // diff is read.
 func TestSyncOutputGolden(t *testing.T) {
-	for name, dev := range map[string]device.Target{"generic": device.Generic, "wolfgang": device.Wolfgang} {
+	for name, dev := range map[string]device.Target{"generic": device.Generic, "wolfgang": wolfgang} {
 		t.Run(name, func(t *testing.T) { checkGolden(t, dev, "sync-"+name+".golden") })
 	}
 }

@@ -1,0 +1,141 @@
+package web
+
+import (
+	"io"
+	"io/fs"
+	"net/http"
+	"strings"
+	"testing"
+	"testing/fstest"
+)
+
+func fetch(t *testing.T, url string) (*http.Response, string) {
+	t.Helper()
+	res, err := http.Get(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res, string(body)
+}
+
+func TestWithoutAFrontendTheServerSays503AndWhatToRun(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a, WithFrontend(fstest.MapFS{}))
+	res, body := fetch(t, srv.URL+"/")
+	if res.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("status %d, want 503", res.StatusCode)
+	}
+	if !strings.Contains(body, "pnpm --dir web run build") {
+		t.Errorf("the page does not say what to run: %q", body)
+	}
+	if !strings.Contains(res.Header.Get("Content-Type"), "text/html") {
+		t.Errorf("content type %q", res.Header.Get("Content-Type"))
+	}
+}
+
+func TestWithFrontendServesItsIndex(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a, WithFrontend(fstest.MapFS{
+		"index.html":      {Data: []byte("<title>new</title>")},
+		"assets/app-1.js": {Data: []byte("export {}")},
+		"favicon.svg":     {Data: []byte("<svg/>")},
+	}))
+	res, body := fetch(t, srv.URL+"/")
+	if res.StatusCode != http.StatusOK || !strings.Contains(body, "<title>new</title>") {
+		t.Errorf("status %d, body %q", res.StatusCode, body)
+	}
+	if got := res.Header.Get("Cache-Control"); got != "no-cache" {
+		t.Errorf("Cache-Control %q, want no-cache", got)
+	}
+	res, body = fetch(t, srv.URL+"/assets/app-1.js")
+	if res.StatusCode != http.StatusOK || body != "export {}" {
+		t.Errorf("asset: status %d, body %q", res.StatusCode, body)
+	}
+	if got := res.Header.Get("Cache-Control"); !strings.Contains(got, "immutable") {
+		t.Errorf("a hashed asset should be cached for good, Cache-Control %q", got)
+	}
+	res, _ = fetch(t, srv.URL+"/favicon.svg")
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("favicon: status %d", res.StatusCode)
+	}
+	if got := res.Header.Get("Cache-Control"); got != "no-cache" {
+		t.Errorf("a file outside assets/ must be revalidated, Cache-Control %q", got)
+	}
+}
+
+func TestAPIRoutesStillWinOverTheFrontend(t *testing.T) {
+	a, _ := seed(t, sample...)
+	for name, fsys := range map[string]fstest.MapFS{
+		"built":     {"index.html": {Data: []byte("<title>new</title>")}, "api/info": {Data: []byte("not json")}},
+		"not built": {},
+	} {
+		srv := start(t, a, WithFrontend(fsys))
+		var info InfoView
+		if code := getJSON(t, srv.URL+"/api/info", &info); code != http.StatusOK {
+			t.Errorf("%s: /api/info status %d", name, code)
+		}
+		if info.Root == "" {
+			t.Errorf("%s: /api/info did not answer with the info: %+v", name, info)
+		}
+	}
+}
+
+func TestWithoutOptionsTheServerServesTheEmbeddedDist(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a)
+	res, _ := fetch(t, srv.URL+"/")
+	want := http.StatusServiceUnavailable
+	if _, err := fs.Stat(distFiles, "dist/index.html"); err == nil {
+		want = http.StatusOK
+	}
+	if res.StatusCode != want {
+		t.Errorf("status %d, want %d", res.StatusCode, want)
+	}
+	if want == http.StatusOK {
+		if res, body := fetch(t, srv.URL+"/"); !strings.Contains(body, `src="/assets/`) || res.Header.Get("Cache-Control") != "no-cache" {
+			t.Errorf("the page served is not the built front end: %q", body)
+		}
+	}
+}
+
+func TestADirectoryOfTheFrontendIsNotListed(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a, WithFrontend(fstest.MapFS{
+		"index.html":      {Data: []byte("<title>new</title>")},
+		"assets/app-1.js": {Data: []byte("export {}")},
+	}))
+	for _, path := range []string{"/assets/", "/assets"} {
+		res, body := fetch(t, srv.URL+path)
+		if res.StatusCode != http.StatusNotFound || strings.Contains(body, "app-1.js") {
+			t.Errorf("%s: status %d, body %q", path, res.StatusCode, body)
+		}
+	}
+}
+
+func TestAnUnknownAPIPathIsAJSON404BuiltOrNot(t *testing.T) {
+	a, _ := seed(t, sample...)
+	for name, fsys := range map[string]fstest.MapFS{
+		"built":     {"index.html": {Data: []byte("<title>new</title>")}},
+		"not built": {},
+	} {
+		srv := start(t, a, WithFrontend(fsys))
+		var e ErrorView
+		if code := getJSON(t, srv.URL+"/api/typo", &e); code != http.StatusNotFound || e.Error == "" {
+			t.Errorf("%s: status %d, %+v", name, code, e)
+		}
+	}
+}
+
+func TestWithoutAFrontendOnlyTheRootSaysItIsNotBuilt(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a, WithFrontend(fstest.MapFS{}))
+	res, body := fetch(t, srv.URL+"/favicon.svg")
+	if res.StatusCode != http.StatusNotFound || strings.Contains(body, "pnpm") {
+		t.Errorf("status %d, body %q", res.StatusCode, body)
+	}
+}

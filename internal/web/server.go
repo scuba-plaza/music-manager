@@ -7,7 +7,6 @@ package web
 
 import (
 	"context"
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,23 +24,18 @@ import (
 	"music-manager/internal/version"
 )
 
-//go:embed static
-var staticFiles embed.FS
-
 // Server is the web interface to one library.
 type Server struct {
 	app        *app.App
-	source     app.MetadataSource
 	downloader app.Downloader
-	wolfgang   bool
+	frontend   fs.FS
 
 	hub  *hub
 	jobs *jobs
 	mux  *http.ServeMux
 
-	plans   plans
-	scanned scan
-	mounts  func() []string // the drives to offer; browse.DetectMounts unless a test says otherwise
+	plans  plans
+	mounts func() []string // the drives to offer; browse.DetectMounts unless a test says otherwise
 
 	infoMu    sync.Mutex
 	coverInfo map[string]string
@@ -51,14 +45,8 @@ type Server struct {
 // Option adds a capability to the server.
 type Option func(*Server)
 
-// WithSource lets the server look tracks up in a music database.
-func WithSource(s app.MetadataSource) Option { return func(v *Server) { v.source = s } }
-
 // WithDownloader lets the server add tracks by downloading them.
 func WithDownloader(d app.Downloader) Option { return func(v *Server) { v.downloader = d } }
-
-// WithWolfgang shows what a sync for the Wolfgang WMP01 writes.
-func WithWolfgang() Option { return func(v *Server) { v.wolfgang = true } }
 
 // New returns the server for a library.
 func New(a *app.App, opts ...Option) *Server {
@@ -67,7 +55,14 @@ func New(a *app.App, opts ...Option) *Server {
 	for _, o := range opts {
 		o(s)
 	}
-	s.ed = browse.NewEditor(a, browse.WithSource(s.source), browse.WithDownloader(s.downloader))
+	if s.frontend == nil {
+		dist, err := fs.Sub(distFiles, "dist")
+		if err != nil {
+			panic(err)
+		}
+		s.frontend = dist
+	}
+	s.ed = browse.NewEditor(a, browse.WithDownloader(s.downloader))
 	s.routes()
 	return s
 }
@@ -76,12 +71,7 @@ func New(a *app.App, opts ...Option) *Server {
 func (s *Server) Handler() http.Handler { return guard(s.mux) }
 
 func (s *Server) routes() {
-	static, err := fs.Sub(staticFiles, "static")
-	if err != nil {
-		panic(err)
-	}
-	files := http.FileServerFS(static)
-	s.mux.Handle("GET /", noCache(files))
+	s.mux.Handle("GET /", frontendHandler(s.frontend))
 
 	s.mux.HandleFunc("GET /api/info", s.info)
 	s.mux.HandleFunc("GET /api/doctor", s.doctor)
@@ -91,9 +81,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/peek", s.peek)
 	s.mux.HandleFunc("GET /api/events", s.hub.serve)
 	s.editRoutes()
-	s.identifyRoutes()
 	s.addRoutes()
+	s.jobRoutes()
 	s.syncRoutes()
+	s.profileRoutes()
 }
 
 // Serve answers requests on ln until ctx is done, and watches the library for
@@ -102,7 +93,6 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	s.jobs.useContext(ctx)
 	go s.watch(ctx)
-	go s.scanUnsynced()
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ln) }()
 	select {
@@ -153,6 +143,17 @@ func URL(ln net.Listener) string {
 	return "http://" + host + ":" + port + "/"
 }
 
+type InfoView struct {
+	CanAdd  bool   `json:"canAdd"`
+	Root    string `json:"root"`
+	Version string `json:"version"`
+}
+
+type ErrorView struct {
+	Error  string            `json:"error"`
+	Fields map[string]string `json:"fields,omitempty"`
+}
+
 // info is what does not change while the program runs.
 func (s *Server) info(w http.ResponseWriter, r *http.Request) {
 	root := s.root()
@@ -161,9 +162,10 @@ func (s *Server) info(w http.ResponseWriter, r *http.Request) {
 			root = filepath.Join("~", rel)
 		}
 	}
-	writeJSON(w, map[string]any{
-		"root": root, "version": version.String(), "wolfgang": s.wolfgang,
-		"canAdd": s.downloader != nil, "lookup": s.source != nil,
+	writeJSON(w, InfoView{
+		CanAdd:  s.downloader != nil,
+		Root:    root,
+		Version: version.String(),
 	})
 }
 
@@ -178,7 +180,12 @@ func fail(w http.ResponseWriter, status int, err error) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": capitalize(err.Error())})
+	view := ErrorView{Error: capitalize(err.Error())}
+	var fields app.FieldErrors
+	if errors.As(err, &fields) {
+		view.Fields = fields
+	}
+	_ = json.NewEncoder(w).Encode(view)
 }
 
 func capitalize(s string) string {
@@ -189,13 +196,6 @@ func capitalize(s string) string {
 }
 
 var errNotFound = errors.New("not found")
-
-func noCache(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
-		h.ServeHTTP(w, r)
-	})
-}
 
 // root is the library folder as a full path, wherever mm was started from.
 func (s *Server) root() string {

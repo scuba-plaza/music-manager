@@ -15,6 +15,7 @@ import (
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
 	"music-manager/internal/coverimg"
+	"music-manager/internal/manifest"
 )
 
 // snapshot reads the records as they are now.
@@ -23,7 +24,7 @@ func (s *Server) snapshot() (browse.Snapshot, error) {
 	if err != nil {
 		return browse.Snapshot{}, err
 	}
-	return browse.Snapshot{Tracks: m.Tracks, Playlists: m.Playlists}, nil
+	return browse.Snapshot{Tracks: m.Tracks, Playlists: m.Playlists, Profiles: m.Profiles}, nil
 }
 
 // libraryOptions reads what the left side shows from the query.
@@ -40,6 +41,14 @@ func libraryOptions(r *http.Request) (browse.Options, error) {
 	return o, nil
 }
 
+type LibraryResponse struct {
+	History  browse.HistoryView `json:"history"`
+	Profiles []manifest.Profile `json:"profiles"`
+	Stamp    string             `json:"stamp"`
+	Unsynced int                `json:"unsynced"`
+	View     browse.LibraryView `json:"view"`
+}
+
 func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 	o, err := libraryOptions(r)
 	if err != nil {
@@ -52,12 +61,16 @@ func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, err)
 		return
 	}
-	n, known := s.unsynced()
-	writeJSON(w, map[string]any{
-		"stamp":    stamp,
-		"view":     browse.Library(snap, o),
-		"unsynced": map[string]any{"n": n, "known": known},
-		"history":  s.ed.History(),
+	profiles := snap.Profiles
+	if profiles == nil {
+		profiles = []manifest.Profile{}
+	}
+	writeJSON(w, LibraryResponse{
+		History:  s.ed.History(),
+		Profiles: profiles,
+		Stamp:    stamp,
+		Unsynced: s.unsynced(),
+		View:     browse.Library(snap, o),
 	})
 }
 
@@ -67,7 +80,14 @@ func (s *Server) track(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, err)
 		return
 	}
-	v, ok := browse.Track(snap, r.PathValue("id"), browse.TrackOptions{Wolfgang: s.wolfgang, CoverInfo: s.describeCover})
+	profile := r.URL.Query().Get("profile")
+	if profile != "" {
+		if _, err := s.app.Format(profile); err != nil {
+			fail(w, http.StatusBadRequest, err)
+			return
+		}
+	}
+	v, ok := browse.Track(snap, r.PathValue("id"), browse.TrackOptions{CoverInfo: s.describeCover, Profile: profile})
 	if !ok {
 		fail(w, http.StatusNotFound, errNotFound)
 		return

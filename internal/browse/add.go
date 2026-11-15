@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
+	"net/url"
 	"strings"
 
 	"music-manager/internal/app"
@@ -30,10 +32,8 @@ type AddForm struct {
 	CutEnd   string `json:"cutEnd"`
 }
 
-// addDefaults is what to offer for a downloaded track: what the MusicBrainz
-// match says, if there is one and it is wanted, and otherwise what the
-// download itself reported (taking the uploader of a "- Topic" channel for
-// the artist).
+// addDefaults is what to offer for a downloaded track: what the download
+// reported, taking the uploader of a "- Topic" channel for the artist.
 func addDefaults(info app.Info) AddForm {
 	artist := info.Artist
 	if artist == "" {
@@ -42,7 +42,20 @@ func addDefaults(info app.Info) AddForm {
 	return AddForm{
 		Title: info.Title, Artist: artist, Album: info.Album,
 		Track: numberText(info.TrackNumber), Of: numberText(info.TrackTotal), Released: info.Released,
+		Genre: info.Genre,
 	}
+}
+
+func addNote(info app.Info) string {
+	switch {
+	case info.Source == app.FromTitle:
+		return "Guessed from the video title: check the artist and the title."
+	case info.Source == app.FromMetadata || info.Artist != "":
+		return "From YouTube Music metadata: change anything before adding."
+	case strings.TrimSpace(info.Uploader) != "":
+		return "Guessed from the channel name: check the artist."
+	}
+	return "YouTube gave only a title: fill in the rest."
 }
 
 // Edit turns the form into the details of the track.
@@ -58,12 +71,21 @@ func (f AddForm) Edit() (app.Edit, error) {
 		{field: fCutStart, text: f.CutStart},
 		{field: fCutEnd, text: f.CutEnd},
 	}
+	bad := app.FieldErrors{}
 	for _, p := range parts {
 		part, err := p.edit()
+		var fields app.FieldErrors
+		if errors.As(err, &fields) {
+			maps.Copy(bad, fields)
+			continue
+		}
 		if err != nil {
-			return e, err
+			return app.Edit{}, err
 		}
 		e = mergeEdits(e, part)
+	}
+	if err := bad.OrNil(); err != nil {
+		return app.Edit{}, err
 	}
 	return e, nil
 }
@@ -115,21 +137,12 @@ func AddPath(f AddForm) string {
 	}, device.Generic.Layout())
 }
 
-// MatchView is the recording a download was matched with on MusicBrainz.
-type MatchView struct {
-	Artist string `json:"artist"`
-	Title  string `json:"title"`
-	Album  string `json:"album"`
-}
-
 // DraftView is a downloaded track, waiting for its details.
 type DraftView struct {
-	Draft string     `json:"draft"`
-	Match *MatchView `json:"match,omitempty"`
-	// Matched is the form to start from if the match is used, and Downloaded
-	// the form from what the download said; they are the same without a match.
-	Matched    AddForm `json:"matched"`
-	Downloaded AddForm `json:"downloaded"`
+	Draft string  `json:"draft"`
+	Form  AddForm `json:"form"`
+	Note  string  `json:"note"`
+	Cover string  `json:"cover"`
 }
 
 // DuplicateView is the track that a download turned out to be already.
@@ -145,14 +158,27 @@ type Fetched struct {
 	Duplicate *DuplicateView `json:"duplicate,omitempty"`
 }
 
+var ErrDraftGone = errors.New("That download is gone: fetch the link again")
+
 // maxDrafts is how many downloads wait to be added; the oldest are forgotten.
 const maxDrafts = 8
 
 // CanAdd reports whether tracks can be downloaded.
 func (e *Editor) CanAdd() bool { return e.downloader != nil }
 
-// CleanLink strips the spaces and line breaks that come with a paste.
-func CleanLink(s string) string { return strings.Join(strings.Fields(s), "") }
+// CheckLink strips the spaces and line breaks that come with a paste and says
+// whether what is left is a web link.
+func CheckLink(s string) (string, error) {
+	link := strings.Join(strings.Fields(s), "")
+	if link == "" {
+		return "", app.Invalid("link", "Paste a link first")
+	}
+	u, err := url.Parse(link)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return "", app.Invalid("link", "That is not a web link: it should start with http:// or https://")
+	}
+	return link, nil
+}
 
 // Fetch downloads the audio at the link and prepares it to be added. A track
 // that is in the library already comes back as a Duplicate, not an error.
@@ -160,11 +186,11 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 	if e.downloader == nil {
 		return Fetched{}, errors.New("Adding from YouTube is not available: yt-dlp is not set up")
 	}
-	link = CleanLink(link)
-	if link == "" {
-		return Fetched{}, errors.New("Paste a link first")
+	link, err := CheckLink(link)
+	if err != nil {
+		return Fetched{}, err
 	}
-	d, err := e.lib.Fetch(ctx, app.AddRequest{URL: link, Source: e.source}, e.downloader)
+	d, err := e.lib.Fetch(ctx, app.AddRequest{URL: link}, e.downloader)
 	var dup *app.DuplicateError
 	if errors.As(err, &dup) {
 		s, serr := e.snapshot()
@@ -182,12 +208,7 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 	if _, err := rand.Read(raw[:]); err != nil {
 		return Fetched{}, err
 	}
-	v := DraftView{Draft: hex.EncodeToString(raw[:]), Matched: addDefaults(d.Info), Downloaded: addDefaults(d.Downloaded)}
-	if d.Match != nil {
-		v.Match = &MatchView{Artist: d.Match.Artist, Title: d.Match.Title, Album: d.Match.Album}
-	} else {
-		v.Matched = v.Downloaded
-	}
+	v := DraftView{Draft: hex.EncodeToString(raw[:]), Form: addDefaults(d.Info), Note: addNote(d.Info), Cover: d.CoverSHA()}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.drafts == nil {
@@ -200,6 +221,43 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 	e.drafts[v.Draft] = d
 	e.draftOrder = append(e.draftOrder, v.Draft)
 	return Fetched{Draft: &v}, nil
+}
+
+// DraftCover is the stored cover of a draft, by its SHA, or "" if it has none.
+func (e *Editor) DraftCover(draft string) (string, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	d, ok := e.drafts[draft]
+	if !ok {
+		return "", false
+	}
+	return d.CoverSHA(), true
+}
+
+// ReplaceDraftCover gives a draft the picture as its cover, and returns its SHA.
+func (e *Editor) ReplaceDraftCover(draft string, image []byte) (string, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	d, ok := e.drafts[draft]
+	if !ok {
+		return "", ErrDraftGone
+	}
+	if err := e.lib.SetDraftCover(d, image); err != nil {
+		return "", err
+	}
+	return d.CoverSHA(), nil
+}
+
+// RemoveDraftCover takes the cover of a draft away.
+func (e *Editor) RemoveDraftCover(draft string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	d, ok := e.drafts[draft]
+	if !ok {
+		return ErrDraftGone
+	}
+	e.lib.RemoveDraftCover(d)
+	return nil
 }
 
 // Discard forgets a draft that is not going to be added.
@@ -216,19 +274,19 @@ func (e *Editor) Discard(draft string) {
 }
 
 // Finish adds a downloaded track to the library with the details of the form.
-func (e *Editor) Finish(ctx context.Context, draft string, f AddForm) (Result, error) {
+func (e *Editor) Finish(draft string, f AddForm) (Result, error) {
 	e.mu.Lock()
 	d, ok := e.drafts[draft]
 	e.mu.Unlock()
 	if !ok {
-		return Result{}, errors.New("That download is gone: fetch the link again")
+		return Result{}, ErrDraftGone
 	}
 	edit, err := f.Edit()
 	if err != nil {
 		return Result{}, err
 	}
 	// the library is written without the editor locked: it may take a moment
-	t, err := e.lib.Finish(ctx, d, edit)
+	t, err := e.lib.Finish(d, edit)
 	if err != nil {
 		return Result{}, err
 	}

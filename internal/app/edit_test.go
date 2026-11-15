@@ -18,7 +18,7 @@ func ingested(t *testing.T) (*app.App, manifest.Track) {
 	t.Helper()
 	a := openLib(t)
 	f := filepath.Join(t.TempDir(), "x.mp3")
-	writeFile(t, f, testmp3.WithTags(testmp3.Silent(100), "old", "old", "old"))
+	writeFile(t, f, testmp3.Silent(100))
 	rep, err := a.Ingest([]string{f})
 	if err != nil || len(rep.Added) != 1 {
 		t.Fatalf("ingest: %+v, %v", rep, err)

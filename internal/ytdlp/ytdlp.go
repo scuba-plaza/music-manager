@@ -33,9 +33,10 @@ func (d *Downloader) Download(ctx context.Context, url, dir string) (app.Downloa
 	cmd := exec.CommandContext(ctx, bin,
 		"--no-playlist", "-q", "--no-warnings",
 		"-x", "--audio-format", "mp3", "--audio-quality", "0",
+		"--write-thumbnail", "--convert-thumbnails", "jpg",
 		"--print-json",
 		"-o", filepath.Join(dir, "%(id)s.%(ext)s"),
-		url)
+		"--", url)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	cmd.WaitDelay = 2 * time.Second // a killed run may leave children holding the pipes
@@ -57,7 +58,8 @@ func (d *Downloader) Download(ctx context.Context, url, dir string) (app.Downloa
 	if _, err := os.Stat(path); err != nil {
 		return app.Downloaded{}, fmt.Errorf("%s did not produce %s", d.Bin, path)
 	}
-	return app.Downloaded{Path: path, Info: info.Info}, nil
+	cover, _ := os.ReadFile(filepath.Join(dir, info.id+".jpg"))
+	return app.Downloaded{Path: path, Info: info.Info, Cover: cover}, nil
 }
 
 type parsed struct {
@@ -65,21 +67,23 @@ type parsed struct {
 	app.Info
 }
 
-// parseInfo reads the JSON object yt-dlp prints for the video, ignoring any
-// lines around it.
+type rawInfo struct {
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Track       string   `json:"track"`
+	Artist      string   `json:"artist"`
+	Artists     []string `json:"artists"`
+	Uploader    string   `json:"uploader"`
+	Album       string   `json:"album"`
+	TrackNumber float64  `json:"track_number"`
+	ReleaseDate string   `json:"release_date"`
+	ReleaseYear float64  `json:"release_year"`
+	Genre       string   `json:"genre"`
+	Genres      []string `json:"genres"`
+}
+
 func parseInfo(out []byte) (parsed, error) {
-	var raw struct {
-		ID          string   `json:"id"`
-		Title       string   `json:"title"`
-		Track       string   `json:"track"`
-		Artist      string   `json:"artist"`
-		Artists     []string `json:"artists"`
-		Uploader    string   `json:"uploader"`
-		Album       string   `json:"album"`
-		TrackNumber float64  `json:"track_number"`
-		ReleaseDate string   `json:"release_date"`
-		ReleaseYear float64  `json:"release_year"`
-	}
+	var raw rawInfo
 	var found bool
 	for _, line := range strings.Split(string(out), "\n") {
 		if line = strings.TrimSpace(line); strings.HasPrefix(line, "{") {
@@ -92,18 +96,7 @@ func parseInfo(out []byte) (parsed, error) {
 	if !found || raw.ID == "" {
 		return parsed{}, errors.New("yt-dlp printed no video information")
 	}
-	title := raw.Track
-	if title == "" {
-		title = raw.Title
-	}
-	artist := raw.Artist // "A, B" when there are several: a track has one artist, the first
-	if len(raw.Artists) > 0 && strings.TrimSpace(raw.Artists[0]) != "" {
-		artist = strings.TrimSpace(raw.Artists[0])
-	}
-	return parsed{id: raw.ID, Info: app.Info{
-		Title: title, Artist: artist, Uploader: raw.Uploader, Album: raw.Album, TrackNumber: int(raw.TrackNumber),
-		Released: released(raw.ReleaseDate, raw.ReleaseYear),
-	}}, nil
+	return parsed{id: raw.ID, Info: interpret(raw)}, nil
 }
 
 func lastLine(s string) string {

@@ -86,10 +86,13 @@ func (s *Server) syncRoutes() {
 	s.mux.HandleFunc("DELETE /api/sync/{plan}", s.syncDrop)
 }
 
+type SyncTargetsView struct {
+	Targets []browse.TargetView `json:"targets"`
+}
+
 func (s *Server) syncTargets(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, map[string]any{
-		"targets":  browse.Targets(s.root(), s.mounts()),
-		"wolfgang": s.wolfgang,
+	writeJSON(w, SyncTargetsView{
+		Targets: browse.Targets(s.root(), s.mounts()),
 	})
 }
 
@@ -102,28 +105,31 @@ func (s *Server) target(library bool, folder string) (path, where string, isLibr
 	}
 	p := browse.CleanPath(folder)
 	if p == "" {
-		return "", "", false, errors.New("type the folder to write into")
+		return "", "", false, app.Invalid("folder", "type the folder to write into")
 	}
 	if !filepath.IsAbs(p) {
-		return "", "", false, errors.New("write the whole path of the folder, starting with / or ~")
+		return "", "", false, app.Invalid("folder", "write the whole path of the folder, starting with / or ~")
 	}
 	p = filepath.Clean(p)
+	if home, err := os.UserHomeDir(); err == nil && home != "" && sameFolder(p, home) {
+		return "", "", false, app.Invalid("folder", "that is your home folder: pick a folder of its own")
+	}
 	root := s.root()
 	if sameFolder(p, root) {
 		return "", "Library folder", true, nil
 	}
 	if inside(p, root) {
-		return "", "", false, errors.New("that folder is inside the library folder: pick another one, or the library folder itself")
+		return "", "", false, app.Invalid("folder", "that folder is inside the library folder: pick another one, or the library folder itself")
 	}
 	if inside(root, p) {
-		return "", "", false, errors.New("that folder holds the library: pick a folder of its own")
+		return "", "", false, app.Invalid("folder", "that folder holds the library: pick a folder of its own")
 	}
 	switch info, err := os.Stat(p); {
 	case err == nil && !info.IsDir():
-		return "", "", false, fmt.Errorf("%s is a file, not a folder", browse.Tilde(p))
+		return "", "", false, app.Invalid("folder", fmt.Sprintf("%s is a file, not a folder", browse.Tilde(p)))
 	case err != nil:
 		if parent, perr := os.Stat(filepath.Dir(p)); perr != nil || !parent.IsDir() {
-			return "", "", false, fmt.Errorf("%s is not there, and neither is the folder it would be made in", browse.Tilde(p))
+			return "", "", false, app.Invalid("folder", fmt.Sprintf("%s is not there, and neither is the folder it would be made in", browse.Tilde(p)))
 		}
 	}
 	return p, browse.Tilde(p), false, nil
@@ -143,9 +149,9 @@ func inside(p, dir string) bool {
 
 func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Library  bool
-		Folder   string
-		Wolfgang bool
+		Library bool
+		Folder  string
+		Profile string
 	}
 	if !read(w, r, &in) {
 		return
@@ -155,9 +161,13 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnprocessableEntity, err)
 		return
 	}
-	var dev device.Target = device.Generic
-	if in.Wolfgang && !isLibrary { // the library folder is always written the standard way
-		dev, where = device.Wolfgang, where+" · Wolfgang WMP01"
+	dev, err := s.syncDevice(isLibrary, in.Profile)
+	if err != nil {
+		fail(w, http.StatusBadRequest, err)
+		return
+	}
+	if dev.ID() != device.Generic.ID() {
+		where += " · " + dev.Profile().Name
 	}
 	v, err := s.jobs.start("sync", func(ctx context.Context, report func(any)) (any, error) {
 		type made struct {
@@ -203,6 +213,16 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, v)
+}
+
+func (s *Server) syncDevice(isLibrary bool, profile string) (device.Target, error) {
+	switch {
+	case isLibrary:
+		return device.Generic, nil
+	case profile != "":
+		return s.app.Format(profile)
+	}
+	return device.Generic, nil
 }
 
 func newID() (string, error) {
@@ -294,47 +314,10 @@ func (s *Server) syncDrop(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ---- the count in the header
-
-// scan is the count of tracks the library folder lags behind by, for a library
-// that has never been synced. Normally the count is a comparison of records and
-// nothing more; only the first time, when there is nothing to compare with, the
-// folder itself is looked at, once, in the background.
-type scan struct {
-	mu sync.Mutex
-	n  int
-}
-
-// unsynced is the header's count.
-func (s *Server) unsynced() (n int, known bool) {
+func (s *Server) unsynced() int {
 	n, known, err := s.app.Unsynced()
-	if err != nil {
-		return 0, false
+	if err != nil || !known {
+		return 0
 	}
-	if known {
-		return n, true
-	}
-	s.scanned.mu.Lock()
-	defer s.scanned.mu.Unlock()
-	return s.scanned.n, false
-}
-
-// scanUnsynced looks at the library folder once, if nothing says how far behind
-// it is, and tells the pages. A folder that is up to date is remembered as such.
-func (s *Server) scanUnsynced() {
-	if _, known, err := s.app.Unsynced(); err != nil || known {
-		return
-	}
-	plan, err := s.app.PlanSync(app.SyncOptions{})
-	if err != nil {
-		return
-	}
-	if writes := browse.CountOps(plan.Ops).Writes(); writes > 0 {
-		s.scanned.mu.Lock()
-		s.scanned.n = writes
-		s.scanned.mu.Unlock()
-		s.hub.publish("library", fmt.Sprintf("%q", s.stamp()+"scanned"))
-		return
-	}
-	_ = s.app.RecordSynced()
+	return n
 }

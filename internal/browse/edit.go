@@ -17,12 +17,10 @@ import (
 // Store is what the editor changes; *app.App is one.
 type Store interface {
 	Manifest() (*manifest.Manifest, error)
-	Candidates(ctx context.Context, id string, src app.MetadataSource, q *app.Query) ([]app.Candidate, error)
-	ApplyCandidate(ctx context.Context, id string, c app.Candidate, src app.MetadataSource) (manifest.Track, error)
-	Identify(ctx context.Context, ids []string, src app.MetadataSource, p app.Prompter, opts app.IdentifyOptions) ([]app.IdentifyResult, error)
-	Adopt(ids []string) ([]app.AdoptResult, error)
 	Fetch(ctx context.Context, req app.AddRequest, dl app.Downloader) (*app.Draft, error)
-	Finish(ctx context.Context, d *app.Draft, e app.Edit) (manifest.Track, error)
+	Finish(d *app.Draft, e app.Edit) (manifest.Track, error)
+	SetDraftCover(d *app.Draft, image []byte) error
+	RemoveDraftCover(d *app.Draft)
 	Edit(id string, e app.Edit) (manifest.Track, error)
 	EditMany(edits map[string]app.Edit) (map[string]manifest.Track, error)
 	Renumber(ids []string) (map[string]manifest.Track, error)
@@ -69,8 +67,8 @@ type change struct {
 // maxHistory is how many changes can be undone.
 const maxHistory = 200
 
-// History says what undo and redo would do now, and what is copied.
-type History struct {
+// HistoryView says what undo and redo would do now, and what is copied.
+type HistoryView struct {
 	Undo string `json:"undo,omitempty"`
 	Redo string `json:"redo,omitempty"`
 	Clip string `json:"clip,omitempty"`
@@ -80,8 +78,7 @@ type History struct {
 // undone. One editor serves the one person using the program.
 type Editor struct {
 	lib        Store
-	source     app.MetadataSource // the music database to look tracks up in; nil if there is none
-	downloader app.Downloader     // what downloads a link; nil if there is none
+	downloader app.Downloader // what downloads a link; nil if there is none
 
 	mu       sync.Mutex
 	undoes   []change
@@ -89,17 +86,12 @@ type Editor struct {
 	nudgeKey string
 	clip     *clipContents
 
-	searches    map[string]search // what the searches found, by name
-	searchOrder []string
-	drafts      map[string]*app.Draft // downloads waiting for their details, by name
-	draftOrder  []string
+	drafts     map[string]*app.Draft // downloads waiting for their details, by name
+	draftOrder []string
 }
 
 // EditorOption adds a capability to an editor.
 type EditorOption func(*Editor)
-
-// WithSource lets the editor look tracks up in a music database.
-func WithSource(s app.MetadataSource) EditorOption { return func(e *Editor) { e.source = s } }
 
 // WithDownloader lets the editor add tracks by downloading them.
 func WithDownloader(d app.Downloader) EditorOption { return func(e *Editor) { e.downloader = d } }
@@ -118,14 +110,14 @@ func (e *Editor) snapshot() (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
-	return Snapshot{Tracks: m.Tracks, Playlists: m.Playlists}, nil
+	return Snapshot{Tracks: m.Tracks, Playlists: m.Playlists, Profiles: m.Profiles}, nil
 }
 
 // History is what undo, redo and paste would do now.
-func (e *Editor) History() History {
+func (e *Editor) History() HistoryView {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	var h History
+	var h HistoryView
 	if n := len(e.undoes); n > 0 {
 		h.Undo = e.undoes[n-1].label
 	}
@@ -181,7 +173,7 @@ func (e *Editor) SetField(id, field, text, second string) (Result, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	f, ok := fieldByKey(field)
-	if !ok || f == fWolfgang || f == fCover || f > fLatinGenre {
+	if !ok || f == fCover || f > fLatinGenre {
 		return Result{}, fmt.Errorf("there is no field %q to edit", field)
 	}
 	s, err := e.snapshot()

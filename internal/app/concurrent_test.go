@@ -87,7 +87,7 @@ func TestASyncCollectsNoFilesWhileTheRecordsAreBeingChanged(t *testing.T) {
 	<-inside
 
 	applied := make(chan error, 1)
-	go func() { applied <- plan.Apply() }()
+	go func() { applied <- plan.ApplyWith(nil) }()
 	select {
 	case err := <-applied:
 		t.Fatalf("the sync collected files while the records were being changed (err %v)", err)

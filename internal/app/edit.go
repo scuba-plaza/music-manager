@@ -198,7 +198,11 @@ func validate(t manifest.Track) error {
 	case t.TrimStart < 0 || t.TrimEnd < 0:
 		return fmt.Errorf("trims cannot be negative")
 	case t.TrimStart+t.TrimEnd >= t.SourceLength:
-		return fmt.Errorf("trims (%v + %v) leave nothing of a %v track", t.TrimStart, t.TrimEnd, t.SourceLength.Round(time.Millisecond))
+		message := fmt.Sprintf("trims (%v + %v) leave nothing of a %v track", t.TrimStart, t.TrimEnd, t.SourceLength.Round(time.Millisecond))
+		e := FieldErrors{}
+		e.Set("cutStart", message)
+		e.Set("cutEnd", message)
+		return e
 	case t.TrackNumber < 0 || t.TrackTotal < 0:
 		return fmt.Errorf("track numbers cannot be negative")
 	case t.GainSteps > MaxGainSteps || t.GainSteps < -MaxGainSteps:

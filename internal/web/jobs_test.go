@@ -1,0 +1,55 @@
+package web
+
+import (
+	"context"
+	"testing"
+	"time"
+)
+
+var raw = sendInto
+
+func waitJob(t *testing.T, base, id string) JobView {
+	t.Helper()
+	for i := 0; i < 200; i++ {
+		var v JobView
+		if code := getJSON(t, base+"/api/jobs/"+id, &v); code != 200 {
+			t.Fatalf("job %s: %d", id, code)
+		}
+		if v.State != jobRunning {
+			return v
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	t.Fatal("the job never ended")
+	return JobView{}
+}
+
+func jobEnded(t *testing.T, j *jobs, id string) {
+	t.Helper()
+	for i := 0; i < 400; i++ {
+		if v, ok := j.get(id); ok && v.State != jobRunning {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("job %s never ended", id)
+}
+
+func TestTheOldestFinishedJobsAreTheOnesForgotten(t *testing.T) {
+	j := newJobs(newHub())
+	var ids []string
+	for i := 0; i < maxFinished+5; i++ {
+		v, err := j.start("work", func(context.Context, func(any)) (any, error) { return nil, nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, v.ID)
+		jobEnded(t, j, v.ID)
+	}
+	for i, id := range ids {
+		_, kept := j.get(id)
+		if forgotten := i < 4; kept == forgotten {
+			t.Errorf("job %d of %d: kept = %v, want %v", i+1, len(ids), kept, !forgotten)
+		}
+	}
+}

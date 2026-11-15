@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 )
@@ -39,6 +40,7 @@ type job struct {
 	view   JobView
 	cancel context.CancelFunc
 	sent   time.Time
+	seq    int
 }
 
 type jobs struct {
@@ -47,6 +49,7 @@ type jobs struct {
 	mu   sync.Mutex
 	base context.Context
 	byID map[string]*job
+	next int
 	wg   sync.WaitGroup
 }
 
@@ -92,7 +95,8 @@ func (j *jobs) start(kind string, work func(ctx context.Context, report func(dat
 		return JobView{}, err
 	}
 	ctx, cancel := context.WithCancel(j.base)
-	jb := &job{view: JobView{ID: hex.EncodeToString(raw[:]), Kind: kind, State: jobRunning}, cancel: cancel}
+	j.next++
+	jb := &job{view: JobView{ID: hex.EncodeToString(raw[:]), Kind: kind, State: jobRunning}, cancel: cancel, seq: j.next}
 	j.byID[jb.view.ID] = jb
 	j.forgetOld()
 	started := jb.view
@@ -144,6 +148,7 @@ func (j *jobs) forgetOld() {
 			finished = append(finished, id)
 		}
 	}
+	slices.SortFunc(finished, func(a, b string) int { return j.byID[a].seq - j.byID[b].seq })
 	for len(finished) > maxFinished {
 		delete(j.byID, finished[0])
 		finished = finished[1:]

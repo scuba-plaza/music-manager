@@ -109,3 +109,11 @@ func (s *Server) watch(ctx context.Context) {
 		}
 	}
 }
+
+type HelloEvent struct{}
+
+type ServerEvents struct {
+	Hello   HelloEvent `json:"hello"`
+	Job     JobView    `json:"job"`
+	Library string     `json:"library"`
+}

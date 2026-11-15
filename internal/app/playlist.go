@@ -25,10 +25,6 @@ func (a *App) CreatePlaylist(name string, ids ...string) error {
 	})
 }
 
-// targets are the kinds of place a library is written to; two playlists may
-// not come out as one file on any of them.
-var targets = []device.Target{device.Generic, device.Wolfgang}
-
 // checkPlaylist says whether a playlist with this name, and this Latin name if one
 // was set by hand, can be among the playlists of m.
 func checkPlaylist(m *manifest.Manifest, add manifest.Playlist) error {
@@ -39,10 +35,8 @@ func checkPlaylist(m *manifest.Manifest, add manifest.Playlist) error {
 		return fmt.Errorf("the Latin name of a playlist, %q, must be on one line", add.NameLatin)
 	}
 	for _, p := range m.Playlists {
-		for _, dev := range targets {
-			if file := dev.PlaylistFile(add); strings.EqualFold(file, dev.PlaylistFile(p)) {
-				return fmt.Errorf("there is already a playlist called %q, and %q would be the same file (%s)", p.Name, add.Name, file)
-			}
+		if file := device.Generic.PlaylistFile(add); strings.EqualFold(file, device.Generic.PlaylistFile(p)) {
+			return fmt.Errorf("there is already a playlist called %q, and %q would be the same file (%s)", p.Name, add.Name, file)
 		}
 	}
 	return nil

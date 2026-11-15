@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
+	"music-manager/internal/manifest"
 )
 
 // syncServer is a server that offers the given drives, not the ones of the machine.
@@ -60,11 +64,10 @@ func TestTheTargetsAreTheLibraryFolderAndTheDrives(t *testing.T) {
 	a, _ := seed(t, sample...)
 	_, ts := syncServer(t, a, "/run/media/tau/PLAYER")
 	var out struct {
-		Targets  []browse.TargetView
-		Wolfgang bool
+		Targets []browse.TargetView
 	}
 	if code := getJSON(t, ts.URL+"/api/sync/targets", &out); code != 200 || len(out.Targets) != 2 ||
-		out.Targets[0].Kind != "library" || out.Targets[1].Path != "/run/media/tau/PLAYER" || out.Wolfgang {
+		out.Targets[0].Kind != "library" || out.Targets[1].Path != "/run/media/tau/PLAYER" {
 		t.Errorf("%d %+v", code, out)
 	}
 }
@@ -114,16 +117,13 @@ func TestSyncingTheLibraryFolderRecordsItAndClearsUndo(t *testing.T) {
 	send(t, srv, "PATCH", "/api/tracks/"+ts[0].ID, obj{"field": "title", "text": "Wanderer II"})
 
 	var lib struct {
-		Unsynced struct {
-			N     int
-			Known bool
-		}
-		History struct{ Undo string }
+		Unsynced int
+		History  struct{ Undo string }
 	}
-	if getJSON(t, srv.URL+"/api/library", &lib); lib.Unsynced.Known || lib.History.Undo == "" {
-		t.Fatalf("%+v", lib)
+	if getJSON(t, srv.URL+"/api/library", &lib); lib.Unsynced != 0 || lib.History.Undo == "" {
+		t.Fatalf("a library never synced has no count to show: %+v", lib)
 	}
-	_, d := planned(t, srv.URL, obj{"library": true, "wolfgang": true})
+	_, d := planned(t, srv.URL, obj{"library": true})
 	if d.Plan.Where != "Library folder" || d.Plan.Counts.Create != 4 {
 		t.Fatalf("%+v", d.Plan)
 	}
@@ -137,14 +137,14 @@ func TestSyncingTheLibraryFolderRecordsItAndClearsUndo(t *testing.T) {
 	after := lib
 	after.History.Undo = ""
 	getJSON(t, srv.URL+"/api/library", &after)
-	if !after.Unsynced.Known || after.Unsynced.N != 0 || after.History.Undo != "" {
+	if after.Unsynced != 0 || after.History.Undo != "" {
 		t.Errorf("after the sync: %+v", after)
 	}
 
 	// edited again (a tag, so that the file keeps its name), then planned: it is written
 	send(t, srv, "PATCH", "/api/tracks/"+ts[0].ID, obj{"field": "genre", "text": "Blues"})
 	getJSON(t, srv.URL+"/api/library", &lib)
-	if lib.Unsynced.N != 1 {
+	if lib.Unsynced != 1 {
 		t.Fatalf("one edit: %+v", lib)
 	}
 	_, d = planned(t, srv.URL, obj{"library": true})
@@ -219,7 +219,7 @@ func TestOnlyAFolderThatMakesSenseIsATarget(t *testing.T) {
 	}
 	for folder, want := range cases {
 		var r reply
-		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), want) {
+		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), want) || !strings.Contains(strings.ToLower(r.Fields["folder"]), want) {
 			t.Errorf("%q: %d %+v, want %q", folder, code, r, want)
 		}
 	}
@@ -229,6 +229,22 @@ func TestOnlyAFolderThatMakesSenseIsATarget(t *testing.T) {
 	}
 	if _, d := planned(t, srv.URL, obj{"folder": filepath.Join(t.TempDir(), "new")}); d.Plan == nil || d.Plan.Counts.Create != 4 {
 		t.Errorf("%+v", d)
+	}
+}
+
+func TestTheHomeFolderIsNotATargetEvenWhenTheLibraryLivesElsewhere(t *testing.T) {
+	a, _ := seed(t, sample...)
+	_, srv := syncServer(t, a)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	for _, folder := range []string{home, home + "/", "~"} {
+		var r reply
+		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Fields["folder"]), "home folder") {
+			t.Errorf("%q: %d %+v, want 422 about the home folder", folder, code, r)
+		}
+	}
+	if _, d := planned(t, srv.URL, obj{"folder": filepath.Join(home, "player")}); d.Plan == nil {
+		t.Errorf("a folder inside the home folder should still be a target: %+v", d)
 	}
 }
 
@@ -272,39 +288,6 @@ func TestAPlanNobodyWaitsForIsDropped(t *testing.T) {
 	}
 }
 
-func TestACountIsFoundForALibraryNeverSynced(t *testing.T) {
-	a, _ := seed(t, sample...)
-	s, srv := syncServer(t, a)
-	var lib struct {
-		Unsynced struct {
-			N     int
-			Known bool
-		}
-	}
-	getJSON(t, srv.URL+"/api/library", &lib)
-	if lib.Unsynced.N != 0 || lib.Unsynced.Known {
-		t.Fatalf("nothing is known before the folder is looked at: %+v", lib)
-	}
-	s.scanUnsynced()
-	getJSON(t, srv.URL+"/api/library", &lib)
-	if lib.Unsynced.N != 4 || lib.Unsynced.Known {
-		t.Errorf("the one scan counts what would be written: %+v", lib)
-	}
-	// a folder that is up to date is recorded as such
-	b, _ := seed(t, sample...)
-	plan, err := b.PlanSync(app.SyncOptions{})
-	if err != nil || plan.Apply() != nil {
-		t.Fatal(err)
-	}
-	os.Remove(filepath.Join(b.Root(), ".mm", "synced.json"))
-	s2, srv2 := syncServer(t, b)
-	s2.scanUnsynced()
-	getJSON(t, srv2.URL+"/api/library", &lib)
-	if lib.Unsynced.N != 0 || !lib.Unsynced.Known {
-		t.Errorf("an up-to-date folder is remembered: %+v", lib)
-	}
-}
-
 func TestAFolderInsideALibraryGivenByARelativePathIsStillRefused(t *testing.T) {
 	t.Chdir(t.TempDir())
 	a, err := app.Open("lib")
@@ -315,7 +298,7 @@ func TestAFolderInsideALibraryGivenByARelativePathIsStillRefused(t *testing.T) {
 	abs, _ := filepath.Abs("lib")
 	for folder, want := range map[string]string{filepath.Join(abs, "card"): "inside the library folder", filepath.Dir(abs): "holds the library"} {
 		var r reply
-		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), want) {
+		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), want) || !strings.Contains(strings.ToLower(r.Fields["folder"]), want) {
 			t.Errorf("%q: %d %+v, want %q", folder, code, r, want)
 		}
 	}
@@ -323,5 +306,119 @@ func TestAFolderInsideALibraryGivenByARelativePathIsStillRefused(t *testing.T) {
 	getJSON(t, srv.URL+"/api/sync/targets", &out)
 	if !filepath.IsAbs(strings.Replace(out.Targets[0].Path, "~", "/home", 1)) {
 		t.Errorf("the library folder is shown as %q", out.Targets[0].Path)
+	}
+}
+
+func TestAPlanForTheWolfgangNamesItAndWarnsAboutWhatItWillNotShowWell(t *testing.T) {
+	a, ts := seed(t, sample...)
+	genre := "Alternative Rock"
+	if _, err := a.Edit(ts[0].ID, app.Edit{Genre: &genre}); err != nil {
+		t.Fatal(err)
+	}
+	_, srv := syncServer(t, a)
+	target := t.TempDir()
+
+	_, d := planned(t, srv.URL, obj{"folder": target, "profile": "wolfgang-wmp01"})
+	if !strings.HasSuffix(d.Plan.Where, "Wolfgang WMP01") {
+		t.Errorf("the plan is for %q, want it to name the Wolfgang", d.Plan.Where)
+	}
+	if len(d.Plan.Warnings) != 1 || d.Plan.Warnings[0].Track != ts[0].Title || !strings.Contains(d.Plan.Warnings[0].Message, genre) {
+		t.Errorf("warnings %+v, want one about the genre of %q", d.Plan.Warnings, ts[0].Title)
+	}
+
+	_, plain := planned(t, srv.URL, obj{"folder": target})
+	if strings.HasSuffix(plain.Plan.Where, "Wolfgang WMP01") || len(plain.Plan.Warnings) != 0 {
+		t.Errorf("a plan that is not for the Wolfgang talks about it: %q, %+v", plain.Plan.Where, plain.Plan.Warnings)
+	}
+}
+
+var shortStems = manifest.Profile{
+	Name: "Short Stems", StemMax: 8, ComponentMax: 200, CoverFormat: "keep", ReplayGain: true,
+	PlaylistExt: ".m3u8", PlaylistStyle: "relative",
+}
+
+func profileSyncServer(t *testing.T, a *app.App, profiles ...manifest.Profile) *httptest.Server {
+	t.Helper()
+	for _, p := range profiles {
+		if _, err := a.CreateProfile(p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s := New(a)
+	s.mounts = func() []string { return nil }
+	ts := httptest.NewServer(s.Handler())
+	t.Cleanup(ts.Close)
+	return ts
+}
+
+func TestSyncPlanWithAnUnknownProfileIs400(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := profileSyncServer(t, a, shortStems)
+	var r reply
+	code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": t.TempDir(), "profile": "nobody"}, &r)
+	if code != 400 || !strings.Contains(r.Error, `"nobody"`) {
+		t.Errorf("%d %+v", code, r)
+	}
+}
+
+func TestSyncPlanForTheLibraryFolderIgnoresTheProfile(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := profileSyncServer(t, a, shortStems)
+	for _, profile := range []string{"short-stems", "wolfgang-wmp01", "nobody"} {
+		_, d := planned(t, srv.URL, obj{"library": true, "profile": profile})
+		if d.Plan.Where != "Library folder" || len(d.Plan.Warnings) != 0 {
+			t.Fatalf("%s: %+v", profile, d.Plan)
+		}
+		if !slices.ContainsFunc(d.Plan.Ops, func(op browse.OpView) bool { return op.Path == "Shawn James/Shadows/01 - The Wanderer.mp3" }) {
+			t.Errorf("%s: the library folder is not written the generic way: %+v", profile, d.Plan.Ops)
+		}
+	}
+}
+
+func TestSyncPlanWithAProfileUsesItsRules(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := profileSyncServer(t, a, shortStems)
+	_, d := planned(t, srv.URL, obj{"folder": t.TempDir(), "profile": "short-stems"})
+	if !strings.HasSuffix(d.Plan.Where, " · Short Stems") {
+		t.Errorf("the plan is for %q, want it to name the profile", d.Plan.Where)
+	}
+	var mp3s int
+	for _, op := range d.Plan.Ops {
+		if stem, ok := strings.CutSuffix(path.Base(op.Path), ".mp3"); ok {
+			mp3s++
+			if n := utf8.RuneCountInString(stem); n > 8 {
+				t.Errorf("%s: a name of %d characters, want it cut at 8", op.Path, n)
+			}
+		}
+	}
+	if mp3s != 4 {
+		t.Errorf("%d tracks planned: %+v", mp3s, d.Plan.Ops)
+	}
+
+	_, g := planned(t, srv.URL, obj{"folder": t.TempDir()})
+	if strings.Contains(g.Plan.Where, "·") || !slices.ContainsFunc(g.Plan.Ops, func(op browse.OpView) bool { return op.Path == "Shawn James/Shadows/01 - The Wanderer.mp3" }) {
+		t.Errorf("without a profile the plan is not generic: %q %+v", g.Plan.Where, g.Plan.Ops)
+	}
+}
+
+func TestAPlanNamesNoDeviceBesidesItsProfile(t *testing.T) {
+	a, _ := seed(t, sample...)
+	srv := start(t, a)
+	var refused reply
+	if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": t.TempDir(), "wolfgang": true}, &refused); code != 400 || !strings.Contains(refused.Error, "wolfgang") {
+		t.Errorf("a plan with a field the server does not know: %d %+v, want it refused", code, refused)
+	}
+	_, d := planned(t, srv.URL, obj{"folder": t.TempDir()})
+	if strings.Contains(d.Plan.Where, " · ") || len(d.Plan.Warnings) != 0 {
+		t.Errorf("a plan with no profile is not for generic: %q %+v", d.Plan.Where, d.Plan.Warnings)
+	}
+	for _, path := range []string{"/api/info", "/api/sync/targets"} {
+		var body map[string]any
+		if code := getJSON(t, srv.URL+path, &body); code != 200 {
+			t.Fatalf("%s: %d", path, code)
+		}
+		if _, there := body["wolfgang"]; there {
+			t.Errorf("%s says %v about a Wolfgang flag", path, body["wolfgang"])
+		}
 	}
 }
