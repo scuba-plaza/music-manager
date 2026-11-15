@@ -30,7 +30,7 @@ buildGoModule {
     cp -r --no-preserve=mode ${frontend}/. internal/web/dist/
   '';
 
-  vendorHash = "sha256-pdCnt8lqPiPSipa6KmtSxl8c2YZ32vv4X6tMETZRAQY=";
+  vendorHash = "sha256-nA2Evpdnm6UFiXDygjzJQFU+7OK3+cgw6ItumlwyPTI=";
 
   excludedPackages = [
     "e2e-server"
