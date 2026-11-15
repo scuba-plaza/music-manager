@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddForm, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
 import { changeResponse, infoView, jsonResponse, memoryStorage, requestsTo, sampleLibrary, stubServer, type StubRoute , urlOf } from '../testing/fakes';
-import { chooseDraftCover, chooseFiles, fetchLink, leaveAdd, leaveField, openAdd, removeDraftCover, retryAdd, saveAdd, setField, showDuplicate, typeLink, useAdd } from './add';
+import { chooseDraftCover, chooseFiles, fetchLink, leaveField, openAdd, removeDraftCover, retryAdd, saveAdd, setField, showDuplicate, typeLink, useAdd } from './add';
 import { shownErrors } from './form';
 import { jobEvent } from './jobs';
 import { useApp } from './store';
@@ -270,7 +270,7 @@ describe('fetching a link', () => {
       expect(state().job?.id).toBe('a1');
     });
 
-    leaveAdd();
+    useApp.setState({ overlay: null });
 
     expect(useApp.getState().overlay).toBeNull();
     await vi.waitFor(() => {
@@ -504,7 +504,7 @@ describe('adding the track', () => {
   it('forgets the download when the dialog is closed without adding it', async () => {
     await inFormWith(finish, discard);
 
-    leaveAdd();
+    useApp.setState({ overlay: null });
 
     await vi.waitFor(() => {
       expect(requestsTo(fetchMock, 'DELETE', '/api/add/d1')).toEqual([null]);
@@ -523,7 +523,7 @@ describe('adding the track', () => {
 
   it('keeps asking nothing after the form has been closed once', async () => {
     await inFormWith(finish, discard);
-    leaveAdd();
+    useApp.setState({ overlay: null });
     await vi.waitFor(() => {
       expect(requestsTo(fetchMock, 'DELETE', '/api/add/d1')).toHaveLength(1);
     });

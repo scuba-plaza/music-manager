@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { KeyEventLike } from '../keys/keymap';
 import { FormField } from '../components/FormField';
 import { Dialog } from '../overlay/Dialog';
+import { ringKey } from '../overlay/focusRing';
 import { applyBulk, bulkFields, leaveBulk, typeBulk, useBulk } from '../state/bulk';
 import { shownErrors } from '../state/form';
 import { plural } from '../state/text';
@@ -28,15 +29,6 @@ export function BulkForm({ ids, head }: BulkFormProps) {
     inputs.current[0]?.focus();
   }, []);
 
-  function focusBy(by: number): void {
-    const n = bulkFields.length;
-    const at = Math.max(
-      0,
-      inputs.current.findIndex((input) => input === document.activeElement),
-    );
-    inputs.current[(at + by + n) % n]?.focus();
-  }
-
   function apply(): void {
     void applyBulk().then((wrong) => {
       inputs.current[bulkFields.findIndex((f) => f.key === wrong)]?.focus();
@@ -46,16 +38,12 @@ export function BulkForm({ ids, head }: BulkFormProps) {
   function onKey(e: KeyEventLike): boolean {
     if (e.key === 'Enter') {
       apply();
-    } else if (e.key === 'Tab') {
-      focusBy(e.shiftKey ? -1 : 1);
-    } else if (e.key === 'ArrowDown') {
-      focusBy(1);
-    } else if (e.key === 'ArrowUp') {
-      focusBy(-1);
-    } else {
-      return false;
+      return true;
     }
-    return true;
+    return ringKey(
+      e,
+      inputs.current.filter((input) => input !== null),
+    );
   }
 
   return (

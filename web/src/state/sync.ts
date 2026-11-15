@@ -6,6 +6,7 @@ import { fail, setStatus } from './status';
 import { follow, stopJob } from './jobs';
 import { formatChoices, genericId } from './profiles';
 import { useApp } from './store';
+import { messageOf } from './text';
 
 export type SyncPhase = 'choosing' | 'typing' | 'planning' | 'reviewing' | 'confirming' | 'applying' | 'finished' | 'failed';
 
@@ -52,9 +53,6 @@ export const useSync = create<SyncState>()(fresh);
 
 let session = 0;
 
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 function target(): TargetView | undefined {
   const { targets, cursor } = useSync.getState();

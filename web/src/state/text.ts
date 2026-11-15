@@ -4,3 +4,7 @@ export function plural(n: number, word: string): string {
   }
   return `${String(n)} ${word}${/(ch|sh|s|x)$/.test(word) ? 'es' : 's'}`;
 }
+
+export function messageOf(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}

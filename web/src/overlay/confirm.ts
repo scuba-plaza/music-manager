@@ -4,16 +4,13 @@ import { applyChange } from '../state/edit';
 import { loadLibrary } from '../state/library';
 import { closeOverlay, useApp, type AppState } from '../state/store';
 import { idsOf, rowByKey, trackRowKey } from '../state/tree';
-
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
+import { messageOf } from '../state/text';
 
 async function change(path: string, body: unknown): Promise<string> {
   try {
     await applyChange(() => send<ChangeResponse>('POST', path, body));
   } catch (err) {
-    return message(err);
+    return messageOf(err);
   }
   closeOverlay();
   return '';

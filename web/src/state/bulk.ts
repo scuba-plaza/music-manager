@@ -5,6 +5,7 @@ import { ApiError } from '../api/client';
 import { applyChange } from './edit';
 import { cleanChecks, firstWrong, left, tried, verdict, type FormChecks } from './form';
 import { useApp } from './store';
+import { messageOf } from './text';
 
 export const bulkFields = [
   { key: 'artist', label: 'Artist' },
@@ -86,7 +87,7 @@ async function preview(): Promise<void> {
     }
   } catch (err) {
     if (mine === seq) {
-      say({ text: err instanceof Error ? err.message : String(err), bad: true });
+      say({ text: messageOf(err), bad: true });
     }
   }
 }

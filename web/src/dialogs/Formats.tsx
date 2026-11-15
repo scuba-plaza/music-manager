@@ -4,6 +4,7 @@ import { FormField } from '../components/FormField';
 import { motionOf, moveTo } from '../keys/dialog';
 import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
+import { ringKey } from '../overlay/focusRing';
 import { MenuList } from '../overlay/MenuList';
 import {
   backToList,
@@ -62,15 +63,6 @@ export function Formats() {
     }
   }, [mode]);
 
-  function focusBy(by: number): void {
-    const all = controls();
-    const at = Math.max(
-      0,
-      all.findIndex((c) => c === document.activeElement),
-    );
-    all[(at + by + all.length) % all.length]?.focus();
-  }
-
   function save(): void {
     void saveFormat().then((wrong) => {
       if (wrong !== undefined) {
@@ -101,14 +93,8 @@ export function Formats() {
       save();
     } else if (e.key === 'Escape' || (e.key === 'q' && !onText)) {
       backToList();
-    } else if (e.key === 'Tab') {
-      focusBy(e.shiftKey ? -1 : 1);
-    } else if (!onSelect && e.key === 'ArrowDown') {
-      focusBy(1);
-    } else if (!onSelect && e.key === 'ArrowUp') {
-      focusBy(-1);
     } else {
-      return false;
+      return ringKey(e, controls(), !onSelect);
     }
     return true;
   }

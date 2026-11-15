@@ -8,6 +8,7 @@ import { applyChange } from './edit';
 import { uploadFiles } from './ingest';
 import { follow, stopJob } from './jobs';
 import { useApp } from './store';
+import { messageOf } from './text';
 
 export type AddPhase = 'asking' | 'fetching' | 'form' | 'saving' | 'duplicate' | 'failed';
 
@@ -61,10 +62,6 @@ let attemptNo = 0;
 let pathTimer: ReturnType<typeof setTimeout> | undefined;
 let pathNo = 0;
 let finished = false;
-
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 function addOpen(): boolean {
   return useApp.getState().overlay?.kind === 'add';
@@ -172,15 +169,13 @@ export function setField(key: AddKey, text: string): void {
   askForPath();
 }
 
-const enc = encodeURIComponent;
-
 export async function chooseDraftCover(file: File): Promise<void> {
   const { draft } = useAdd.getState();
   if (draft === null) {
     return;
   }
   try {
-    const res = await send<DraftCoverView>('PUT', `/api/add/${enc(draft.draft)}/cover`, file);
+    const res = await send<DraftCoverView>('PUT', `/api/add/${encodeURIComponent(draft.draft)}/cover`, file);
     useAdd.setState({ cover: res.cover, coverError: '' });
   } catch (err) {
     useAdd.setState({ coverError: messageOf(err) });
@@ -193,7 +188,7 @@ export async function removeDraftCover(): Promise<void> {
     return;
   }
   try {
-    const res = await send<DraftCoverView>('DELETE', `/api/add/${enc(draft.draft)}/cover`);
+    const res = await send<DraftCoverView>('DELETE', `/api/add/${encodeURIComponent(draft.draft)}/cover`);
     useAdd.setState({ cover: res.cover, coverError: '' });
   } catch (err) {
     useAdd.setState({ coverError: messageOf(err) });
@@ -233,10 +228,6 @@ export function showDuplicate(): void {
   }
   useApp.setState({ overlay: null });
   void loadLibrary({ reveal: existing.id });
-}
-
-export function leaveAdd(): void {
-  useApp.setState({ overlay: null });
 }
 
 export function chooseFiles(files: readonly File[]): void {

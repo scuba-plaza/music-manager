@@ -3,6 +3,7 @@ import type { KeyEventLike } from '../keys/keymap';
 import { FormField } from '../components/FormField';
 import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
+import { ringKey } from '../overlay/focusRing';
 import {
   addOrder,
   chooseDraftCover,
@@ -99,15 +100,6 @@ export function Add() {
     }
   }, [phase]);
 
-  function focusBy(by: number): void {
-    const all = controls();
-    const at = Math.max(
-      0,
-      all.findIndex((input) => input === document.activeElement),
-    );
-    all[(at + by + all.length) % all.length]?.focus();
-  }
-
   function onKey(e: KeyEventLike): boolean {
     switch (phase) {
       case 'asking':
@@ -138,16 +130,9 @@ export function Add() {
               inputs()[addOrder.indexOf(wrong)]?.focus();
             }
           });
-        } else if (e.key === 'Tab') {
-          focusBy(e.shiftKey ? -1 : 1);
-        } else if (e.key === 'ArrowDown') {
-          focusBy(1);
-        } else if (e.key === 'ArrowUp') {
-          focusBy(-1);
-        } else {
-          return false;
+          return true;
         }
-        return true;
+        return ringKey(e, controls());
       case 'fetching':
       case 'saving':
         return false;

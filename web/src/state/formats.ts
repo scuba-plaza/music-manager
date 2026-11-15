@@ -5,6 +5,7 @@ import { cleanChecks, firstWrong, left, tried, verdict, type FormChecks } from '
 import { loadLibrary } from './library';
 import { setStatus } from './status';
 import { ask, useApp } from './store';
+import { messageOf } from './text';
 
 export type FormatsMode = 'list' | 'form';
 
@@ -55,7 +56,6 @@ export interface FormatsState {
 }
 
 const checkPause = 150;
-const enc = encodeURIComponent;
 
 export function blankForm(): FormatForm {
   return {
@@ -167,10 +167,6 @@ export function moveFormats(to: number): void {
   useFormats.setState({ cursor: Math.min(Math.max(to, 0), stored().length) });
 }
 
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
 function scheduleCheck(): void {
   clearTimeout(timer);
   timer = setTimeout(() => {
@@ -247,7 +243,7 @@ export async function saveFormat(): Promise<FormatKey | undefined> {
   useFormats.setState({ saving: true, error: '' });
   try {
     const made =
-      editing === null ? await send<Profile>('POST', '/api/profiles', profile) : await send<Profile>('PUT', `/api/profiles/${enc(editing)}`, profile);
+      editing === null ? await send<Profile>('POST', '/api/profiles', profile) : await send<Profile>('PUT', `/api/profiles/${encodeURIComponent(editing)}`, profile);
     await loadLibrary();
     setStatus(`Saved the format “${made.name}”`, 'good');
     const at = stored().findIndex((p) => p.id === made.id);
@@ -282,7 +278,7 @@ export function removeFormat(): void {
 
 async function deleteFormat(chosen: Profile, at: number): Promise<void> {
   try {
-    await send('DELETE', `/api/profiles/${enc(chosen.id)}`);
+    await send('DELETE', `/api/profiles/${encodeURIComponent(chosen.id)}`);
     await loadLibrary();
     setStatus(`Deleted the format “${chosen.name}”`, 'good');
   } catch (err) {

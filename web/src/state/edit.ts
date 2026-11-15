@@ -12,7 +12,6 @@ import { ancestorKeys, rowByKey } from './tree';
 const notePause = 150;
 const pathFields = ['title', 'artist', 'album', 'track'];
 const joinFields = ['artist', 'album'];
-const enc = encodeURIComponent;
 
 export async function applyChange(call: () => Promise<ChangeResponse>): Promise<ChangeResponse> {
   if (useApp.getState().busy) {
@@ -67,7 +66,7 @@ let noteSeq = 0;
 async function noteFor(f: FieldView, edit: EditState): Promise<string> {
   const { detail, cursor } = useApp.getState();
   if (isTrack(detail) && pathFields.includes(f.key)) {
-    const res = await send<PathView>('POST', `/api/tracks/${enc(detail.id)}/path`, { field: f.key, text: edit.text, second: edit.second ?? '' });
+    const res = await send<PathView>('POST', `/api/tracks/${encodeURIComponent(detail.id)}/path`, { field: f.key, text: edit.text, second: edit.second ?? '' });
     return `→ ${res.path}`;
   }
   if (detail !== null && !isTrack(detail) && joinFields.includes(f.key)) {
@@ -125,7 +124,7 @@ export function cancelEdit(): void {
 function saveCall(f: FieldView, edit: EditState): () => Promise<ChangeResponse> {
   const { detail, cursor } = useApp.getState();
   if (isTrack(detail)) {
-    return () => send<ChangeResponse>('PATCH', `/api/tracks/${enc(detail.id)}`, { field: f.key, text: edit.text, second: edit.second ?? '' });
+    return () => send<ChangeResponse>('PATCH', `/api/tracks/${encodeURIComponent(detail.id)}`, { field: f.key, text: edit.text, second: edit.second ?? '' });
   }
   return () => send<ChangeResponse>('PATCH', '/api/group', { key: cursor, field: f.key, text: edit.text });
 }
@@ -176,7 +175,7 @@ function cutField(): { id: string; key: string } | undefined {
 export function nudge(more: 1 | -1, big: boolean): void {
   const cut = cutField();
   if (cut !== undefined) {
-    void attempt(() => send<ChangeResponse>('POST', `/api/tracks/${enc(cut.id)}/nudge`, { field: cut.key, more, big }));
+    void attempt(() => send<ChangeResponse>('POST', `/api/tracks/${encodeURIComponent(cut.id)}/nudge`, { field: cut.key, more, big }));
   }
 }
 
@@ -187,7 +186,7 @@ export function clear(): void {
   }
   const cut = cutField();
   if (cut !== undefined) {
-    void attempt(() => send<ChangeResponse>('POST', `/api/tracks/${enc(cut.id)}/clear`, { field: cut.key }));
+    void attempt(() => send<ChangeResponse>('POST', `/api/tracks/${encodeURIComponent(cut.id)}/clear`, { field: cut.key }));
   }
 }
 
@@ -209,7 +208,7 @@ export async function hear(): Promise<void> {
   useApp.setState({ playing });
   setStatus('Cutting the preview…');
   try {
-    const blob = await getBlob(`/api/tracks/${enc(cut.id)}/preview${query({ field: cut.key })}`);
+    const blob = await getBlob(`/api/tracks/${encodeURIComponent(cut.id)}/preview${query({ field: cut.key })}`);
     if (useApp.getState().playing !== playing) {
       return;
     }

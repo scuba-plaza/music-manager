@@ -4,6 +4,7 @@ import { moveTo, type Motion } from '../keys/dialog';
 import type { DoctorView } from '../api/types.gen';
 import { loadLibrary } from './library';
 import { useApp } from './store';
+import { messageOf } from './text';
 
 export type DoctorPhase = 'checking' | 'done' | 'failed';
 
@@ -36,7 +37,7 @@ export function openDoctor(): void {
     },
     (err: unknown) => {
       if (current === mine) {
-        useDoctor.setState({ phase: 'failed', error: err instanceof Error ? err.message : String(err) });
+        useDoctor.setState({ phase: 'failed', error: messageOf(err) });
       }
     },
   );

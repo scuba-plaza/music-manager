@@ -3,6 +3,7 @@ import type { PeekView, TrackView } from '../api/types.gen';
 import { fail } from './status';
 import { useApp, type AppState } from './store';
 import { rowByKey, settledCursor } from './tree';
+import { messageOf } from './text';
 
 const detailPause = 40;
 
@@ -50,7 +51,7 @@ export async function loadDetail(): Promise<void> {
   } catch (err) {
     if (seq === detailSeq) {
       detailAwaited = false;
-      useApp.setState({ detail: null, detailError: err instanceof Error ? err.message : String(err) });
+      useApp.setState({ detail: null, detailError: messageOf(err) });
       fail(err);
     }
   }
