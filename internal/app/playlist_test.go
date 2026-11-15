@@ -415,16 +415,22 @@ func TestReplacingThePlaylistsPutsBackAnEarlierState(t *testing.T) {
 	}
 }
 
-func TestPlaylistNamesThatAreTheSameFileOnAnyTargetAreRefused(t *testing.T) {
-	a := openLib(t)
-	if err := a.CreatePlaylist("Bjørn"); err != nil {
-		t.Fatal(err)
+func TestPlaylistNamesThatAreTheSameFileOnAnotherFormatAreBothWrittenThere(t *testing.T) {
+	a := libWithTracks(t, 10)
+	ts := tracks(t, a)
+	for _, name := range []string{"Bjørn", "Bjorn"} {
+		if err := a.CreatePlaylist(name, ts[0].ID); err != nil {
+			t.Fatalf("%s is its own file in the library folder: %v", name, err)
+		}
 	}
-	// Bjørn and Bjorn are two files for a folder that keeps names as they are,
-	// but the Wolfgang writes Latin letters only and they would be one.
-	err := a.CreatePlaylist("Bjorn")
-	if err == nil || !strings.Contains(err.Error(), "same file") {
-		t.Errorf("err = %v, want a refusal because the Wolfgang would write one file", err)
+	dest := filepath.Join(t.TempDir(), "player")
+
+	mustSync(t, a, app.SyncOptions{Target: dest, Device: wolfgang})
+
+	for _, file := range []string{"Playlists/Bjorn.m3u", "Playlists/Bjorn (2).m3u"} {
+		if len(readFile(t, dest, file)) == 0 {
+			t.Errorf("%s is missing: the Wolfgang writes Latin letters only, so the two names are one file there", file)
+		}
 	}
 }
 
@@ -467,27 +473,37 @@ func TestAPlaylistsLatinNameIsSetByHandAndOnlyTheWolfgangFileFollowsIt(t *testin
 	}
 }
 
-func TestTwoPlaylistsMayNotHaveTheSameFileOnTheWolfgang(t *testing.T) {
+func TestLatinNamesThatGiveOneFileOnTheWolfgangAreWrittenAsThreeFiles(t *testing.T) {
 	a := libWithTracks(t, 10)
+	ts := tracks(t, a)
 	for _, name := range []string{"دراسة", "عمل"} {
-		if err := a.CreatePlaylist(name); err != nil {
+		if err := a.CreatePlaylist(name, ts[0].ID); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if err := a.SetPlaylistLatin("دراسة", "Work"); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.SetPlaylistLatin("عمل", "work"); err == nil || !strings.Contains(err.Error(), "same file") {
-		t.Errorf("err = %v, want a refusal: both would be Work.m3u", err)
+	if err := a.SetPlaylistLatin("عمل", "work"); err != nil {
+		t.Errorf("err = %v: the library folder keeps the true names, so these are two files", err)
 	}
-	if err := a.CreatePlaylist("Work"); err == nil {
-		t.Error("a new playlist may not take the file of another's Latin name")
+	if err := a.CreatePlaylist("Work", ts[0].ID); err != nil {
+		t.Errorf("err = %v: Work.m3u8 is not دراسة.m3u8 in the library folder", err)
 	}
 	if err := a.SetPlaylistLatin("دراسة", "one\ntwo"); err == nil {
 		t.Error("a name on two lines should be refused")
 	}
 	if err := a.SetPlaylistLatin("nothing", "x"); err == nil {
 		t.Error("a playlist that does not exist has no Latin name")
+	}
+	dest := filepath.Join(t.TempDir(), "player")
+
+	mustSync(t, a, app.SyncOptions{Target: dest, Device: wolfgang})
+
+	for _, file := range []string{"Playlists/Work.m3u", "Playlists/work (2).m3u", "Playlists/Work (3).m3u"} {
+		if len(readFile(t, dest, file)) == 0 {
+			t.Errorf("%s is missing", file)
+		}
 	}
 }
 
@@ -513,46 +529,38 @@ func TestReplacingThePlaylistsKeepsTheirLatinNames(t *testing.T) {
 	}
 }
 
-func TestPlaylistNamesCollideOnAUserProfile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "devices.toml")
-	writeFile(t, path, []byte(`[[profile]]
-name = "my-player"
-latin_names = true
-playlist_ext = ".m3u"
-component_max = 20
-`))
-	registry, err := device.LoadRegistry(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	plain := openLib(t)
+func TestPlaylistsThatCollideOnAFormatAreBothWrittenAndTheLaterOneIsNumbered(t *testing.T) {
+	a := libWithTracks(t, 40)
+	ts := tracks(t, a)
 	for _, name := range []string{"Road Trip Songs Volume One", "Road Trip Songs Volume Two"} {
-		if err := plain.CreatePlaylist(name); err != nil {
-			t.Fatalf("without the profile the names are two files: %v", err)
+		if err := a.CreatePlaylist(name, ts[0].ID); err != nil {
+			t.Fatalf("they are two files on Generic, so two playlists: %v", err)
 		}
 	}
+	short := manifest.Profile{
+		ID: "my-player", Name: "My Player", LatinNames: true, ComponentMax: 20,
+		CoverFormat: "keep", ReplayGain: true, PlaylistExt: ".m3u", PlaylistStyle: "relative",
+	}
+	dest := filepath.Join(t.TempDir(), "player")
 
-	a := openLib(t)
-	a.UseProfiles(registry)
-	if a.Profiles() != registry {
-		t.Fatal("the app does not use the registry it was given")
-	}
-	if err := a.CreatePlaylist("Road Trip Songs Volume One"); err != nil {
-		t.Fatal(err)
-	}
-	err = a.CreatePlaylist("Road Trip Songs Volume Two")
-	if err == nil || !strings.Contains(err.Error(), "same file") || !strings.Contains(err.Error(), "Road Trip Songs Volu.m3u") {
-		t.Errorf("err = %v, want a refusal: both are Road Trip Songs Volu.m3u on my-player", err)
+	mustSync(t, a, app.SyncOptions{Target: dest, Device: device.TargetOf(short)})
+
+	first := string(readFile(t, dest, "Playlists/Road Trip Songs Volu.m3u"))
+	second := string(readFile(t, dest, "Playlists/Road Trip Songs Volu (2).m3u"))
+	if first == "" || second == "" {
+		t.Errorf("a playlist is missing: %q %q", first, second)
 	}
 }
 
-func TestAnAppWithoutProfilesUsesTheBuiltinOnes(t *testing.T) {
-	var names []string
-	for _, p := range openLib(t).Profiles().Profiles() {
-		names = append(names, p.Name)
+func TestPlaylistsThatAreTheSameFileOnGenericAreStillRefused(t *testing.T) {
+	a := openLib(t)
+	if err := a.CreatePlaylist("Road"); err != nil {
+		t.Fatal(err)
 	}
-	if !slices.Equal(names, []string{"generic", "wolfgang-wmp01"}) {
-		t.Errorf("profiles %v", names)
+
+	err := a.CreatePlaylist("ROAD")
+
+	if err == nil || !strings.Contains(err.Error(), "same file") {
+		t.Errorf("err = %v", err)
 	}
 }

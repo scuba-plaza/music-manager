@@ -13,7 +13,7 @@ export default defineConfig({
       'pnpm run build',
       'cd ..',
       `go build -o ${server} ./cmd/e2e-server`,
-      `exec ${server} --addr 127.0.0.1:7979 --dist internal/web/dist --config web/e2e/fixtures/devices.toml`,
+      `exec ${server} --addr 127.0.0.1:7979 --dist internal/web/dist`,
     ].join(' && '),
     url: `${baseURL}/api/info`,
     reuseExistingServer: false,

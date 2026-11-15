@@ -12,7 +12,7 @@ import (
 
 // Target is a kind of place the library is written to.
 type Target interface {
-	Name() string
+	ID() string
 	// Layout says how paths are made.
 	Layout() layout.Rules
 	// Tags is the complete tag of the track's file, except for its cover.
@@ -36,7 +36,7 @@ type Target interface {
 	Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (name string, data []byte)
 	// Diagnose says what the target will not do well for these tracks.
 	Diagnose(tracks []manifest.Track) []Warning
-	Profile() Profile
+	Profile() manifest.Profile
 }
 
 // extras are the tag fields that belong to no standard frame. A track not yet

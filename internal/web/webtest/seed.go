@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"music-manager/internal/app"
+	"music-manager/internal/manifest"
 	"music-manager/internal/testmp3"
 )
 
@@ -28,6 +29,11 @@ var identifiedTracks = []seededTrack{
 }
 
 const unidentifiedFrames = 200
+
+var myPlayer = manifest.Profile{
+	Name: "My Player", LatinNames: true, TagWidth: 12, ComponentMax: 200,
+	CoverFormat: "keep", ReplayGain: true, PlaylistExt: ".m3u8", PlaylistStyle: "relative",
+}
 
 func Seed(dir string) (*app.App, error) {
 	a, err := app.Open(dir)
@@ -91,6 +97,11 @@ func Seed(dir string) (*app.App, error) {
 	}
 	if err := a.CreatePlaylist(longPlaylistName, ids["Giant Steps"], ids["وطني"]); err != nil {
 		return nil, err
+	}
+	for _, p := range []manifest.Profile{manifest.WolfgangWMP01, myPlayer} {
+		if _, err := a.CreateProfile(p); err != nil {
+			return nil, err
+		}
 	}
 	return a, nil
 }

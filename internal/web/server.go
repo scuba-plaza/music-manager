@@ -21,7 +21,6 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
-	"music-manager/internal/device"
 	"music-manager/internal/version"
 )
 
@@ -29,7 +28,6 @@ import (
 type Server struct {
 	app        *app.App
 	downloader app.Downloader
-	profiles   *device.Registry
 	frontend   fs.FS
 
 	hub  *hub
@@ -50,17 +48,12 @@ type Option func(*Server)
 // WithDownloader lets the server add tracks by downloading them.
 func WithDownloader(d app.Downloader) Option { return func(v *Server) { v.downloader = d } }
 
-func WithProfiles(r *device.Registry) Option { return func(v *Server) { v.profiles = r } }
-
 // New returns the server for a library.
 func New(a *app.App, opts ...Option) *Server {
 	s := &Server{app: a, hub: newHub(), mux: http.NewServeMux(), coverInfo: map[string]string{}, mounts: browse.DetectMounts}
 	s.jobs = newJobs(s.hub)
 	for _, o := range opts {
 		o(s)
-	}
-	if s.profiles == nil {
-		s.profiles = a.Profiles()
 	}
 	if s.frontend == nil {
 		dist, err := fs.Sub(distFiles, "dist")
@@ -81,7 +74,6 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /", frontendHandler(s.frontend))
 
 	s.mux.HandleFunc("GET /api/info", s.info)
-	s.mux.HandleFunc("GET /api/profiles", s.listProfiles)
 	s.mux.HandleFunc("GET /api/doctor", s.doctor)
 	s.mux.HandleFunc("GET /api/library", s.library)
 	s.mux.HandleFunc("GET /api/tracks/{id}", s.track)
@@ -92,6 +84,7 @@ func (s *Server) routes() {
 	s.addRoutes()
 	s.jobRoutes()
 	s.syncRoutes()
+	s.profileRoutes()
 }
 
 // Serve answers requests on ln until ctx is done, and watches the library for

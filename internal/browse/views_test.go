@@ -3,19 +3,18 @@ package browse
 import (
 	"encoding/json"
 	"os"
-	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"music-manager/internal/app"
-	"music-manager/internal/device"
 	"music-manager/internal/manifest"
 )
 
 func snapshot() Snapshot {
 	tracks := append([]manifest.Track{}, sampleTracks...)
-	return Snapshot{Tracks: tracks, Playlists: []manifest.Playlist{{Name: "Road", Tracks: []string{"t1", "t5"}}}}
+	return Snapshot{Tracks: tracks, Playlists: []manifest.Playlist{{Name: "Road", Tracks: []string{"t1", "t5"}}}, Profiles: []manifest.Profile{manifest.WolfgangWMP01}}
 }
 
 func TestTheLibraryViewCountsAndFlattens(t *testing.T) {
@@ -227,17 +226,12 @@ func longNamed() Snapshot {
 	return s
 }
 
-func userRegistry(t *testing.T, content string) *device.Registry {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "devices.toml")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	r, err := device.LoadRegistry(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return r
+func withMyPlayer(s Snapshot) Snapshot {
+	s.Profiles = append(slices.Clone(s.Profiles), manifest.Profile{
+		ID: "my-player", Name: "My Player", LatinNames: true, ComponentMax: 200,
+		CoverFormat: "keep", ReplayGain: true, PlaylistExt: ".m3u8", PlaylistStyle: "relative",
+	})
+	return s
 }
 
 func TestTheDeviceViewOfTheWolfgangProfileSaysWhatThePlayerShows(t *testing.T) {
@@ -270,15 +264,13 @@ func TestTheDeviceTabIsThereOnlyWhenAProfileIsAsked(t *testing.T) {
 	if strings.Join(ids, ",") != "details,audio,latin,device" {
 		t.Errorf("tab ids %v", ids)
 	}
-	r := userRegistry(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")
-	if _, ok := Track(snapshot(), "t1", TrackOptions{Profile: "nobody", Profiles: r}); ok {
+	if _, ok := Track(withMyPlayer(snapshot()), "t1", TrackOptions{Profile: "nobody"}); ok {
 		t.Error("an unknown profile previews something")
 	}
 }
 
 func TestTheDevicePreviewOfAProfileWithoutAStemMaxHasNoCutRow(t *testing.T) {
-	r := userRegistry(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")
-	v, _ := Track(longNamed(), "long", TrackOptions{Profile: "my-player", Profiles: r})
+	v, _ := Track(withMyPlayer(longNamed()), "long", TrackOptions{Profile: "my-player"})
 	dev, _ := tabWithID(v, "device")
 	if got := strings.Join(rowLabels(dev.Device), ","); got != "Folder,File,Artist,Album,Genre,Title" {
 		t.Errorf("rows %s", got)
@@ -291,8 +283,7 @@ func TestTheDevicePreviewOfAProfileWithoutAStemMaxHasNoCutRow(t *testing.T) {
 }
 
 func TestTheDevicePreviewOfAProfileWithoutATagWidthCountsNothing(t *testing.T) {
-	r := userRegistry(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")
-	v, _ := Track(longNamed(), "t4", TrackOptions{Profile: "my-player", Profiles: r})
+	v, _ := Track(withMyPlayer(longNamed()), "t4", TrackOptions{Profile: "my-player"})
 	dev, _ := tabWithID(v, "device")
 	for _, row := range dev.Device.Rows {
 		if row.Tail != "" {

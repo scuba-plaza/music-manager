@@ -1,13 +1,8 @@
 package device_test
 
-import "music-manager/internal/device"
+import (
+	"music-manager/internal/device"
+	"music-manager/internal/manifest"
+)
 
-var wolfgang = builtinTarget("wolfgang-wmp01")
-
-func builtinTarget(name string) device.Target {
-	target, ok := device.Builtin().Get(name)
-	if !ok {
-		panic("no built-in profile " + name)
-	}
-	return target
-}
+var wolfgang = device.TargetOf(manifest.WolfgangWMP01)

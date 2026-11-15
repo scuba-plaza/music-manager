@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -30,10 +29,7 @@ type seedTrack struct {
 // seed adds identified tracks (one real audio file each) to a fresh library.
 func seed(t *testing.T, specs ...seedTrack) (*app.App, []manifest.Track) {
 	t.Helper()
-	a, err := app.Open(filepath.Join(t.TempDir(), "lib"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	a := openFresh(t)
 	src := t.TempDir()
 	for i, s := range specs {
 		name := filepath.Join(src, string(rune('a'+i))+".mp3")
@@ -58,8 +54,20 @@ func seed(t *testing.T, specs ...seedTrack) (*app.App, []manifest.Track) {
 			t.Fatal(err)
 		}
 	}
+	if _, err := a.CreateProfile(manifest.WolfgangWMP01); err != nil {
+		t.Fatal(err)
+	}
 	m, _ = a.Manifest()
 	return a, m.Tracks
+}
+
+func openFresh(t *testing.T) *app.App {
+	t.Helper()
+	a, err := app.Open(filepath.Join(t.TempDir(), "lib"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a
 }
 
 func start(t *testing.T, a *app.App, opts ...Option) *httptest.Server {
@@ -628,37 +636,12 @@ func TestTheDeviceTabOfTheWolfgangProfileSaysWhatThePlayerWillShowAndWhatItWillN
 	}
 }
 
-func TestProfilesEndpointListsBuiltinsThenUser(t *testing.T) {
-	a, _ := seed(t)
-	user := "[[profile]]\nname = \"my-player\"\nlabel = \"My Player\"\nlatin_names = true\n"
-	var got []ProfileView
-	if code := getJSON(t, start(t, a, WithProfiles(registryWith(t, user))).URL+"/api/profiles", &got); code != 200 {
-		t.Fatal(code)
-	}
-	want := []ProfileView{
-		{Name: "generic", Label: "Generic", Builtin: true},
-		{Name: "wolfgang-wmp01", Label: "Wolfgang WMP01", Builtin: true},
-		{Name: "my-player", Label: "My Player", Builtin: false},
-	}
-	if !slices.Equal(got, want) {
-		t.Errorf("profiles %+v, want %+v", got, want)
-	}
-
-	a.UseProfiles(registryWith(t, user))
-	var fromApp []ProfileView
-	if getJSON(t, start(t, a).URL+"/api/profiles", &fromApp); !slices.Equal(fromApp, want) {
-		t.Errorf("a server without its own profiles does not use the app's: %+v", fromApp)
-	}
-	b, _ := seed(t)
-	var builtin []ProfileView
-	if getJSON(t, start(t, b).URL+"/api/profiles", &builtin); !slices.Equal(builtin, want[:2]) {
-		t.Errorf("profiles without a config %+v", builtin)
-	}
-}
-
 func TestTheDeviceTabFollowsTheProfileParameter(t *testing.T) {
 	a, ts := seed(t, seedTrack{"Bahlam Bek Ya Habibi Forever", "Abdel Halim Hafez", "Abd El Halim Hafez", 1})
-	srv := start(t, a, WithProfiles(registryWith(t, "[[profile]]\nname = \"my-player\"\nlatin_names = true\n")))
+	if _, err := a.CreateProfile(manifest.Profile{Name: "My Player", LatinNames: true, ComponentMax: 200, CoverFormat: "keep", ReplayGain: true, PlaylistExt: ".m3u8", PlaylistStyle: "relative"}); err != nil {
+		t.Fatal(err)
+	}
+	srv := start(t, a)
 	type tab struct {
 		ID     string
 		Name   string

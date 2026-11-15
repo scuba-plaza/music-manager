@@ -18,7 +18,7 @@ import (
 // tell which parts of a sync ask the target.
 type fakeTarget struct{ device.Target }
 
-func (fakeTarget) Name() string { return "fake" }
+func (fakeTarget) ID() string { return "fake" }
 
 func (fakeTarget) Layout() layout.Rules { return layout.Rules{Fold: strings.ToUpper} }
 

@@ -1,6 +1,9 @@
 package web
 
-import "music-manager/internal/browse"
+import (
+	"music-manager/internal/browse"
+	"music-manager/internal/manifest"
+)
 
 func Contract() []any {
 	return []any{
@@ -13,6 +16,7 @@ func Contract() []any {
 		browse.PeekView{},
 		browse.PlanView{},
 		browse.TrackView{},
+		manifest.Profile{},
 		AddCheck{},
 		ChangeResponse{},
 		ErrorView{},
@@ -21,7 +25,6 @@ func Contract() []any {
 		JobView{},
 		LibraryResponse{},
 		PathView{},
-		ProfileView{},
 		ServerEvents{},
 		SyncData{},
 		SyncTargetsView{},

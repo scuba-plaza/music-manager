@@ -1,7 +1,6 @@
 package device
 
 import (
-	_ "embed"
 	"errors"
 	"fmt"
 	"math"
@@ -15,37 +14,21 @@ import (
 	"music-manager/internal/translit"
 )
 
-//go:embed builtin.toml
-var builtinTOML []byte
-
-var builtinProfiles = mustParseProfiles(builtinTOML)
-
-var Generic = builtinTarget("generic")
-
-func mustParseProfiles(data []byte) []Profile {
-	profiles, err := ParseProfiles(data)
-	if err != nil {
-		panic(err)
-	}
-	return profiles
+var GenericProfile = manifest.Profile{
+	ID: "generic", Name: manifest.GenericName,
+	ComponentMax: 200, CoverFormat: "keep", ReplayGain: true,
+	PlaylistExt: ".m3u8", PlaylistStyle: "relative",
 }
 
-func builtinTarget(name string) Target {
-	for _, p := range builtinProfiles {
-		if p.Name == name {
-			return p.Target()
-		}
-	}
-	panic("builtin.toml has no profile " + name)
-}
+var Generic = TargetOf(GenericProfile)
 
-type profileTarget struct{ p Profile }
+type profileTarget struct{ p manifest.Profile }
 
-func (p Profile) Target() Target { return profileTarget{p} }
+func TargetOf(p manifest.Profile) Target { return profileTarget{p} }
 
-func (t profileTarget) Name() string { return t.p.Name }
+func (t profileTarget) ID() string { return t.p.ID }
 
-func (t profileTarget) Profile() Profile { return t.p }
+func (t profileTarget) Profile() manifest.Profile { return t.p }
 
 func (t profileTarget) Layout() layout.Rules {
 	rules := layout.Rules{ComponentMax: t.p.ComponentMax, StemMax: t.p.StemMax}

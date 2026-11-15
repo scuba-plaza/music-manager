@@ -144,7 +144,7 @@ func record(t *testing.T, target Target) recordedTarget {
 	byID := map[string]manifest.Track{}
 	rules := target.Layout()
 	r := recordedTarget{
-		Name:         target.Name(),
+		Name:         target.ID(),
 		Layout:       recordedLayout{ComponentMax: rules.ComponentMax, StemMax: rules.StemMax, Latin: rules.Latin},
 		Paths:        layout.Assign(tracks, rules),
 		Tags:         map[string]mp3.TagSet{},
@@ -208,7 +208,7 @@ func TestBuiltinTargetsMatchTheRecordedOutputs(t *testing.T) {
 			if !ok {
 				t.Fatalf("%s has no outputs for %q", recordedOutputs, name)
 			}
-			encoded, err := json.Marshal(record(t, builtinTarget(name)))
+			encoded, err := json.Marshal(record(t, recordedTargetOf(name)))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -234,4 +234,11 @@ func TestTheCoverInputsAreTheBytesTheOutputsWereRecordedFrom(t *testing.T) {
 			t.Errorf("the %s input is %s, not %s: the encoders of the standard library changed, so the recorded outputs cannot be compared", c.name, got, want[c.name])
 		}
 	}
+}
+
+func recordedTargetOf(name string) Target {
+	if name == "generic" {
+		return Generic
+	}
+	return TargetOf(manifest.WolfgangWMP01)
 }

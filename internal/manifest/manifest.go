@@ -12,7 +12,10 @@ import (
 	"time"
 )
 
-const schemaVersion = 2
+const (
+	schemaVersion = 3
+	legacyVersion = 2
+)
 
 type Status string
 
@@ -97,6 +100,7 @@ type Playlist struct {
 type Manifest struct {
 	Tracks    []Track    `json:"tracks"`
 	Playlists []Playlist `json:"playlists,omitempty"`
+	Profiles  []Profile  `json:"profiles,omitempty"`
 }
 
 // Store keeps the records in one file. Reading is free; every change to the
@@ -110,6 +114,7 @@ type file struct {
 	Version   int        `json:"version"`
 	Tracks    []Track    `json:"tracks"`
 	Playlists []Playlist `json:"playlists,omitempty"`
+	Profiles  []Profile  `json:"profiles,omitempty"`
 }
 
 func (s *Store) Load() (*Manifest, error) {
@@ -124,22 +129,31 @@ func (s *Store) Load() (*Manifest, error) {
 	if err := json.Unmarshal(data, &f); err != nil {
 		return nil, fmt.Errorf("%s: %w", s.path, err)
 	}
-	if f.Version != schemaVersion {
+	switch f.Version {
+	case schemaVersion:
+	case legacyVersion:
+		f.Profiles = []Profile{WolfgangWMP01}
+	default:
 		return nil, fmt.Errorf("%s: unsupported library version %d (want %d)", s.path, f.Version, schemaVersion)
 	}
-	return &Manifest{Tracks: f.Tracks, Playlists: f.Playlists}, nil
+	return &Manifest{Tracks: f.Tracks, Playlists: f.Playlists, Profiles: f.Profiles}, nil
 }
 
 // save writes the manifest atomically: the data goes to a temp file that is
 // renamed over the target, after the previous version is copied to .bak.
 func (s *Store) save(m *Manifest) error {
-	data, err := json.MarshalIndent(file{Version: schemaVersion, Tracks: m.Tracks, Playlists: m.Playlists}, "", "  ")
+	data, err := json.MarshalIndent(file{Version: schemaVersion, Tracks: m.Tracks, Playlists: m.Playlists, Profiles: m.Profiles}, "", "  ")
 	if err != nil {
 		return err
 	}
 	if prev, err := os.ReadFile(s.path); err == nil {
 		if err := os.WriteFile(s.path+".bak", prev, 0o644); err != nil {
 			return err
+		}
+		if versionOf(prev) == legacyVersion {
+			if err := keepOnce(s.path+".v2.bak", prev); err != nil {
+				return err
+			}
 		}
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(s.path), filepath.Base(s.path)+".tmp*")
@@ -159,4 +173,27 @@ func (s *Store) save(m *Manifest) error {
 		return err
 	}
 	return os.Rename(tmp.Name(), s.path)
+}
+
+func versionOf(data []byte) int {
+	var v struct {
+		Version int `json:"version"`
+	}
+	_ = json.Unmarshal(data, &v)
+	return v.Version
+}
+
+func keepOnce(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if errors.Is(err, fs.ErrExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }

@@ -63,7 +63,7 @@ func TestPlanSyncCarriesTheWarningsOfItsDevice(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(plan.Warnings) != c.want {
-			t.Errorf("%s: warnings = %+v, want %d", c.dev.Name(), plan.Warnings, c.want)
+			t.Errorf("%s: warnings = %+v, want %d", c.dev.ID(), plan.Warnings, c.want)
 		}
 		if c.want == 1 && plan.Warnings[0].TrackID != ts[0].ID {
 			t.Errorf("the warning is for %q, want %q", plan.Warnings[0].TrackID, ts[0].ID)

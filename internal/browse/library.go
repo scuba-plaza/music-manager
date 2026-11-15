@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"music-manager/internal/app"
+	"music-manager/internal/device"
 	"music-manager/internal/manifest"
 	"music-manager/internal/timecode"
 )
@@ -17,6 +18,19 @@ import (
 type Snapshot struct {
 	Tracks    []manifest.Track
 	Playlists []manifest.Playlist
+	Profiles  []manifest.Profile
+}
+
+func (s Snapshot) target(id string) (device.Target, bool) {
+	if id == device.GenericProfile.ID {
+		return device.Generic, true
+	}
+	for _, p := range s.Profiles {
+		if p.ID == id {
+			return device.TargetOf(p), true
+		}
+	}
+	return nil, false
 }
 
 // Track returns the track with the given ID.

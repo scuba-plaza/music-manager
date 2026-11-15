@@ -3,6 +3,7 @@ package layout_test
 import (
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -273,5 +274,21 @@ func TestAssignKeepsTwoNamesApartThatShareALatinForm(t *testing.T) {
 	got := layout.Assign([]manifest.Track{a, b}, layout.Rules{Latin: true})
 	if got["aaaaaa"] == got["bbbbbb"] {
 		t.Errorf("both go to %q", got["aaaaaa"])
+	}
+}
+
+func TestFilesThatWouldBeTheSameFileGetANumberBeforeTheExtension(t *testing.T) {
+	taken := map[string]bool{}
+
+	got := []string{
+		layout.Unique(taken, "Playlists/Road.m3u"),
+		layout.Unique(taken, "Playlists/ROAD.m3u"),
+		layout.Unique(taken, "Playlists/road.m3u"),
+		layout.Unique(taken, "Playlists/Other.m3u"),
+	}
+
+	want := []string{"Playlists/Road.m3u", "Playlists/ROAD (2).m3u", "Playlists/road (3).m3u", "Playlists/Other.m3u"}
+	if !slices.Equal(got, want) {
+		t.Errorf("%q, want %q", got, want)
 	}
 }

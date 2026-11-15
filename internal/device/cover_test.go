@@ -66,10 +66,10 @@ func TestTheNameOfTheCoverFileFollowsWhatIsWritten(t *testing.T) {
 		{wolfgang, "image/png", "cover.jpg", true}, // it is shrunk to a JPEG
 	} {
 		if got := c.dev.CoverFile(c.stored); got != c.want {
-			t.Errorf("%s.CoverFile(%s) = %q, want %q", c.dev.Name(), c.stored, got, c.want)
+			t.Errorf("%s.CoverFile(%s) = %q, want %q", c.dev.ID(), c.stored, got, c.want)
 		}
 		if got := c.dev.SingleCovers(); got != c.singleToo {
-			t.Errorf("%s.SingleCovers() = %v, want %v", c.dev.Name(), got, c.singleToo)
+			t.Errorf("%s.SingleCovers() = %v, want %v", c.dev.ID(), got, c.singleToo)
 		}
 	}
 }

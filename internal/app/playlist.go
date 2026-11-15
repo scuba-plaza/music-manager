@@ -16,7 +16,7 @@ import (
 func (a *App) CreatePlaylist(name string, ids ...string) error {
 	name = strings.TrimSpace(name)
 	return a.store.Update(func(m *manifest.Manifest) error {
-		if err := checkPlaylist(a.Profiles().Targets(), m, manifest.Playlist{Name: name}); err != nil {
+		if err := checkPlaylist(m, manifest.Playlist{Name: name}); err != nil {
 			return err
 		}
 		m.Playlists = append(m.Playlists, manifest.Playlist{Name: name, Tracks: []string{}})
@@ -27,7 +27,7 @@ func (a *App) CreatePlaylist(name string, ids ...string) error {
 
 // checkPlaylist says whether a playlist with this name, and this Latin name if one
 // was set by hand, can be among the playlists of m.
-func checkPlaylist(targets []device.Target, m *manifest.Manifest, add manifest.Playlist) error {
+func checkPlaylist(m *manifest.Manifest, add manifest.Playlist) error {
 	if add.Name == "" {
 		return errors.New("a playlist needs a name")
 	}
@@ -35,10 +35,8 @@ func checkPlaylist(targets []device.Target, m *manifest.Manifest, add manifest.P
 		return fmt.Errorf("the Latin name of a playlist, %q, must be on one line", add.NameLatin)
 	}
 	for _, p := range m.Playlists {
-		for _, dev := range targets {
-			if file := dev.PlaylistFile(add); strings.EqualFold(file, dev.PlaylistFile(p)) {
-				return fmt.Errorf("there is already a playlist called %q, and %q would be the same file (%s)", p.Name, add.Name, file)
-			}
+		if file := device.Generic.PlaylistFile(add); strings.EqualFold(file, device.Generic.PlaylistFile(p)) {
+			return fmt.Errorf("there is already a playlist called %q, and %q would be the same file (%s)", p.Name, add.Name, file)
 		}
 	}
 	return nil
@@ -146,7 +144,7 @@ func (a *App) RenamePlaylist(name, to string) error {
 		// Check the new name against the others only: it may differ from the old
 		// one in nothing but case.
 		others := &manifest.Manifest{Playlists: slices.Delete(slices.Clone(m.Playlists), i, i+1)}
-		if err := checkPlaylist(a.Profiles().Targets(), others, manifest.Playlist{Name: to, NameLatin: m.Playlists[i].NameLatin}); err != nil {
+		if err := checkPlaylist(others, manifest.Playlist{Name: to, NameLatin: m.Playlists[i].NameLatin}); err != nil {
 			return err
 		}
 		m.Playlists[i].Name = to
@@ -165,7 +163,7 @@ func (a *App) SetPlaylistLatin(name, latin string) error {
 			return err
 		}
 		others := &manifest.Manifest{Playlists: slices.Delete(slices.Clone(m.Playlists), i, i+1)}
-		if err := checkPlaylist(a.Profiles().Targets(), others, manifest.Playlist{Name: name, NameLatin: latin}); err != nil {
+		if err := checkPlaylist(others, manifest.Playlist{Name: name, NameLatin: latin}); err != nil {
 			return err
 		}
 		m.Playlists[i].NameLatin = latin
@@ -192,7 +190,6 @@ func (a *App) DeletePlaylist(name string) error {
 func (a *App) ReplacePlaylists(ps []manifest.Playlist) error {
 	return a.store.Update(func(m *manifest.Manifest) error {
 		checked := &manifest.Manifest{}
-		targets := a.Profiles().Targets()
 		for _, p := range ps {
 			if p.Name != strings.TrimSpace(p.Name) {
 				return fmt.Errorf("playlist name %q has spaces around it", p.Name)
@@ -200,7 +197,7 @@ func (a *App) ReplacePlaylists(ps []manifest.Playlist) error {
 			if p.NameLatin != strings.TrimSpace(p.NameLatin) {
 				return fmt.Errorf("the Latin name %q of playlist %q has spaces around it", p.NameLatin, p.Name)
 			}
-			if err := checkPlaylist(targets, checked, p); err != nil {
+			if err := checkPlaylist(checked, p); err != nil {
 				return err
 			}
 			seen := map[string]bool{}

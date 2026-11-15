@@ -96,7 +96,6 @@ type TrackOptions struct {
 	// CoverInfo describes a stored cover image, for example "500×500 JPEG".
 	CoverInfo func(sha string) string
 	Profile   string
-	Profiles  *device.Registry
 }
 
 // Track makes the inspector of the track with the given ID.
@@ -114,11 +113,7 @@ func Track(s Snapshot, id string, o TrackOptions) (TrackView, bool) {
 	if t.CoverSHA256 != "" && o.CoverInfo != nil {
 		v.CoverInfo = o.CoverInfo(t.CoverSHA256)
 	}
-	profiles := o.Profiles
-	if profiles == nil {
-		profiles = device.Builtin()
-	}
-	previewed, ok := profiles.Get(o.Profile)
+	previewed, ok := s.target(o.Profile)
 	if o.Profile != "" && !ok {
 		return TrackView{}, false
 	}

@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"music-manager/internal/blobstore"
-	"music-manager/internal/device"
 	"music-manager/internal/loudness"
 	"music-manager/internal/manifest"
 )
@@ -21,7 +20,6 @@ type App struct {
 	// loudness measures the tracks that are synced, to write their ReplayGain
 	// tags; nil means no tags.
 	loudness loudness.Analyzer
-	profiles *device.Registry
 }
 
 // Open returns the library at root, creating the directory if needed.
@@ -43,15 +41,6 @@ func Open(root string) (*App, error) {
 // first sync.
 func (a *App) UseLoudness(meter loudness.Analyzer) {
 	a.loudness = loudness.Cached(filepath.Join(a.root, ".mm", "loudness"), meter)
-}
-
-func (a *App) UseProfiles(r *device.Registry) { a.profiles = r }
-
-func (a *App) Profiles() *device.Registry {
-	if a.profiles == nil {
-		return device.Builtin()
-	}
-	return a.profiles
 }
 
 // Manifest reads the records of the library as they are now.

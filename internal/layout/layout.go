@@ -105,6 +105,20 @@ func Assign(tracks []manifest.Track, r Rules) map[string]string {
 	return out
 }
 
+// Unique returns file, or file with " (2)", " (3)", ... before its extension
+// if a file that is the same one (compared case-insensitively, as on FAT) was
+// taken already, and takes it.
+func Unique(taken map[string]bool, file string) string {
+	ext := path.Ext(file)
+	stem := strings.TrimSuffix(file, ext)
+	candidate := file
+	for n := 2; taken[strings.ToLower(candidate)]; n++ {
+		candidate = fmt.Sprintf("%s (%d)%s", stem, n, ext)
+	}
+	taken[strings.ToLower(candidate)] = true
+	return candidate
+}
+
 // Component is s as one path component under the rules: what a folder or the
 // name of a file is made of it, "Unknown" if nothing is left.
 func Component(s string, r Rules) string { return clean(s, r) }

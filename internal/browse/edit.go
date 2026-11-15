@@ -108,7 +108,7 @@ func (e *Editor) snapshot() (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
-	return Snapshot{Tracks: m.Tracks, Playlists: m.Playlists}, nil
+	return Snapshot{Tracks: m.Tracks, Playlists: m.Playlists, Profiles: m.Profiles}, nil
 }
 
 // History is what undo, redo and paste would do now.

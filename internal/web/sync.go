@@ -166,8 +166,8 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, err)
 		return
 	}
-	if dev.Name() != device.Generic.Name() {
-		where += " · " + dev.Profile().Label
+	if dev.ID() != device.Generic.ID() {
+		where += " · " + dev.Profile().Name
 	}
 	v, err := s.jobs.start("sync", func(ctx context.Context, report func(any)) (any, error) {
 		type made struct {
@@ -220,7 +220,7 @@ func (s *Server) syncDevice(isLibrary bool, profile string) (device.Target, erro
 	case isLibrary:
 		return device.Generic, nil
 	case profile != "":
-		return s.profile(profile)
+		return s.app.Format(profile)
 	}
 	return device.Generic, nil
 }

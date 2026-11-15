@@ -35,7 +35,6 @@ func serve(ctx context.Context, o launch.Options) error {
 		return err
 	}
 	a.UseLoudness(loudness.NewFFmpeg())
-	a.UseProfiles(o.Profiles)
 	ln, err := web.Listen(o.Addr, !o.AddrSet)
 	if err != nil {
 		return err
@@ -47,6 +46,6 @@ func serve(ctx context.Context, o launch.Options) error {
 			fmt.Fprintln(o.Out, "mm: cannot open a browser:", err)
 		}
 	}
-	server := web.New(a, web.WithDownloader(ytdlp.New()), web.WithProfiles(o.Profiles))
+	server := web.New(a, web.WithDownloader(ytdlp.New()))
 	return server.Serve(ctx, ln)
 }

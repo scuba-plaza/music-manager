@@ -14,7 +14,7 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
-	"music-manager/internal/device"
+	"music-manager/internal/manifest"
 )
 
 // syncServer is a server that offers the given drives, not the ones of the machine.
@@ -332,24 +332,19 @@ func TestAPlanForTheWolfgangNamesItAndWarnsAboutWhatItWillNotShowWell(t *testing
 	}
 }
 
-func registryWith(t *testing.T, content string) *device.Registry {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "devices.toml")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	r, err := device.LoadRegistry(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return r
+var shortStems = manifest.Profile{
+	Name: "Short Stems", StemMax: 8, ComponentMax: 200, CoverFormat: "keep", ReplayGain: true,
+	PlaylistExt: ".m3u8", PlaylistStyle: "relative",
 }
 
-const shortStems = "[[profile]]\nname = \"short-stems\"\nlabel = \"Short Stems\"\nstem_max = 8\n"
-
-func profileSyncServer(t *testing.T, a *app.App, r *device.Registry) *httptest.Server {
+func profileSyncServer(t *testing.T, a *app.App, profiles ...manifest.Profile) *httptest.Server {
 	t.Helper()
-	s := New(a, WithProfiles(r))
+	for _, p := range profiles {
+		if _, err := a.CreateProfile(p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s := New(a)
 	s.mounts = func() []string { return nil }
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
@@ -358,7 +353,7 @@ func profileSyncServer(t *testing.T, a *app.App, r *device.Registry) *httptest.S
 
 func TestSyncPlanWithAnUnknownProfileIs400(t *testing.T) {
 	a, _ := seed(t, sample...)
-	srv := profileSyncServer(t, a, registryWith(t, shortStems))
+	srv := profileSyncServer(t, a, shortStems)
 	var r reply
 	code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": t.TempDir(), "profile": "nobody"}, &r)
 	if code != 400 || !strings.Contains(r.Error, `"nobody"`) {
@@ -368,7 +363,7 @@ func TestSyncPlanWithAnUnknownProfileIs400(t *testing.T) {
 
 func TestSyncPlanForTheLibraryFolderIgnoresTheProfile(t *testing.T) {
 	a, _ := seed(t, sample...)
-	srv := profileSyncServer(t, a, registryWith(t, shortStems))
+	srv := profileSyncServer(t, a, shortStems)
 	for _, profile := range []string{"short-stems", "wolfgang-wmp01", "nobody"} {
 		_, d := planned(t, srv.URL, obj{"library": true, "profile": profile})
 		if d.Plan.Where != "Library folder" || len(d.Plan.Warnings) != 0 {
@@ -382,7 +377,7 @@ func TestSyncPlanForTheLibraryFolderIgnoresTheProfile(t *testing.T) {
 
 func TestSyncPlanWithAProfileUsesItsRules(t *testing.T) {
 	a, _ := seed(t, sample...)
-	srv := profileSyncServer(t, a, registryWith(t, shortStems))
+	srv := profileSyncServer(t, a, shortStems)
 	_, d := planned(t, srv.URL, obj{"folder": t.TempDir(), "profile": "short-stems"})
 	if !strings.HasSuffix(d.Plan.Where, " · Short Stems") {
 		t.Errorf("the plan is for %q, want it to name the profile", d.Plan.Where)

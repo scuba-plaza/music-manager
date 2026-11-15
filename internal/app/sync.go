@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"music-manager/internal/device"
+	"music-manager/internal/layout"
 	"music-manager/internal/loudness"
 	"music-manager/internal/manifest"
 	"music-manager/internal/mp3"
@@ -95,8 +96,10 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 			opts.OnProgress(i+1, len(m.Tracks))
 		}
 	}
+	playlistFiles := map[string]bool{}
 	for _, p := range m.Playlists {
 		name, data := dev.Playlist(p, byID(m.Tracks), paths)
+		name = layout.Unique(playlistFiles, name)
 		build[name] = func() ([]byte, error) { return data, nil }
 		desired[name] = fingerprint(data)
 	}

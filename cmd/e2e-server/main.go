@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"music-manager/internal/app"
-	"music-manager/internal/device"
 	"music-manager/internal/web"
 	"music-manager/internal/web/webtest"
 )
@@ -35,17 +34,8 @@ func main() {
 func run() error {
 	addr := flag.String("addr", "127.0.0.1:7979", "address to listen on (only this computer: 127.0.0.1, localhost or ::1)")
 	dist := flag.String("dist", "internal/web/dist", "folder with the built front end")
-	config := flag.String("config", "", "device profiles file (only the built-in profiles when empty)")
 	flag.Parse()
 
-	profiles := device.Builtin()
-	if *config != "" {
-		loaded, err := device.LoadRegistry(*config)
-		if err != nil {
-			return err
-		}
-		profiles = loaded
-	}
 	ln, err := web.Listen(*addr, false)
 	if err != nil {
 		return err
@@ -58,7 +48,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	servers := &seededServers{ctx: ctx, parent: parent, profiles: profiles, frontend: os.DirFS(*dist)}
+	servers := &seededServers{ctx: ctx, parent: parent, frontend: os.DirFS(*dist)}
 	if err := servers.reset(); err != nil {
 		return err
 	}
@@ -84,7 +74,6 @@ func run() error {
 type seededServers struct {
 	ctx      context.Context
 	parent   string
-	profiles *device.Registry
 	frontend fs.FS
 
 	mu      sync.Mutex
@@ -106,9 +95,7 @@ func (l *seededServers) reset() error {
 	if err != nil {
 		return err
 	}
-	a.UseProfiles(l.profiles)
 	server := web.New(a,
-		web.WithProfiles(l.profiles),
 		web.WithDownloader(&webtest.FakeDownloader{Info: app.Info{Title: "So What", Artist: "Miles Davis", Album: "Kind of Blue", TrackNumber: 1, TrackTotal: 5, Released: "1959-08-17"}}),
 		web.WithFrontend(l.frontend),
 	)

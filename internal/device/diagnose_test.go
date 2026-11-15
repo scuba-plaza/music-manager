@@ -210,23 +210,19 @@ func TestEachDiagnosticFollowsItsProfileField(t *testing.T) {
 		track("istan2", "Istanbul", "", "Song"),
 	}
 	for _, c := range []struct {
-		name   string
-		fields string
-		want   []string
+		name string
+		set  func(*manifest.Profile)
+		want []string
 	}{
-		{"nothing set", ``, nil},
-		{"latin_names only", `latin_names = true`, []string{"no-latin"}},
-		{"stem_max only", `stem_max = 20`, []string{"cut"}},
-		{"latin_names and tag_width without latin_genre", "latin_names = true\ntag_width = 12", []string{"no-latin", "several"}},
-		{"latin_genre without tag_width", `latin_genre = true`, nil},
-		{"every check on", "latin_names = true\ntag_width = 12\nlatin_genre = true\nstem_max = 20", []string{"genre", "no-latin", "several", "cut"}},
+		{"nothing set", func(p *manifest.Profile) {}, nil},
+		{"latin_names only", func(p *manifest.Profile) { p.LatinNames = true }, []string{"no-latin"}},
+		{"stem_max only", func(p *manifest.Profile) { p.StemMax = 20 }, []string{"cut"}},
+		{"latin_names and tag_width without latin_genre", func(p *manifest.Profile) { p.LatinNames, p.TagWidth = true, 12 }, []string{"no-latin", "several"}},
+		{"latin_genre without tag_width", func(p *manifest.Profile) { p.LatinGenre = true }, nil},
+		{"every check on", func(p *manifest.Profile) { p.LatinNames, p.TagWidth, p.LatinGenre, p.StemMax = true, 12, true, 20 }, []string{"genre", "no-latin", "several", "cut"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			profiles, err := device.ParseProfiles([]byte("[[profile]]\nname = \"my-player\"\n" + c.fields + "\n"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			ws := profiles[0].Target().Diagnose(tracks)
+			ws := myPlayer(c.set).Diagnose(tracks)
 			if got := warningKinds(ws); !reflect.DeepEqual(got, c.want) {
 				t.Errorf("warnings %v, want %v: %+v", got, c.want, ws)
 			}
@@ -234,30 +230,30 @@ func TestEachDiagnosticFollowsItsProfileField(t *testing.T) {
 	}
 }
 
+func myPlayer(set func(*manifest.Profile)) device.Target {
+	p := manifest.Profile{ID: "my-player", Name: "My Player", ComponentMax: 200, CoverFormat: "keep", ReplayGain: true, PlaylistExt: ".m3u8", PlaylistStyle: "relative"}
+	set(&p)
+	return device.TargetOf(p)
+}
+
 func TestAClashTheCutDidNotCauseIsNotBlamedOnTheCut(t *testing.T) {
-	profiles, err := device.ParseProfiles([]byte("[[profile]]\nname = \"my-player\"\nstem_max = 20\n"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	target := myPlayer(func(p *manifest.Profile) { p.StemMax = 20 })
 	tracks := []manifest.Track{
 		track("dotted", "İstanbul", "", "Song"),
 		track("plain1", "Istanbul", "", "Song"),
 	}
-	if ws := profiles[0].Target().Diagnose(tracks); len(ws) != 0 {
+	if ws := target.Diagnose(tracks); len(ws) != 0 {
 		t.Errorf("names equal without the cut were blamed on it: %+v", ws)
 	}
 }
 
 func TestTwoNamesThatDifferInCaseAndBeyondTheCutAreStillTheSameAfterIt(t *testing.T) {
-	profiles, err := device.ParseProfiles([]byte("[[profile]]\nname = \"my-player\"\nstem_max = 20\n"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	target := myPlayer(func(p *manifest.Profile) { p.StemMax = 20 })
 	tracks := []manifest.Track{
 		track("upper1", "Artist", "", "A Very Long Song Title Indeed Yes"),
 		track("lower1", "Artist", "", "a very long song title indeed no"),
 	}
-	ws := profiles[0].Target().Diagnose(tracks)
+	ws := target.Diagnose(tracks)
 	for _, id := range []string{"upper1", "lower1"} {
 		if got := warned(ws, id); !hasMessage(got, "cut") {
 			t.Errorf("%s: %q", id, got)

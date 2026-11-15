@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -139,7 +137,7 @@ func TestHelpListsTheFlags(t *testing.T) {
 	if code != 0 || p.calls != 0 {
 		t.Fatalf("code %d, calls %d", code, p.calls)
 	}
-	for _, name := range []string{"library", "addr", "no-open", "config", "check-config", "version"} {
+	for _, name := range []string{"library", "addr", "no-open", "version"} {
 		if !strings.Contains(errs, name) {
 			t.Errorf("usage does not mention %s: %q", name, errs)
 		}
@@ -154,193 +152,25 @@ func TestAServerErrorIsReported(t *testing.T) {
 	}
 }
 
-const userProfile = `[[profile]]
-name = "my-player"
-latin_names = true
-`
-
-const typoProfile = `[[profile]]
-name = "my-player"
-latin_nmes = true
-`
-
-func writeConfig(t *testing.T, content string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "devices.toml")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
+func TestTheOldFlagsAndVariableForTheDeviceFileAreGone(t *testing.T) {
+	for _, flag := range []string{"--config", "--check-config"} {
+		p := &probe{}
+		if code, _, errs := run(t, p, noEnv, flag); code != 2 || p.calls != 0 || !strings.Contains(errs, "not defined") {
+			t.Errorf("%s: code %d, calls %d, %q", flag, code, p.calls, errs)
+		}
 	}
-	return path
+	p := &probe{}
+	if code, _, errs := run(t, p, configEnvOf("/does/not/exist/devices.toml")); code != 0 || errs != "" || p.calls != 1 {
+		t.Errorf("a MM_CONFIG that points nowhere is not read any more: code %d, calls %d, %q", code, p.calls, errs)
+	}
 }
 
-func configEnv(key, value string) func(string) string {
+func configEnvOf(path string) func(string) string {
 	return func(k string) string {
-		if k == key {
-			return value
+		if k == "MM_CONFIG" {
+			return path
 		}
 		return ""
-	}
-}
-
-func profileNames(o launch.Options) []string {
-	if o.Profiles == nil {
-		return nil
-	}
-	var names []string
-	for _, p := range o.Profiles.Profiles() {
-		names = append(names, p.Name)
-	}
-	return names
-}
-
-func TestTheConfigFileGivesTheServerItsProfiles(t *testing.T) {
-	p := &probe{}
-	path := writeConfig(t, userProfile)
-	code, _, errs := run(t, p, noEnv, "--config", path)
-	if code != 0 || p.calls != 1 {
-		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
-	}
-	if got := profileNames(p.options); !slices.Equal(got, []string{"generic", "wolfgang-wmp01", "my-player"}) {
-		t.Errorf("profiles %v", got)
-	}
-	if p.options.Config != path {
-		t.Errorf("config %q, want %q", p.options.Config, path)
-	}
-}
-
-func TestAnInvalidConfigRefusesToStart(t *testing.T) {
-	path := writeConfig(t, typoProfile)
-	for name, args := range map[string][]string{"--config": {"--config", path}, "MM_CONFIG": nil} {
-		p := &probe{}
-		code, _, errs := run(t, p, configEnv("MM_CONFIG", path), args...)
-		if code != 1 || p.calls != 0 || !strings.Contains(errs, path) || !strings.Contains(errs, "latin_nmes") || !strings.Contains(errs, "my-player") {
-			t.Errorf("%s: code %d, calls %d, err %q", name, code, p.calls, errs)
-		}
-	}
-}
-
-func TestCheckConfigPrintsProfilesAndExits(t *testing.T) {
-	p := &probe{}
-	code, out, errs := run(t, p, noEnv, "--config", writeConfig(t, userProfile), "--check-config")
-	if code != 0 || p.calls != 0 || errs != "" {
-		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
-	}
-	if out != "generic\nwolfgang-wmp01\nmy-player\n" {
-		t.Errorf("output %q", out)
-	}
-	path := writeConfig(t, typoProfile)
-	code, out, errs = run(t, p, noEnv, "--config", path, "--check-config")
-	if code != 1 || p.calls != 0 || out != "" || !strings.Contains(errs, path) {
-		t.Errorf("invalid: code %d, calls %d, out %q, err %q", code, p.calls, out, errs)
-	}
-}
-
-func TestAMissingDefaultConfigIsFine(t *testing.T) {
-	dir := t.TempDir()
-	for name, getenv := range map[string]func(string) string{
-		"home":            noEnv,
-		"XDG_CONFIG_HOME": configEnv("XDG_CONFIG_HOME", dir),
-	} {
-		p := &probe{}
-		code, _, errs := run(t, p, getenv)
-		if code != 0 || p.calls != 1 {
-			t.Fatalf("%s: code %d, calls %d, err %q", name, code, p.calls, errs)
-		}
-		if got := profileNames(p.options); !slices.Equal(got, []string{"generic", "wolfgang-wmp01"}) {
-			t.Errorf("%s: profiles %v", name, got)
-		}
-	}
-	p := &probe{}
-	code, out, errs := run(t, p, noEnv, "--check-config")
-	if code != 0 || p.calls != 0 || out != "generic\nwolfgang-wmp01\n" {
-		t.Errorf("check: code %d, calls %d, out %q, err %q", code, p.calls, out, errs)
-	}
-}
-
-func TestAMissingExplicitConfigFails(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "absent.toml")
-	for _, args := range [][]string{{"--config", path}, {"--config", path, "--check-config"}} {
-		p := &probe{}
-		code, _, errs := run(t, p, noEnv, args...)
-		if code != 1 || p.calls != 0 || !strings.Contains(errs, path) {
-			t.Errorf("%v: code %d, calls %d, err %q", args, code, p.calls, errs)
-		}
-	}
-}
-
-func TestAMissingConfigNamedByTheEnvironmentFails(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "absent.toml")
-	for _, args := range [][]string{nil, {"--check-config"}} {
-		p := &probe{}
-		code, _, errs := run(t, p, configEnv("MM_CONFIG", path), args...)
-		if code != 1 || p.calls != 0 || !strings.Contains(errs, path) {
-			t.Errorf("%v: code %d, calls %d, err %q", args, code, p.calls, errs)
-		}
-	}
-}
-
-func writeAt(t *testing.T, path, content string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestAConfigFileNamedByTheEnvironmentGivesTheServerItsProfiles(t *testing.T) {
-	path := writeConfig(t, userProfile)
-	p := &probe{}
-	code, _, errs := run(t, p, configEnv("MM_CONFIG", path))
-	if code != 0 || p.calls != 1 {
-		t.Fatalf("code %d, calls %d, err %q", code, p.calls, errs)
-	}
-	if got := profileNames(p.options); !slices.Equal(got, []string{"generic", "wolfgang-wmp01", "my-player"}) {
-		t.Errorf("profiles %v", got)
-	}
-	if p.options.Config != path {
-		t.Errorf("config %q, want %q", p.options.Config, path)
-	}
-}
-
-func TestTheDefaultConfigFilesAreReadAndAnInvalidOneRefusesToStart(t *testing.T) {
-	root := t.TempDir()
-	xdg := filepath.Join(root, "xdg")
-	home := filepath.Join(root, "home")
-	cases := []struct {
-		name   string
-		getenv func(string) string
-		path   string
-	}{
-		{"XDG_CONFIG_HOME", configEnv("XDG_CONFIG_HOME", xdg), filepath.Join(xdg, "mm", "devices.toml")},
-		{"home", noEnv, filepath.Join(home, ".config", "mm", "devices.toml")},
-	}
-	for _, c := range cases {
-		writeAt(t, c.path, userProfile)
-		p := &probe{}
-		code, _, errs := runAt(home, p, c.getenv)
-		if code != 0 || p.calls != 1 {
-			t.Fatalf("%s: code %d, calls %d, err %q", c.name, code, p.calls, errs)
-		}
-		if got := profileNames(p.options); !slices.Equal(got, []string{"generic", "wolfgang-wmp01", "my-player"}) {
-			t.Errorf("%s: profiles %v", c.name, got)
-		}
-		writeAt(t, c.path, typoProfile)
-		p = &probe{}
-		code, _, errs = runAt(home, p, c.getenv)
-		if code != 1 || p.calls != 0 || !strings.Contains(errs, c.path) || !strings.Contains(errs, "latin_nmes") {
-			t.Errorf("%s invalid: code %d, calls %d, err %q", c.name, code, p.calls, errs)
-		}
-	}
-}
-
-func TestHelpSaysWhichConfigFileMayBeMissing(t *testing.T) {
-	_, _, errs := run(t, &probe{}, noEnv, "--help")
-	for _, want := range []string{"$MM_CONFIG", "must exist"} {
-		if !strings.Contains(errs, want) {
-			t.Errorf("usage does not say %q: %q", want, errs)
-		}
 	}
 }
 

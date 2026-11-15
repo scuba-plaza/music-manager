@@ -152,7 +152,6 @@ func TestNoListInAnAnswerIsNull(t *testing.T) {
 			return raw
 		}
 		check("GET", "/api/info", nil, reflect.TypeFor[InfoView]())
-		check("GET", "/api/profiles", nil, reflect.TypeFor[[]ProfileView]())
 		check("GET", "/api/library", nil, reflect.TypeFor[LibraryResponse]())
 		check("GET", "/api/library?q=nothing-matches-this", nil, reflect.TypeFor[LibraryResponse]())
 		check("GET", "/api/library?sort=title", nil, reflect.TypeFor[LibraryResponse]())

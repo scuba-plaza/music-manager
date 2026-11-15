@@ -129,6 +129,7 @@ export interface JobView {
 
 export interface LibraryResponse {
   history: HistoryView;
+  profiles: Profile[];
   stamp: string;
   unsynced: number;
   view: LibraryView;
@@ -204,10 +205,21 @@ export interface ProblemView {
   message: string;
 }
 
-export interface ProfileView {
+export interface Profile {
+  id: string;
   name: string;
-  label: string;
-  builtin: boolean;
+  latin_names: boolean;
+  component_max: number;
+  stem_max: number;
+  tag_width: number;
+  latin_genre: boolean;
+  cover_format: string;
+  cover_max_edge: number;
+  cover_quality: number;
+  single_covers: boolean;
+  replaygain: boolean;
+  playlist_ext: string;
+  playlist_style: string;
 }
 
 export interface RowView {
