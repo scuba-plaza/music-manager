@@ -39,6 +39,8 @@ interface AddState {
 
 const pathPause = 120;
 
+const pickOne = 'Pick at least one track';
+
 export const albumOrder: readonly AlbumKey[] = ['album', 'artist', 'released', 'genre'];
 
 function blankAlbum(): AlbumForm {
@@ -268,13 +270,17 @@ export function setAlbumField(key: AlbumKey, text: string): void {
 }
 
 export function togglePick(number: number): void {
-  useAdd.setState((s) => ({
-    picked: s.picked.includes(number) ? s.picked.filter((n) => n !== number) : [...s.picked, number].sort((a, b) => a - b),
-  }));
+  useAdd.setState((s) => {
+    const picked = s.picked.includes(number) ? s.picked.filter((n) => n !== number) : [...s.picked, number].sort((a, b) => a - b);
+    return { picked, error: picked.length > 0 && s.error === pickOne ? '' : s.error };
+  });
 }
 
 export function pickAll(all: boolean): void {
-  useAdd.setState((s) => ({ picked: all && s.album !== null ? s.album.tracks.map((t) => t.number) : [] }));
+  useAdd.setState((s) => {
+    const picked = all && s.album !== null ? s.album.tracks.map((t) => t.number) : [];
+    return { picked, error: picked.length > 0 && s.error === pickOne ? '' : s.error };
+  });
 }
 
 export async function saveAlbum(): Promise<AlbumKey | undefined> {
@@ -283,7 +289,7 @@ export async function saveAlbum(): Promise<AlbumKey | undefined> {
     return undefined;
   }
   if (picked.length === 0) {
-    useAdd.setState({ error: 'Pick at least one track' });
+    useAdd.setState({ error: pickOne });
     return undefined;
   }
   attemptNo += 1;

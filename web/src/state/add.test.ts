@@ -631,6 +631,21 @@ describe('an album review', () => {
     expect(state().picked).toEqual([1, 2, 3]);
   });
 
+  it('picking a track clears the pick-one error', async () => {
+    await inAlbum(running);
+    pickAll(false);
+    await saveAlbum();
+    expect(state().error).toBe('Pick at least one track');
+
+    togglePick(2);
+    expect(state().error).toBe('');
+
+    pickAll(false);
+    await saveAlbum();
+    pickAll(true);
+    expect(state().error).toBe('');
+  });
+
   it('typing a field clears that field error only', async () => {
     await inAlbum();
     useAdd.setState({ albumErrors: { album: 'x', artist: 'y' } });
