@@ -18,6 +18,7 @@ func Contract() []any {
 		browse.TrackView{},
 		manifest.Profile{},
 		AddCheck{},
+		AlbumProgress{},
 		ChangeResponse{},
 		DraftCoverView{},
 		ErrorView{},

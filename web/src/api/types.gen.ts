@@ -17,6 +17,33 @@ export interface AddForm {
   cutEnd: string;
 }
 
+export interface AlbumForm {
+  album: string;
+  artist: string;
+  released: string;
+  genre: string;
+}
+
+export interface AlbumProgress {
+  done: number;
+  total: number;
+  title: string;
+}
+
+export interface AlbumTrackView {
+  number: number;
+  title: string;
+  seconds: number;
+}
+
+export interface AlbumView {
+  id: string;
+  form: AlbumForm;
+  note: string;
+  cover: string;
+  tracks: AlbumTrackView[];
+}
+
 export interface BarView {
   total: number;
   start: number;
@@ -92,6 +119,7 @@ export interface ErrorView {
 export interface Fetched {
   draft?: DraftView;
   duplicate?: DuplicateView;
+  album?: AlbumView;
 }
 
 export interface FieldView {

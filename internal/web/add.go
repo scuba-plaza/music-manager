@@ -22,6 +22,7 @@ func (s *Server) addRoutes() {
 	s.mux.HandleFunc("POST /api/add/fetch", s.addFetch)
 	s.mux.HandleFunc("POST /api/add/path", s.addPath)
 	s.mux.HandleFunc("POST /api/add/finish", s.addFinish)
+	s.mux.HandleFunc("POST /api/add/album", s.addAlbum)
 	s.mux.HandleFunc("DELETE /api/add/{draft}", s.addDiscard)
 	s.mux.HandleFunc("GET /api/add/{draft}/cover", s.draftCover)
 	s.mux.HandleFunc("PUT /api/add/{draft}/cover", s.draftCoverPut)
