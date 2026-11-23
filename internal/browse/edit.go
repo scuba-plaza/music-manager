@@ -86,8 +86,7 @@ type Editor struct {
 	nudgeKey string
 	clip     *clipContents
 
-	drafts     map[string]*app.Draft // downloads waiting for their details, by name
-	draftOrder []string
+	drafts shelf[*app.Draft]
 }
 
 // EditorOption adds a capability to an editor.
