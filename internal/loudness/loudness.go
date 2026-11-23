@@ -52,10 +52,11 @@ func Tags(m Measurement) map[string]string {
 // it prints along the way carry running values and are ignored; the answer is
 // the summary at the end.
 func Parse(output string) (Measurement, error) {
-	_, summary, found := cutLast(output, "Summary:")
-	if !found {
+	i := strings.LastIndex(output, "Summary:")
+	if i < 0 {
 		return Measurement{}, errors.New("ffmpeg printed no loudness summary")
 	}
+	summary := output[i:]
 	lufs, err := number(integrated, summary, "integrated loudness")
 	if err != nil {
 		return Measurement{}, err
@@ -80,13 +81,4 @@ func number(re *regexp.Regexp, text, what string) (float64, error) {
 		return 0, fmt.Errorf("ffmpeg's loudness summary has an unreadable %s: %q", what, m[1])
 	}
 	return v, nil
-}
-
-// cutLast splits s around the last occurrence of sep.
-func cutLast(s, sep string) (before, after string, found bool) {
-	i := strings.LastIndex(s, sep)
-	if i < 0 {
-		return s, "", false
-	}
-	return s[:i], s[i+len(sep):], true
 }

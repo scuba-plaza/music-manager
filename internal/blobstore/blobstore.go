@@ -18,8 +18,6 @@ type Store struct{ dir, ext string }
 // New returns a store keeping blobs as <dir>/<sha><ext>.
 func New(dir, ext string) *Store { return &Store{dir: dir, ext: ext} }
 
-func (s *Store) path(sha string) string { return filepath.Join(s.dir, sha+s.ext) }
-
 // Put stores r's content and returns its hex SHA-256. Storing content that
 // is already present is a no-op. A failed Put leaves nothing behind.
 func (s *Store) Put(r io.Reader) (string, error) {
@@ -43,18 +41,16 @@ func (s *Store) Put(r io.Reader) (string, error) {
 	if s.Has(sha) {
 		return sha, nil
 	}
-	return sha, os.Rename(tmp.Name(), s.path(sha))
+	return sha, os.Rename(tmp.Name(), s.Path(sha))
 }
 
 func (s *Store) Has(sha string) bool {
-	_, err := os.Stat(s.path(sha))
+	_, err := os.Stat(s.Path(sha))
 	return err == nil
 }
 
-func (s *Store) Open(sha string) (*os.File, error) { return os.Open(s.path(sha)) }
-
-// Path returns where the blob lives, for callers that copy it elsewhere.
-func (s *Store) Path(sha string) string { return s.path(sha) }
+// Path returns where the blob lives, for callers that read it.
+func (s *Store) Path(sha string) string { return filepath.Join(s.dir, sha+s.ext) }
 
 // GC deletes every blob whose SHA is not in keep and returns the deleted SHAs.
 func (s *Store) GC(keep map[string]bool) ([]string, error) {
