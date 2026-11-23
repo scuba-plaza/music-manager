@@ -44,11 +44,7 @@ func (a *App) CheckProfile(p manifest.Profile) (FieldErrors, error) {
 	if err != nil {
 		return nil, err
 	}
-	var fields FieldErrors
-	if err := check(tidy(p), m.Profiles, p.ID); err != nil {
-		errors.As(err, &fields)
-	}
-	return fields, nil
+	return check(tidy(p), m.Profiles, p.ID), nil
 }
 
 func (a *App) CreateProfile(p manifest.Profile) (manifest.Profile, error) {
@@ -57,7 +53,7 @@ func (a *App) CreateProfile(p manifest.Profile) (manifest.Profile, error) {
 		if len(m.Profiles) >= manifest.MaxProfiles {
 			return fmt.Errorf("there can be at most %d formats besides Generic: delete one first", manifest.MaxProfiles)
 		}
-		if err := check(p, m.Profiles, ""); err != nil {
+		if err := check(p, m.Profiles, "").OrNil(); err != nil {
 			return err
 		}
 		p.ID = freshID(p.Name, m.Profiles)
@@ -74,7 +70,7 @@ func (a *App) UpdateProfile(id string, p manifest.Profile) (manifest.Profile, er
 		if i < 0 {
 			return fmt.Errorf("there is no format with the id %q: %w", id, ErrNoFormat)
 		}
-		if err := check(p, m.Profiles, id); err != nil {
+		if err := check(p, m.Profiles, id).OrNil(); err != nil {
 			return err
 		}
 		p.ID = id
@@ -103,7 +99,7 @@ func tidy(p manifest.Profile) manifest.Profile {
 	return p
 }
 
-func check(p manifest.Profile, others []manifest.Profile, own string) error {
+func check(p manifest.Profile, others []manifest.Profile, own string) FieldErrors {
 	bad := FieldErrors{}
 	for field, message := range p.Problems() {
 		bad.Set(field, message)
@@ -115,7 +111,7 @@ func check(p manifest.Profile, others []manifest.Profile, own string) error {
 			}
 		}
 	}
-	return bad.OrNil()
+	return bad
 }
 
 func freshID(name string, taken []manifest.Profile) string {

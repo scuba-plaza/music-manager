@@ -62,8 +62,9 @@ func (a *App) signatures(m *manifest.Manifest) map[string]string {
 	if a.loudness != nil && device.Generic.ReplayGain() {
 		replayGain = "\x00replaygain-1"
 	}
+	tracksByID := byID(m.Tracks)
 	for _, p := range m.Playlists {
-		_, content := device.Generic.Playlist(p, byID(m.Tracks), paths)
+		_, content := device.Generic.Playlist(p, tracksByID, paths)
 		sum := sha256.Sum256(append([]byte(p.Name+"\x00"), content...))
 		sigs[playlistKey+p.Name] = hex.EncodeToString(sum[:])
 	}
@@ -98,9 +99,6 @@ func (a *App) syncedPath() string { return filepath.Join(a.root, ".mm", "synced.
 func (a *App) writeSynced(sigs map[string]string) error {
 	data, err := json.MarshalIndent(syncedFile{Version: 1, Tracks: sigs}, "", "  ")
 	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(a.syncedPath()), 0o755); err != nil {
 		return err
 	}
 	return writeAtomic(a.syncedPath(), data)

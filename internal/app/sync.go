@@ -50,9 +50,6 @@ type SyncPlan struct {
 	sigs                  map[string]string
 }
 
-// Root is the library directory.
-func (a *App) Root() string { return a.root }
-
 // PlanSync works out what rendering the manifest into the target would
 // change. It reads the whole tree but writes nothing.
 func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
@@ -78,7 +75,6 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 	build := map[string]func() ([]byte, error){}
 	warnings := dev.Diagnose(m.Tracks)
 	for i, t := range m.Tracks {
-		t := t
 		p := paths[t.ID]
 		build[p] = func() ([]byte, error) {
 			data, _, err := a.renderTrack(t, dev)
@@ -97,8 +93,9 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 		}
 	}
 	playlistFiles := map[string]bool{}
+	tracksByID := byID(m.Tracks)
 	for _, p := range m.Playlists {
-		name, data := dev.Playlist(p, byID(m.Tracks), paths)
+		name, data := dev.Playlist(p, tracksByID, paths)
 		name = layout.Unique(playlistFiles, name)
 		build[name] = func() ([]byte, error) { return data, nil }
 		desired[name] = fingerprint(data)

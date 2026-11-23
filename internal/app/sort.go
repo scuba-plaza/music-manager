@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmp"
 	"fmt"
 	"sort"
 	"strconv"
@@ -30,8 +31,9 @@ var SortKeys = []SortKey{SortArtist, SortAlbum, SortTitle, SortTrack, SortLength
 
 // ParseSortKey reads a key by its name.
 func ParseSortKey(s string) (SortKey, error) {
+	name := strings.ToLower(strings.TrimSpace(s))
 	for _, k := range SortKeys {
-		if string(k) == strings.ToLower(strings.TrimSpace(s)) {
+		if string(k) == name {
 			return k, nil
 		}
 	}
@@ -160,7 +162,7 @@ func compareBy(a, b manifest.Track, k SortKey) (c int, missing bool) {
 	case SortTrack:
 		return trackNumber(a) - trackNumber(b), false
 	case SortLength:
-		return compareInt(int64(a.PlayingLength()), int64(b.PlayingLength())), false
+		return cmp.Compare(a.PlayingLength(), b.PlayingLength()), false
 	case SortReleased:
 		return strings.Compare(a.Released, b.Released), false
 	case SortAdded:
@@ -180,16 +182,6 @@ func sortText(t manifest.Track, k SortKey) string {
 		return set
 	}
 	return SortValue(t, k)
-}
-
-func compareInt(a, b int64) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	}
-	return 0
 }
 
 // tieBreak orders tracks that are equal in the key being sorted by.

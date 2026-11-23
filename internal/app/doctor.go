@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -8,7 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"music-manager/internal/artist"
@@ -87,7 +88,9 @@ func (a *App) Doctor() ([]Problem, error) {
 			}
 		}
 	}
-	sortProblems(ps)
+	slices.SortStableFunc(ps, func(p, q Problem) int {
+		return cmp.Or(cmp.Compare(q.Severity, p.Severity), cmp.Compare(p.TrackID, q.TrackID))
+	})
 	return ps, nil
 }
 
@@ -112,13 +115,4 @@ func hashFile(path string) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-func sortProblems(ps []Problem) {
-	sort.SliceStable(ps, func(i, j int) bool {
-		if ps[i].Severity != ps[j].Severity {
-			return ps[i].Severity > ps[j].Severity
-		}
-		return ps[i].TrackID < ps[j].TrackID
-	})
 }
