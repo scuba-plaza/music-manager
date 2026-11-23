@@ -117,3 +117,7 @@ func released(date string, year float64) string {
 	}
 	return ""
 }
+
+func (d *Downloader) List(ctx context.Context, url, dir string, limit int) (app.Listing, error) {
+	return app.Listing{}, errors.New("listing a playlist is not implemented yet")
+}

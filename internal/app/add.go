@@ -48,6 +48,7 @@ type Downloaded struct {
 // Downloader fetches the audio at a URL as an MP3 file into dir.
 type Downloader interface {
 	Download(ctx context.Context, url, dir string) (Downloaded, error)
+	List(ctx context.Context, url, dir string, limit int) (Listing, error)
 }
 
 // DuplicateError says the audio is already in the library.
@@ -91,14 +92,11 @@ func (a *App) RemoveDraftCover(d *Draft) { d.staged.coverSHA = "" }
 // anything to the library. It fails with a *DuplicateError if the audio is
 // already there.
 func (a *App) Fetch(ctx context.Context, req AddRequest, dl Downloader) (*Draft, error) {
-	if err := os.MkdirAll(filepath.Join(a.root, ".mm"), 0o755); err != nil {
-		return nil, err
-	}
-	dir, err := os.MkdirTemp(filepath.Join(a.root, ".mm"), "download-")
+	dir, remove, err := a.downloadDir()
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(dir)
+	defer remove()
 
 	d, err := dl.Download(ctx, req.URL, dir)
 	if err != nil {
@@ -120,6 +118,17 @@ func (a *App) Fetch(ctx context.Context, req AddRequest, dl Downloader) (*Draft,
 	}
 
 	return &Draft{URL: req.URL, Info: d.Info, Length: s.length, staged: s}, nil
+}
+
+func (a *App) downloadDir() (dir string, remove func(), err error) {
+	if err := os.MkdirAll(filepath.Join(a.root, ".mm"), 0o755); err != nil {
+		return "", nil, err
+	}
+	dir, err = os.MkdirTemp(filepath.Join(a.root, ".mm"), "download-")
+	if err != nil {
+		return "", nil, err
+	}
+	return dir, func() { os.RemoveAll(dir) }, nil
 }
 
 // Finish records the draft as an identified track with the details in e.

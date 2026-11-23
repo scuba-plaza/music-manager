@@ -42,6 +42,10 @@ func (d *FakeDownloader) Download(_ context.Context, url, dir string) (app.Downl
 	return app.Downloaded{Path: path, Info: d.Info, Cover: d.Cover}, nil
 }
 
+func (d *FakeDownloader) List(_ context.Context, _, _ string, _ int) (app.Listing, error) {
+	return app.Listing{}, nil
+}
+
 func (d *FakeDownloader) Calls() []string {
 	d.mu.Lock()
 	defer d.mu.Unlock()

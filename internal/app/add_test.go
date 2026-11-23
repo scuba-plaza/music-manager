@@ -22,6 +22,24 @@ type fakeDownloader struct {
 	err   error
 	calls []string // URLs asked for
 	dirs  []string // where the file was put
+
+	listing   app.Listing
+	listErr   error
+	listCalls []struct {
+		url   string
+		limit int
+	}
+}
+
+func (f *fakeDownloader) List(ctx context.Context, url, dir string, limit int) (app.Listing, error) {
+	f.listCalls = append(f.listCalls, struct {
+		url   string
+		limit int
+	}{url, limit})
+	if f.listErr != nil {
+		return app.Listing{}, f.listErr
+	}
+	return f.listing, nil
 }
 
 func (f *fakeDownloader) Download(ctx context.Context, url, dir string) (app.Downloaded, error) {
