@@ -41,19 +41,11 @@ type PeekView struct {
 // Peek describes the row with the given key as the library view for the same
 // filter lays it out.
 func Peek(s Snapshot, key, filter string) (PeekView, bool) {
-	var r Row
-	found := false
-	for _, row := range buildRows(s.Tracks, s.Playlists, filter, func(string) bool { return true }) {
-		if row.Key == key {
-			r, found = row, true
-			break
-		}
-	}
+	r, found := rowWithKey(s, filter, key)
 	if !found || r.Kind == kindTrack {
 		return PeekView{}, false
 	}
-	v := PeekView{Kind: r.Kind.String(), Label: r.Label, Title: peekTitle(r), Info: []string{}, List: []ListRow{}}
-	v.Editable = r.Kind == kindPlaylist || r.Kind == kindArtist || (r.Kind == kindAlbum && r.Album != "")
+	v := PeekView{Kind: r.Kind.String(), Label: r.Label, Title: peekTitle(r), Editable: editableAsGroup(r), Info: []string{}, List: []ListRow{}}
 	if g, ok := groupOf(s, key); ok && v.Editable {
 		v.Fields, v.Note = groupFieldViews(g), groupNote(g)
 		for _, t := range g.tracks {
@@ -128,9 +120,9 @@ func artistPeek(s Snapshot, r Row) (info []string, list []ListRow) {
 		}
 		g.tracks = append(g.tracks, t)
 	}
-	summary := plural(r.Count, "track")
+	summary := Plural(r.Count, "track")
 	if len(albums) > 0 {
-		summary += " · " + plural(len(albums), "album")
+		summary += " · " + Plural(len(albums), "album")
 	}
 	info = []string{summary + " · " + timecode.Clock(lengthOf(ts))}
 	for _, g := range albums {
@@ -155,7 +147,7 @@ func albumPeek(s Snapshot, r Row) (info []string, list []ListRow) {
 	if len(ts) > 0 {
 		artist, _, _ = app.Display(ts[0])
 	}
-	info = []string{strings.TrimPrefix(artist+" · ", " · ") + plural(r.Count, "track") + " · " + timecode.Clock(lengthOf(ts))}
+	info = []string{strings.TrimPrefix(artist+" · ", " · ") + Plural(r.Count, "track") + " · " + timecode.Clock(lengthOf(ts))}
 	numberWidth := 0
 	for _, t := range ts {
 		numberWidth = max(numberWidth, len(numberText(t.TrackNumber)))
@@ -174,7 +166,7 @@ func albumPeek(s Snapshot, r Row) (info []string, list []ListRow) {
 func playlistPeek(s Snapshot, r Row) (info []string, list []ListRow) {
 	list = []ListRow{}
 	ts := s.tracksFor(r.IDs)
-	info = []string{plural(r.Count, "track") + " · " + timecode.Clock(lengthOf(ts)) + " plays"}
+	info = []string{Plural(r.Count, "track") + " · " + timecode.Clock(lengthOf(ts)) + " plays"}
 	numberWidth := len(fmt.Sprint(len(ts)))
 	for i, t := range ts {
 		artist, title, _ := app.Display(t)

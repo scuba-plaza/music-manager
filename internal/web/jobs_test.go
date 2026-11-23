@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-var raw = sendInto
-
 func waitJob(t *testing.T, base, id string) JobView {
 	t.Helper()
 	for i := 0; i < 200; i++ {

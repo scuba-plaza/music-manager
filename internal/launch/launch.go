@@ -30,13 +30,6 @@ type Env struct {
 	Serve  func(ctx context.Context, o Options) error
 }
 
-func DefaultLibrary(getenv func(string) string, home string) string {
-	if library := getenv("MM_LIBRARY"); library != "" {
-		return library
-	}
-	return filepath.Join(home, "Music", "Library")
-}
-
 func Run(ctx context.Context, e Env) int {
 	var o Options
 	var showVersion bool
@@ -67,7 +60,10 @@ func Run(ctx context.Context, e Env) int {
 		return 0
 	}
 	if o.Library == "" {
-		o.Library = DefaultLibrary(e.Getenv, e.Home)
+		o.Library = e.Getenv("MM_LIBRARY")
+	}
+	if o.Library == "" {
+		o.Library = filepath.Join(e.Home, "Music", "Library")
 	}
 	o.Out = e.Out
 	fs.Visit(func(f *flag.Flag) {

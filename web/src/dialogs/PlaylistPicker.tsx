@@ -29,8 +29,8 @@ export function PlaylistPicker({ ids, lists }: PlaylistPickerProps) {
     }
   }, [naming]);
 
-  function name(isNaming: boolean): void {
-    setNaming(isNaming);
+  function switchNaming(on: boolean): void {
+    setNaming(on);
     setError('');
   }
 
@@ -45,7 +45,7 @@ export function PlaylistPicker({ ids, lists }: PlaylistPickerProps) {
 
   function pick(at: number): void {
     if (!naming && at === lists.length) {
-      name(true);
+      switchNaming(true);
     } else {
       void submit(at);
     }
@@ -55,7 +55,7 @@ export function PlaylistPicker({ ids, lists }: PlaylistPickerProps) {
     const motion = motionOf(e);
     if (e.key === 'Escape') {
       if (naming && lists.length > 0) {
-        name(false);
+        switchNaming(false);
       } else {
         closeOverlay();
       }
@@ -66,7 +66,7 @@ export function PlaylistPicker({ ids, lists }: PlaylistPickerProps) {
     } else if (motion !== undefined) {
       setCursor(moveTo(entries, cursor, motion));
     } else if (e.key === 'c') {
-      name(true);
+      switchNaming(true);
     } else {
       return false;
     }

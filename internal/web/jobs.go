@@ -89,14 +89,14 @@ func (j *jobs) start(kind string, work func(ctx context.Context, report func(dat
 			return JobView{}, errBusy
 		}
 	}
-	var raw [6]byte
-	if _, err := rand.Read(raw[:]); err != nil {
+	id, err := randomID(6)
+	if err != nil {
 		j.mu.Unlock()
 		return JobView{}, err
 	}
 	ctx, cancel := context.WithCancel(j.base)
 	j.next++
-	jb := &job{view: JobView{ID: hex.EncodeToString(raw[:]), Kind: kind, State: jobRunning}, cancel: cancel, seq: j.next}
+	jb := &job{view: JobView{ID: id, Kind: kind, State: jobRunning}, cancel: cancel, seq: j.next}
 	j.byID[jb.view.ID] = jb
 	j.forgetOld()
 	started := jb.view
@@ -138,6 +138,15 @@ func (j *jobs) start(kind string, work func(ctx context.Context, report func(dat
 		j.publish(view)
 	}()
 	return started, nil
+}
+
+// randomID is n random bytes written in hex.
+func randomID(n int) (string, error) {
+	raw := make([]byte, n)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(raw), nil
 }
 
 // forgetOld drops the oldest finished jobs; the caller holds the lock.
@@ -194,6 +203,21 @@ func (j *jobs) stop(id string) bool {
 		o.cancel()
 	}
 	return ok
+}
+
+// startJob starts work as a job of the given kind and answers with it, or
+// says busy if one of that kind is going on already.
+func (s *Server) startJob(w http.ResponseWriter, kind, busy string, work func(ctx context.Context, report func(data any)) (any, error)) {
+	v, err := s.jobs.start(kind, work)
+	if errors.Is(err, errBusy) {
+		fail(w, http.StatusConflict, errors.New(busy))
+		return
+	}
+	if err != nil {
+		fail(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, v)
 }
 
 func (s *Server) jobRoutes() {

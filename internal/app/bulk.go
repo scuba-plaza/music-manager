@@ -2,7 +2,8 @@ package app
 
 import (
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 
 	"music-manager/internal/manifest"
 )
@@ -30,12 +31,7 @@ func (a *App) Restore(t manifest.Track) error {
 // and saved together, or, if any is invalid, none is. It returns the updated
 // tracks by ID.
 func (a *App) EditMany(edits map[string]Edit) (map[string]manifest.Track, error) {
-	ids := make([]string, 0, len(edits))
-	for id := range edits {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-
+	ids := slices.Sorted(maps.Keys(edits))
 	var updated map[string]manifest.Track
 	err := a.store.Update(func(m *manifest.Manifest) error {
 		updated = make(map[string]manifest.Track, len(edits))

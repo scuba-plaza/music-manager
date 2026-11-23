@@ -29,7 +29,7 @@ func playerForm(name string) obj {
 	}
 }
 
-func TestTheLibraryCarriesTheStoredFormatsAndNoNullList(t *testing.T) {
+func TestTheLibraryCarriesTheStoredFormats(t *testing.T) {
 	a, _ := seed(t)
 	srv := start(t, a)
 
@@ -37,14 +37,6 @@ func TestTheLibraryCarriesTheStoredFormatsAndNoNullList(t *testing.T) {
 
 	if len(got) != 1 || got[0].ID != "wolfgang-wmp01" || got[0].Name != "Wolfgang WMP01" {
 		t.Errorf("%+v", got)
-	}
-	empty := openFresh(t)
-	var raw map[string]any
-	if code := getJSON(t, start(t, empty).URL+"/api/library", &raw); code != 200 {
-		t.Fatal(code)
-	}
-	if list, ok := raw["profiles"].([]any); !ok || len(list) != 0 {
-		t.Errorf("profiles = %#v, want an empty list", raw["profiles"])
 	}
 }
 

@@ -50,21 +50,16 @@ func (d *Downloader) Download(ctx context.Context, url, dir string) (app.Downloa
 		return app.Downloaded{}, fmt.Errorf("%s: %w", d.Bin, err)
 	}
 
-	info, err := parseInfo(stdout.Bytes())
+	id, info, err := parseInfo(stdout.Bytes())
 	if err != nil {
 		return app.Downloaded{}, err
 	}
-	path := filepath.Join(dir, info.id+".mp3")
+	path := filepath.Join(dir, id+".mp3")
 	if _, err := os.Stat(path); err != nil {
 		return app.Downloaded{}, fmt.Errorf("%s did not produce %s", d.Bin, path)
 	}
-	cover, _ := os.ReadFile(filepath.Join(dir, info.id+".jpg"))
-	return app.Downloaded{Path: path, Info: info.Info, Cover: cover}, nil
-}
-
-type parsed struct {
-	id string
-	app.Info
+	cover, _ := os.ReadFile(filepath.Join(dir, id+".jpg"))
+	return app.Downloaded{Path: path, Info: info, Cover: cover}, nil
 }
 
 type rawInfo struct {
@@ -82,21 +77,23 @@ type rawInfo struct {
 	Genres      []string `json:"genres"`
 }
 
-func parseInfo(out []byte) (parsed, error) {
+// parseInfo reads the video id and what it says about the music from the JSON
+// yt-dlp printed.
+func parseInfo(out []byte) (id string, info app.Info, err error) {
 	var raw rawInfo
 	var found bool
 	for _, line := range strings.Split(string(out), "\n") {
 		if line = strings.TrimSpace(line); strings.HasPrefix(line, "{") {
 			if err := json.Unmarshal([]byte(line), &raw); err != nil {
-				return parsed{}, fmt.Errorf("unreadable yt-dlp output: %w", err)
+				return "", app.Info{}, fmt.Errorf("unreadable yt-dlp output: %w", err)
 			}
 			found = true
 		}
 	}
 	if !found || raw.ID == "" {
-		return parsed{}, errors.New("yt-dlp printed no video information")
+		return "", app.Info{}, errors.New("yt-dlp printed no video information")
 	}
-	return parsed{id: raw.ID, Info: interpret(raw)}, nil
+	return raw.ID, interpret(raw), nil
 }
 
 func lastLine(s string) string {

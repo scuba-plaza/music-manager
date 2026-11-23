@@ -44,24 +44,18 @@ func TestAnAddFormThatIsRightIsNotAnError(t *testing.T) {
 	}
 }
 
-func TestTheTrackNumberAndTheTrackTotalAreNamedApart(t *testing.T) {
-	_, err := AddForm{Title: "A", Artist: "B", Track: "x"}.Edit()
-	if fields := fieldErrorsOf(t, err); len(fields) != 1 || fields["track"] == "" {
-		t.Errorf("%v", fields)
-	}
-
-	_, err = AddForm{Title: "A", Artist: "B", Track: "1", Of: "x"}.Edit()
-	if fields := fieldErrorsOf(t, err); len(fields) != 1 || fields["of"] == "" {
-		t.Errorf("%v", fields)
-	}
-}
-
-func TestATotalBelowTheTrackNumberIsRefusedOnTheTotal(t *testing.T) {
-	_, err := AddForm{Title: "A", Artist: "B", Track: "5", Of: "3"}.Edit()
-
-	fields := fieldErrorsOf(t, err)
-	if len(fields) != 1 || !strings.Contains(fields["of"], "5") {
-		t.Errorf("%v", fields)
+func TestTheTrackNumberAndTheTrackTotalAreRefusedApart(t *testing.T) {
+	for _, c := range []struct {
+		track, of, key, says string
+	}{
+		{"x", "", "track", "whole number"},
+		{"1", "x", "of", "whole number"},
+		{"5", "3", "of", "5"},
+	} {
+		_, err := AddForm{Title: "A", Artist: "B", Track: c.track, Of: c.of}.Edit()
+		if fields := fieldErrorsOf(t, err); len(fields) != 1 || !strings.Contains(fields[c.key], c.says) {
+			t.Errorf("track %q of %q: %v, want only %s saying %q", c.track, c.of, fields, c.key, c.says)
+		}
 	}
 }
 

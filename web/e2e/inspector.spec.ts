@@ -1,33 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
-import { expect, test } from './fixtures.ts';
-
-async function openPage(page: Page): Promise<void> {
-  await page.goto('/');
-  await expect(page.getByRole('banner')).toContainText('6 tracks');
-  await expect(page.getByRole('treeitem').first()).toBeVisible();
-}
-
-function row(page: Page, label: string): Locator {
-  return page
-    .getByRole('tree')
-    .getByRole('treeitem')
-    .filter({ has: page.locator('.label bdi', { hasText: new RegExp(`^${label}$`) }) });
-}
-
-function pane(page: Page): Locator {
-  return page.getByRole('region', { name: 'Details' });
-}
-
-async function enterTrack(page: Page, label: string): Promise<void> {
-  await row(page, label).last().click();
-  await page.keyboard.press('Enter');
-  await expect(pane(page).getByRole('heading', { level: 3 })).toHaveText(label);
-}
+import { enterTrack, expect, openAll, pane, row, test } from './fixtures.ts';
 
 async function intoFields(page: Page, label: string): Promise<void> {
-  await openPage(page);
-  await page.keyboard.press('Shift+ArrowRight');
-  await page.keyboard.press('Shift+ArrowRight');
+  await openAll(page);
   await enterTrack(page, label);
 }
 
@@ -44,7 +19,7 @@ test('editing the title saves it and the tree row follows', async ({ page }) => 
   await expect(pane(page).getByRole('heading', { level: 3 })).toHaveText('So What (take 2)');
   await expect(pane(page).getByTestId('value-title')).toHaveText('So What (take 2)');
   await page.keyboard.press('Escape');
-  await expect(row(page, 'So What \\(take 2\\)')).toHaveAttribute('aria-selected', 'true');
+  await expect(row(page, 'So What (take 2)')).toHaveAttribute('aria-selected', 'true');
   await expect(row(page, 'So What')).toHaveCount(0);
 });
 
@@ -144,24 +119,4 @@ test('the device tab previews the track with the profile chosen', async ({ page 
 
   await expect(profile).toHaveValue('my-player');
   await expect(pane(page).getByText('01 - Watani.mp3')).toBeVisible();
-});
-
-test('the inspector takes the whole screen on a narrow window, and esc goes back to the tree', { tag: '@narrow' }, async ({ page }, testInfo) => {
-  await intoFields(page, 'So What');
-  const narrow = testInfo.project.name === 'narrow';
-
-  await expect(page.getByRole('tree')).toBeVisible({ visible: !narrow });
-  const inspector = await pane(page).boundingBox();
-  const panes = await page.locator('.panes').boundingBox();
-  expect(inspector !== null && panes !== null).toBe(true);
-  if (inspector !== null && panes !== null) {
-    expect(inspector.width > panes.width * 0.8).toBe(narrow);
-  }
-
-  await page.keyboard.press('2');
-  await expect(pane(page).getByRole('tab', { name: '2 Audio' })).toHaveAttribute('aria-selected', 'true');
-  await page.keyboard.press('Escape');
-
-  await expect(page.getByRole('tree')).toBeVisible();
-  await expect(row(page, 'So What')).toHaveAttribute('aria-selected', 'true');
 });

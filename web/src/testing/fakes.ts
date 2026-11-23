@@ -232,7 +232,7 @@ export function narrowRows(rows: readonly RowView[], filter: string): RowView[] 
   return rows.filter((row) => kept.has(row.key));
 }
 
-export function trackViewFor(row: RowView): TrackView {
+function trackViewFor(row: RowView): TrackView {
   return {
     id: row.trackId ?? '',
     title: row.label,
@@ -248,7 +248,6 @@ export function trackViewFor(row: RowView): TrackView {
 export function peekViewFor(row: RowView): PeekView {
   return { kind: row.kind, title: row.kind, label: row.label, editable: row.editable === true, info: [], list: [] };
 }
-
 
 export function sampleProfiles(): Profile[] {
   return [
@@ -312,7 +311,7 @@ export function withDevice(view: TrackView, profile: string): TrackView {
   return { ...view, tabs: [...view.tabs, device] };
 }
 
-export interface StubRequest {
+interface StubRequest {
   method: string;
   url: URL;
   body: unknown;
@@ -320,7 +319,7 @@ export interface StubRequest {
 
 export type StubRoute = (request: StubRequest) => Response | Promise<Response> | undefined;
 
-export interface StubOptions {
+interface StubOptions {
   route?: StubRoute;
 }
 

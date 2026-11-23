@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ChangeEvent, type ReactNode } from 'react';
 import type { Profile } from '../api/types.gen';
-import { FormField } from '../components/FormField';
+import { FieldError, FormField } from '../components/FormField';
+import { useStoredFormats } from '../components/FormatOptions';
 import { motionOf, moveTo } from '../keys/dialog';
 import type { KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
@@ -22,7 +23,6 @@ import {
   type FormatKey,
 } from '../state/formats';
 import { shownErrors } from '../state/form';
-import { useApp } from '../state/store';
 
 const listHints = [
   { keys: 'enter', label: 'edit' },
@@ -37,8 +37,6 @@ const formHints = [
   { keys: 'esc', label: 'back' },
 ];
 
-const noFormats: Profile[] = [];
-
 function summary(p: Profile): string {
   return [p.latin_names ? 'Latin letters' : '', `names up to ${String(p.component_max)}`, p.playlist_ext].filter((s) => s !== '').join(' · ');
 }
@@ -48,7 +46,7 @@ function Group({ name }: { name: string }) {
 }
 
 export function Formats() {
-  const stored = useApp((s) => s.lib?.profiles ?? noFormats);
+  const stored = useStoredFormats();
   const { mode, cursor, editing, form, checks, error } = useFormats();
   const errors = shownErrors(checks);
   const grid = useRef<HTMLDivElement>(null);
@@ -71,7 +69,7 @@ export function Formats() {
     });
   }
 
-  function onKey(e: KeyEventLike & { target?: EventTarget | null }): boolean {
+  function onKey(e: KeyEventLike): boolean {
     if (mode === 'list') {
       const motion = motionOf(e);
       if (motion !== undefined) {
@@ -237,12 +235,7 @@ export function Formats() {
               ['root-backslash', 'From the root, with backslashes'],
             ])}
           </div>
-          {error !== '' && (
-            <div className="field-error" role="alert">
-              <span aria-hidden="true">✗ </span>
-              <bdi dir="auto">{error}</bdi>
-            </div>
-          )}
+          {error !== '' && <FieldError text={error} />}
         </>
       )}
     </Dialog>

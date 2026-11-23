@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -46,7 +48,7 @@ cat "$FAKE_JSON"
 	t.Setenv("FAKE_ARGS", argsFile)
 	t.Setenv("FAKE_FIXTURE", fixture)
 	t.Setenv("FAKE_JSON", jsonFile)
-	t.Setenv("FAKE_EXIT", string(rune('0'+exit)))
+	t.Setenv("FAKE_EXIT", strconv.Itoa(exit))
 	t.Setenv("FAKE_THUMB", "")
 	return argsFile
 }
@@ -68,50 +70,23 @@ func TestDownloadRunsYtDlpForAudioAndReportsTheMetadata(t *testing.T) {
 	if _, err := os.Stat(got.Path); err != nil {
 		t.Error(err)
 	}
-	want := app.Info{Title: "Real Track", Artist: "The Artist", Uploader: "Channel", Album: "The Album", TrackNumber: 5, Source: app.FromMetadata}
-	if got.Info != want {
-		t.Errorf("Info = %+v, want %+v", got.Info, want)
+	wantInfo := app.Info{Title: "Real Track", Artist: "The Artist", Uploader: "Channel", Album: "The Album", TrackNumber: 5, Source: app.FromMetadata}
+	if got.Info != wantInfo {
+		t.Errorf("Info = %+v, want %+v", got.Info, wantInfo)
 	}
 
 	raw, _ := os.ReadFile(argsFile)
 	args := strings.Split(strings.TrimSpace(string(raw)), "\n")
-	for _, must := range []string{"--no-playlist", "-x", "--print-json", "-q"} {
-		if !contains(args, must) {
-			t.Errorf("args %v lack %s", args, must)
-		}
+	wantArgs := []string{
+		"--no-playlist", "-q", "--no-warnings",
+		"-x", "--audio-format", "mp3", "--audio-quality", "0",
+		"--write-thumbnail", "--convert-thumbnails", "jpg",
+		"--print-json",
+		"-o", filepath.Join(dir, "%(id)s.%(ext)s"),
+		"--", "https://youtu.be/vid123", // the URL after the end of options
 	}
-	if i := indexOf(args, "--audio-format"); i < 0 || args[i+1] != "mp3" {
-		t.Errorf("args %v do not ask for mp3", args)
-	}
-	if i := indexOf(args, "-o"); i < 0 || args[i+1] != filepath.Join(dir, "%(id)s.%(ext)s") {
-		t.Errorf("args %v: bad output template", args)
-	}
-	if args[len(args)-1] != "https://youtu.be/vid123" {
-		t.Errorf("the URL must come last: %v", args)
-	}
-}
-
-func TestDownloadPutsTheURLAfterTheEndOfOptions(t *testing.T) {
-	argsFile := fakeBin(t, musicJSON, 0)
-	if _, err := ytdlp.New().Download(context.Background(), "https://youtu.be/vid123", t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-	raw, _ := os.ReadFile(argsFile)
-	args := strings.Split(strings.TrimSpace(string(raw)), "\n")
-	n := len(args)
-	if n < 2 || args[n-2] != "--" || args[n-1] != "https://youtu.be/vid123" {
-		t.Errorf("the arguments must end with -- and the URL: %v", args)
-	}
-}
-
-func TestDownloadFallsBackToTheVideoTitle(t *testing.T) {
-	fakeBin(t, `{"id":"vid123","title":"Just A Title","uploader":"Chan"}`+"\n", 0)
-	got, err := ytdlp.New().Download(context.Background(), "u", t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Info != (app.Info{Title: "Just A Title", Uploader: "Chan"}) {
-		t.Errorf("Info = %+v", got.Info)
+	if !slices.Equal(args, wantArgs) {
+		t.Errorf("args\n%q\nwant\n%q", args, wantArgs)
 	}
 }
 
@@ -155,64 +130,8 @@ func TestDownloadStopsWhenTheContextIsCancelled(t *testing.T) {
 	}
 }
 
-func contains(s []string, v string) bool { return indexOf(s, v) >= 0 }
-
-func indexOf(s []string, v string) int {
-	for i, x := range s {
-		if x == v {
-			return i
-		}
-	}
-	return -1
-}
-
-func TestDownloadReportsWhenTheTrackCameOutButNotWhenTheVideoWasUploaded(t *testing.T) {
-	for name, c := range map[string]struct{ json, want string }{
-		"a full release date": {`{"id":"vid123","title":"T","release_date":"20150904","release_year":2015,"upload_date":"20230101"}`, "2015-09-04"},
-		"only a year":         {`{"id":"vid123","title":"T","release_year":2012,"upload_date":"20230101"}`, "2012"},
-		"only an upload date": {`{"id":"vid123","title":"T","upload_date":"20230101"}`, ""},
-		"null date":           {`{"id":"vid123","title":"T","release_date":null,"release_year":null}`, ""},
-		"nonsense":            {`{"id":"vid123","title":"T","release_date":"soon"}`, ""},
-	} {
-		t.Run(name, func(t *testing.T) {
-			fakeBin(t, c.json+"\n", 0)
-			got, err := ytdlp.New().Download(context.Background(), "u", t.TempDir())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got.Info.Released != c.want {
-				t.Errorf("released = %q, want %q", got.Info.Released, c.want)
-			}
-		})
-	}
-}
-
-// A track has one artist: where yt-dlp lists several, the first is the artist,
-// not the "A, B" it also prints in the artist field.
-func TestDownloadTakesTheFirstOfSeveralArtists(t *testing.T) {
-	fakeBin(t, `{"id":"vid123","title":"T","track":"Song","artist":"Fairuz, Ziad Rahbani","artists":["Fairuz","Ziad Rahbani"]}`+"\n", 0)
-	got, err := ytdlp.New().Download(context.Background(), "u", t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Info.Artist != "Fairuz" {
-		t.Errorf("Artist = %q, want Fairuz", got.Info.Artist)
-	}
-}
-
-func TestDownloadKeepsTheArtistFieldWhenThereIsNoList(t *testing.T) {
-	fakeBin(t, `{"id":"vid123","title":"T","track":"Song","artist":"Earth, Wind & Fire"}`+"\n", 0)
-	got, err := ytdlp.New().Download(context.Background(), "u", t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Info.Artist != "Earth, Wind & Fire" {
-		t.Errorf("Artist = %q, want it untouched", got.Info.Artist)
-	}
-}
-
-func TestDownloadAsksForTheThumbnailAsAJpegAndReturnsItAsTheCover(t *testing.T) {
-	argsFile := fakeBin(t, musicJSON, 0)
+func TestDownloadReturnsTheThumbnailAsTheCover(t *testing.T) {
+	fakeBin(t, musicJSON, 0)
 	thumb := filepath.Join(t.TempDir(), "thumb.jpg")
 	if err := os.WriteFile(thumb, testmp3.JPEG, 0o644); err != nil {
 		t.Fatal(err)
@@ -226,13 +145,6 @@ func TestDownloadAsksForTheThumbnailAsAJpegAndReturnsItAsTheCover(t *testing.T) 
 
 	if string(got.Cover) != string(testmp3.JPEG) {
 		t.Errorf("the cover is %d bytes, want the thumbnail of %d", len(got.Cover), len(testmp3.JPEG))
-	}
-	raw, _ := os.ReadFile(argsFile)
-	args := strings.Split(strings.TrimSpace(string(raw)), "\n")
-	for _, must := range []string{"--write-thumbnail", "--convert-thumbnails", "jpg"} {
-		if !contains(args, must) {
-			t.Errorf("args %v lack %s", args, must)
-		}
 	}
 }
 

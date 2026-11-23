@@ -169,23 +169,23 @@ func (s *Server) info(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func writeJSON(w http.ResponseWriter, v any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_ = json.NewEncoder(w).Encode(v)
-}
+func writeJSON(w http.ResponseWriter, v any) { respond(w, http.StatusOK, v) }
 
 // fail answers with an error the page shows to the person using it.
 func fail(w http.ResponseWriter, status int, err error) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
 	view := ErrorView{Error: capitalize(err.Error())}
 	var fields app.FieldErrors
 	if errors.As(err, &fields) {
 		view.Fields = fields
 	}
-	_ = json.NewEncoder(w).Encode(view)
+	respond(w, status, view)
+}
+
+func respond(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func capitalize(s string) string {

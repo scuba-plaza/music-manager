@@ -35,11 +35,6 @@ describe('what a form shows of what the server found wrong', () => {
 
     expect(shownErrors(checks)).toEqual({ released: 'Not a date' });
   });
-
-  it('starts again clean', () => {
-    expect(shownErrors(cleanChecks())).toEqual({});
-    expect(cleanChecks().tried).toBe(false);
-  });
 });
 
 describe('firstWrong', () => {

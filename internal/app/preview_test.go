@@ -27,65 +27,35 @@ func near(got, want time.Duration) bool {
 	return d > -30*time.Millisecond && d < 30*time.Millisecond
 }
 
-func TestPreviewTrimPlaysTheStretchAfterTheStartCut(t *testing.T) {
+func TestPreviewTrimPlaysAWindowAtACutAndNeverCutAudio(t *testing.T) {
 	a := libWithTracks(t, 400) // about 10.4s
 	tr := tracks(t, a)[0]
-	if _, err := a.Edit(tr.ID, app.Edit{TrimStart: ptr(2 * time.Second), TrimEnd: ptr(time.Second)}); err != nil {
-		t.Fatal(err)
-	}
-	path, cleanup, err := a.PreviewTrim(tr.ID, app.EdgeStart, 3*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := previewLength(t, path); !near(got, 3*time.Second) {
-		t.Errorf("start preview is %v, want about 3s", got)
-	}
-	cleanup()
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Errorf("cleanup left %s behind", path)
-	}
-}
-
-func TestPreviewTrimPlaysTheStretchBeforeTheEndCut(t *testing.T) {
-	a := libWithTracks(t, 400)
-	tr := tracks(t, a)[0]
-	a.Edit(tr.ID, app.Edit{TrimStart: ptr(2 * time.Second), TrimEnd: ptr(time.Second)})
-	path, cleanup, err := a.PreviewTrim(tr.ID, app.EdgeEnd, 3*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
-	if got := previewLength(t, path); !near(got, 3*time.Second) {
-		t.Errorf("end preview is %v, want about 3s", got)
-	}
-}
-
-func TestPreviewTrimNeverPlaysCutAudioOrMoreThanThereIs(t *testing.T) {
-	a := libWithTracks(t, 400) // about 10.4s; the kept part is 2s..9.4s, 7.4s long
-	tr := tracks(t, a)[0]
-	a.Edit(tr.ID, app.Edit{TrimStart: ptr(2 * time.Second), TrimEnd: ptr(time.Second)})
-	for _, edge := range []app.Edge{app.EdgeStart, app.EdgeEnd} {
-		path, cleanup, err := a.PreviewTrim(tr.ID, edge, time.Minute)
-		if err != nil {
+	for _, c := range []struct {
+		name               string
+		trimStart, trimEnd time.Duration
+		edge               app.Edge
+		window, want       time.Duration
+	}{
+		{"after the start cut", 2 * time.Second, time.Second, app.EdgeStart, 3 * time.Second, 3 * time.Second},
+		{"before the end cut", 2 * time.Second, time.Second, app.EdgeEnd, 3 * time.Second, 3 * time.Second},
+		{"at the end of a track without cuts", 0, 0, app.EdgeEnd, 2 * time.Second, 2 * time.Second},
+		{"all that is kept after the start cut", 2 * time.Second, time.Second, app.EdgeStart, time.Minute, 7449 * time.Millisecond},
+		{"all that is kept before the end cut", 2 * time.Second, time.Second, app.EdgeEnd, time.Minute, 7449 * time.Millisecond},
+	} {
+		if _, err := a.Edit(tr.ID, app.Edit{TrimStart: &c.trimStart, TrimEnd: &c.trimEnd}); err != nil {
 			t.Fatal(err)
 		}
-		if got := previewLength(t, path); !near(got, 7449*time.Millisecond) {
-			t.Errorf("edge %d: %v, want the whole kept part (about 7.4s)", edge, got)
+		path, cleanup, err := a.PreviewTrim(tr.ID, c.edge, c.window)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if got := previewLength(t, path); !near(got, c.want) {
+			t.Errorf("%s: the preview is %v, want about %v", c.name, got, c.want)
 		}
 		cleanup()
-	}
-}
-
-func TestPreviewTrimWithoutTrimsPlaysTheEdgesOfTheTrack(t *testing.T) {
-	a := libWithTracks(t, 400)
-	tr := tracks(t, a)[0]
-	path, cleanup, err := a.PreviewTrim(tr.ID, app.EdgeEnd, 2*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
-	if got := previewLength(t, path); !near(got, 2*time.Second) {
-		t.Errorf("= %v", got)
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("%s: cleanup left %s behind", c.name, path)
+		}
 	}
 }
 

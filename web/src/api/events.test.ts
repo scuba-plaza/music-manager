@@ -38,13 +38,6 @@ describe('subscribe', () => {
     };
   }
 
-  it('listens to the event stream of the server', () => {
-    const stop = subscribe(recorder().handlers);
-
-    expect(openStream().url).toBe('/api/events');
-    stop();
-  });
-
   it('a library event with the same stamp does nothing', () => {
     const { seen, handlers } = recorder();
     const stop = subscribe(handlers);
@@ -103,8 +96,9 @@ describe('subscribe', () => {
     stop();
   });
 
-  it('closes the stream when stopped', () => {
+  it('listens to the event stream of the server and closes it when stopped', () => {
     const stop = subscribe(recorder().handlers);
+    expect(openStream().url).toBe('/api/events');
     expect(openStream().closed).toBe(false);
 
     stop();
@@ -143,14 +137,6 @@ describe('connect', () => {
     stop();
   });
 
-  it('does not load the library on open before the page has one', () => {
-    const stop = connect(() => undefined);
-
-    openStream().emit('open');
-
-    expect(libraryRequests()).toBe(0);
-    stop();
-  });
 
   it('reloads the library for a library event with a stamp the page does not have', async () => {
     useApp.setState({ lib: libraryResponse('s1') });
@@ -165,21 +151,15 @@ describe('connect', () => {
     stop();
   });
 
-  it('does not reload the library for the stamp the page already has', () => {
-    useApp.setState({ lib: libraryResponse('s1') });
+  it.each([
+    ['on open before the page has one', { lib: null }, 'open', undefined],
+    ['for the stamp the page already has', { lib: libraryResponse('s1') }, 'library', '"s1"'],
+    ['while a change is in flight', { lib: libraryResponse('s1'), busy: true }, 'library', '"s2"'],
+  ])('does not load the library %s', (_, state, event, data) => {
+    useApp.setState(state);
     const stop = connect(() => undefined);
 
-    openStream().emit('library', '"s1"');
-
-    expect(libraryRequests()).toBe(0);
-    stop();
-  });
-
-  it('does not reload the library while a change is in flight', () => {
-    useApp.setState({ lib: libraryResponse('s1'), busy: true });
-    const stop = connect(() => undefined);
-
-    openStream().emit('library', '"s2"');
+    openStream().emit(event, data);
 
     expect(libraryRequests()).toBe(0);
     stop();

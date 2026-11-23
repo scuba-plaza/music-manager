@@ -304,5 +304,5 @@ func (e *Editor) Ingested(added []manifest.Track) {
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.record(change{label: "addition of " + plural(len(added), "track"), after: added})
+	e.record(change{label: "addition of " + Plural(len(added), "track"), after: added})
 }

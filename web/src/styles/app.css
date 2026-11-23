@@ -124,14 +124,6 @@ kbd {
   white-space: pre-wrap;
 }
 
-.status.bad {
-  color: var(--bad);
-}
-
-.status.good {
-  color: var(--good);
-}
-
 .hints {
   display: flex;
   flex: 1 1 auto;
@@ -272,8 +264,6 @@ kbd {
   padding-block: 0.25rem;
   overflow: auto;
   outline: 0;
-  scrollbar-color: var(--rule) transparent;
-  scrollbar-width: thin;
 }
 
 .tree:empty {
@@ -345,17 +335,14 @@ kbd {
 }
 
 .tree .row.group .label,
-.tree .row.artist .label {
+.tree .row.artist .label,
+.tree .row.cursor .label {
   font-weight: bold;
 }
 
 .tree .row.cursor {
   border-inline-start-color: var(--accent);
   background: var(--sel);
-}
-
-.tree .row.cursor .label {
-  font-weight: bold;
 }
 
 .pane-tree:not(.focus) .tree .row.cursor {
@@ -379,6 +366,13 @@ kbd {
 .inspector {
   padding-block: 0.4rem 1rem;
   padding-inline: 1rem;
+}
+
+.tree,
+.inspector,
+.dialog-body,
+.problems,
+.ops {
   scrollbar-color: var(--rule) transparent;
   scrollbar-width: thin;
 }
@@ -400,6 +394,14 @@ kbd {
 
 .warn {
   color: var(--warn);
+}
+
+.accent {
+  color: var(--accent);
+}
+
+.good {
+  color: var(--good);
 }
 
 .tabs {
@@ -463,10 +465,6 @@ kbd {
   min-width: 0;
   padding-inline-start: 0.75rem;
   overflow-wrap: anywhere;
-}
-
-.fields .value.dim {
-  color: var(--dim);
 }
 
 .fields .cur {
@@ -574,10 +572,6 @@ input.edit.short {
 
 .pathline::before {
   content: '→ ';
-}
-
-.pathrow .pathline::before {
-  content: none;
 }
 
 .foot {
@@ -734,8 +728,6 @@ input.edit.short {
   padding-block-start: 0.3rem;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-color: var(--rule) transparent;
-  scrollbar-width: thin;
 }
 
 .dialog .keys {
@@ -863,7 +855,6 @@ input.edit.short {
   margin-block: 0.6rem;
 }
 
-.form .label,
 .form .field {
   display: grid;
   grid-column: 1 / -1;
@@ -872,14 +863,13 @@ input.edit.short {
   color: var(--dim);
 }
 
-.form .label:focus-within,
 .form .field:focus-within {
   color: var(--accent);
 }
 
 .form .field > .label {
-  display: block;
   grid-column: 1;
+  color: var(--dim);
 }
 
 .form .field.wrong > .label {
@@ -939,8 +929,7 @@ input.edit:disabled,
 }
 
 input.edit[aria-invalid='true'],
-.form input.edit[aria-invalid='true'],
-.form input.edit[aria-invalid='true']:focus {
+.form input.edit[aria-invalid='true'] {
   border-color: var(--bad);
 }
 
@@ -957,14 +946,6 @@ input.edit[aria-invalid='true'],
 body.dropping .app {
   outline: 2px dashed var(--accent);
   outline-offset: -6px;
-}
-
-.accent {
-  color: var(--accent);
-}
-
-.good {
-  color: var(--good);
 }
 
 .busy::after {
@@ -1009,8 +990,6 @@ body.dropping .app {
   max-block-size: 50vh;
   margin-block-start: 0.4em;
   overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule) transparent;
 }
 
 .problem {
@@ -1039,8 +1018,6 @@ body.dropping .app {
   padding-inline: 0.5ch;
   border: 1px solid var(--rule);
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule) transparent;
 }
 
 .ops:focus {

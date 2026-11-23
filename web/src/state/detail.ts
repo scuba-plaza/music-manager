@@ -11,7 +11,7 @@ let detailSeq = 0;
 let detailTimer: ReturnType<typeof setTimeout> | undefined;
 let detailAwaited = false;
 
-export function scheduleDetail(): void {
+function scheduleDetail(): void {
   clearTimeout(detailTimer);
   detailAwaited = true;
   detailTimer = setTimeout(() => {

@@ -2,7 +2,6 @@ package web
 
 import (
 	"embed"
-	"errors"
 	"io/fs"
 	"net/http"
 	"path"
@@ -40,7 +39,7 @@ func frontendHandler(fsys fs.FS) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
 		if name == "api" || strings.HasPrefix(name, "api/") {
-			fail(w, http.StatusNotFound, errors.New("not found"))
+			fail(w, http.StatusNotFound, errNotFound)
 			return
 		}
 		if _, err := fs.Stat(fsys, "index.html"); err != nil {

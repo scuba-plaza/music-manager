@@ -14,7 +14,7 @@ function refuse(text: string): void {
   setStatus(text, 'bad');
 }
 
-function change(path: string, body?: unknown): void {
+function post(path: string, body?: unknown): void {
   void attempt(() => send<ChangeResponse>('POST', path, body));
 }
 
@@ -90,7 +90,7 @@ function removeHead(row: RowView, n: number, marked: boolean): string {
 function removeInPlaylist(lib: LibraryResponse, row: RowView, name: string): void {
   if (row.kind === 'playlist') {
     ask(`Delete the playlist “${name}”?`, [`Its ${plural(row.count ?? 0, 'track')} stay in the library.`, 'u brings the playlist back.'], 'delete', () => {
-      change('/api/playlists/delete', { name });
+      post('/api/playlists/delete', { name });
     });
     return;
   }
@@ -99,7 +99,7 @@ function removeInPlaylist(lib: LibraryResponse, row: RowView, name: string): voi
   const marked = parent === undefined ? [] : idsOf(lib.view.rows, parent).filter((id) => marks.has(id));
   const ids = marked.length > 0 ? marked : row.trackId === undefined ? [] : [row.trackId];
   if (ids.length > 0) {
-    change('/api/playlists/takeout', { name, ids });
+    post('/api/playlists/takeout', { name, ids });
   }
 }
 
@@ -131,7 +131,7 @@ export function remove(): void {
   }
   body.push(`Nothing is deleted from disk until you sync with prune, and u brings ${ids.length > 1 ? 'them' : 'it'} back until then.`);
   ask(removeHead(row, ids.length, marked), body, 'remove', () => {
-    change('/api/remove', { ids });
+    post('/api/remove', { ids });
   });
 }
 
@@ -152,7 +152,7 @@ export function moveTrack(dir: 1 | -1): void {
       refuse('Clear the filter first, so the whole playlist is in view');
       return;
     }
-    change('/api/move', { id: row.trackId, dir, playlist: list });
+    post('/api/move', { id: row.trackId, dir, playlist: list });
     return;
   }
   const parent = rowByKey(lib, row.parent ?? null);
@@ -164,7 +164,7 @@ export function moveTrack(dir: 1 | -1): void {
     refuse('Clear the filter first, so the whole album is in view');
     return;
   }
-  change('/api/move', { id: row.trackId, dir });
+  post('/api/move', { id: row.trackId, dir });
 }
 
 export function renumber(): void {
@@ -186,7 +186,7 @@ export function renumber(): void {
     refuse('Clear the filter first, so the whole album is in view');
     return;
   }
-  change('/api/renumber', { key: album.key });
+  post('/api/renumber', { key: album.key });
 }
 
 export function history(which: 'undo' | 'redo'): void {
@@ -195,7 +195,7 @@ export function history(which: 'undo' | 'redo'): void {
     setStatus(which === 'undo' ? 'Nothing to undo' : 'Nothing to redo');
     return;
   }
-  change(`/api/${which}`);
+  post(`/api/${which}`);
 }
 
 export async function paste(): Promise<void> {
@@ -232,6 +232,6 @@ export function copyField(): void {
   const s = useApp.getState();
   const f = currentField(s);
   if (isTrack(s.detail) && f !== undefined) {
-    change('/api/copy', { id: s.detail.id, field: f.key });
+    post('/api/copy', { id: s.detail.id, field: f.key });
   }
 }

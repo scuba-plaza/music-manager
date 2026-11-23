@@ -2,6 +2,7 @@ package mp3_test
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 	"time"
 
@@ -35,76 +36,25 @@ func gainsOf(t *testing.T, audio []byte) [][]int {
 	return got
 }
 
-func TestGainMovesEveryGranuleByWholeSteps(t *testing.T) {
-	before := ramp(20, 2, 100)
-	audio := testmp3.WithGains(testmp3.Layout{}, before)
-	original := bytes.Clone(audio)
-
-	out, err := mp3.Adjust(audio, mp3.Shape{Steps: 4})
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := gainsOf(t, out)
-	if len(got) != len(before) {
-		t.Fatalf("%d granules, want %d", len(got), len(before))
-	}
-	for g := range before {
-		for c := range before[g] {
-			if got[g][c] != before[g][c]+4 {
-				t.Errorf("granule %d channel %d: gain %d, want %d", g, c, got[g][c], before[g][c]+4)
-			}
-		}
-	}
-
-	if !bytes.Equal(audio, original) {
-		t.Error("the audio that was given was changed")
-	}
-	if len(out) != len(audio) {
-		t.Errorf("the length changed from %d to %d", len(audio), len(out))
-	}
-	// Nothing but the gains moved: undoing the steps gives the audio back.
-	back, err := mp3.Adjust(out, mp3.Shape{Steps: -4})
-	if err != nil || !bytes.Equal(back, audio) {
-		t.Errorf("undoing the gain did not give the audio back (err %v)", err)
-	}
-}
-
 func TestGainStopsAtTheEndsOfTheRangeInsteadOfWrapping(t *testing.T) {
 	audio := testmp3.WithGains(testmp3.Layout{}, [][]int{{253, 255}, {2, 0}, {128, 128}, {250, 5}})
 	up, err := mp3.Adjust(audio, mp3.Shape{Steps: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := gainsOf(t, up), [][]int{{255, 255}, {12, 10}, {138, 138}, {255, 15}}; !equalGains(got, want) {
+	if got, want := gainsOf(t, up), [][]int{{255, 255}, {12, 10}, {138, 138}, {255, 15}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("up: %v, want %v", got, want)
 	}
 	down, err := mp3.Adjust(audio, mp3.Shape{Steps: -10})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := gainsOf(t, down), [][]int{{243, 245}, {0, 0}, {118, 118}, {240, 0}}; !equalGains(got, want) {
+	if got, want := gainsOf(t, down), [][]int{{243, 245}, {0, 0}, {118, 118}, {240, 0}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("down: %v, want %v", got, want)
 	}
 }
 
-func equalGains(a, b [][]int) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if len(a[i]) != len(b[i]) {
-			return false
-		}
-		for j := range a[i] {
-			if a[i][j] != b[i][j] {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func TestGainWorksOnEveryLayoutOfFrame(t *testing.T) {
+func TestGainMovesEveryGranuleByWholeStepsInEveryLayoutOfFrame(t *testing.T) {
 	for name, l := range map[string]testmp3.Layout{
 		"MPEG-1 stereo": {},
 		"MPEG-1 mono":   {Mono: true},
@@ -112,22 +62,19 @@ func TestGainWorksOnEveryLayoutOfFrame(t *testing.T) {
 		"MPEG-2 mono":   {MPEG2: true, Mono: true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			before := ramp(7*l.Granules(), l.Channels(), 90)
-			audio := testmp3.WithGains(l, before)
+			audio := testmp3.WithGains(l, ramp(7*l.Granules(), l.Channels(), 90))
+			original := bytes.Clone(audio)
 			out, err := mp3.Adjust(audio, mp3.Shape{Steps: -3})
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := make([][]int, len(before))
-			for g := range before {
-				want[g] = make([]int, len(before[g]))
-				for c := range before[g] {
-					want[g][c] = before[g][c] - 3
-				}
-			}
-			if got := gainsOf(t, out); !equalGains(got, want) {
+			if got, want := gainsOf(t, out), ramp(7*l.Granules(), l.Channels(), 87); !reflect.DeepEqual(got, want) {
 				t.Errorf("gains %v, want %v", got, want)
 			}
+			if !bytes.Equal(audio, original) {
+				t.Error("the audio that was given was changed")
+			}
+			// Nothing but the gains moved: undoing the steps gives the audio back.
 			if back, err := mp3.Adjust(out, mp3.Shape{Steps: 3}); err != nil || !bytes.Equal(back, audio) {
 				t.Errorf("something besides the gains changed (err %v)", err)
 			}
@@ -146,7 +93,7 @@ func TestAProtectedFrameKeepsACrcThatFitsItsChangedSideInformation(t *testing.T)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if want := ramp(6*l.Granules(), l.Channels(), 125); !equalGains(gainsOf(t, out), want) {
+			if want := ramp(6*l.Granules(), l.Channels(), 125); !reflect.DeepEqual(gainsOf(t, out), want) {
 				t.Fatalf("gains %v, want %v", gainsOf(t, out), want)
 			}
 			size := len(out) / 6

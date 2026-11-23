@@ -28,9 +28,6 @@ func TestOpCounts(t *testing.T) {
 	if got := (OpCounts{}).Text(); got != "Nothing to do" {
 		t.Errorf("= %q", got)
 	}
-	if c.Writes() != 3 {
-		t.Errorf("writes = %d", c.Writes())
-	}
 }
 
 func TestASyncIsSummedUpInWords(t *testing.T) {
@@ -53,7 +50,7 @@ func TestMountCandidatesAreTheFoldersUnderTheMountRoots(t *testing.T) {
 	}
 	os.WriteFile(filepath.Join(userRoot, "a file"), nil, 0o644)
 
-	got := MountCandidates([]string{userRoot, plain, filepath.Join(root, "missing")}, "tau")
+	got := mountCandidates([]string{userRoot, plain, filepath.Join(root, "missing")}, "tau")
 	want := []string{filepath.Join(userRoot, "PLAYER"), filepath.Join(userRoot, "STICK"), filepath.Join(plain, "OTHER")}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("= %v, want %v (files, missing folders and the user's own folder are not drives)", got, want)

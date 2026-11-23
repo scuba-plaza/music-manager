@@ -23,7 +23,7 @@ func fetch(t *testing.T, url string) (*http.Response, string) {
 	return res, string(body)
 }
 
-func TestWithoutAFrontendTheServerSays503AndWhatToRun(t *testing.T) {
+func TestWithoutAFrontendTheRootSays503AndWhatToRun(t *testing.T) {
 	a, _ := seed(t, sample...)
 	srv := start(t, a, WithFrontend(fstest.MapFS{}))
 	res, body := fetch(t, srv.URL+"/")
@@ -35,6 +35,10 @@ func TestWithoutAFrontendTheServerSays503AndWhatToRun(t *testing.T) {
 	}
 	if !strings.Contains(res.Header.Get("Content-Type"), "text/html") {
 		t.Errorf("content type %q", res.Header.Get("Content-Type"))
+	}
+	res, body = fetch(t, srv.URL+"/favicon.svg")
+	if res.StatusCode != http.StatusNotFound || strings.Contains(body, "pnpm") {
+		t.Errorf("another path: status %d, body %q", res.StatusCode, body)
 	}
 }
 
@@ -128,14 +132,5 @@ func TestAnUnknownAPIPathIsAJSON404BuiltOrNot(t *testing.T) {
 		if code := getJSON(t, srv.URL+"/api/typo", &e); code != http.StatusNotFound || e.Error == "" {
 			t.Errorf("%s: status %d, %+v", name, code, e)
 		}
-	}
-}
-
-func TestWithoutAFrontendOnlyTheRootSaysItIsNotBuilt(t *testing.T) {
-	a, _ := seed(t, sample...)
-	srv := start(t, a, WithFrontend(fstest.MapFS{}))
-	res, body := fetch(t, srv.URL+"/favicon.svg")
-	if res.StatusCode != http.StatusNotFound || strings.Contains(body, "pnpm") {
-		t.Errorf("status %d, body %q", res.StatusCode, body)
 	}
 }

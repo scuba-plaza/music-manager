@@ -403,7 +403,7 @@ func (s *Server) paste(w http.ResponseWriter, r *http.Request) {
 		}
 		var ok bool
 		if ids, ok = browse.GroupIDs(snap, in.Group); !ok {
-			fail(w, http.StatusUnprocessableEntity, errors.New("Select a track, an album or an artist to paste on"))
+			fail(w, http.StatusUnprocessableEntity, browse.ErrNothingToPasteOn)
 			return
 		}
 	}

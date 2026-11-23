@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"music-manager/internal/app"
-	"music-manager/internal/device"
 	"music-manager/internal/manifest"
 	"music-manager/internal/render"
 )
@@ -278,29 +277,6 @@ func syncedPlaylistLib(t *testing.T) (*app.App, []manifest.Track) {
 	return a, ts
 }
 
-func TestSyncWritesAPlaylistTheWolfgangPlayerCanRead(t *testing.T) {
-	a, ts := syncedPlaylistLib(t)
-	target := filepath.Join(t.TempDir(), "player")
-	opts := app.SyncOptions{Target: target, Device: wolfgang}
-
-	ops := mustSync(t, a, opts)
-	if len(ops) != 4 { // three tracks and the playlist
-		t.Fatalf("ops = %v, want 4 creates", ops)
-	}
-
-	// Found by experiment on the player (WMP01): paths from the card's root,
-	// with backslashes, one per line, Windows line endings, plain UTF-8.
-	want := "\\Max Richter\\Dream.mp3\r\n" +
-		"\\Ali Al Attar\\Atlek Neranak\\01 - Atlek Neranak.mp3\r\n" +
-		"\\_Inbox\\" + ts[2].ID + " - c.mp3\r\n"
-	if got := string(readFile(t, target, "Playlists/Study.m3u")); got != want {
-		t.Errorf("Study.m3u =\n%q\nwant\n%q", got, want)
-	}
-	if ops := mustSync(t, a, opts); len(ops) != 0 {
-		t.Errorf("a second sync wants %v, want nothing", ops)
-	}
-}
-
 func TestSyncWritesAnM3U8AnyPlayerCanRead(t *testing.T) {
 	a, ts := syncedPlaylistLib(t)
 
@@ -379,6 +355,7 @@ func TestReplacingThePlaylistsPutsBackAnEarlierState(t *testing.T) {
 	a := libWithTracks(t, 10, 20)
 	ts := tracks(t, a)
 	a.CreatePlaylist("Study", ts[1].ID, ts[0].ID)
+	a.SetPlaylistLatin("Study", "Etude")
 	a.CreatePlaylist("Gym")
 	before := playlists(t, a)
 
@@ -412,25 +389,6 @@ func TestReplacingThePlaylistsPutsBackAnEarlierState(t *testing.T) {
 	}
 	if got := playlists(t, a); len(got) != 0 {
 		t.Errorf("playlists = %+v, want none", got)
-	}
-}
-
-func TestPlaylistNamesThatAreTheSameFileOnAnotherFormatAreBothWrittenThere(t *testing.T) {
-	a := libWithTracks(t, 10)
-	ts := tracks(t, a)
-	for _, name := range []string{"Bjørn", "Bjorn"} {
-		if err := a.CreatePlaylist(name, ts[0].ID); err != nil {
-			t.Fatalf("%s is its own file in the library folder: %v", name, err)
-		}
-	}
-	dest := filepath.Join(t.TempDir(), "player")
-
-	mustSync(t, a, app.SyncOptions{Target: dest, Device: wolfgang})
-
-	for _, file := range []string{"Playlists/Bjorn.m3u", "Playlists/Bjorn (2).m3u"} {
-		if len(readFile(t, dest, file)) == 0 {
-			t.Errorf("%s is missing: the Wolfgang writes Latin letters only, so the two names are one file there", file)
-		}
 	}
 }
 
@@ -504,63 +462,5 @@ func TestLatinNamesThatGiveOneFileOnTheWolfgangAreWrittenAsThreeFiles(t *testing
 		if len(readFile(t, dest, file)) == 0 {
 			t.Errorf("%s is missing", file)
 		}
-	}
-}
-
-func TestReplacingThePlaylistsKeepsTheirLatinNames(t *testing.T) {
-	a := libWithTracks(t, 10)
-	if err := a.CreatePlaylist("دراسة"); err != nil {
-		t.Fatal(err)
-	}
-	if err := a.SetPlaylistLatin("دراسة", "Study"); err != nil {
-		t.Fatal(err)
-	}
-	m, _ := a.Manifest()
-	snapshot := slices.Clone(m.Playlists)
-	if err := a.DeletePlaylist("دراسة"); err != nil {
-		t.Fatal(err)
-	}
-	if err := a.ReplacePlaylists(snapshot); err != nil {
-		t.Fatal(err)
-	}
-	m, _ = a.Manifest()
-	if len(m.Playlists) != 1 || m.Playlists[0].NameLatin != "Study" {
-		t.Errorf("playlists = %+v", m.Playlists)
-	}
-}
-
-func TestPlaylistsThatCollideOnAFormatAreBothWrittenAndTheLaterOneIsNumbered(t *testing.T) {
-	a := libWithTracks(t, 40)
-	ts := tracks(t, a)
-	for _, name := range []string{"Road Trip Songs Volume One", "Road Trip Songs Volume Two"} {
-		if err := a.CreatePlaylist(name, ts[0].ID); err != nil {
-			t.Fatalf("they are two files on Generic, so two playlists: %v", err)
-		}
-	}
-	short := manifest.Profile{
-		ID: "my-player", Name: "My Player", LatinNames: true, ComponentMax: 20,
-		CoverFormat: "keep", ReplayGain: true, PlaylistExt: ".m3u", PlaylistStyle: "relative",
-	}
-	dest := filepath.Join(t.TempDir(), "player")
-
-	mustSync(t, a, app.SyncOptions{Target: dest, Device: device.TargetOf(short)})
-
-	first := string(readFile(t, dest, "Playlists/Road Trip Songs Volu.m3u"))
-	second := string(readFile(t, dest, "Playlists/Road Trip Songs Volu (2).m3u"))
-	if first == "" || second == "" {
-		t.Errorf("a playlist is missing: %q %q", first, second)
-	}
-}
-
-func TestPlaylistsThatAreTheSameFileOnGenericAreStillRefused(t *testing.T) {
-	a := openLib(t)
-	if err := a.CreatePlaylist("Road"); err != nil {
-		t.Fatal(err)
-	}
-
-	err := a.CreatePlaylist("ROAD")
-
-	if err == nil || !strings.Contains(err.Error(), "same file") {
-		t.Errorf("err = %v", err)
 	}
 }

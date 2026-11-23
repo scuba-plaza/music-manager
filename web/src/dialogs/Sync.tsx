@@ -1,15 +1,13 @@
 import { useEffect, useRef } from 'react';
-import type { Profile } from '../api/types.gen';
 import { FormField } from '../components/FormField';
+import { FormatOptions } from '../components/FormatOptions';
+import { Problem } from '../components/Problem';
 import { Progress } from '../components/Progress';
 import { motionOf, moveTo, type Motion } from '../keys/dialog';
-import { keyName, type KeyEventLike } from '../keys/keymap';
-import { Problem } from '../components/Problem';
+import { keyName, type Hint, type KeyEventLike } from '../keys/keymap';
 import { Dialog } from '../overlay/Dialog';
 import { MenuList } from '../overlay/MenuList';
-import { formatChoices } from '../state/profiles';
 import { closeOverlay } from '../state/store';
-import { useApp } from '../state/store';
 import {
   applyPlan,
   backToChoosing,
@@ -33,11 +31,6 @@ const glyphs: Record<string, string> = { create: '+', update: '~', remove: '−'
 const warningsShown = 4;
 const pageLines = 10;
 const scrolls: Record<Motion, number> = { up: -1, down: 1, first: -Infinity, last: Infinity };
-
-interface Hint {
-  keys: string;
-  label: string;
-}
 
 function hintsFor(phase: SyncPhase, library: boolean, nothingToDo: boolean): readonly Hint[] {
   switch (phase) {
@@ -78,10 +71,7 @@ function hintsFor(phase: SyncPhase, library: boolean, nothingToDo: boolean): rea
   }
 }
 
-const noFormats: Profile[] = [];
-
 function Format({ library, how }: { library: boolean; how: string }) {
-  const stored = useApp((s) => s.lib?.profiles ?? noFormats);
   const profile = useSync((s) => s.profile);
   if (library) {
     return (
@@ -102,11 +92,7 @@ function Format({ library, how }: { library: boolean; how: string }) {
           chooseProfile(e.target.value);
         }}
       >
-        {formatChoices(stored).map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
+        <FormatOptions />
       </select>
       {how !== '' && <span className="dim"> · {how}</span>}
     </label>
@@ -383,9 +369,7 @@ export function Sync() {
           <div className="ask-head">{summary}</div>
         </>
       )}
-      {phase === 'failed' && (
-        <Problem text={error} />
-      )}
+      {phase === 'failed' && <Problem text={error} />}
     </Dialog>
   );
 }

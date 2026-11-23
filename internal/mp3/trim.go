@@ -20,23 +20,19 @@ func Trim(audio []byte, start, end time.Duration) ([]byte, error) {
 	}
 	var elapsed time.Duration
 	from, to := -1, 0
-	for pos := 0; pos < len(audio); {
-		f, ok := frameAt(audio[pos:])
-		if !ok || f.size > len(audio)-pos {
-			break
+	frames(audio, func(pos int, f frame) {
+		if f.info {
+			return
 		}
-		if !f.info {
-			d := time.Duration(f.samples) * time.Second / time.Duration(f.rate)
-			if mid := elapsed + d/2; mid >= start && mid < total-end {
-				if from < 0 {
-					from = pos
-				}
-				to = pos + f.size
+		d := f.duration()
+		if mid := elapsed + d/2; mid >= start && mid < total-end {
+			if from < 0 {
+				from = pos
 			}
-			elapsed += d
+			to = pos + f.size
 		}
-		pos += f.size
-	}
+		elapsed += d
+	})
 	if from < 0 {
 		return nil, errors.New("mp3: trims leave no audio")
 	}

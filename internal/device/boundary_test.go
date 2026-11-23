@@ -25,8 +25,8 @@ func sources(t *testing.T) map[string]string {
 			return err
 		}
 		if d.IsDir() {
-			switch d.Name() {
-			case ".git", "testdata", "result", "vendor":
+			name := d.Name()
+			if p != root && strings.HasPrefix(name, ".") || name == "testdata" || name == "result" || name == "vendor" || name == "node_modules" {
 				return filepath.SkipDir
 			}
 			return nil

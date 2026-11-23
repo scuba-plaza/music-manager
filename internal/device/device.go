@@ -38,20 +38,3 @@ type Target interface {
 	Diagnose(tracks []manifest.Track) []Warning
 	Profile() manifest.Profile
 }
-
-// extras are the tag fields that belong to no standard frame. A track not yet
-// identified has only its ID.
-func extras(t manifest.Track) map[string]string {
-	extra := map[string]string{"MM_ID": t.ID}
-	if t.Status != manifest.Identified {
-		return extra
-	}
-	for k, v := range map[string]string{
-		"SOURCE_URL": t.SourceURL,
-	} {
-		if v != "" {
-			extra[k] = v
-		}
-	}
-	return extra
-}

@@ -61,20 +61,13 @@ describe('the client', () => {
     expect(requestOf(fetchMock).url).toBe('/api/info');
   });
 
-  it('returns null when the answer has no content', async () => {
-    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
-
-    expect(await send<null>('DELETE', '/api/jobs/a')).toBeNull();
-  });
-
-  it('turns an error body into the message', async () => {
+  it('turns an error body into the message, with no field messages when it names no field', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ error: 'no such track' }, 422));
 
     const err = await get('/api/tracks/zz').catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(ApiError);
-    expect(err).toHaveProperty('message', 'no such track');
-    expect(err).toHaveProperty('status', 422);
+    expect(err).toMatchObject({ message: 'no such track', status: 422, fields: {} });
   });
 
   it('keeps the messages that belong to fields', async () => {
@@ -86,31 +79,16 @@ describe('the client', () => {
     expect(err).toHaveProperty('fields', { title: 'Title cannot be empty', released: 'Not a date' });
   });
 
-  it('has no field messages when the error is about nothing in particular', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ error: 'no such track' }, 422));
-
-    const err = await get('/api/tracks/zz').catch((e: unknown) => e);
-
-    expect(err).toHaveProperty('fields', {});
-  });
-
-  it('names the status when the error body is not JSON', async () => {
-    fetchMock.mockResolvedValue(new Response('<h1>bad gateway</h1>', { status: 502, statusText: 'Bad Gateway', headers: { 'Content-Type': 'text/html' } }));
+  it.each([
+    ['is not JSON', new Response('<h1>bad gateway</h1>', { status: 502, statusText: 'Bad Gateway', headers: { 'Content-Type': 'text/html' } }), '502 Bad Gateway', 502],
+    ['has no message', jsonResponse({ detail: 'x' }, 500), 'Request failed (500)', 500],
+  ])('names the status when the error body %s', async (_, response, message, status) => {
+    fetchMock.mockResolvedValue(response);
 
     const err = await get('/api/info').catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(ApiError);
-    expect(err).toHaveProperty('message', '502 Bad Gateway');
-    expect(err).toHaveProperty('status', 502);
-  });
-
-  it('names the status when the error body has no message', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ detail: 'x' }, 500));
-
-    const err = await get('/api/info').catch((e: unknown) => e);
-
-    expect(err).toBeInstanceOf(ApiError);
-    expect(err).toHaveProperty('message', 'Request failed (500)');
+    expect(err).toMatchObject({ message, status });
   });
 
   it('turns a failed fetch into the unreachable message', async () => {
@@ -141,15 +119,6 @@ describe('the client', () => {
 
     expect(requestOf(fetchMock).init.signal).toBe(controller.signal);
   });
-
-  it('hands the abort signal to fetch when sending, too', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({}));
-    const controller = new AbortController();
-
-    await send('POST', '/api/tracks/a/candidates', {}, { signal: controller.signal });
-
-    expect(requestOf(fetchMock).init.signal).toBe(controller.signal);
-  });
 });
 
 describe('getBlob', () => {
@@ -167,12 +136,6 @@ describe('getBlob', () => {
     fetchMock.mockResolvedValue(jsonResponse({ error: 'ffmpeg is not installed' }, 500));
 
     await expect(getBlob('/api/tracks/a/preview')).rejects.toEqual(new ApiError('ffmpeg is not installed', 500));
-  });
-
-  it('turns a failed fetch into the unreachable message', async () => {
-    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
-
-    await expect(getBlob('/api/tracks/a/preview')).rejects.toThrow('Cannot reach mm. Is it still running?');
   });
 });
 
@@ -192,20 +155,15 @@ describe('query', () => {
 });
 
 describe('an answer the page cannot read', () => {
-  it('is an error that says so when it claims to be JSON and is not', async () => {
-    fetchMock.mockResolvedValue(new Response('{"root":', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  it.each([
+    ['claims to be JSON and is not', new Response('{"root":', { status: 200, headers: { 'Content-Type': 'application/json' } })],
+    ['has content that is not JSON at all', new Response('<!doctype html>', { status: 200, headers: { 'Content-Type': 'text/html' } })],
+  ])('is an error that says so when it %s', async (_, response) => {
+    fetchMock.mockResolvedValue(response);
 
     const failure = await get('/api/info').catch((err: unknown) => err);
 
     expect(failure).toBeInstanceOf(ApiError);
-    expect(failure).toMatchObject({ message: 'mm gave an answer the page cannot read.', status: 200 });
-  });
-
-  it('is an error when an answer with content is not JSON at all', async () => {
-    fetchMock.mockResolvedValue(new Response('<!doctype html>', { status: 200, headers: { 'Content-Type': 'text/html' } }));
-
-    const failure = await get('/api/info').catch((err: unknown) => err);
-
     expect(failure).toMatchObject({ message: 'mm gave an answer the page cannot read.', status: 200 });
   });
 

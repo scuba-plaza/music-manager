@@ -129,16 +129,14 @@ func (s *Store) Load() (*Manifest, error) {
 	if err := json.Unmarshal(data, &f); err != nil {
 		return nil, fmt.Errorf("%s: %w", s.path, err)
 	}
-	legacy := false
 	switch f.Version {
 	case schemaVersion:
 	case legacyVersion:
-		legacy = true
 		f.Profiles = []Profile{WolfgangWMP01}
 	default:
 		return nil, fmt.Errorf("%s: unsupported library version %d (want %d)", s.path, f.Version, schemaVersion)
 	}
-	return &Manifest{Tracks: f.Tracks, Playlists: f.Playlists, Profiles: f.Profiles, FromVersion2: legacy}, nil
+	return &Manifest{Tracks: f.Tracks, Playlists: f.Playlists, Profiles: f.Profiles, FromVersion2: f.Version == legacyVersion}, nil
 }
 
 // save writes the manifest atomically: the data goes to a temp file that is

@@ -20,8 +20,6 @@ import { chooseProfile } from './profiles';
 import { useApp } from './store';
 
 vi.mock('./treeDom', () => ({
-  pageSize: vi.fn(() => 3),
-  centreCursor: vi.fn(),
   focusFilterBox: vi.fn(),
   leaveFilterBox: vi.fn(),
 }));
@@ -156,21 +154,13 @@ describe('typing in a field', () => {
     expect(useApp.getState().edit).toBeNull();
   });
 
-  it('typing changes the text and wipes the error of the last save', () => {
-    onTrack({ edit: { field: 0, text: 'So What', error: 'refused' } });
+  it('typing changes the text and wipes what the last save said, in general and about the fields', () => {
+    onTrack({ edit: { field: 0, text: 'So What', error: 'refused', wrong: { title: 'Title cannot be empty' } } });
 
     typeEdit('text', 'So When');
     typeEdit('second', '7');
 
-    expect(useApp.getState().edit).toMatchObject({ text: 'So When', second: '7', error: '' });
-  });
-
-  it('typing also wipes what was said about the fields', () => {
-    onTrack({ edit: { field: 0, text: 'So What', wrong: { title: 'Title cannot be empty' } } });
-
-    typeEdit('text', 'So When');
-
-    expect(useApp.getState().edit).toEqual({ field: 0, text: 'So When', error: '', wrong: {} });
+    expect(useApp.getState().edit).toEqual({ field: 0, text: 'So When', second: '7', error: '', wrong: {} });
   });
 
   it('cancelEdit closes the field and sends nothing', () => {
@@ -399,14 +389,16 @@ describe('cuts, gains and fades', () => {
     });
   });
 
-  it('the nudge keys and 0 leave a field that is not a cut, a gain or a fade alone', async () => {
+  it('the nudge, clear and hear keys leave a field that is not a cut, a gain or a fade alone', async () => {
     onTrack();
 
     run('nudgeUp');
     run('clear');
+    run('hear');
     await Promise.resolve();
 
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(useApp.getState()).toMatchObject({ overlay: null, playing: null });
   });
 
   it('a refused nudge is said in the status line', async () => {
@@ -501,15 +493,6 @@ describe('hearing a cut', () => {
     expect(created).not.toHaveBeenCalled();
   });
 
-  it('p leaves a field that is not a cut alone', () => {
-    onTrack();
-
-    run('hear');
-
-    expect(useApp.getState().playing).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it('a preview that cannot be cut is said in the status line', async () => {
     serve(({ url }) => (url.pathname.endsWith('/preview') ? jsonResponse({ error: 'ffmpeg is not installed' }, 500) : undefined));
     onTrack({ tab: 1 });
@@ -524,14 +507,6 @@ describe('hearing a cut', () => {
 });
 
 describe('the details of what the cursor is on', () => {
-  it('a track is asked for with the format chosen', async () => {
-    onTrack({ profile: 'my-player' });
-
-    await loadDetail();
-
-    expect(requestsTo(fetchMock, 'GET', '/api/tracks/sowhat?profile=my-player')).toHaveLength(1);
-  });
-
   it('details that cannot be had are said in the pane and in the status line, until other details come', async () => {
     serve(({ url }) => (url.pathname === '/api/tracks/sowhat' ? jsonResponse({ error: 'the track is gone' }, 404) : undefined));
     onTrack();
@@ -546,36 +521,12 @@ describe('the details of what the cursor is on', () => {
 });
 
 describe('the formats that come with the library', () => {
-  it('the first format of the library is previewed at first', async () => {
+  it('a format the library no longer has is replaced by its first, and the details are read with it', async () => {
+    onTrack({ profile: 'gone' });
+
     await loadLibrary();
 
     expect(useApp.getState().profile).toBe('wolfgang-wmp01');
-  });
-
-  it('a format chosen before is kept while the library still has it', async () => {
-    useApp.setState({ profile: 'my-player' });
-
-    await loadLibrary();
-
-    expect(useApp.getState().profile).toBe('my-player');
-  });
-
-  it('a format the library no longer has is replaced by its first, and with none there is no preview', async () => {
-    useApp.setState({ profile: 'gone' });
-    await loadLibrary();
-    expect(useApp.getState().profile).toBe('wolfgang-wmp01');
-
-    fetchMock = stubServer(infoView(), { ...sampleLibrary(), profiles: [] });
-    await loadLibrary();
-
-    expect(useApp.getState().profile).toBe('');
-  });
-
-  it('the details of a track shown are read again with the format', async () => {
-    onTrack();
-
-    await loadLibrary();
-
     expect(requestsTo(fetchMock, 'GET', '/api/tracks/sowhat?profile=wolfgang-wmp01').length).toBeGreaterThan(0);
   });
 

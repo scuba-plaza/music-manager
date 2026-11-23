@@ -86,14 +86,16 @@ describe('D', () => {
     expect(signal?.aborted).toBe(true);
   });
 
-  it('an answer that arrives after the dialog was closed changes nothing', async () => {
-    let answer: (res: Response) => void = () => undefined;
-    serve(doctor(new Promise<Response>((resolve) => {
-      answer = resolve;
-    })));
+  it('drops a report that was already being read when the dialog closed', async () => {
+    const slow = slowAnswer();
+    serve(doctor(slow.response));
     openDoctor();
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalled();
+    });
+
     useApp.setState({ overlay: null });
-    answer(jsonResponse(report()));
+    slow.finish(report());
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(useDoctor.getState().phase).toBe('checking');
@@ -112,24 +114,12 @@ describe('choosing a problem', () => {
   it('moves through the problems and stays inside the list', async () => {
     await opened();
 
-    moveProblem('up');
-    expect(useDoctor.getState().cursor).toBe(0);
     moveProblem('down');
-    moveProblem('down');
-    expect(useDoctor.getState().cursor).toBe(1);
-    chooseProblem(0);
-    expect(useDoctor.getState().cursor).toBe(0);
-    chooseProblem(7);
-    expect(useDoctor.getState().cursor).toBe(1);
-  });
-
-  it('goes to the first and the last problem', async () => {
-    await opened();
-
-    moveProblem('last');
     expect(useDoctor.getState().cursor).toBe(1);
     moveProblem('first');
     expect(useDoctor.getState().cursor).toBe(0);
+    chooseProblem(7);
+    expect(useDoctor.getState().cursor).toBe(1);
   });
 
   it('goes to the track of the problem: the dialog closes and the tree shows the track', async () => {
@@ -160,22 +150,5 @@ describe('choosing a problem', () => {
 
     expect(useApp.getState().overlay).toEqual({ kind: 'doctor' });
     expect(useDoctor.getState().cursor).toBe(0);
-  });
-});
-
-describe('a report that was already on its way when the dialog closed', () => {
-  it('is dropped, even when it is read after the dialog closed', async () => {
-    const slow = slowAnswer();
-    serve(doctor(slow.response));
-    openDoctor();
-    await vi.waitFor(() => {
-      expect(fetchMock).toHaveBeenCalled();
-    });
-
-    useApp.setState({ overlay: null });
-    slow.finish(report());
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    expect(useDoctor.getState().phase).toBe('checking');
   });
 });

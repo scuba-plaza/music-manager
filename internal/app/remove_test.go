@@ -53,13 +53,6 @@ func TestRemoveDeletesTheRecordAndSyncCollectsItsBlobs(t *testing.T) {
 	}
 }
 
-func TestRemoveUnknownID(t *testing.T) {
-	a := libWithTracks(t, 10)
-	if _, err := a.Remove("nope"); err == nil {
-		t.Error("removing an unknown id succeeded")
-	}
-}
-
 func TestSyncKeepsBlobsSharedAcrossTracksAndTargets(t *testing.T) {
 	a := libWithTracks(t, 10, 20)
 	ts := tracks(t, a)
@@ -79,19 +72,9 @@ func TestSyncKeepsBlobsSharedAcrossTracksAndTargets(t *testing.T) {
 	}
 }
 
-func TestRemoveManyRemovesAllOrNone(t *testing.T) {
+func TestRemoveManyReturnsTheRemovedTracksInTheOrderGiven(t *testing.T) {
 	a := libWithTracks(t, 10, 20, 30)
 	ts := tracks(t, a)
-
-	if _, err := a.RemoveMany([]string{ts[0].ID, "nope"}); err == nil {
-		t.Error("an unknown id was accepted")
-	}
-	if len(tracks(t, a)) != 3 {
-		t.Fatal("a failed RemoveMany removed something")
-	}
-	if _, err := a.RemoveMany([]string{ts[0].ID, ts[0].ID}); err == nil {
-		t.Error("an id listed twice was accepted")
-	}
 
 	got, err := a.RemoveMany([]string{ts[2].ID, ts[0].ID})
 	if err != nil {
@@ -111,31 +94,25 @@ func TestRemoveManyRemovesAllOrNone(t *testing.T) {
 	}
 }
 
-func TestRemovingWithARepeatedIDRemovesNothing(t *testing.T) {
+func TestRemoveManyRefusesAnUnknownOrRepeatedIDAndRemovesNothing(t *testing.T) {
 	a := libWithTracks(t, 10, 20)
 	ts := tracks(t, a)
-
-	got, err := a.RemoveMany([]string{ts[0].ID, ts[1].ID, ts[0].ID})
-	if err == nil || !strings.Contains(err.Error(), ts[0].ID) {
-		t.Fatalf("RemoveMany = %v, %v; want an error that names the repeated id %s", got, err, ts[0].ID)
-	}
-	if len(got) != 0 {
-		t.Errorf("RemoveMany returned %v together with its error", got)
-	}
-	if left := tracks(t, a); len(left) != 2 {
-		t.Errorf("%d tracks left, want both: the one named once went too", len(left))
-	}
-}
-
-func TestRemovingAnUnknownIDSaysWhichOneAndRemovesNothing(t *testing.T) {
-	a := libWithTracks(t, 10, 20)
-	ts := tracks(t, a)
-
-	_, err := a.RemoveMany([]string{ts[0].ID, "nope"})
-	if err == nil || !strings.Contains(err.Error(), "nope") {
-		t.Fatalf("err = %v, want one that names nope", err)
-	}
-	if left := tracks(t, a); len(left) != 2 {
-		t.Errorf("%d tracks left, want both: the known one went too", len(left))
+	for _, c := range []struct {
+		name, named string
+		ids         []string
+	}{
+		{"an unknown id", "nope", []string{ts[0].ID, "nope"}},
+		{"a repeated id", ts[0].ID, []string{ts[0].ID, ts[1].ID, ts[0].ID}},
+	} {
+		got, err := a.RemoveMany(c.ids)
+		if err == nil || !strings.Contains(err.Error(), c.named) {
+			t.Errorf("%s: err = %v, want one that names %s", c.name, err, c.named)
+		}
+		if len(got) != 0 {
+			t.Errorf("%s: RemoveMany returned %v together with its error", c.name, got)
+		}
+		if left := tracks(t, a); len(left) != 2 {
+			t.Errorf("%s: %d tracks left, want both", c.name, len(left))
+		}
 	}
 }

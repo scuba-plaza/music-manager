@@ -1,16 +1,8 @@
-import type { Locator, Page } from '@playwright/test';
-import type { InfoView, LibraryResponse } from '../src/api/types.gen.ts';
-import { expect, test } from './fixtures.ts';
+import type { Page } from '@playwright/test';
+import type { InfoView } from '../src/api/types.gen.ts';
+import { boxOf, expect, library, test } from './fixtures.ts';
 
-async function boxOf(locator: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
-  const box = await locator.boundingBox();
-  if (box === null) {
-    throw new Error('the element has no box on the page');
-  }
-  return box;
-}
-
-async function openPage(page: Page, width: number, height = 700): Promise<void> {
+async function openAt(page: Page, width: number, height = 700): Promise<void> {
   await page.setViewportSize({ width, height });
   await page.goto('/');
   await expect(page.getByRole('banner')).toContainText(/\d+ tracks/);
@@ -31,22 +23,27 @@ async function dragDivider(page: Page, to: number): Promise<void> {
   await page.mouse.up();
 }
 
-test('the header shows the library folder, the tracks and what waits to sync', async ({ page, request }) => {
+test('the header shows the library folder, the tracks and what waits to sync, and the sync chip opens the dialog', async ({ page, dialog, request }) => {
   const info = (await (await request.get('/api/info')).json()) as InfoView;
-  const { unsynced, view } = (await (await request.get('/api/library')).json()) as LibraryResponse;
+  const { unsynced, view } = await library(request);
   expect(unsynced).toBeGreaterThan(0);
 
-  await openPage(page, 1200, 800);
+  await openAt(page, 1200, 800);
 
   const header = page.getByRole('banner');
   await expect(header).toContainText(info.root);
   await expect(header).toContainText(`${String(view.tracks)} tracks · ${String(view.needWork)} need work`);
-  await expect(header.getByRole('button', { name: /to sync/ })).toHaveText(`${String(unsynced)} to sync · press s`);
   await expect(page).toHaveTitle(`mm · ${info.root}`);
+  const chip = header.getByRole('button', { name: /to sync/ });
+  await expect(chip).toHaveText(`${String(unsynced)} to sync · press s`);
+
+  await chip.click();
+
+  await expect(dialog()).toHaveAccessibleName('Sync');
 });
 
-test('below 800px one pane shows at a time: → into the fields shows the right pane and esc returns to the tree', async ({ page, press }) => {
-  await openPage(page, 500);
+test('below 800px one pane shows at a time: → into the fields shows the right pane and esc returns to the tree', async ({ page }) => {
+  await openAt(page, 500);
   const tree = page.getByTestId('tree-pane');
   const fields = page.getByTestId('inspector-pane');
   await expect(tree).toBeVisible();
@@ -54,20 +51,20 @@ test('below 800px one pane shows at a time: → into the fields shows the right 
   expect((await boxOf(tree)).width).toBeGreaterThan(400);
   await putCursorOnTrack(page);
 
-  await press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
 
   await expect(fields).toBeVisible();
   await expect(tree).toBeHidden();
   expect((await boxOf(fields)).width).toBeGreaterThan(400);
 
-  await press('Escape');
+  await page.keyboard.press('Escape');
 
   await expect(tree).toBeVisible();
   await expect(fields).toBeHidden();
 });
 
 test('both panes show from 800px and one pane below it', async ({ page }) => {
-  await openPage(page, 800);
+  await openAt(page, 800);
   await expect(page.getByTestId('tree-pane')).toBeVisible();
   await expect(page.getByTestId('inspector-pane')).toBeVisible();
   await expect(page.getByRole('separator')).toBeVisible();
@@ -80,7 +77,7 @@ test('both panes show from 800px and one pane below it', async ({ page }) => {
 });
 
 test('dragging the divider changes the left width and survives a reload', async ({ page }) => {
-  await openPage(page, 1200, 800);
+  await openAt(page, 1200, 800);
   const library = page.getByRole('region', { name: 'Library' });
   const before = (await boxOf(library)).width;
   const divider = await boxOf(page.getByRole('separator'));
@@ -97,7 +94,7 @@ test('dragging the divider changes the left width and survives a reload', async 
 });
 
 test('the divider leaves the left pane 220px and the right pane 300px', async ({ page }) => {
-  await openPage(page, 1200, 800);
+  await openAt(page, 1200, 800);
   const library = page.getByRole('region', { name: 'Library' });
   const details = page.getByRole('region', { name: 'Details' });
 
@@ -111,7 +108,7 @@ test('the divider leaves the left pane 220px and the right pane 300px', async ({
 });
 
 test('a stored width that leaves a pane no room is brought back, and one that is no number is ignored', async ({ page }) => {
-  await openPage(page, 1200, 800);
+  await openAt(page, 1200, 800);
   const library = page.getByRole('region', { name: 'Library' });
   const details = page.getByRole('region', { name: 'Details' });
   const standard = (await boxOf(library)).width;
@@ -139,7 +136,7 @@ test('a stored width that leaves a pane no room is brought back, and one that is
 });
 
 test('the theme starts dark and the light one survives a reload', async ({ page }) => {
-  await openPage(page, 1200, 800);
+  await openAt(page, 1200, 800);
   const root = page.locator('html');
   await expect(root).toHaveAttribute('data-theme', 'dark');
 
@@ -151,8 +148,8 @@ test('the theme starts dark and the light one survives a reload', async ({ page 
   await expect(root).toHaveAttribute('data-theme', 'light');
 });
 
-test('no horizontal scrollbar at 500px', async ({ page, press }) => {
-  await openPage(page, 500);
+test('no horizontal scrollbar at 500px', async ({ page }) => {
+  await openAt(page, 500);
   const overflow = () =>
     page.evaluate(() => ({
       page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -163,7 +160,7 @@ test('no horizontal scrollbar at 500px', async ({ page, press }) => {
   expect((await overflow()).body).toBeLessThanOrEqual(0);
 
   await putCursorOnTrack(page);
-  await press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
   await expect(page.getByTestId('inspector-pane')).toBeVisible();
 
   expect((await overflow()).page).toBeLessThanOrEqual(0);
@@ -173,7 +170,7 @@ test('no horizontal scrollbar at 500px', async ({ page, press }) => {
 });
 
 test('a long library path is cut short in the header and the page does not scroll sideways', async ({ page }) => {
-  await openPage(page, 500);
+  await openAt(page, 500);
   await page.locator('.library-root bdi').evaluate((path) => {
     path.textContent = '/media/'.concat('a-very-long-folder-name/'.repeat(20));
   });
@@ -184,21 +181,15 @@ test('a long library path is cut short in the header and the page does not scrol
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
-test('a stored light theme is on the page before the page script runs', async ({ page }) => {
-  await page.addInitScript(() => {
+test('the stored theme, or else the dark one, is on the page before the page script runs', async ({ page }) => {
+  await page.route('**/*.js', (route) => route.abort());
+
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+  await page.evaluate(() => {
     localStorage.setItem('mm.theme', 'light');
   });
-  await page.route('**/*.js', (route) => route.abort());
-
-  await page.goto('/');
-
+  await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-});
-
-test('a page without a stored theme is dark before the page script runs', async ({ page }) => {
-  await page.route('**/*.js', (route) => route.abort());
-
-  await page.goto('/');
-
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });

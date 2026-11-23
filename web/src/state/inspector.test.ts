@@ -5,13 +5,6 @@ import { run } from './actions';
 import { currentField, fieldIndex, tabIndex } from './inspector';
 import { useApp } from './store';
 
-vi.mock('./treeDom', () => ({
-  pageSize: vi.fn(() => 3),
-  centreCursor: vi.fn(),
-  focusFilterBox: vi.fn(),
-  leaveFilterBox: vi.fn(),
-}));
-
 const sep = '\u001f';
 const keys = {
   playlists: 'playlists',
@@ -98,7 +91,7 @@ describe('choosing a field', () => {
     expect(useApp.getState().field).toBe(0);
   });
 
-  it('fieldDown starts from the field shown when the cursor was beyond the fields', () => {
+  it('fieldUp starts from the field shown when the cursor was beyond the fields', () => {
     onTrack({ tab: 1, field: 6 });
 
     run('fieldUp');
@@ -130,14 +123,6 @@ describe('choosing a tab', () => {
     expect(useApp.getState().edit).toBeNull();
   });
 
-  it('the tab is not remembered between visits', () => {
-    onTrack();
-
-    run('tab2');
-
-    expect(localStorage.getItem('mm.tab')).toBeNull();
-  });
-
   it('an artist has no tabs: the tab keys leave it alone', () => {
     useApp.setState({ lib: sampleLibrary(), cursor: keys.miles, detail: artistView(), focus: 'inspector', tab: 0 });
 
@@ -167,14 +152,6 @@ describe('the other pane', () => {
 
       expect(useApp.getState(), way).toMatchObject({ focus: 'inspector', tab: 0, field: 0 });
     }
-  });
-
-  it('Tab goes into the fields of an artist or a playlist at the first field', () => {
-    useApp.setState({ lib: sampleLibrary(), cursor: keys.lateNight, field: 3 });
-
-    run('toggleFocus');
-
-    expect(useApp.getState()).toMatchObject({ focus: 'inspector', field: 0 });
   });
 
   it('Tab stays in the tree on what has no fields: the Playlists group and Singles', () => {

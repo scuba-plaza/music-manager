@@ -131,18 +131,15 @@ func Library(s Snapshot, o Options) LibraryView {
 	}
 	var rows []Row
 	if o.Sort == "" {
-		rows = buildRows(s.Tracks, s.Playlists, o.Filter, func(string) bool { return true })
+		rows = buildRows(s.Tracks, s.Playlists, o.Filter)
 	} else {
 		rows = buildSortedRows(s.Tracks, o.Filter, o.Sort, o.Reverse)
-	}
-	editable := func(r Row) bool {
-		return r.Kind == kindPlaylist || r.Kind == kindArtist || (r.Kind == kindAlbum && r.Album != "")
 	}
 	for _, r := range rows {
 		rv := RowView{
 			Kind: r.Kind.String(), Depth: r.Depth, Key: r.Key, Parent: r.Parent,
 			Label: r.Label, Artist: r.Artist, Album: r.Album, Detail: r.Detail, Num: r.Num, Right: r.Right,
-			Count: r.Count, Editable: editable(r),
+			Count: r.Count, Editable: editableAsGroup(r),
 		}
 		if r.Kind == kindTrack {
 			rv.TrackID = r.Track.ID
@@ -236,8 +233,8 @@ func direction(k app.SortKey) (forward, backward string) {
 	return "artist → album → track", "artist → album → track"
 }
 
-// plural writes a count with its noun, as "1 track" or "3 tracks".
-func plural(n int, word string) string {
+// Plural writes a count with its noun, as "1 track" or "3 tracks".
+func Plural(n int, word string) string {
 	if n == 1 {
 		return fmt.Sprintf("1 %s", word)
 	}

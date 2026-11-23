@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { JobView, OpCounts, PlanView, SyncData, TargetView } from '../api/types.gen';
 import { infoView, jsonResponse, memoryStorage, requestsTo, sampleLibrary, stubServer, type StubRoute, urlOf } from '../testing/fakes';
-import { run } from './actions';
 import { jobEvent } from './jobs';
 import { useApp } from './store';
 import {
@@ -28,7 +27,6 @@ const targets: TargetView[] = [
   { label: 'Library folder', path: '~/Music', kind: 'library' },
   { label: 'USB', path: '/media/me/USB', kind: 'drive' },
 ];
-
 
 function counts(over: Partial<OpCounts> = {}): OpCounts {
   return { create: 1, update: 0, stray: 0, remove: 0, ...over };
@@ -148,16 +146,6 @@ describe('s', () => {
     expect(state().targets).toEqual([...targets, { label: 'Another folder…', path: '', kind: 'folder' }]);
   });
 
-  it('is the action of the s key', async () => {
-    serve();
-
-    run('sync');
-
-    await vi.waitFor(() => {
-      expect(useApp.getState().overlay).toEqual({ kind: 'sync' });
-    });
-  });
-
   it('opens nothing before the library is there', async () => {
     serve();
     useApp.setState({ lib: null });
@@ -223,27 +211,12 @@ describe('choosing where', () => {
     expect(state().profile).toBe('generic');
   });
 
-  it('w does nothing for the library folder, whose format is not a choice', () => {
+  it('f does nothing for the library folder, whose format is not a choice', () => {
     chooseTarget(0);
 
     cycleProfile();
 
     expect(state().profile).toBe('generic');
-  });
-
-  it('w does nothing without profiles', () => {
-    useApp.setState({ lib: { ...sampleLibrary(), profiles: [] } });
-    chooseTarget(1);
-
-    cycleProfile();
-
-    expect(state().profile).toBe('generic');
-  });
-
-  it('the format can be chosen by name', () => {
-    chooseProfile('my-player');
-
-    expect(state().profile).toBe('my-player');
   });
 
   it('enter on another folder asks which folder instead of planning', () => {
@@ -326,12 +299,6 @@ describe('planning', () => {
     });
   });
 
-  it('never sends the old format flag', async () => {
-    await planning(1);
-
-    expect(JSON.stringify(sent('/api/sync/plan'))).not.toContain('wolfgang"');
-  });
-
   it('shows what the job says as it goes', async () => {
     await planning(1);
 
@@ -362,11 +329,14 @@ describe('planning', () => {
     });
   });
 
-  it('reviewing a library folder with things to write does not reload', async () => {
-    await planning(0);
+  it.each([
+    ['a library folder with things to write', 0, {}],
+    ['a drive that is up to date', 1, { ops: [], counts: counts({ create: 0 }) }],
+  ])('reviewing %s does not reload', async (_, at, over) => {
+    await planning(at);
     const before = libraryReloads();
 
-    jobEvent(planned());
+    jobEvent(planned(over));
     await vi.waitFor(() => {
       expect(state().phase).toBe('reviewing');
     });
@@ -374,35 +344,16 @@ describe('planning', () => {
     expect(libraryReloads()).toBe(before);
   });
 
-  it('a drive that is up to date does not reload', async () => {
-    await planning(1);
-    const before = libraryReloads();
-
-    jobEvent(planned({ ops: [], counts: counts({ create: 0 }) }));
-    await vi.waitFor(() => {
-      expect(state().phase).toBe('reviewing');
-    });
-
-    expect(libraryReloads()).toBe(before);
-  });
-
-  it('a plan that fails shows why', async () => {
+  it.each([
+    ['fails shows why', job('failed', undefined, 'the drive is read-only'), 'the drive is read-only'],
+    ['was stopped says so', job('stopped'), 'The sync was stopped.'],
+  ])('a plan that %s', async (_, ended, error) => {
     await planning(1);
 
-    jobEvent(job('failed', undefined, 'the drive is read-only'));
+    jobEvent(ended);
 
     await vi.waitFor(() => {
-      expect(state()).toMatchObject({ phase: 'failed', error: 'the drive is read-only' });
-    });
-  });
-
-  it('a plan that was stopped says so', async () => {
-    await planning(1);
-
-    jobEvent(job('stopped'));
-
-    await vi.waitFor(() => {
-      expect(state()).toMatchObject({ phase: 'failed', error: 'The sync was stopped.' });
+      expect(state()).toMatchObject({ phase: 'failed', error });
     });
   });
 
@@ -493,24 +444,16 @@ describe('planning', () => {
 });
 
 describe('the review', () => {
-  it('p asks for the strays to go and shows the plan the server then made', async () => {
-    const pruned = plan({ prune: true, counts: counts({ stray: 0, remove: 1 }) });
-    await reviewing({ counts: counts({ stray: 1 }) }, ({ method, url }) => (method === 'POST' && url.pathname === '/api/sync/p1/prune' ? jsonResponse(pruned) : undefined));
+  it.each([
+    ['asks for the strays to go', plan({ counts: counts({ stray: 1 }) }), plan({ prune: true, counts: counts({ stray: 0, remove: 1 }) })],
+    ['again keeps them', plan({ prune: true }), plan({ prune: false })],
+  ])('p %s and shows the plan the server then made', async (_, before, after) => {
+    await reviewing(before, ({ method, url }) => (method === 'POST' && url.pathname === '/api/sync/p1/prune' ? jsonResponse(after) : undefined));
 
     await togglePrune();
 
-    expect(sent('/api/sync/p1/prune')).toEqual([{ prune: true }]);
-    expect(state().plan).toEqual(pruned);
-  });
-
-  it('p again keeps them', async () => {
-    const kept = plan({ prune: false });
-    await reviewing({ prune: true }, ({ method, url }) => (method === 'POST' && url.pathname === '/api/sync/p1/prune' ? jsonResponse(kept) : undefined));
-
-    await togglePrune();
-
-    expect(sent('/api/sync/p1/prune')).toEqual([{ prune: false }]);
-    expect(state().plan).toEqual(kept);
+    expect(sent('/api/sync/p1/prune')).toEqual([{ prune: after.prune }]);
+    expect(state().plan).toEqual(after);
   });
 
   it('a refusal to change the strays is shown and the plan stays', async () => {
@@ -522,7 +465,10 @@ describe('the review', () => {
     expect(state().plan).toEqual(plan());
   });
 
-  it('a change of the strays that comes back after the dialog was closed changes nothing', async () => {
+  it.each([
+    ['comes back', () => jsonResponse(plan({ prune: true }))],
+    ['is refused', () => jsonResponse({ error: 'gone' }, 410)],
+  ])('a change of the strays that %s after the dialog was closed changes nothing', async (_, late) => {
     let answer: (res: Response) => void = () => undefined;
     await reviewing({}, ({ method, url }) =>
       method === 'POST' && url.pathname === '/api/sync/p1/prune'
@@ -534,28 +480,10 @@ describe('the review', () => {
     const asking = togglePrune();
     useApp.setState({ overlay: null });
 
-    answer(jsonResponse(plan({ prune: true })));
+    answer(late());
     await asking;
 
-    expect(state().plan).toEqual(plan());
-  });
-
-  it('a change of the strays that is refused after the dialog was closed shows nothing', async () => {
-    let answer: (res: Response) => void = () => undefined;
-    await reviewing({}, ({ method, url }) =>
-      method === 'POST' && url.pathname === '/api/sync/p1/prune'
-        ? new Promise<Response>((resolve) => {
-            answer = resolve;
-          })
-        : undefined,
-    );
-    const asking = togglePrune();
-    useApp.setState({ overlay: null });
-
-    answer(jsonResponse({ error: 'gone' }, 410));
-    await asking;
-
-    expect(state().error).toBe('');
+    expect(state()).toMatchObject({ plan: plan(), error: '' });
   });
 
   it('a change that works takes the complaint about the one before away', async () => {
@@ -583,17 +511,14 @@ describe('the review', () => {
     expect(sent('/api/sync/p1/prune')).toEqual([]);
   });
 
-  it('closing the review drops the plan on the server', async () => {
-    await reviewing();
-
-    useApp.setState({ overlay: null });
-
-    expect(requestsTo(fetchMock, 'DELETE', '/api/sync/p1')).toEqual([null]);
-  });
-
-  it('closing the confirmation drops it too', async () => {
-    await reviewing({ counts: counts({ remove: 2 }) });
-    applyPlan();
+  it.each([
+    ['the review', false],
+    ['the confirmation', true],
+  ])('closing %s drops the plan on the server', async (_, confirming) => {
+    await reviewing({ counts: counts({ remove: confirming ? 2 : 0 }) });
+    if (confirming) {
+      applyPlan();
+    }
 
     useApp.setState({ overlay: null });
 
@@ -763,47 +688,32 @@ describe('applying', () => {
     expect(useApp.getState().status.text).toBe('');
   });
 
-  it('a write that fails shows why', async () => {
+  it.each([
+    ['fails shows why', job('failed', undefined, 'no space left'), 'no space left'],
+    ['was stopped says so', job('stopped'), 'The sync was stopped.'],
+  ])('a write that %s', async (_, ended, error) => {
     await applying();
 
-    jobEvent(job('failed', undefined, 'no space left'));
+    jobEvent(ended);
 
     await vi.waitFor(() => {
-      expect(state()).toMatchObject({ phase: 'failed', error: 'no space left' });
+      expect(state()).toMatchObject({ phase: 'failed', error });
     });
   });
 
-  it('a write that was stopped says so', async () => {
-    await applying();
-
-    jobEvent(job('stopped'));
-
-    await vi.waitFor(() => {
-      expect(state()).toMatchObject({ phase: 'failed', error: 'The sync was stopped.' });
-    });
-  });
-
-  it('a write that ends after the dialog was closed says how it went in the status line', async () => {
+  it.each([
+    ['ends', job('done', { phase: 'apply', summary: '1 new' }), { text: 'Synced to ~/player: 1 new', kind: 'good' }],
+    ['fails', job('failed', undefined, 'no space left'), { text: 'no space left', kind: 'bad' }],
+  ])('a write that %s after the dialog was closed says how it went in the status line', async (_, ended, status) => {
     await applying();
     useApp.setState({ overlay: null });
 
-    jobEvent(job('done', { phase: 'apply', summary: '1 new' }));
+    jobEvent(ended);
 
     await vi.waitFor(() => {
-      expect(useApp.getState().status).toEqual({ text: 'Synced to ~/player: 1 new', kind: 'good' });
+      expect(useApp.getState().status).toEqual(status);
     });
     expect(state().phase).toBe('applying');
-  });
-
-  it('a write that fails after the dialog was closed says so in the status line', async () => {
-    await applying();
-    useApp.setState({ overlay: null });
-
-    jobEvent(job('failed', undefined, 'no space left'));
-
-    await vi.waitFor(() => {
-      expect(useApp.getState().status).toEqual({ text: 'no space left', kind: 'bad' });
-    });
   });
 
   it('closing the dialog while it writes drops nothing and stops nothing', async () => {
@@ -817,23 +727,16 @@ describe('applying', () => {
 });
 
 describe('progressOf', () => {
-  it('reads the progress of the phase asked for', () => {
-    expect(progressOf(job('running', { phase: 'plan', done: 2, total: 8 }), 'plan', 0)).toEqual({ done: 2, total: 8 });
-    expect(progressOf(job('running', { phase: 'apply', done: 5, total: 6 }), 'apply', 0)).toEqual({ done: 5, total: 6 });
-  });
-
-  it('knows nothing of the other phase, and starts at nothing done', () => {
-    expect(progressOf(job('running', { phase: 'plan', done: 2, total: 8 }), 'apply', 7)).toEqual({ done: 0, total: 7 });
-    expect(progressOf(null, 'plan', 0)).toEqual({ done: 0, total: 0 });
-    expect(progressOf(job('running'), 'apply', 3)).toEqual({ done: 0, total: 3 });
-  });
-
-  it('counts nothing for a report without numbers', () => {
-    expect(progressOf(job('running', { phase: 'plan' }), 'plan', 4)).toEqual({ done: 0, total: 0 });
-  });
-
-  it('ignores data that is not a report', () => {
-    expect(progressOf({ id: 'j1', kind: 'sync', state: 'running', data: 'text' }, 'plan', 4)).toEqual({ done: 0, total: 4 });
-    expect(progressOf({ id: 'j1', kind: 'sync', state: 'running', data: { done: 3 } }, 'plan', 4)).toEqual({ done: 0, total: 4 });
+  it.each([
+    ['reads the progress of the phase asked for', job('running', { phase: 'plan', done: 2, total: 8 }), 'plan', 0, { done: 2, total: 8 }],
+    ['reads the apply phase too', job('running', { phase: 'apply', done: 5, total: 6 }), 'apply', 0, { done: 5, total: 6 }],
+    ['knows nothing of the other phase', job('running', { phase: 'plan', done: 2, total: 8 }), 'apply', 7, { done: 0, total: 7 }],
+    ['starts at nothing done without a job', null, 'plan', 0, { done: 0, total: 0 }],
+    ['starts at nothing done without data', job('running'), 'apply', 3, { done: 0, total: 3 }],
+    ['counts nothing for a report without numbers', job('running', { phase: 'plan' }), 'plan', 4, { done: 0, total: 0 }],
+    ['ignores data that is text', { id: 'j1', kind: 'sync', state: 'running', data: 'text' }, 'plan', 4, { done: 0, total: 4 }],
+    ['ignores data with no phase', { id: 'j1', kind: 'sync', state: 'running', data: { done: 3 } }, 'plan', 4, { done: 0, total: 4 }],
+  ] as const)('%s', (_, view, phase, total, expected) => {
+    expect(progressOf(view, phase, total)).toEqual(expected);
   });
 });

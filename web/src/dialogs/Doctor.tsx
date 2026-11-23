@@ -43,9 +43,7 @@ export function Doctor() {
           <div className="ask-body">esc cancels</div>
         </>
       )}
-      {phase === 'failed' && (
-        <Problem text={error} />
-      )}
+      {phase === 'failed' && <Problem text={error} />}
       {phase === 'done' && result !== null && result.problems.length === 0 && <div className="good">No problems found.</div>}
       {phase === 'done' && result !== null && result.problems.length > 0 && (
         <>

@@ -56,16 +56,6 @@ var inspectorTabs = []inspectorTab{
 	{"device", "Device", []fieldKind{fDevice}},
 }
 
-// trackFields is every field, tab by tab, in the order the cursor goes through
-// them.
-var trackFields = func() []fieldKind {
-	var all []fieldKind
-	for _, tab := range inspectorTabs {
-		all = append(all, tab.fields...)
-	}
-	return all
-}()
-
 // tabOf is the index of the tab that holds f.
 func tabOf(f fieldKind) int {
 	for i, tab := range inspectorTabs {
