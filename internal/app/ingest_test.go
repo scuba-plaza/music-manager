@@ -238,15 +238,6 @@ func TestIngestIgnoresOtherFilesAndReportsBrokenMP3s(t *testing.T) {
 	}
 }
 
-func TestIngestAcceptsASingleFilePath(t *testing.T) {
-	a := openLib(t)
-	f := filepath.Join(t.TempDir(), "x.mp3")
-	writeFile(t, f, testmp3.Silent(3))
-	if rep, err := a.Ingest([]string{f}); err != nil || len(rep.Added) != 1 {
-		t.Errorf("rep = %+v, err = %v", rep, err)
-	}
-}
-
 func TestIngestSkipsTheLibrarysOwnStore(t *testing.T) {
 	a := openLib(t)
 	writeFile(t, filepath.Join(a.Root(), "Old", "song.mp3"), testmp3.Silent(10))

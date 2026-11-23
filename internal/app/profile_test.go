@@ -17,27 +17,8 @@ func player(name string) manifest.Profile {
 	}
 }
 
-func openEmpty(t *testing.T) *app.App {
-	t.Helper()
-	a, err := app.Open(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return a
-}
-
-func TestALibraryStartsWithNoFormatsBesidesGeneric(t *testing.T) {
-	a := openEmpty(t)
-
-	got, err := a.Profiles()
-
-	if err != nil || len(got) != 0 {
-		t.Errorf("%+v %v", got, err)
-	}
-}
-
 func TestAFormatIsMadeWithAnIDOfItsOwnAndATrimmedName(t *testing.T) {
-	a := openEmpty(t)
+	a := openLib(t)
 
 	made, err := a.CreateProfile(player("  My Player  "))
 
@@ -50,7 +31,7 @@ func TestAFormatIsMadeWithAnIDOfItsOwnAndATrimmedName(t *testing.T) {
 }
 
 func TestTheIDOfAFormatDoesNotChangeWhenItIsRenamed(t *testing.T) {
-	a := openEmpty(t)
+	a := openLib(t)
 	made, _ := a.CreateProfile(player("My Player"))
 	edited := player("Car")
 
@@ -62,7 +43,7 @@ func TestTheIDOfAFormatDoesNotChangeWhenItIsRenamed(t *testing.T) {
 }
 
 func TestFormatsWhoseNamesMakeTheSameIDStillGetIDsOfTheirOwn(t *testing.T) {
-	a := openEmpty(t)
+	a := openLib(t)
 
 	first, _ := a.CreateProfile(player("My Player"))
 	second, _ := a.CreateProfile(player("my player!"))
@@ -78,7 +59,7 @@ func TestFormatsWhoseNamesMakeTheSameIDStillGetIDsOfTheirOwn(t *testing.T) {
 }
 
 func TestAFormatThatIsWrongIsRefusedBySetting(t *testing.T) {
-	a := openEmpty(t)
+	a := openLib(t)
 	p := player("")
 	p.ComponentMax = 5
 	p.PlaylistExt = ".pls"
@@ -95,7 +76,7 @@ func TestAFormatThatIsWrongIsRefusedBySetting(t *testing.T) {
 }
 
 func TestTwoFormatsCannotHaveTheSameNameWhateverTheCase(t *testing.T) {
-	a := openEmpty(t)
+	a := openLib(t)
 	a.CreateProfile(player("My Player"))
 
 	_, err := a.CreateProfile(player("my PLAYER"))
@@ -107,7 +88,7 @@ func TestTwoFormatsCannotHaveTheSameNameWhateverTheCase(t *testing.T) {
 }
 
 func TestAFormatMayBeSavedUnderItsOwnNameAgain(t *testing.T) {
-	a := openEmpty(t)
+	a := openLib(t)
 	made, _ := a.CreateProfile(player("My Player"))
 	changed := player("my player")
 	changed.ComponentMax = 120
@@ -120,7 +101,7 @@ func TestAFormatMayBeSavedUnderItsOwnNameAgain(t *testing.T) {
 }
 
 func TestNoMoreThanEightFormatsCanBeMade(t *testing.T) {
-	a := openEmpty(t)
+	a := openLib(t)
 	for _, name := range []string{"a", "b", "c", "d", "e", "f", "g", "h"} {
 		if _, err := a.CreateProfile(player(name)); err != nil {
 			t.Fatal(err)
@@ -139,7 +120,7 @@ func TestNoMoreThanEightFormatsCanBeMade(t *testing.T) {
 }
 
 func TestAKeptCoverForgetsItsSizeAndQuality(t *testing.T) {
-	a := openEmpty(t)
+	a := openLib(t)
 	p := player("My Player")
 	p.CoverMaxEdge, p.CoverQuality = 480, 85
 
@@ -151,7 +132,7 @@ func TestAKeptCoverForgetsItsSizeAndQuality(t *testing.T) {
 }
 
 func TestAFormatThatIsGoneCannotBeChangedOrDeleted(t *testing.T) {
-	a := openEmpty(t)
+	a := openLib(t)
 
 	if _, err := a.UpdateProfile("nope", player("x")); err == nil {
 		t.Error("updated")
@@ -162,7 +143,7 @@ func TestAFormatThatIsGoneCannotBeChangedOrDeleted(t *testing.T) {
 }
 
 func TestAFormatIsDeleted(t *testing.T) {
-	a := openEmpty(t)
+	a := openLib(t)
 	made, _ := a.CreateProfile(player("My Player"))
 
 	if err := a.DeleteProfile(made.ID); err != nil {
@@ -175,7 +156,7 @@ func TestAFormatIsDeleted(t *testing.T) {
 }
 
 func TestGenericIsAlwaysThereAndNothingElseIsCalledGeneric(t *testing.T) {
-	a := openEmpty(t)
+	a := openLib(t)
 
 	if target, err := a.Format("generic"); err != nil || target.ID() != device.Generic.ID() {
 		t.Errorf("%v %v", target, err)

@@ -142,13 +142,16 @@ func TestSortValueIsWhatTheListShowsBesideATrack(t *testing.T) {
 
 func init() { time.Local = time.UTC } // dates are shown in local time; the tests do not depend on where they run
 
+// Names are put in order by their Latin forms, the ones set by hand included,
+// so that a name in another script stands where it would be read.
 func TestAnArtistInAnotherScriptSortsWhereItsLatinFormWouldBe(t *testing.T) {
 	ts := []manifest.Track{
 		{ID: "z", Status: manifest.Identified, Artist: "Zed", Title: "t"},
 		{ID: "f", Status: manifest.Identified, Artist: "فيروز", Title: "t"}, // Firuz
-		{ID: "a", Status: manifest.Identified, Artist: "Abba", Title: "t"},
+		{ID: "b", Status: manifest.Identified, Artist: "Beta", Title: "t"},
+		{ID: "h", Status: manifest.Identified, Artist: "حليم", ArtistLatin: "Alpha", Title: "t"},
 	}
-	if got := ids(app.SortTracks(ts, app.SortArtist, false)); got != "afz" {
-		t.Errorf("by artist: %s, want afz", got)
+	if got := ids(app.SortTracks(ts, app.SortArtist, false)); got != "hbfz" {
+		t.Errorf("by artist: %s, want hbfz", got)
 	}
 }
