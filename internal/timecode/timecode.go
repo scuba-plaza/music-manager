@@ -11,34 +11,32 @@ import (
 // Parse reads [[h:]m:]s[.fraction]. Minutes and seconds must be below 60
 // when a larger unit is present.
 func Parse(s string) (time.Duration, error) {
-	orig := s
 	parts := strings.Split(strings.TrimSpace(s), ":")
 	if len(parts) > 3 {
-		return 0, fmt.Errorf("invalid time %q", orig)
+		return 0, fmt.Errorf("invalid time %q", s)
 	}
 	var total time.Duration
 	for i, p := range parts {
 		last := i == len(parts)-1
 		if p == "" || strings.HasSuffix(p, ".") || strings.ContainsAny(p, "+-eE") {
-			return 0, fmt.Errorf("invalid time %q", orig)
+			return 0, fmt.Errorf("invalid time %q", s)
 		}
-		var unit time.Duration
-		if last {
-			unit = time.Second
-		} else if i == len(parts)-2 {
-			unit = time.Minute
-		} else {
+		unit, name := time.Second, "seconds"
+		switch len(parts) - 1 - i {
+		case 1:
+			unit, name = time.Minute, "minutes"
+		case 2:
 			unit = time.Hour
 		}
 		if !last && strings.Contains(p, ".") {
-			return 0, fmt.Errorf("invalid time %q: only seconds may have a fraction", orig)
+			return 0, fmt.Errorf("invalid time %q: only seconds may have a fraction", s)
 		}
 		v, err := strconv.ParseFloat(p, 64)
-		if err != nil || v < 0 {
-			return 0, fmt.Errorf("invalid time %q", orig)
+		if err != nil {
+			return 0, fmt.Errorf("invalid time %q", s)
 		}
 		if i > 0 && v >= 60 {
-			return 0, fmt.Errorf("invalid time %q: %s must be below 60", orig, map[bool]string{true: "seconds", false: "minutes"}[last])
+			return 0, fmt.Errorf("invalid time %q: %s must be below 60", s, name)
 		}
 		total += time.Duration(v * float64(unit))
 	}
