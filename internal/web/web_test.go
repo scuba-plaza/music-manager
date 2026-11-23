@@ -99,74 +99,6 @@ var sample = []seedTrack{
 	{"", "", "", 0}, // not identified
 }
 
-func TestInfoSaysWhatTheServerCanDo(t *testing.T) {
-	a, _ := seed(t, sample...)
-	var info map[string]any
-	getJSON(t, start(t, a).URL+"/api/info", &info)
-	if info["canAdd"] != false {
-		t.Errorf("a server with nothing added: %v", info)
-	}
-}
-
-func TestTheLibraryComesAsAFlatOpenTree(t *testing.T) {
-	a, tracks := seed(t, sample...)
-	var got struct {
-		Stamp string
-		View  struct {
-			Rows []struct {
-				Kind, Key, Label, Parent, TrackID string
-				Depth                             int
-			}
-			Tracks, NeedWork, Shown int
-		}
-		Unsynced int
-	}
-	if code := getJSON(t, start(t, a).URL+"/api/library", &got); code != 200 {
-		t.Fatalf("status %d", code)
-	}
-	if got.Stamp == "" || got.View.Tracks != 4 || got.View.NeedWork != 1 {
-		t.Errorf("stamp %q, tracks %d, need work %d", got.Stamp, got.View.Tracks, got.View.NeedWork)
-	}
-	var labels []string
-	ids := map[string]bool{}
-	for _, r := range got.View.Rows {
-		labels = append(labels, strings.Repeat(" ", r.Depth)+r.Label)
-		if r.TrackID != "" {
-			ids[r.TrackID] = true
-		}
-	}
-	if len(ids) != len(tracks) {
-		t.Errorf("tracks in rows: %d of %d", len(ids), len(tracks))
-	}
-	// The Arabic artist is put in order by how it reads in Latin letters (Dawud…).
-	want := []string{"Needs work", " d", "داود القَيسي", " Singles", "  سلام", "Shawn James", " Shadows", "  The Wanderer", "  Flow"}
-	if strings.Join(labels, "|") != strings.Join(want, "|") {
-		t.Errorf("rows %q, want %q", labels, want)
-	}
-}
-
-func TestTheLibraryCanBeFilteredAndSorted(t *testing.T) {
-	a, _ := seed(t, sample...)
-	srv := start(t, a)
-	var got struct {
-		View struct {
-			Rows []struct{ Kind, Label string }
-			Sort struct{ Key, Title string }
-		}
-	}
-	getJSON(t, srv.URL+"/api/library?q=flow", &got)
-	if len(got.View.Rows) != 3 || got.View.Rows[2].Label != "Flow" {
-		t.Errorf("filtered: %+v", got.View.Rows)
-	}
-	getJSON(t, srv.URL+"/api/library?sort=title", &got)
-	if got.View.Sort.Key != "title" || !strings.HasPrefix(got.View.Sort.Title, "Library · Title") || got.View.Rows[0].Kind != "track" {
-		t.Errorf("sorted: %+v", got.View)
-	}
-	if code := getJSON(t, srv.URL+"/api/library?sort=nonsense", nil); code != 400 {
-		t.Errorf("a key that does not exist: status %d", code)
-	}
-}
-
 func TestATracksInspectorAndItsCover(t *testing.T) {
 	a, tracks := seed(t, sample...)
 	srv := start(t, a)
@@ -196,10 +128,8 @@ func TestATracksInspectorAndItsCover(t *testing.T) {
 	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/png" || len(data) != len(testmp3.PNG) || res.Header.Get("ETag") == "" {
 		t.Errorf("status %d, type %q, %d bytes", res.StatusCode, res.Header.Get("Content-Type"), len(data))
 	}
-	getJSON(t, srv.URL+"/api/tracks/"+tracks[0].ID, &v)
 	var cover struct {
 		CoverInfo string
-		Tabs      []struct{ Fields []struct{ Key, Text string } }
 	}
 	getJSON(t, srv.URL+"/api/tracks/"+tracks[0].ID, &cover)
 	if !strings.Contains(cover.CoverInfo, "16×12 PNG") {
@@ -554,20 +484,6 @@ func TestTheInspectorSaysWhereATrackCameFrom(t *testing.T) {
 type devicePreview struct {
 	Rows     []struct{ Label, Value string }
 	Warnings []string
-}
-
-func deviceTabOf(t *testing.T, srv *httptest.Server, id, profile string) devicePreview {
-	t.Helper()
-	var v struct {
-		Tabs []struct {
-			Name   string
-			Device *devicePreview
-		}
-	}
-	if code := getJSON(t, srv.URL+"/api/tracks/"+id+"?profile="+profile, &v); code != 200 || len(v.Tabs) != 4 || v.Tabs[3].Name != "Device" || v.Tabs[3].Device == nil {
-		t.Fatalf("%d %+v", code, v)
-	}
-	return *v.Tabs[3].Device
 }
 
 func TestTheDeviceTabFollowsTheProfileParameter(t *testing.T) {

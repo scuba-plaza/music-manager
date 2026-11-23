@@ -2,7 +2,6 @@ package web
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"net/http"
 	"testing"
@@ -13,11 +12,11 @@ import (
 	"music-manager/internal/web/webtest"
 )
 
-func draftWithCover(t *testing.T) (*app.App, string, string, browse.DraftView) {
+func draftWithCover(t *testing.T) (*app.App, string, browse.DraftView) {
 	t.Helper()
 	a, _ := seed(t, sample...)
 	srv := start(t, a, WithDownloader(&webtest.FakeDownloader{Audio: testmp3.Silent(700), Info: app.Info{Title: "A song", Artist: "Some Band", Source: app.FromMetadata}, Cover: testmp3.JPEG}))
-	return a, srv.URL, "", *fetched(t, srv, "https://example.org/watch?v=1").Draft
+	return a, srv.URL, *fetched(t, srv, "https://example.org/watch?v=1").Draft
 }
 
 func getBytes(t *testing.T, url string) (int, string, []byte) {
@@ -31,23 +30,18 @@ func getBytes(t *testing.T, url string) (int, string, []byte) {
 	return res.StatusCode, res.Header.Get("Content-Type"), data
 }
 
-func putBytes(t *testing.T, method, url string, body []byte) (int, map[string]string) {
+func sendCover(t *testing.T, method, base, draft string, picture []byte) (int, DraftCoverView) {
 	t.Helper()
-	req, _ := http.NewRequest(method, url, bytes.NewReader(body))
-	req.Header.Set("X-MM", "1")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
+	var out DraftCoverView
+	var body any
+	if picture != nil {
+		body = picture
 	}
-	defer res.Body.Close()
-	var out map[string]string
-	data, _ := io.ReadAll(res.Body)
-	_ = json.Unmarshal(data, &out)
-	return res.StatusCode, out
+	return sendInto(t, base, method, "/api/add/"+draft+"/cover", body, &out), out
 }
 
 func TestTheCoverYouTubeGaveIsOnTheDraftAndServedAsAPicture(t *testing.T) {
-	_, base, _, draft := draftWithCover(t)
+	_, base, draft := draftWithCover(t)
 
 	if draft.Cover == "" || draft.Note == "" {
 		t.Fatalf("%+v", draft)
@@ -59,23 +53,23 @@ func TestTheCoverYouTubeGaveIsOnTheDraftAndServedAsAPicture(t *testing.T) {
 }
 
 func TestTheCoverOfADraftIsReplacedAndTakenAway(t *testing.T) {
-	_, base, _, draft := draftWithCover(t)
+	_, base, draft := draftWithCover(t)
 
-	code, replaced := putBytes(t, "PUT", base+"/api/add/"+draft.Draft+"/cover", testmp3.PNG)
+	code, replaced := sendCover(t, "PUT", base, draft.Draft, testmp3.PNG)
 
-	if code != 200 || replaced["cover"] == "" || replaced["cover"] == draft.Cover {
+	if code != 200 || replaced.Cover == "" || replaced.Cover == draft.Cover {
 		t.Fatalf("%d %v", code, replaced)
 	}
 	if _, kind, data := getBytes(t, base+"/api/add/"+draft.Draft+"/cover"); kind != "image/png" || !bytes.Equal(data, testmp3.PNG) {
 		t.Errorf("%q %d bytes", kind, len(data))
 	}
-	if code, _ := putBytes(t, "PUT", base+"/api/add/"+draft.Draft+"/cover", []byte("not a picture")); code != http.StatusUnsupportedMediaType {
+	if code, _ := sendCover(t, "PUT", base, draft.Draft, []byte("not a picture")); code != http.StatusUnsupportedMediaType {
 		t.Errorf("a text cover: %d", code)
 	}
 
-	code, gone := putBytes(t, "DELETE", base+"/api/add/"+draft.Draft+"/cover", nil)
+	code, gone := sendCover(t, "DELETE", base, draft.Draft, nil)
 
-	if code != 200 || gone["cover"] != "" {
+	if code != 200 || gone.Cover != "" {
 		t.Errorf("%d %v", code, gone)
 	}
 	if code, _, _ := getBytes(t, base+"/api/add/"+draft.Draft+"/cover"); code != http.StatusNotFound {
@@ -84,22 +78,22 @@ func TestTheCoverOfADraftIsReplacedAndTakenAway(t *testing.T) {
 }
 
 func TestADraftThatIsGoneHasNoCoverToServeChangeOrTakeAway(t *testing.T) {
-	_, base, _, _ := draftWithCover(t)
+	_, base, _ := draftWithCover(t)
 
 	if code, _, _ := getBytes(t, base+"/api/add/nope/cover"); code != http.StatusNotFound {
 		t.Errorf("get %d", code)
 	}
-	if code, _ := putBytes(t, "PUT", base+"/api/add/nope/cover", testmp3.PNG); code != http.StatusNotFound {
+	if code, _ := sendCover(t, "PUT", base, "nope", testmp3.PNG); code != http.StatusNotFound {
 		t.Errorf("put %d", code)
 	}
-	if code, _ := putBytes(t, "DELETE", base+"/api/add/nope/cover", nil); code != http.StatusNotFound {
+	if code, _ := sendCover(t, "DELETE", base, "nope", nil); code != http.StatusNotFound {
 		t.Errorf("delete %d", code)
 	}
 }
 
 func TestTheTrackIsAddedWithTheCoverTheDraftHasThen(t *testing.T) {
-	a, base, _, draft := draftWithCover(t)
-	if code, _ := putBytes(t, "PUT", base+"/api/add/"+draft.Draft+"/cover", testmp3.PNG); code != 200 {
+	a, base, draft := draftWithCover(t)
+	if code, _ := sendCover(t, "PUT", base, draft.Draft, testmp3.PNG); code != 200 {
 		t.Fatal(code)
 	}
 	var r reply

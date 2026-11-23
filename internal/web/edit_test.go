@@ -112,6 +112,9 @@ func TestWhatCannotBeDoneIsA422WithTheReason(t *testing.T) {
 	if code != 422 || !strings.Contains(r.Error, "cannot be empty") {
 		t.Errorf("%d %+v", code, r)
 	}
+	if code, r := send(t, srv, "PATCH", "/api/tracks/"+ts[0].ID, obj{"field": "released", "text": "soon"}); code != 422 || r.Fields["released"] == "" {
+		t.Errorf("the field that is wrong is named: %d %+v", code, r)
+	}
 	if code, _ := send(t, srv, "PATCH", "/api/tracks/"+ts[0].ID, obj{"field": "title", "text": "x", "extra": 1}); code != 400 {
 		t.Errorf("a field nobody knows: %d", code)
 	}
@@ -129,17 +132,9 @@ func TestWhatCannotBeDoneIsA422WithTheReason(t *testing.T) {
 func TestThePathShownWhileTyping(t *testing.T) {
 	a, ts := seed(t, sample...)
 	srv := start(t, a)
-	req, _ := http.NewRequest("POST", srv.URL+"/api/tracks/"+ts[0].ID+"/path", strings.NewReader(`{"field":"title","text":"Wanderer II"}`))
-	req.Header.Set("X-MM", "1")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	var out struct{ Path string }
-	json.NewDecoder(res.Body).Decode(&out)
-	if res.StatusCode != 200 || out.Path != "Shawn James/Shadows/01 - Wanderer II.mp3" {
-		t.Errorf("%d %q", res.StatusCode, out.Path)
+	var out PathView
+	if code := sendInto(t, srv.URL, "POST", "/api/tracks/"+ts[0].ID+"/path", obj{"field": "title", "text": "Wanderer II"}, &out); code != 200 || out.Path != "Shawn James/Shadows/01 - Wanderer II.mp3" {
+		t.Errorf("%d %q", code, out.Path)
 	}
 	if code, _ := send(t, srv, "POST", "/api/tracks/nope/path", obj{"field": "title", "text": "x"}); code != 404 {
 		t.Errorf("a track that is not there: %d", code)
@@ -241,20 +236,8 @@ func TestGroupsBulkAndPlaylistsOverHTTP(t *testing.T) {
 	if code, r := send(t, srv, "PATCH", "/api/group", obj{"key": key, "field": "artist", "text": "S. James"}); code != 200 || r.Message != "Changed 2 tracks" || r.Moves[key] != "artist\x1fS. James" {
 		t.Fatalf("%d %+v", code, r)
 	}
-	var hint struct{ Hint string }
-	post := func(path string, body any, into any) int {
-		raw, _ := json.Marshal(body)
-		req, _ := http.NewRequest("POST", srv.URL+path, bytes.NewReader(raw))
-		req.Header.Set("X-MM", "1")
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer res.Body.Close()
-		json.NewDecoder(res.Body).Decode(into)
-		return res.StatusCode
-	}
-	if code := post("/api/group/hint", obj{"key": "artist\x1fS. James", "field": "artist", "text": "داود القَيسي"}, &hint); code != 200 || !strings.HasPrefix(hint.Hint, "joins the artist") {
+	var hint HintView
+	if code := sendInto(t, srv.URL, "POST", "/api/group/hint", obj{"key": "artist\x1fS. James", "field": "artist", "text": "داود القَيسي"}, &hint); code != 200 || !strings.HasPrefix(hint.Hint, "joins the artist") {
 		t.Errorf("%d %q", code, hint.Hint)
 	}
 
@@ -264,7 +247,7 @@ func TestGroupsBulkAndPlaylistsOverHTTP(t *testing.T) {
 		Summary string
 		Error   string
 	}
-	if code := post("/api/bulk/preview", obj{"ids": ids, "values": obj{"genre": "Folk"}}, &p); code != 200 || p.Changed != 2 || p.Summary != "Genre → Folk" {
+	if code := sendInto(t, srv.URL, "POST", "/api/bulk/preview", obj{"ids": ids, "values": obj{"genre": "Folk"}}, &p); code != 200 || p.Changed != 2 || p.Summary != "Genre → Folk" {
 		t.Errorf("%d %+v", code, p)
 	}
 	if code, r := send(t, srv, "POST", "/api/bulk", obj{"ids": ids, "values": obj{"genre": "Folk"}}); code != 200 || r.Message != "Changed 2 tracks" {
@@ -299,7 +282,7 @@ func TestCopyingPastingRemovingAndRenumberingOverHTTP(t *testing.T) {
 	if len(c) == 0 {
 		t.Errorf("nothing can be copied: %+v", c)
 	}
-	if code, _ := getStatus(srv.URL + "/api/tracks/nope/copyable"); code != 404 {
+	if code := getJSON(t, srv.URL+"/api/tracks/nope/copyable", nil); code != 404 {
 		t.Errorf("%d", code)
 	}
 	if code, r := send(t, srv, "POST", "/api/copy", obj{"id": ts[0].ID, "attrs": []string{"artist", "album"}}); code != 200 || r.History.Clip != "artist and album" {
@@ -323,15 +306,6 @@ func TestCopyingPastingRemovingAndRenumberingOverHTTP(t *testing.T) {
 	}
 }
 
-func getStatus(url string) (int, error) {
-	res, err := http.Get(url)
-	if err != nil {
-		return 0, err
-	}
-	res.Body.Close()
-	return res.StatusCode, nil
-}
-
 func TestAudioToHearACut(t *testing.T) {
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		t.Skip("no ffmpeg")
@@ -349,18 +323,18 @@ func TestAudioToHearACut(t *testing.T) {
 	if res.StatusCode != http.StatusPartialContent || len(body) != 100 || res.Header.Get("Content-Type") != "audio/mpeg" || res.Header.Get("Cache-Control") != "no-store" {
 		t.Errorf("%d %d bytes %v", res.StatusCode, len(body), res.Header)
 	}
-	if code, _ := getStatus(srv.URL + "/api/tracks/" + ts[0].ID + "/preview?field=fadeOut"); code != 200 {
+	if code := getJSON(t, srv.URL+"/api/tracks/"+ts[0].ID+"/preview?field=fadeOut", nil); code != 200 {
 		t.Errorf("a fade is heard by its field: %d", code)
 	}
-	if code, _ := getStatus(srv.URL + "/api/tracks/" + ts[0].ID + "/preview?field=title"); code != 400 {
+	if code := getJSON(t, srv.URL+"/api/tracks/"+ts[0].ID+"/preview?field=title", nil); code != 400 {
 		t.Errorf("a title is not heard: %d", code)
 	}
 	for _, bad := range []string{"?edge=middle", "?window=0", "?window=x", "?window=999999"} {
-		if code, _ := getStatus(srv.URL + "/api/tracks/" + ts[0].ID + "/preview" + bad); code != 400 {
+		if code := getJSON(t, srv.URL+"/api/tracks/"+ts[0].ID+"/preview"+bad, nil); code != 400 {
 			t.Errorf("%s: %d", bad, code)
 		}
 	}
-	if code, _ := getStatus(srv.URL + "/api/tracks/nope/preview"); code != 404 {
+	if code := getJSON(t, srv.URL+"/api/tracks/nope/preview", nil); code != 404 {
 		t.Errorf("a track that is not there: %d", code)
 	}
 }
