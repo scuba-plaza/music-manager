@@ -42,9 +42,6 @@ func CountOps(ops []render.Op) OpCounts {
 	return c
 }
 
-// Writes is how many files would be written.
-func (c OpCounts) Writes() int { return c.Create + c.Update }
-
 // Text says in words what the operations are.
 func (c OpCounts) Text() string {
 	var parts []string
@@ -55,7 +52,7 @@ func (c OpCounts) Text() string {
 		parts = append(parts, fmt.Sprintf("%d to update", c.Update))
 	}
 	if c.Stray > 0 {
-		parts = append(parts, plural(c.Stray, "stray file"))
+		parts = append(parts, Plural(c.Stray, "stray file"))
 	}
 	if c.Remove > 0 {
 		parts = append(parts, fmt.Sprintf("%d to delete", c.Remove))
@@ -79,7 +76,7 @@ func Summary(c OpCounts, collected int) string {
 		parts = append(parts, fmt.Sprintf("%d deleted", c.Remove))
 	}
 	if collected > 0 {
-		parts = append(parts, plural(collected, "unused file")+" cleared away")
+		parts = append(parts, Plural(collected, "unused file")+" cleared away")
 	}
 	if len(parts) == 0 {
 		return "Nothing needed doing."
@@ -153,10 +150,10 @@ func Targets(root string, mounts []string) []TargetView {
 	return out
 }
 
-// MountCandidates lists the folders directly inside the given roots, which is
+// mountCandidates lists the folders directly inside the given roots, which is
 // where removable drives are mounted. skip names a folder to leave out, such as
 // the user's own folder inside /media.
-func MountCandidates(roots []string, skip string) []string {
+func mountCandidates(roots []string, skip string) []string {
 	var found []string
 	for _, root := range roots {
 		entries, err := os.ReadDir(root)
@@ -180,7 +177,7 @@ func MountCandidates(roots []string, skip string) []string {
 // DetectMounts finds the drives mounted for the current user.
 func DetectMounts() []string {
 	user := os.Getenv("USER")
-	return MountCandidates([]string{"/run/media/" + user, "/media/" + user, "/media"}, user)
+	return mountCandidates([]string{"/run/media/" + user, "/media/" + user, "/media"}, user)
 }
 
 // CleanPath turns what was typed or pasted as a file name into a path: it

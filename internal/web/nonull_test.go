@@ -98,11 +98,33 @@ func nullFields(fields map[string]any, typ reflect.Type, path string) []string {
 	return out
 }
 
-func TestTheHelperFindsANullListByItsPath(t *testing.T) {
-	got := nullCollections(map[string]any{"view": map[string]any{"rows": []any{}, "playlists": nil}},
-		reflect.TypeFor[LibraryResponse](), "LibraryResponse")
-	if len(got) != 1 || got[0] != "LibraryResponse.view.playlists" {
-		t.Errorf("%v", got)
+func TestTheHelperFindsEveryNullCollectionByItsPath(t *testing.T) {
+	type inner struct {
+		Items []string `json:"items"`
+	}
+	type outer struct {
+		List []inner          `json:"list"`
+		Map  map[string]inner `json:"map"`
+	}
+	for _, c := range []struct {
+		name string
+		v    map[string]any
+		typ  reflect.Type
+		want []string
+	}{
+		{"a null list", map[string]any{"view": map[string]any{"rows": []any{}, "playlists": nil}}, reflect.TypeFor[LibraryResponse](), []string{"LibraryResponse.view.playlists"}},
+		{"empty lists", map[string]any{"view": map[string]any{"rows": []any{}, "playlists": []any{}}}, reflect.TypeFor[LibraryResponse](), nil},
+		{"an embedded struct", map[string]any{"message": "x", "moves": nil, "history": map[string]any{}}, reflect.TypeFor[ChangeResponse](), []string{"ChangeResponse.moves"}},
+		{"inside a list and a map", map[string]any{
+			"list": []any{map[string]any{"items": []any{}}, map[string]any{"items": nil}},
+			"map":  map[string]any{"k": map[string]any{"items": nil}},
+		}, reflect.TypeFor[outer](), []string{"outer.list[1].items", "outer.map[k].items"}},
+	} {
+		got := nullCollections(c.v, c.typ, c.typ.Name())
+		slices.Sort(got)
+		if !slices.Equal(got, c.want) {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
 	}
 }
 
@@ -181,52 +203,5 @@ func TestNoListInAnAnswerIsNull(t *testing.T) {
 		} {
 			check("GET", "/api/peek?key="+url.QueryEscape(key), nil, reflect.TypeFor[browse.PeekView]())
 		}
-	}
-}
-
-func TestNoListIsNullForALibraryWithoutPlaylists(t *testing.T) {
-	a, ts := seed(t, sample...)
-	srv := start(t, a)
-	check := func(path string, typ reflect.Type) {
-		noNullCollections(t, path, readRaw(t, srv.URL, "GET", path, nil), typ)
-	}
-	check("/api/library", reflect.TypeFor[LibraryResponse]())
-	check("/api/peek?key=needs", reflect.TypeFor[browse.PeekView]())
-	for _, tr := range ts {
-		check("/api/tracks/"+tr.ID+"?profile=wolfgang-wmp01", reflect.TypeFor[browse.TrackView]())
-	}
-}
-
-func TestTheHelperLooksIntoTheFieldsOfAnEmbeddedStruct(t *testing.T) {
-	got := nullCollections(map[string]any{"message": "x", "moves": nil, "history": map[string]any{}},
-		reflect.TypeFor[ChangeResponse](), "ChangeResponse")
-	if len(got) != 1 || got[0] != "ChangeResponse.moves" {
-		t.Errorf("%v", got)
-	}
-}
-
-func TestTheHelperFindsANullInsideAListAndInsideAMap(t *testing.T) {
-	type inner struct {
-		Items []string `json:"items"`
-	}
-	type outer struct {
-		List []inner          `json:"list"`
-		Map  map[string]inner `json:"map"`
-	}
-	got := nullCollections(map[string]any{
-		"list": []any{map[string]any{"items": []any{}}, map[string]any{"items": nil}},
-		"map":  map[string]any{"k": map[string]any{"items": nil}},
-	}, reflect.TypeFor[outer](), "outer")
-	slices.Sort(got)
-	want := []string{"outer.list[1].items", "outer.map[k].items"}
-	if !slices.Equal(got, want) {
-		t.Errorf("%v, want %v", got, want)
-	}
-}
-
-func TestTheHelperAcceptsEmptyCollections(t *testing.T) {
-	if got := nullCollections(map[string]any{"view": map[string]any{"rows": []any{}, "playlists": []any{}}},
-		reflect.TypeFor[LibraryResponse](), "LibraryResponse"); len(got) != 0 {
-		t.Errorf("%v", got)
 	}
 }

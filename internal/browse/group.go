@@ -3,9 +3,9 @@ package browse
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
-	"music-manager/internal/app"
 	"music-manager/internal/manifest"
 )
 
@@ -25,14 +25,7 @@ type group struct {
 // groupOf finds the group that the row with the given key stands for, among
 // all the tracks, not only those a filter keeps.
 func groupOf(s Snapshot, key string) (group, bool) {
-	var r Row
-	found := false
-	for _, row := range buildRows(s.Tracks, s.Playlists, "", func(string) bool { return true }) {
-		if row.Key == key {
-			r, found = row, true
-			break
-		}
-	}
+	r, found := rowWithKey(s, "", key)
 	if !found {
 		return group{}, false
 	}
@@ -157,7 +150,7 @@ func groupNote(g group) string {
 	if len(g.tracks) == 1 {
 		return "its only track · one undo step"
 	}
-	return "all " + plural(len(g.tracks), "track") + " · one undo step"
+	return "all " + Plural(len(g.tracks), "track") + " · one undo step"
 }
 
 // anyHas reports whether any of the tracks has the name that the Latin field f
@@ -202,11 +195,11 @@ func coverSummary(ts []manifest.Track) string {
 	case len(distinct) == 0:
 		return "none"
 	case len(distinct) == 1 && without == 0:
-		return "the same on all " + plural(len(ts), "track")
+		return "the same on all " + Plural(len(ts), "track")
 	case without == 0:
-		return plural(len(distinct), "cover") + " among the tracks"
+		return Plural(len(distinct), "cover") + " among the tracks"
 	}
-	return plural(len(distinct), "cover") + ", " + plural(without, "track") + " without one"
+	return Plural(len(distinct), "cover") + ", " + Plural(without, "track") + " without one"
 }
 
 // groupFieldViews describes the fields of a group for the pane.
@@ -290,9 +283,9 @@ func GroupHint(s Snapshot, key, field, text string) string {
 	case n == 0:
 		return ""
 	case f == fArtist:
-		return "joins the artist " + typed + " (" + plural(n, "track") + ")"
+		return "joins the artist " + typed + " (" + Plural(n, "track") + ")"
 	}
-	return "joins the album " + typed + " of " + g.artist + " (" + plural(n, "track") + ")"
+	return "joins the album " + typed + " of " + g.artist + " (" + Plural(n, "track") + ")"
 }
 
 // SetGroupField saves a field of an artist, an album or a playlist on all it
@@ -313,7 +306,7 @@ func (e *Editor) SetGroupField(key, field, text string) (Result, error) {
 	if !ok {
 		return Result{}, errors.New("that is not there any more")
 	}
-	if !contains(groupFields(g.kind), f) {
+	if !slices.Contains(groupFields(g.kind), f) {
 		return Result{}, fmt.Errorf("a %s has no field %q", groupNoun(g.kind), field)
 	}
 	if g.kind == kindPlaylist {
@@ -341,17 +334,11 @@ func (e *Editor) SetGroupField(key, field, text string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	edits := map[string]app.Edit{}
-	var ids []string
-	for _, t := range g.tracks {
-		if f.isLatin() && trueName(t, f) == "" {
-			continue // a form of nothing
-		}
-		if changes(t, edit) {
-			edits[t.ID] = edit
-			ids = append(ids, t.ID)
-		}
+	targets := g.tracks
+	if f.isLatin() { // a form of nothing is not set
+		targets = slices.DeleteFunc(slices.Clone(targets), func(t manifest.Track) bool { return trueName(t, f) == "" })
 	}
+	edits, ids := editsFor(targets, edit)
 	if len(edits) == 0 {
 		return Result{Same: true}, nil
 	}
@@ -362,7 +349,7 @@ func (e *Editor) SetGroupField(key, field, text string) (Result, error) {
 	case fAlbum:
 		moves = map[string]string{albumRowKey(g.artist, g.name): albumRowKey(g.artist, text)}
 	}
-	r, err := e.saveMany(s, "change of "+groupNoun(g.kind)+" "+whatOf(f), "Changed "+plural(len(ids), "track"), ids,
+	r, err := e.saveMany(s, "change of "+groupNoun(g.kind)+" "+whatOf(f), "Changed "+Plural(len(ids), "track"), ids,
 		func() (map[string]manifest.Track, error) { return e.lib.EditMany(edits) })
 	if err != nil {
 		return r, err
@@ -371,15 +358,6 @@ func (e *Editor) SetGroupField(key, field, text string) (Result, error) {
 	e.noteMoves(moves)
 	r.Reveal = "" // the cursor stays on the group, whatever it is called now
 	return r, nil
-}
-
-func contains(fs []fieldKind, f fieldKind) bool {
-	for _, x := range fs {
-		if x == f {
-			return true
-		}
-	}
-	return false
 }
 
 // whatOf names a field of a group in a change: "name", "Latin name", "genre".

@@ -160,11 +160,7 @@ func CopyChoices(s Snapshot, id string) ([]CopyChoice, bool) {
 func (e *Editor) Copy(id string, attrs []string) (Result, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	s, err := e.snapshot()
-	if err != nil {
-		return Result{}, err
-	}
-	t, err := track(s, id)
+	t, err := e.currentTrack(id)
 	if err != nil {
 		return Result{}, err
 	}
@@ -193,11 +189,7 @@ func (e *Editor) CopyField(id, field string) (Result, error) {
 	if !ok {
 		return Result{}, fmt.Errorf("there is no field %q", field)
 	}
-	s, err := e.snapshot()
-	if err != nil {
-		return Result{}, err
-	}
-	t, err := track(s, id)
+	t, err := e.currentTrack(id)
 	if err != nil {
 		return Result{}, err
 	}
@@ -221,6 +213,9 @@ func (e *Editor) copied(t manifest.Track, attrs []clipAttr) Result {
 	return Result{Message: "Copied " + e.clip.names() + " from " + title}
 }
 
+// ErrNothingToPasteOn is the answer to a paste with no track to paste on.
+var ErrNothingToPasteOn = errors.New("Select a track, an album or an artist to paste on")
+
 func haveOrHas(n int) string {
 	if n == 1 {
 		return "has"
@@ -241,22 +236,14 @@ func (e *Editor) Paste(ids []string) (Result, error) {
 	}
 	targets := s.tracksFor(ids)
 	if len(targets) == 0 {
-		return Result{}, errors.New("Select a track, an album or an artist to paste on")
+		return Result{}, ErrNothingToPasteOn
 	}
-	edit := e.clip.edit()
-	edits := map[string]app.Edit{}
-	var changed []string
-	for _, t := range targets {
-		if changes(t, edit) {
-			edits[t.ID] = edit
-			changed = append(changed, t.ID)
-		}
-	}
+	edits, changed := editsFor(targets, e.clip.edit())
 	if len(edits) == 0 {
-		return Result{Message: "Nothing to paste: " + plural(len(targets), "track") + " already " + haveOrHas(len(targets)) + " the " + e.clip.names(), Same: true}, nil
+		return Result{Message: "Nothing to paste: " + Plural(len(targets), "track") + " already " + haveOrHas(len(targets)) + " the " + e.clip.names(), Same: true}, nil
 	}
 	names := e.clip.names()
-	return e.saveMany(s, "paste of the "+names, "Pasted the "+names+" on "+plural(len(changed), "track")+" · u undoes it", changed,
+	return e.saveMany(s, "paste of the "+names, "Pasted the "+names+" on "+Plural(len(changed), "track")+" · u undoes it", changed,
 		func() (map[string]manifest.Track, error) { return e.lib.EditMany(edits) })
 }
 
@@ -273,9 +260,9 @@ func (e *Editor) PastePicture(ids []string, data []byte, name string) (Result, e
 	}
 	targets := s.tracksFor(ids)
 	if len(targets) == 0 {
-		return Result{}, errors.New("Select a track, an album or an artist to paste on")
+		return Result{}, ErrNothingToPasteOn
 	}
-	sha := fmt.Sprintf("%x", sha256sum(data))
+	sha := fmt.Sprintf("%x", sha256.Sum256(data))
 	var todo []string
 	for _, t := range targets {
 		if t.CoverSHA256 != sha {
@@ -283,14 +270,12 @@ func (e *Editor) PastePicture(ids []string, data []byte, name string) (Result, e
 		}
 	}
 	if len(todo) == 0 {
-		return Result{Message: "Nothing to paste: " + plural(len(targets), "track") + " already " + haveOrHas(len(targets)) + " this cover", Same: true}, nil
+		return Result{Message: "Nothing to paste: " + Plural(len(targets), "track") + " already " + haveOrHas(len(targets)) + " this cover", Same: true}, nil
 	}
 	from := "the clipboard"
 	if name != "" {
 		from = name
 	}
-	return e.saveMany(s, "paste of a cover", "Pasted the cover from "+from+" on "+plural(len(todo), "track")+" · u undoes it", todo,
+	return e.saveMany(s, "paste of a cover", "Pasted the cover from "+from+" on "+Plural(len(todo), "track")+" · u undoes it", todo,
 		func() (map[string]manifest.Track, error) { return e.lib.SetCoverMany(todo, data) })
 }
-
-func sha256sum(data []byte) [32]byte { return sha256.Sum256(data) }

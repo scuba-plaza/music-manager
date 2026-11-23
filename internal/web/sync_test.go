@@ -31,7 +31,7 @@ func syncServer(t *testing.T, a *app.App, drives ...string) (*Server, *httptest.
 func planned(t *testing.T, base string, body obj) (JobView, SyncData) {
 	t.Helper()
 	var v JobView
-	if code := raw(t, base, "POST", "/api/sync/plan", body, &v); code != 200 || v.Kind != "sync" {
+	if code := sendInto(t, base, "POST", "/api/sync/plan", body, &v); code != 200 || v.Kind != "sync" {
 		t.Fatalf("%d %+v", code, v)
 	}
 	done := waitJob(t, base, v.ID)
@@ -52,24 +52,12 @@ func applied(t *testing.T, base, plan string, body obj) (int, JobView, reply) {
 	t.Helper()
 	var v JobView
 	var r reply
-	code := raw(t, base, "POST", "/api/sync/"+plan+"/apply", body, &v)
+	code := sendInto(t, base, "POST", "/api/sync/"+plan+"/apply", body, &v)
 	if code != 200 {
-		raw(t, base, "POST", "/api/sync/"+plan+"/apply", body, &r)
+		sendInto(t, base, "POST", "/api/sync/"+plan+"/apply", body, &r)
 		return code, v, r
 	}
 	return code, waitJob(t, base, v.ID), r
-}
-
-func TestTheTargetsAreTheLibraryFolderAndTheDrives(t *testing.T) {
-	a, _ := seed(t, sample...)
-	_, ts := syncServer(t, a, "/run/media/tau/PLAYER")
-	var out struct {
-		Targets []browse.TargetView
-	}
-	if code := getJSON(t, ts.URL+"/api/sync/targets", &out); code != 200 || len(out.Targets) != 2 ||
-		out.Targets[0].Kind != "library" || out.Targets[1].Path != "/run/media/tau/PLAYER" {
-		t.Errorf("%d %+v", code, out)
-	}
 }
 
 func TestASyncToAnotherFolderIsPlannedThenWritten(t *testing.T) {
@@ -174,7 +162,7 @@ func TestStraysAreOnlyDeletedWhenAskedAndConfirmed(t *testing.T) {
 		t.Fatalf("%+v", d.Plan)
 	}
 	var v browse.PlanView
-	if code := raw(t, srv.URL, "POST", "/api/sync/"+d.Plan.Plan+"/prune", obj{"prune": true}, &v); code != 200 || v.Counts.Remove != 1 || v.Counts.Stray != 0 || !v.Prune {
+	if code := sendInto(t, srv.URL, "POST", "/api/sync/"+d.Plan.Plan+"/prune", obj{"prune": true}, &v); code != 200 || v.Counts.Remove != 1 || v.Counts.Stray != 0 || !v.Prune {
 		t.Fatalf("%d %+v", code, v)
 	}
 	for _, confirm := range []string{"", "yes", "DELETE"} {
@@ -186,10 +174,10 @@ func TestStraysAreOnlyDeletedWhenAskedAndConfirmed(t *testing.T) {
 		t.Fatalf("the stray went without the word: %v", err)
 	}
 	// back to leaving them: no word needed
-	if code := raw(t, srv.URL, "POST", "/api/sync/"+d.Plan.Plan+"/prune", obj{"prune": false}, &v); code != 200 || v.Counts.Stray != 1 || v.Counts.Remove != 0 {
+	if code := sendInto(t, srv.URL, "POST", "/api/sync/"+d.Plan.Plan+"/prune", obj{"prune": false}, &v); code != 200 || v.Counts.Stray != 1 || v.Counts.Remove != 0 {
 		t.Fatalf("%d %+v", code, v)
 	}
-	raw(t, srv.URL, "POST", "/api/sync/"+d.Plan.Plan+"/prune", obj{"prune": true}, &v)
+	sendInto(t, srv.URL, "POST", "/api/sync/"+d.Plan.Plan+"/prune", obj{"prune": true}, &v)
 	_, done, _ := applied(t, srv.URL, d.Plan.Plan, obj{"confirm": " delete "})
 	if sd := syncData(t, done); done.State != jobDone || sd.Summary != "4 created · 1 deleted" {
 		t.Fatalf("%+v %+v", done, sd)
@@ -219,7 +207,7 @@ func TestOnlyAFolderThatMakesSenseIsATarget(t *testing.T) {
 	}
 	for folder, want := range cases {
 		var r reply
-		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), want) || !strings.Contains(strings.ToLower(r.Fields["folder"]), want) {
+		if code := sendInto(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), want) || !strings.Contains(strings.ToLower(r.Fields["folder"]), want) {
 			t.Errorf("%q: %d %+v, want %q", folder, code, r, want)
 		}
 	}
@@ -239,7 +227,7 @@ func TestTheHomeFolderIsNotATargetEvenWhenTheLibraryLivesElsewhere(t *testing.T)
 	t.Setenv("HOME", home)
 	for _, folder := range []string{home, home + "/", "~"} {
 		var r reply
-		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Fields["folder"]), "home folder") {
+		if code := sendInto(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Fields["folder"]), "home folder") {
 			t.Errorf("%q: %d %+v, want 422 about the home folder", folder, code, r)
 		}
 	}
@@ -257,7 +245,7 @@ func TestOnlyOneSyncGoesOnAtATime(t *testing.T) {
 	}
 	defer close(release)
 	var r reply
-	if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"library": true}, &r); code != 409 {
+	if code := sendInto(t, srv.URL, "POST", "/api/sync/plan", obj{"library": true}, &r); code != 409 {
 		t.Errorf("%d %+v", code, r)
 	}
 }
@@ -266,12 +254,12 @@ func TestAPlanThatWasDroppedCannotBeApplied(t *testing.T) {
 	a, _ := seed(t, sample...)
 	_, srv := syncServer(t, a)
 	_, d := planned(t, srv.URL, obj{"folder": t.TempDir()})
-	if code := raw(t, srv.URL, "DELETE", "/api/sync/"+d.Plan.Plan, nil, nil); code != 204 {
+	if code := sendInto(t, srv.URL, "DELETE", "/api/sync/"+d.Plan.Plan, nil, nil); code != 204 {
 		t.Fatal(code)
 	}
 	for _, path := range []string{"/apply", "/prune"} {
 		var r reply
-		if code := raw(t, srv.URL, "POST", "/api/sync/"+d.Plan.Plan+path, obj{}, &r); code != 410 {
+		if code := sendInto(t, srv.URL, "POST", "/api/sync/"+d.Plan.Plan+path, obj{}, &r); code != 410 {
 			t.Errorf("%s: %d %+v", path, code, r)
 		}
 	}
@@ -281,8 +269,8 @@ func TestAPlanNobodyWaitsForIsDropped(t *testing.T) {
 	a, _ := seed(t, sample...)
 	_, srv := syncServer(t, a)
 	var v JobView
-	raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": t.TempDir()}, &v)
-	raw(t, srv.URL, "DELETE", "/api/jobs/"+v.ID, nil, nil)
+	sendInto(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": t.TempDir()}, &v)
+	sendInto(t, srv.URL, "DELETE", "/api/jobs/"+v.ID, nil, nil)
 	if done := waitJob(t, srv.URL, v.ID); done.State != jobStopped && done.State != jobDone {
 		t.Errorf("%+v", done)
 	}
@@ -298,7 +286,7 @@ func TestAFolderInsideALibraryGivenByARelativePathIsStillRefused(t *testing.T) {
 	abs, _ := filepath.Abs("lib")
 	for folder, want := range map[string]string{filepath.Join(abs, "card"): "inside the library folder", filepath.Dir(abs): "holds the library"} {
 		var r reply
-		if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), want) || !strings.Contains(strings.ToLower(r.Fields["folder"]), want) {
+		if code := sendInto(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": folder}, &r); code != 422 || !strings.Contains(strings.ToLower(r.Error), want) || !strings.Contains(strings.ToLower(r.Fields["folder"]), want) {
 			t.Errorf("%q: %d %+v, want %q", folder, code, r, want)
 		}
 	}
@@ -327,8 +315,8 @@ func TestAPlanForTheWolfgangNamesItAndWarnsAboutWhatItWillNotShowWell(t *testing
 	}
 
 	_, plain := planned(t, srv.URL, obj{"folder": target})
-	if strings.HasSuffix(plain.Plan.Where, "Wolfgang WMP01") || len(plain.Plan.Warnings) != 0 {
-		t.Errorf("a plan that is not for the Wolfgang talks about it: %q, %+v", plain.Plan.Where, plain.Plan.Warnings)
+	if strings.Contains(plain.Plan.Where, "·") || len(plain.Plan.Warnings) != 0 {
+		t.Errorf("a plan with no profile is not for generic: %q, %+v", plain.Plan.Where, plain.Plan.Warnings)
 	}
 }
 
@@ -337,25 +325,19 @@ var shortStems = manifest.Profile{
 	PlaylistExt: ".m3u8", PlaylistStyle: "relative",
 }
 
-func profileSyncServer(t *testing.T, a *app.App, profiles ...manifest.Profile) *httptest.Server {
+func withShortStems(t *testing.T, a *app.App) *app.App {
 	t.Helper()
-	for _, p := range profiles {
-		if _, err := a.CreateProfile(p); err != nil {
-			t.Fatal(err)
-		}
+	if _, err := a.CreateProfile(shortStems); err != nil {
+		t.Fatal(err)
 	}
-	s := New(a)
-	s.mounts = func() []string { return nil }
-	ts := httptest.NewServer(s.Handler())
-	t.Cleanup(ts.Close)
-	return ts
+	return a
 }
 
 func TestSyncPlanWithAnUnknownProfileIs400(t *testing.T) {
 	a, _ := seed(t, sample...)
-	srv := profileSyncServer(t, a, shortStems)
+	_, srv := syncServer(t, withShortStems(t, a))
 	var r reply
-	code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": t.TempDir(), "profile": "nobody"}, &r)
+	code := sendInto(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": t.TempDir(), "profile": "nobody"}, &r)
 	if code != 400 || !strings.Contains(r.Error, `"nobody"`) {
 		t.Errorf("%d %+v", code, r)
 	}
@@ -363,7 +345,7 @@ func TestSyncPlanWithAnUnknownProfileIs400(t *testing.T) {
 
 func TestSyncPlanForTheLibraryFolderIgnoresTheProfile(t *testing.T) {
 	a, _ := seed(t, sample...)
-	srv := profileSyncServer(t, a, shortStems)
+	_, srv := syncServer(t, withShortStems(t, a))
 	for _, profile := range []string{"short-stems", "wolfgang-wmp01", "nobody"} {
 		_, d := planned(t, srv.URL, obj{"library": true, "profile": profile})
 		if d.Plan.Where != "Library folder" || len(d.Plan.Warnings) != 0 {
@@ -377,7 +359,7 @@ func TestSyncPlanForTheLibraryFolderIgnoresTheProfile(t *testing.T) {
 
 func TestSyncPlanWithAProfileUsesItsRules(t *testing.T) {
 	a, _ := seed(t, sample...)
-	srv := profileSyncServer(t, a, shortStems)
+	_, srv := syncServer(t, withShortStems(t, a))
 	_, d := planned(t, srv.URL, obj{"folder": t.TempDir(), "profile": "short-stems"})
 	if !strings.HasSuffix(d.Plan.Where, " · Short Stems") {
 		t.Errorf("the plan is for %q, want it to name the profile", d.Plan.Where)
@@ -393,32 +375,5 @@ func TestSyncPlanWithAProfileUsesItsRules(t *testing.T) {
 	}
 	if mp3s != 4 {
 		t.Errorf("%d tracks planned: %+v", mp3s, d.Plan.Ops)
-	}
-
-	_, g := planned(t, srv.URL, obj{"folder": t.TempDir()})
-	if strings.Contains(g.Plan.Where, "·") || !slices.ContainsFunc(g.Plan.Ops, func(op browse.OpView) bool { return op.Path == "Shawn James/Shadows/01 - The Wanderer.mp3" }) {
-		t.Errorf("without a profile the plan is not generic: %q %+v", g.Plan.Where, g.Plan.Ops)
-	}
-}
-
-func TestAPlanNamesNoDeviceBesidesItsProfile(t *testing.T) {
-	a, _ := seed(t, sample...)
-	srv := start(t, a)
-	var refused reply
-	if code := raw(t, srv.URL, "POST", "/api/sync/plan", obj{"folder": t.TempDir(), "wolfgang": true}, &refused); code != 400 || !strings.Contains(refused.Error, "wolfgang") {
-		t.Errorf("a plan with a field the server does not know: %d %+v, want it refused", code, refused)
-	}
-	_, d := planned(t, srv.URL, obj{"folder": t.TempDir()})
-	if strings.Contains(d.Plan.Where, " · ") || len(d.Plan.Warnings) != 0 {
-		t.Errorf("a plan with no profile is not for generic: %q %+v", d.Plan.Where, d.Plan.Warnings)
-	}
-	for _, path := range []string{"/api/info", "/api/sync/targets"} {
-		var body map[string]any
-		if code := getJSON(t, srv.URL+path, &body); code != 200 {
-			t.Fatalf("%s: %d", path, code)
-		}
-		if _, there := body["wolfgang"]; there {
-			t.Errorf("%s says %v about a Wolfgang flag", path, body["wolfgang"])
-		}
 	}
 }

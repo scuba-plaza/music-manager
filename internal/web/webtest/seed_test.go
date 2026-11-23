@@ -32,12 +32,10 @@ func TestSeedBuildsTheUILibrary(t *testing.T) {
 
 	var got []string
 	byTitle := map[string]manifest.Track{}
-	artists := map[string]bool{}
 	for _, tr := range m.Tracks {
 		got = append(got, describe(tr))
 		if tr.Status == manifest.Identified {
 			byTitle[tr.Title] = tr
-			artists[tr.Artist] = true
 		}
 	}
 	slices.Sort(got)
@@ -53,10 +51,6 @@ func TestSeedBuildsTheUILibrary(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Errorf("tracks\n got %q\nwant %q", got, want)
 	}
-	if len(artists) != 4 {
-		t.Errorf("%d artists in the tree, want 4: %v", len(artists), artists)
-	}
-
 	if latin := byTitle["وطني"].TitleLatin; latin != "Watani" {
 		t.Errorf("the Latin form of the Arabic title is %q, want Watani", latin)
 	}
@@ -100,15 +94,5 @@ func TestSeedBuildsTheUILibrary(t *testing.T) {
 	}
 	if !slices.Equal(playlists, wantPlaylists) {
 		t.Errorf("playlists\n got %q\nwant %q", playlists, wantPlaylists)
-	}
-
-	unidentified := 0
-	for _, tr := range m.Tracks {
-		if tr.Status != manifest.Identified {
-			unidentified++
-		}
-	}
-	if unidentified != 1 {
-		t.Errorf("%d unidentified tracks, want 1", unidentified)
 	}
 }

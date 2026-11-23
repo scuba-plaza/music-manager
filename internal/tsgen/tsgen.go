@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"regexp"
 	"slices"
@@ -63,14 +64,9 @@ func Generate(roots ...any) (string, error) {
 		}
 		g.decls[t.Name()] = decl
 	}
-	names := make([]string, 0, len(g.decls))
-	for name := range g.decls {
-		names = append(names, name)
-	}
-	slices.Sort(names)
 	var b strings.Builder
 	b.WriteString(header)
-	for _, name := range names {
+	for _, name := range slices.Sorted(maps.Keys(g.decls)) {
 		b.WriteString("\n")
 		b.WriteString(g.decls[name])
 	}

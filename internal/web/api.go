@@ -123,7 +123,12 @@ func (s *Server) cover(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, errNotFound)
 		return
 	}
-	data, err := os.ReadFile(s.app.CoverPath(t.CoverSHA256))
+	s.serveCover(w, r, t.CoverSHA256, "private, max-age=31536000")
+}
+
+// serveCover answers with the stored cover of the given hash.
+func (s *Server) serveCover(w http.ResponseWriter, r *http.Request, sha, cache string) {
+	data, err := os.ReadFile(s.app.CoverPath(sha))
 	if err != nil {
 		fail(w, http.StatusNotFound, errNotFound)
 		return
@@ -134,8 +139,8 @@ func (s *Server) cover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", kind)
-	w.Header().Set("ETag", `"`+t.CoverSHA256+`"`)
-	w.Header().Set("Cache-Control", "private, max-age=31536000")
+	w.Header().Set("ETag", `"`+sha+`"`)
+	w.Header().Set("Cache-Control", cache)
 	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
 }
 

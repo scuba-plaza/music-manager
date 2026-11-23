@@ -11,8 +11,8 @@ import (
 )
 
 // The tree on the left of the screen is derived data: it is rebuilt from the
-// records whenever they, the filter or the open/closed state change. It has
-// no state of its own, which is what makes it easy to test.
+// records whenever they or the filter change. It has no state of its own,
+// which is what makes it easy to test.
 
 type rowKind int
 
@@ -51,36 +51,31 @@ type Row struct {
 	Key    string // identifies the row across rebuilds
 	Parent string // the key of the row above it in the tree, or ""
 
-	Label  string   // the artist, album or title
-	Artist string   // on an artist or an album: the artist
-	Album  string   // on an album: its name; empty on the singles of an artist
-	Detail string   // secondary text, e.g. the artist of a track nobody has identified
-	Num    string   // a track's number, padded to its album's width, or ""
-	Right  string   // shown at the right of a track in place of its length, or ""
-	Count  int      // how many tracks are beneath a group, artist or album
-	IDs    []string // which tracks, in the order they are listed
-
-	Expanded bool
-	Track    manifest.Track // for track rows
+	Label  string         // the artist, album or title
+	Artist string         // on an artist or an album: the artist
+	Album  string         // on an album: its name; empty on the singles of an artist
+	Detail string         // secondary text, e.g. the artist of a track nobody has identified
+	Num    string         // a track's number, padded to its album's width, or ""
+	Right  string         // shown at the right of a track in place of its length, or ""
+	Count  int            // how many tracks are beneath a group, artist or album
+	IDs    []string       // which tracks, in the order they are listed
+	Track  manifest.Track // for track rows
 }
 
-// buildRows lays out the visible rows: the playlists, which form a group
-// of their own, ahead of the artists. A non-blank filter (same syntax as "mm
-// ls") keeps only the matching tracks, in the playlists too, and the playlists
-// that still have any, and opens everything they sit under; otherwise only the
-// rows for which isOpen says so are open.
-func buildRows(tracks []manifest.Track, playlists []manifest.Playlist, filter string, isOpen func(key string) bool) []Row {
-	filtering := strings.TrimSpace(filter) != ""
+// buildRows lays out every row: the playlists, which form a group of their
+// own, ahead of the artists. A non-blank filter (same syntax as "mm ls") keeps
+// only the matching tracks, in the playlists too, and the playlists that
+// still have any.
+func buildRows(tracks []manifest.Track, playlists []manifest.Playlist, filter string) []Row {
 	all := tracks
 	var matched map[string]bool
-	if filtering {
+	if strings.TrimSpace(filter) != "" {
 		tracks = (&manifest.Manifest{Tracks: tracks}).Search(filter)
 		matched = map[string]bool{}
 		for _, t := range tracks {
 			matched[t.ID] = true
 		}
 	}
-	open := func(key string) bool { return filtering || isOpen(key) }
 
 	var needs []manifest.Track
 	byArtist := map[string][]manifest.Track{}
@@ -92,21 +87,18 @@ func buildRows(tracks []manifest.Track, playlists []manifest.Playlist, filter st
 		byArtist[t.Artist] = append(byArtist[t.Artist], t)
 	}
 
-	rows := playlistRows(all, playlists, matched, open)
+	rows := playlistRows(all, playlists, matched)
 	if len(needs) > 0 {
-		needsOpen := open(keyNeedsWork)
 		sort.SliceStable(needs, func(i, j int) bool {
 			return translit.SortKey(needsLabel(needs[i])) < translit.SortKey(needsLabel(needs[j]))
 		})
-		rows = append(rows, Row{Kind: kindGroup, Key: keyNeedsWork, Label: "Needs work", Count: len(needs), IDs: idsOf(needs), Expanded: needsOpen})
-		if needsOpen {
-			for _, t := range needs {
-				artist, _, _ := app.Display(t)
-				rows = append(rows, Row{
-					Kind: kindTrack, Depth: 1, Key: trackKey(t.ID), Parent: keyNeedsWork,
-					Label: needsLabel(t), Detail: artist, Track: t,
-				})
-			}
+		rows = append(rows, Row{Kind: kindGroup, Key: keyNeedsWork, Label: "Needs work", Count: len(needs), IDs: idsOf(needs)})
+		for _, t := range needs {
+			artist, _, _ := app.Display(t)
+			rows = append(rows, Row{
+				Kind: kindTrack, Depth: 1, Key: trackKey(t.ID), Parent: keyNeedsWork,
+				Label: needsLabel(t), Detail: artist, Track: t,
+			})
 		}
 	}
 
@@ -114,7 +106,6 @@ func buildRows(tracks []manifest.Track, playlists []manifest.Playlist, filter st
 	for _, artist := range sortedNames(byArtist, artistForms) {
 		ts := byArtist[artist]
 		akey := artistKey(artist)
-		artistOpen := open(akey)
 
 		byAlbum := map[string][]manifest.Track{}
 		for _, t := range ts {
@@ -126,22 +117,14 @@ func buildRows(tracks []manifest.Track, playlists []manifest.Playlist, filter st
 			sortTracks(byAlbum[album])
 			ids = append(ids, idsOf(byAlbum[album])...)
 		}
-		rows = append(rows, Row{Kind: kindArtist, Key: akey, Label: artist, Artist: artist, Count: len(ts), IDs: ids, Expanded: artistOpen})
-		if !artistOpen {
-			continue
-		}
-
+		rows = append(rows, Row{Kind: kindArtist, Key: akey, Label: artist, Artist: artist, Count: len(ts), IDs: ids})
 		for _, album := range albums {
 			at := byAlbum[album]
 			bkey, label := albumRowKey(artist, album), album
 			if album == "" {
 				bkey, label = singlesKey(artist), "Singles"
 			}
-			albumOpen := open(bkey)
-			rows = append(rows, Row{Kind: kindAlbum, Depth: 1, Key: bkey, Parent: akey, Label: label, Artist: artist, Album: album, Count: len(at), IDs: idsOf(at), Expanded: albumOpen})
-			if !albumOpen {
-				continue
-			}
+			rows = append(rows, Row{Kind: kindAlbum, Depth: 1, Key: bkey, Parent: akey, Label: label, Artist: artist, Album: album, Count: len(at), IDs: idsOf(at)})
 			width := numberWidth(at)
 			for _, t := range at {
 				num := ""
@@ -153,6 +136,22 @@ func buildRows(tracks []manifest.Track, playlists []manifest.Playlist, filter st
 		}
 	}
 	return rows
+}
+
+// rowWithKey finds the row with the given key in the tree laid out for filter.
+func rowWithKey(s Snapshot, filter, key string) (Row, bool) {
+	for _, r := range buildRows(s.Tracks, s.Playlists, filter) {
+		if r.Key == key {
+			return r, true
+		}
+	}
+	return Row{}, false
+}
+
+// editableAsGroup reports whether the fields of the row can be edited for
+// all it holds: an artist, an album that is not the singles, or a playlist.
+func editableAsGroup(r Row) bool {
+	return r.Kind == kindPlaylist || r.Kind == kindArtist || (r.Kind == kindAlbum && r.Album != "")
 }
 
 // needsLabel is how a track that is not identified is named: by what the
@@ -250,7 +249,7 @@ func padNumber(n, width int) string {
 	return strings.Repeat("0", max(width-len(s), 0)) + s
 }
 
-// ancestorKeys lists the rows that must be open for t to be visible.
+// ancestorKeys lists the rows above t in the tree, which must be open for it to be seen.
 func ancestorKeys(t manifest.Track) []string {
 	if t.Status != manifest.Identified {
 		return []string{keyNeedsWork}
@@ -261,10 +260,10 @@ func ancestorKeys(t manifest.Track) []string {
 	return []string{artistKey(t.Artist), albumRowKey(t.Artist, t.Album)}
 }
 
-// playlistRows is the group of playlists with those open shown in full. When
-// matched is not nil, only those tracks are shown, and only the playlists
-// that have some.
-func playlistRows(tracks []manifest.Track, playlists []manifest.Playlist, matched map[string]bool, open func(string) bool) []Row {
+// playlistRows is the group of playlists, each with its tracks. When matched
+// is not nil, only those tracks are shown, and only the playlists that have
+// some.
+func playlistRows(tracks []manifest.Track, playlists []manifest.Playlist, matched map[string]bool) []Row {
 	byID := make(map[string]manifest.Track, len(tracks))
 	for _, t := range tracks {
 		byID[t.ID] = t
@@ -295,18 +294,10 @@ func playlistRows(tracks []manifest.Track, playlists []manifest.Playlist, matche
 		return nil
 	}
 
-	groupOpen := open(playlistsKey)
-	rows := []Row{{Kind: kindGroup, Key: playlistsKey, Label: "Playlists", Count: len(pls), IDs: groupIDs, Expanded: groupOpen}}
-	if !groupOpen {
-		return rows
-	}
+	rows := []Row{{Kind: kindGroup, Key: playlistsKey, Label: "Playlists", Count: len(pls), IDs: groupIDs}}
 	for _, p := range pls {
 		pkey := playlistRowKey(p.name)
-		plOpen := open(pkey)
-		rows = append(rows, Row{Kind: kindPlaylist, Depth: 1, Key: pkey, Parent: playlistsKey, Label: p.name, Count: len(p.ts), IDs: idsOf(p.ts), Expanded: plOpen})
-		if !plOpen {
-			continue
-		}
+		rows = append(rows, Row{Kind: kindPlaylist, Depth: 1, Key: pkey, Parent: playlistsKey, Label: p.name, Count: len(p.ts), IDs: idsOf(p.ts)})
 		width := max(2, len(strconv.Itoa(len(p.ts))))
 		for i, t := range p.ts {
 			artist, _, _ := app.Display(t)
