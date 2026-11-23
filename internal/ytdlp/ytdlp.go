@@ -26,31 +26,18 @@ func New() *Downloader { return &Downloader{Bin: "yt-dlp"} }
 
 // Download fetches the audio of url as <dir>/<video id>.mp3.
 func (d *Downloader) Download(ctx context.Context, url, dir string) (app.Downloaded, error) {
-	bin, err := exec.LookPath(d.Bin)
-	if err != nil {
-		return app.Downloaded{}, fmt.Errorf("%s not found in PATH: install it to download music", d.Bin)
-	}
-	cmd := exec.CommandContext(ctx, bin,
+	stdout, err := d.run(ctx,
 		"--no-playlist", "-q", "--no-warnings",
 		"-x", "--audio-format", "mp3", "--audio-quality", "0",
 		"--write-thumbnail", "--convert-thumbnails", "jpg",
 		"--print-json",
 		"-o", filepath.Join(dir, "%(id)s.%(ext)s"),
 		"--", url)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	cmd.WaitDelay = 2 * time.Second // a killed run may leave children holding the pipes
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() != nil {
-			return app.Downloaded{}, ctx.Err()
-		}
-		if msg := lastLine(stderr.String()); msg != "" {
-			return app.Downloaded{}, fmt.Errorf("%s: %s", d.Bin, msg)
-		}
-		return app.Downloaded{}, fmt.Errorf("%s: %w", d.Bin, err)
+	if err != nil {
+		return app.Downloaded{}, err
 	}
 
-	id, info, err := parseInfo(stdout.Bytes())
+	id, info, err := parseInfo(stdout)
 	if err != nil {
 		return app.Downloaded{}, err
 	}
@@ -60,6 +47,27 @@ func (d *Downloader) Download(ctx context.Context, url, dir string) (app.Downloa
 	}
 	cover, _ := os.ReadFile(filepath.Join(dir, id+".jpg"))
 	return app.Downloaded{Path: path, Info: info, Cover: cover}, nil
+}
+
+func (d *Downloader) run(ctx context.Context, args ...string) ([]byte, error) {
+	bin, err := exec.LookPath(d.Bin)
+	if err != nil {
+		return nil, fmt.Errorf("%s not found in PATH: install it to download music", d.Bin)
+	}
+	cmd := exec.CommandContext(ctx, bin, args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	cmd.WaitDelay = 2 * time.Second // a killed run may leave children holding the pipes
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if msg := lastLine(stderr.String()); msg != "" {
+			return nil, fmt.Errorf("%s: %s", d.Bin, msg)
+		}
+		return nil, fmt.Errorf("%s: %w", d.Bin, err)
+	}
+	return stdout.Bytes(), nil
 }
 
 type rawInfo struct {
@@ -116,8 +124,4 @@ func released(date string, year float64) string {
 		}
 	}
 	return ""
-}
-
-func (d *Downloader) List(ctx context.Context, url, dir string, limit int) (app.Listing, error) {
-	return app.Listing{}, errors.New("listing a playlist is not implemented yet")
 }
