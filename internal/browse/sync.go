@@ -111,9 +111,8 @@ type PlanView struct {
 // warnings are about.
 func Plan(s Snapshot, id, where string, prune bool, ops []render.Op, warnings []device.Warning) PlanView {
 	v := PlanView{Plan: id, Where: where, Prune: prune, Ops: []OpView{}, Warnings: []WarningView{}}
-	kinds := map[render.Kind]string{render.Create: "create", render.Update: "update", render.Remove: "remove", render.Stray: "stray"}
 	for _, op := range ops {
-		v.Ops = append(v.Ops, OpView{Kind: kinds[op.Kind], Path: op.Path})
+		v.Ops = append(v.Ops, OpView{Kind: op.Kind.String(), Path: op.Path})
 	}
 	v.Counts = CountOps(ops)
 	v.Text = v.Counts.Text()
