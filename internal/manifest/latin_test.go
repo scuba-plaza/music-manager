@@ -1,7 +1,6 @@
 package manifest_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"music-manager/internal/manifest"
@@ -42,35 +41,5 @@ func TestPlaylistsHaveALatinNameToo(t *testing.T) {
 	p.NameLatin = "Study"
 	if got := p.LatinName(); got != "Study" {
 		t.Errorf("set by hand = %q", got)
-	}
-}
-
-func TestLatinFormsAreSavedAndOnlyWhenSet(t *testing.T) {
-	store := manifest.NewStore(filepath.Join(t.TempDir(), "library.json"))
-	m := &manifest.Manifest{
-		Tracks:    []manifest.Track{{ID: "aaaaaa", Title: "وطني", TitleLatin: "Watani", Artist: "A"}},
-		Playlists: []manifest.Playlist{{Name: "دراسة", NameLatin: "Study", Tracks: []string{"aaaaaa"}}},
-	}
-	if err := replace(store, m); err != nil {
-		t.Fatal(err)
-	}
-	got, err := store.Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Tracks[0].TitleLatin != "Watani" || got.Playlists[0].NameLatin != "Study" {
-		t.Errorf("not saved: %+v %+v", got.Tracks[0], got.Playlists[0])
-	}
-}
-
-func TestSearchFindsANameByItsLatinFormSetByHandAndByTheWorkedOutOne(t *testing.T) {
-	m := &manifest.Manifest{Tracks: []manifest.Track{
-		{ID: "a", Status: manifest.Identified, Title: "وطني", Artist: "فيروز", ArtistLatin: "Fairouz"},
-		{ID: "b", Status: manifest.Identified, Title: "Cold", Artist: "Nils Frahm"},
-	}}
-	for query, want := range map[string]int{"fairouz": 1, "firuz": 1, "frahm": 1, "wtni": 1, "nobody": 0} {
-		if got := len(m.Search(query)); got != want {
-			t.Errorf("Search(%q) found %d, want %d", query, got, want)
-		}
 	}
 }

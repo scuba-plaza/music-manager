@@ -55,7 +55,7 @@ func TestUpdateReplacesRecordByID(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 	m := &manifest.Manifest{}
-	m.Add(manifest.Track{Title: "فيروز", Artist: "فيروز", Status: manifest.Identified})
+	m.Add(manifest.Track{Title: "وطني", Artist: "فيروز", ArtistLatin: "Fairouz", Status: manifest.Identified})
 	m.Add(manifest.Track{Title: "Sleep", Artist: "Max Richter", Status: manifest.Identified})
 	m.Add(manifest.Track{Status: manifest.Unidentified, Hint: manifest.Hint{Title: "بحلم بيك", Artist: "Abdel Halim", Album: "Rawaeaa", Filename: "01 Bahlam Bek"}})
 
@@ -71,6 +71,8 @@ func TestSearch(t *testing.T) {
 		{"richter", 1},     // case-insensitive
 		{"فيروز", 1},       // the true name
 		{"firuz", 1},       // its Latin form
+		{"wtni", 1},        // that of the title too
+		{"fairouz", 1},     // and the one set by hand
 		{"firuz sleep", 0}, // every word must match the same track
 		{"max sleep", 1},   // words may match different fields
 		{"status:unidentified", 1},

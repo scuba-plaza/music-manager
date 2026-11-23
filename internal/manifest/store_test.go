@@ -17,52 +17,60 @@ func TestLoadMissingFileIsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.Tracks) != 0 {
-		t.Errorf("got %d tracks, want 0", len(m.Tracks))
+	if len(m.Tracks) != 0 || len(m.Profiles) != 0 {
+		t.Errorf("got %+v, want no tracks and no profiles", m)
 	}
 }
 
 func TestSaveThenLoadRoundTrips(t *testing.T) {
 	s := manifest.NewStore(filepath.Join(t.TempDir(), "library.json"))
-	want := manifest.Track{
-		ID:           "k7f2qd",
-		AudioSHA256:  "abc123",
-		SourceURL:    "https://youtu.be/xyz",
-		Status:       manifest.Identified,
-		Title:        "فيروز",
-		Artist:       "Max Richter",
-		Album:        "Sleep",
-		TrackNumber:  3,
-		TrackTotal:   8,
-		SourceLength: 93 * time.Second,
-		TrimStart:    2 * time.Second,
-		TrimEnd:      1500 * time.Millisecond,
-		Hint:         manifest.Hint{Title: "old title", Artist: "old artist", Album: "old album", Filename: "01 Old.mp3"},
-		CoverSHA256:  "def456",
-		AddedAt:      time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC),
+	want := &manifest.Manifest{
+		Tracks: []manifest.Track{{
+			ID:           "k7f2qd",
+			AudioSHA256:  "abc123",
+			SourceURL:    "https://youtu.be/xyz",
+			Status:       manifest.Identified,
+			Title:        "وطني",
+			Artist:       "Max Richter",
+			Album:        "Sleep",
+			TrackNumber:  3,
+			TrackTotal:   8,
+			SourceLength: 93 * time.Second,
+			TrimStart:    2 * time.Second,
+			TrimEnd:      1500 * time.Millisecond,
+			Hint:         manifest.Hint{Title: "old title", Artist: "old artist", Album: "old album", Filename: "01 Old.mp3"},
+			TitleLatin:   "Watani",
+			CoverSHA256:  "def456",
+			AddedAt:      time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC),
+		}},
+		Playlists: []manifest.Playlist{{Name: "دراسة", NameLatin: "Study", Tracks: []string{"k7f2qd"}}},
+		Profiles:  []manifest.Profile{manifest.WolfgangWMP01},
 	}
-	if err := replace(s, &manifest.Manifest{Tracks: []manifest.Track{want}}); err != nil {
+	if err := replace(s, want); err != nil {
 		t.Fatal(err)
 	}
-	m, err := s.Load()
+	got, err := s.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.Tracks) != 1 || !reflect.DeepEqual(m.Tracks[0], want) {
-		t.Errorf("got %+v, want %+v", m.Tracks, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
 	}
 }
 
-func TestLoadRejectsUnknownVersion(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "library.json")
-	if err := os.WriteFile(path, []byte(`{"version": 99, "tracks": []}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := manifest.NewStore(path).Load(); err == nil {
-		t.Fatal("Load accepted version 99, want error")
-	}
-	if after, _ := os.ReadFile(path); string(after) != `{"version": 99, "tracks": []}` {
-		t.Error("loading changed the file")
+func TestLoadRefusesAVersionItDoesNotKnow(t *testing.T) {
+	for _, version := range []string{"1", "99"} {
+		path := filepath.Join(t.TempDir(), "library.json")
+		data := `{"version": ` + version + `, "tracks": []}`
+		if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := manifest.NewStore(path).Load(); err == nil || !strings.Contains(err.Error(), "unsupported library version "+version) {
+			t.Errorf("version %s: err = %v", version, err)
+		}
+		if after, _ := os.ReadFile(path); string(after) != data {
+			t.Errorf("version %s: loading changed the file", version)
+		}
 	}
 }
 
