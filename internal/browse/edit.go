@@ -157,6 +157,15 @@ func track(s Snapshot, id string) (manifest.Track, error) {
 	return t, nil
 }
 
+// currentTrack reads the track with the given id as the library has it now.
+func (e *Editor) currentTrack(id string) (manifest.Track, error) {
+	s, err := e.snapshot()
+	if err != nil {
+		return manifest.Track{}, err
+	}
+	return track(s, id)
+}
+
 // fieldByKey finds a field by the name it goes by outside this package.
 func fieldByKey(key string) (fieldKind, bool) {
 	for f := fTitle; f <= fPlaylistLatin; f++ {
@@ -176,11 +185,7 @@ func (e *Editor) SetField(id, field, text, second string) (Result, error) {
 	if !ok || f == fCover || f > fLatinGenre {
 		return Result{}, fmt.Errorf("there is no field %q to edit", field)
 	}
-	s, err := e.snapshot()
-	if err != nil {
-		return Result{}, err
-	}
-	t, err := track(s, id)
+	t, err := e.currentTrack(id)
 	if err != nil {
 		return Result{}, err
 	}
@@ -195,12 +200,7 @@ func (e *Editor) SetField(id, field, text, second string) (Result, error) {
 	if orig := newDraft(t, f); !prefilledFrom(t, f) && text == orig.text && second == orig.second {
 		return Result{Same: true}, nil // nothing changed, nothing to save
 	}
-	after, err := e.lib.Edit(id, edit)
-	if err != nil {
-		return Result{}, err
-	}
-	e.record(change{label: "change of " + f.what(), before: []manifest.Track{t}, after: []manifest.Track{after}})
-	return Result{Message: "Saved", Reveal: id}, nil
+	return e.save(t, f, edit, false)
 }
 
 // PathPreview is where the file of a track would go were the text typed in a
@@ -219,18 +219,23 @@ const minKept = 100 * time.Millisecond
 
 func clamp(v, lo, hi int) int { return max(lo, min(hi, v)) }
 
-// save is the one place a change to a single track is made and recorded.
-// nudge, if set, joins this change to the run of nudges before it.
-func (e *Editor) save(t manifest.Track, edit app.Edit, label, nudge string) (Result, error) {
+// save is the one place a change to a field of a single track is made and
+// recorded. A nudge joins the run of nudges of the same field before it, so
+// that one undo takes the run back.
+func (e *Editor) save(t manifest.Track, f fieldKind, edit app.Edit, nudging bool) (Result, error) {
 	after, err := e.lib.Edit(t.ID, edit)
 	if err != nil {
 		return Result{}, err
+	}
+	nudge := ""
+	if nudging {
+		nudge = t.ID + "\x00" + f.label()
 	}
 	if top := len(e.undoes) - 1; nudge != "" && nudge == e.nudgeKey && top >= 0 {
 		e.undoes[top].after = []manifest.Track{after} // one more step of the same run
 		e.redoes = nil
 	} else {
-		e.record(change{label: label, before: []manifest.Track{t}, after: []manifest.Track{after}})
+		e.record(change{label: "change of " + f.what(), before: []manifest.Track{t}, after: []manifest.Track{after}})
 	}
 	e.nudgeKey = nudge
 	return Result{Message: "Saved", Reveal: t.ID}, nil
@@ -245,11 +250,7 @@ func (e *Editor) Nudge(id, field string, more int, big bool) (Result, error) {
 	if !ok {
 		return Result{}, fmt.Errorf("there is no field %q", field)
 	}
-	s, err := e.snapshot()
-	if err != nil {
-		return Result{}, err
-	}
-	t, err := track(s, id)
+	t, err := e.currentTrack(id)
 	if err != nil {
 		return Result{}, err
 	}
@@ -284,7 +285,7 @@ func (e *Editor) Nudge(id, field string, more int, big bool) (Result, error) {
 	} else {
 		edit.TrimEnd = &d
 	}
-	return e.save(t, edit, "change of "+strings.ToLower(f.label()), t.ID+"\x00"+f.label())
+	return e.save(t, f, edit, true)
 }
 
 // Clear takes away the cut, the volume change or the fade of a track.
@@ -295,11 +296,7 @@ func (e *Editor) Clear(id, field string) (Result, error) {
 	if !ok {
 		return Result{}, fmt.Errorf("there is no field %q", field)
 	}
-	s, err := e.snapshot()
-	if err != nil {
-		return Result{}, err
-	}
-	t, err := track(s, id)
+	t, err := e.currentTrack(id)
 	if err != nil {
 		return Result{}, err
 	}
@@ -318,7 +315,7 @@ func (e *Editor) Clear(id, field string) (Result, error) {
 	default:
 		return Result{}, nil
 	}
-	return e.save(t, edit, "change of "+strings.ToLower(f.label()), "")
+	return e.save(t, f, edit, false)
 }
 
 // nudgeVolume changes the volume by a step of 1.5 dB, or four with a big
@@ -336,7 +333,7 @@ func (e *Editor) nudgeVolume(t manifest.Track, step time.Duration) (Result, erro
 		return Result{}, nil
 	}
 	db := float64(next) * mp3.StepDB
-	return e.save(t, app.Edit{GainDB: &db}, "change of volume", t.ID+"\x00"+fVolume.label())
+	return e.save(t, fVolume, app.Edit{GainDB: &db}, true)
 }
 
 // nudgeFade makes a fade longer or shorter by step, from where the track
@@ -372,7 +369,7 @@ func (e *Editor) nudgeFade(t manifest.Track, f fieldKind, step time.Duration) (R
 		}
 		edit.FadeOut = &manifest.Span{Start: end - d, End: end}
 	}
-	return e.save(t, edit, "change of "+strings.ToLower(f.label()), t.ID+"\x00"+f.label())
+	return e.save(t, f, edit, true)
 }
 
 // saveMany runs a change to the tracks with the given ids and records it as
@@ -441,7 +438,7 @@ func (e *Editor) setCover(s Snapshot, ids []string, image []byte, noun string) (
 		e.record(change{label: label, before: []manifest.Track{t}, after: []manifest.Track{after}})
 		return Result{Message: "Saved", Reveal: t.ID}, nil
 	}
-	return e.saveMany(s, label, "Changed "+plural(len(todo), "track"), todo, func() (map[string]manifest.Track, error) {
+	return e.saveMany(s, label, "Changed "+Plural(len(todo), "track"), todo, func() (map[string]manifest.Track, error) {
 		return e.lib.SetCoverMany(todo, image)
 	})
 }
@@ -459,7 +456,7 @@ func (e *Editor) Remove(ids []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	c := change{label: "removal of " + plural(len(got), "track"), before: got}
+	c := change{label: "removal of " + Plural(len(got), "track"), before: got}
 	after, err := e.snapshot()
 	if err != nil {
 		return Result{}, err
@@ -468,7 +465,7 @@ func (e *Editor) Remove(ids []string) (Result, error) {
 		c.playlists, c.playlistsBefore, c.playlistsAfter = true, before.Playlists, after.Playlists
 	}
 	e.record(c)
-	return Result{Message: "Removed " + plural(len(got), "track") + " · u undoes it"}, nil
+	return Result{Message: "Removed " + Plural(len(got), "track") + " · u undoes it"}, nil
 }
 
 // idsMissingFrom lists the ids of the tracks in a that are not in b.

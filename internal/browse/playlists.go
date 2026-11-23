@@ -39,7 +39,7 @@ func (e *Editor) PlaylistNew(name string, ids []string) (Result, error) {
 	defer e.mu.Unlock()
 	name = strings.TrimSpace(name)
 	return e.editPlaylists("new playlist "+name, func() (string, error) {
-		return fmt.Sprintf("Made %s with %s", name, plural(len(ids), "track")), e.lib.CreatePlaylist(name, ids...)
+		return fmt.Sprintf("Made %s with %s", name, Plural(len(ids), "track")), e.lib.CreatePlaylist(name, ids...)
 	})
 }
 
@@ -49,7 +49,7 @@ func (e *Editor) PlaylistAdd(name string, ids []string) (Result, error) {
 	defer e.mu.Unlock()
 	return e.editPlaylists("adding to "+name, func() (string, error) {
 		added, err := e.lib.AddToPlaylist(name, ids)
-		status := "Added " + plural(added, "track") + " to " + name
+		status := "Added " + Plural(added, "track") + " to " + name
 		if skipped := len(ids) - added; skipped > 0 {
 			status += fmt.Sprintf(" (%d already there)", skipped)
 		}
@@ -65,7 +65,7 @@ func (e *Editor) PlaylistTakeOut(name string, ids []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	status := "Took " + plural(len(ids), "track") + " out of " + name
+	status := "Took " + Plural(len(ids), "track") + " out of " + name
 	if len(ids) == 1 {
 		if t, ok := s.Track(ids[0]); ok {
 			_, title, _ := app.Display(t)
@@ -101,16 +101,21 @@ func (e *Editor) MoveInPlaylist(name, id string, dir int) (Result, error) {
 	p := s.Playlists[i]
 	to := slices.Index(p.Tracks, id) + dir
 	if to < 0 || to >= len(p.Tracks) {
-		if dir > 0 {
-			return Result{Message: "It is the last track already", Same: true}, nil
-		}
-		return Result{Message: "It is the first track already", Same: true}, nil
+		return atTheEnd(dir), nil
 	}
 	r, err := e.editPlaylists("move of a track in "+name, func() (string, error) {
 		return "Moved", e.lib.MoveInPlaylist(name, id, to)
 	})
 	r.Reveal = id
 	return r, err
+}
+
+// atTheEnd is the answer to a move past the end of a list, in the direction dir.
+func atTheEnd(dir int) Result {
+	if dir > 0 {
+		return Result{Message: "It is the last track already", Same: true}
+	}
+	return Result{Message: "It is the first track already", Same: true}
 }
 
 // MoveInAlbum swaps the number of a track with its neighbour's, which moves it
@@ -136,18 +141,10 @@ func (e *Editor) MoveInAlbum(id string, dir int) (Result, error) {
 		}
 	}
 	sortTracks(album)
-	at := -1
-	for i, x := range album {
-		if x.ID == id {
-			at = i
-		}
-	}
+	at := slices.IndexFunc(album, func(x manifest.Track) bool { return x.ID == id })
 	i := at + dir
 	if i < 0 || i >= len(album) {
-		if dir > 0 {
-			return Result{Message: "It is the last track already", Same: true}, nil
-		}
-		return Result{Message: "It is the first track already", Same: true}, nil
+		return atTheEnd(dir), nil
 	}
 	a, b := album[at], album[i]
 	if a.TrackNumber == 0 || b.TrackNumber == 0 {
@@ -175,6 +172,6 @@ func (e *Editor) Renumber(albumKey string) (Result, error) {
 	tracks := append([]manifest.Track(nil), g.tracks...)
 	sortTracks(tracks)
 	ids := idsOf(tracks)
-	return e.saveMany(s, "numbering of an album", fmt.Sprintf("Numbered %s 1–%d", plural(len(ids), "track"), len(ids)), ids,
+	return e.saveMany(s, "numbering of an album", fmt.Sprintf("Numbered %s 1–%d", Plural(len(ids), "track"), len(ids)), ids,
 		func() (map[string]manifest.Track, error) { return e.lib.Renumber(ids) })
 }

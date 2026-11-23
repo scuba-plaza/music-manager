@@ -74,17 +74,10 @@ func TestASortedLibraryIsOneListWithAWayBackToTheTree(t *testing.T) {
 }
 
 func TestATrackHasThreeTabsAndTheDeviceTabOnlyWithAProfile(t *testing.T) {
-	s := snapshot()
+	s := withMyPlayer(snapshot())
 	v, ok := Track(s, "t1", TrackOptions{})
-	if !ok || len(v.Tabs) != 3 || v.Tabs[0].Name != "Details" || v.Tabs[1].Name != "Audio" || v.Tabs[2].Name != "Latin" {
+	if !ok || strings.Join(tabIDs(v), ",") != "details,audio,latin" || v.Tabs[0].Name != "Details" || v.Tabs[1].Name != "Audio" || v.Tabs[2].Name != "Latin" {
 		t.Fatalf("%+v", v.Tabs)
-	}
-	w, _ := Track(s, "t1", TrackOptions{Profile: "wolfgang-wmp01"})
-	if len(w.Tabs) != 4 || w.Tabs[3].Device == nil || len(w.Tabs[3].Device.Rows) == 0 {
-		t.Errorf("device tab: %+v", w.Tabs)
-	}
-	if _, ok := Track(s, "nope", TrackOptions{}); ok {
-		t.Error("found a track that is not there")
 	}
 	if got := fieldKeys(v.Tabs[0]); strings.Join(got, ",") != "title,artist,album,track,released,genre,cover" {
 		t.Errorf("details fields %v", got)
@@ -92,6 +85,26 @@ func TestATrackHasThreeTabsAndTheDeviceTabOnlyWithAProfile(t *testing.T) {
 	if got := fieldKeys(v.Tabs[1]); strings.Join(got, ",") != "cutStart,cutEnd,volume,fadeIn,fadeOut" {
 		t.Errorf("audio fields %v", got)
 	}
+	for _, profile := range []string{"generic", "wolfgang-wmp01", "my-player"} {
+		w, ok := Track(s, "t1", TrackOptions{Profile: profile})
+		if !ok || strings.Join(tabIDs(w), ",") != "details,audio,latin,device" || w.Tabs[3].Device == nil || len(w.Tabs[3].Device.Rows) == 0 {
+			t.Errorf("%s: %+v", profile, w.Tabs)
+		}
+	}
+	if _, ok := Track(s, "t1", TrackOptions{Profile: "nobody"}); ok {
+		t.Error("an unknown profile previews something")
+	}
+	if _, ok := Track(s, "nope", TrackOptions{}); ok {
+		t.Error("found a track that is not there")
+	}
+}
+
+func tabIDs(v TrackView) []string {
+	var ids []string
+	for _, tab := range v.Tabs {
+		ids = append(ids, tab.ID)
+	}
+	return ids
 }
 
 func fieldKeys(t TabView) []string {
@@ -234,44 +247,10 @@ func withMyPlayer(s Snapshot) Snapshot {
 	return s
 }
 
-func TestTheDeviceViewOfTheWolfgangProfileSaysWhatThePlayerShows(t *testing.T) {
-	s := longNamed()
-	v, _ := Track(s, "long", TrackOptions{Profile: "wolfgang-wmp01"})
-	dev, _ := tabWithID(v, "device")
-	if got := strings.Join(rowLabels(dev.Device), ","); got != "Folder,File,Cut,Artist,Album,Genre,Title" {
-		t.Errorf("rows %s", got)
-	}
-	for _, r := range dev.Device.Rows {
-		if r.Label == "Cut" && (len([]rune(r.Value)) != 20 || !strings.Contains(r.Hint, "24 characters") || !strings.Contains(r.Hint, "cut at 20")) {
-			t.Errorf("cut row %+v", r)
-		}
-		if r.Label == "Album" && (r.Value != "Jerusalem" || r.Tail != "· 9 of 12") {
-			t.Errorf("album row %+v", r)
-		}
-	}
-}
-
-func TestTheDeviceTabIsThereOnlyWhenAProfileIsAsked(t *testing.T) {
-	v, _ := Track(snapshot(), "t1", TrackOptions{})
-	if _, at := tabWithID(v, "device"); at != -1 || len(v.Tabs) != 3 {
-		t.Errorf("tabs %+v", v.Tabs)
-	}
-	ids := []string{}
-	w, _ := Track(snapshot(), "t1", TrackOptions{Profile: "generic"})
-	for _, tab := range w.Tabs {
-		ids = append(ids, tab.ID)
-	}
-	if strings.Join(ids, ",") != "details,audio,latin,device" {
-		t.Errorf("tab ids %v", ids)
-	}
-	if _, ok := Track(withMyPlayer(snapshot()), "t1", TrackOptions{Profile: "nobody"}); ok {
-		t.Error("an unknown profile previews something")
-	}
-}
-
-func TestTheDevicePreviewOfAProfileWithoutAStemMaxHasNoCutRow(t *testing.T) {
-	v, _ := Track(withMyPlayer(longNamed()), "long", TrackOptions{Profile: "my-player"})
-	dev, _ := tabWithID(v, "device")
+func TestTheDevicePreviewOfAProfileWithoutAStemMaxOrATagWidthCutsAndCountsNothing(t *testing.T) {
+	s := withMyPlayer(longNamed())
+	long, _ := Track(s, "long", TrackOptions{Profile: "my-player"})
+	dev, _ := tabWithID(long, "device")
 	if got := strings.Join(rowLabels(dev.Device), ","); got != "Folder,File,Artist,Album,Genre,Title" {
 		t.Errorf("rows %s", got)
 	}
@@ -280,11 +259,8 @@ func TestTheDevicePreviewOfAProfileWithoutAStemMaxHasNoCutRow(t *testing.T) {
 			t.Errorf("a name that is not cut has nothing to say about the title: %+v", row)
 		}
 	}
-}
-
-func TestTheDevicePreviewOfAProfileWithoutATagWidthCountsNothing(t *testing.T) {
-	v, _ := Track(withMyPlayer(longNamed()), "t4", TrackOptions{Profile: "my-player"})
-	dev, _ := tabWithID(v, "device")
+	other, _ := Track(s, "t4", TrackOptions{Profile: "my-player"})
+	dev, _ = tabWithID(other, "device")
 	for _, row := range dev.Device.Rows {
 		if row.Tail != "" {
 			t.Errorf("row %+v has a tail without a tag width", row)

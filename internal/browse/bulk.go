@@ -142,21 +142,18 @@ func changes(t manifest.Track, e app.Edit) bool {
 	return false
 }
 
-// bulkPlan works out what to do to each of tracks: the same edit for those
-// it would change, and nothing for those that already have the values. It
-// returns the edits by track ID.
-func bulkPlan(tracks []manifest.Track, v BulkValues) (map[string]app.Edit, error) {
-	e, err := v.edit()
-	if err != nil {
-		return nil, err
-	}
+// editsFor gives the edit to each of the tracks it would change, and lists
+// their ids in the order of the tracks.
+func editsFor(tracks []manifest.Track, edit app.Edit) (map[string]app.Edit, []string) {
 	edits := map[string]app.Edit{}
+	var ids []string
 	for _, t := range tracks {
-		if changes(t, e) {
-			edits[t.ID] = e
+		if changes(t, edit) {
+			edits[t.ID] = edit
+			ids = append(ids, t.ID)
 		}
 	}
-	return edits, nil
+	return edits, ids
 }
 
 // Summary says in words what the typed values would do.
@@ -194,13 +191,14 @@ type BulkPreview struct {
 // PreviewBulk checks the values typed for the tracks, without changing anything.
 func PreviewBulk(s Snapshot, ids []string, v BulkValues) BulkPreview {
 	p := BulkPreview{Summary: v.Summary()}
-	edits, err := bulkPlan(s.tracksFor(ids), v)
+	edit, err := v.edit()
 	var fields app.FieldErrors
 	if errors.As(err, &fields) {
 		p.Fields = fields
 		return p
 	}
-	p.Changed = len(edits)
+	_, changed := editsFor(s.tracksFor(ids), edit)
+	p.Changed = len(changed)
 	return p
 }
 
@@ -212,20 +210,14 @@ func (e *Editor) Bulk(ids []string, v BulkValues) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	tracks := s.tracksFor(ids)
-	edits, err := bulkPlan(tracks, v)
+	edit, err := v.edit()
 	if err != nil {
 		return Result{}, err
 	}
+	edits, changed := editsFor(s.tracksFor(ids), edit)
 	if len(edits) == 0 {
 		return Result{}, errors.New("Nothing to change")
 	}
-	changed := make([]string, 0, len(edits))
-	for _, t := range tracks { // in the order they are listed
-		if _, ok := edits[t.ID]; ok {
-			changed = append(changed, t.ID)
-		}
-	}
-	return e.saveMany(s, "bulk edit of "+plural(len(changed), "track"), "Changed "+plural(len(changed), "track"), changed,
+	return e.saveMany(s, "bulk edit of "+Plural(len(changed), "track"), "Changed "+Plural(len(changed), "track"), changed,
 		func() (map[string]manifest.Track, error) { return e.lib.EditMany(edits) })
 }
