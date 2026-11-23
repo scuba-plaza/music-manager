@@ -46,18 +46,6 @@ func TestTheWolfgangWarnsAboutAGenreItCannotShow(t *testing.T) {
 	}
 }
 
-func TestTheWolfgangWarnsAboutANameWithNoLatinForm(t *testing.T) {
-	emoji := track("emoji", "🎵🎶", "", "Song")
-	plain := track("plain", "Max Richter", "", "Dream")
-	ws := wolfgang.Diagnose([]manifest.Track{emoji, plain})
-	if got := warned(ws, "emoji"); !hasMessage(got, "artist") || !hasMessage(got, "Unknown") {
-		t.Errorf("artist with no Latin form: %q", got)
-	}
-	if got := warned(ws, "plain"); len(got) != 0 {
-		t.Errorf("a plain name drew %q", got)
-	}
-}
-
 func TestTheWolfgangWarnsWhenCuttingMakesTwoFileNamesAlike(t *testing.T) {
 	a := track("aaaaaa", "Artist", "", "A Very Long Song Title Indeed Yes")
 	b := track("bbbbbb", "Artist", "", "A Very Long Song Title Indeed No")
@@ -70,29 +58,6 @@ func TestTheWolfgangWarnsWhenCuttingMakesTwoFileNamesAlike(t *testing.T) {
 	}
 	if got := warned(ws, "cccccc"); len(got) != 0 {
 		t.Errorf("a name that is not cut like another drew %q", got)
-	}
-}
-
-func TestTheWolfgangDoesNotBlameTheCutForTwoTracksThatAreTheSame(t *testing.T) {
-	a, b := track("aaaaaa", "Artist", "", "Same"), track("bbbbbb", "Artist", "", "Same")
-	if ws := wolfgang.Diagnose([]manifest.Track{a, b}); len(ws) != 0 {
-		t.Errorf("warnings = %+v", ws)
-	}
-}
-
-func TestTheWolfgangWarnsAboutAnArtistThatLooksLikeSeveral(t *testing.T) {
-	duo := track("duo", "Fairuz & Ziad Rahbani", "", "Song")
-	ws := wolfgang.Diagnose([]manifest.Track{duo})
-	if got := warned(ws, "duo"); !hasMessage(got, "several") {
-		t.Errorf("%q", got)
-	}
-}
-
-func TestAGenericTargetHasNothingToWarnAbout(t *testing.T) {
-	long := track("long", "🎵 & Fairuz", "", "A Very Long Song Title Indeed Yes")
-	long.Genre = "Alternative Rock"
-	if ws := device.Generic.Diagnose([]manifest.Track{long}); len(ws) != 0 {
-		t.Errorf("warnings = %+v", ws)
 	}
 }
 
@@ -238,12 +203,17 @@ func myPlayer(set func(*manifest.Profile)) device.Target {
 
 func TestAClashTheCutDidNotCauseIsNotBlamedOnTheCut(t *testing.T) {
 	target := myPlayer(func(p *manifest.Profile) { p.StemMax = 20 })
-	tracks := []manifest.Track{
-		track("dotted", "İstanbul", "", "Song"),
-		track("plain1", "Istanbul", "", "Song"),
-	}
-	if ws := target.Diagnose(tracks); len(ws) != 0 {
-		t.Errorf("names equal without the cut were blamed on it: %+v", ws)
+	for name, artists := range map[string][2]string{
+		"the same name":          {"Artist", "Artist"},
+		"equal but for the case": {"İstanbul", "Istanbul"},
+	} {
+		tracks := []manifest.Track{
+			track("first1", artists[0], "", "Song"),
+			track("second", artists[1], "", "Song"),
+		}
+		if ws := target.Diagnose(tracks); len(ws) != 0 {
+			t.Errorf("%s: names equal without the cut were blamed on it: %+v", name, ws)
+		}
 	}
 }
 

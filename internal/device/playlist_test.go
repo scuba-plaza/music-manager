@@ -49,3 +49,29 @@ func TestTheWolfgangsPlaylistIsAnM3UWithPathsFromTheRoot(t *testing.T) {
 		t.Errorf("playlist =\n%q\nwant\n%q", data, want)
 	}
 }
+
+// A playlist is called by its true name on a target that can show it, and by its
+// Latin name, the one set by hand or else the one worked out, on one that cannot.
+
+func TestAPlaylistFileIsNamedByTheTrueNameOrTheLatinOne(t *testing.T) {
+	for _, c := range []struct {
+		name, latin string
+		generic     string
+		wolfgang    string
+	}{
+		{"Study", "", "Playlists/Study.m3u8", "Playlists/Study.m3u"},
+		{"دراسة", "Study", "Playlists/دراسة.m3u8", "Playlists/Study.m3u"},
+		{"فيروز", "", "Playlists/فيروز.m3u8", "Playlists/Firuz.m3u"}, // worked out
+	} {
+		p := manifest.Playlist{Name: c.name, NameLatin: c.latin}
+		if got := device.Generic.PlaylistFile(p); got != c.generic {
+			t.Errorf("generic file of %+v = %q, want %q", p, got, c.generic)
+		}
+		if got := wolfgang.PlaylistFile(p); got != c.wolfgang {
+			t.Errorf("Wolfgang file of %+v = %q, want %q", p, got, c.wolfgang)
+		}
+		if got, _ := wolfgang.Playlist(p, nil, nil); got != c.wolfgang {
+			t.Errorf("Wolfgang writes %+v to %q, want %q", p, got, c.wolfgang)
+		}
+	}
+}
