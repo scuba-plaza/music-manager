@@ -25,10 +25,24 @@ func Silent(n int) []byte {
 // WithID3v2 prepends an ID3v2 tag of the given major version (3 or 4) whose
 // body is bodyLen bytes of padding.
 func WithID3v2(audio []byte, version byte, bodyLen int) []byte {
-	hdr := []byte{'I', 'D', '3', version, 0, 0,
-		byte(bodyLen >> 21 & 0x7F), byte(bodyLen >> 14 & 0x7F), byte(bodyLen >> 7 & 0x7F), byte(bodyLen & 0x7F)}
-	out := append(hdr, make([]byte, bodyLen)...)
+	return withTag(audio, version, make([]byte, bodyLen))
+}
+
+func withTag(audio []byte, version byte, body []byte) []byte {
+	out := append([]byte{'I', 'D', '3', version, 0, 0}, syncsafe(len(body))...)
+	out = append(out, body...)
 	return append(out, audio...)
+}
+
+// id3Frame is an ID3v2.4 frame without flags.
+func id3Frame(id string, data []byte) []byte {
+	out := append([]byte(id), syncsafe(len(data))...)
+	out = append(out, 0, 0)
+	return append(out, data...)
+}
+
+func syncsafe(n int) []byte {
+	return []byte{byte(n >> 21 & 0x7F), byte(n >> 14 & 0x7F), byte(n >> 7 & 0x7F), byte(n & 0x7F)}
 }
 
 // WithID3v1 appends a 128-byte ID3v1 tag.
@@ -66,26 +80,18 @@ func WithTagsTrack(audio []byte, title, artist, album, track string) []byte {
 func WithTextFrames(audio []byte, frames ...[2]string) []byte {
 	var body []byte
 	for _, f := range frames {
-		id, text := f[0], f[1]
-		if text == "" {
-			continue
+		if id, text := f[0], f[1]; text != "" {
+			body = append(body, id3Frame(id, append([]byte{3}, text...))...) // 3: UTF-8
 		}
-		n := 1 + len(text) // encoding byte + text
-		body = append(body, id...)
-		body = append(body, byte(n>>21&0x7F), byte(n>>14&0x7F), byte(n>>7&0x7F), byte(n&0x7F), 0, 0, 3)
-		body = append(body, text...)
 	}
-	tag := WithID3v2(nil, 4, len(body))
-	copy(tag[10:], body)
-	return append(tag, audio...)
+	return withTag(audio, 4, body)
 }
 
 // WithInfoFrame prepends a Xing/Info-style metadata frame (marker is "Xing",
 // "Info" or "VBRI"), as encoders write at the start of a file. It looks like
 // a silent frame but carries no audio.
 func WithInfoFrame(audio []byte, marker string) []byte {
-	frame := make([]byte, FrameSize)
-	copy(frame, []byte{0xFF, 0xFB, 0x90, 0x00})
+	frame := Silent(1)
 	copy(frame[36:], marker) // after the 32-byte MPEG-1 stereo side info
 	return append(frame, audio...)
 }
@@ -125,22 +131,13 @@ func cover(col color.RGBA, asJPEG bool) []byte {
 func WithCover(audio []byte, mime string, img []byte) []byte {
 	data := append([]byte{3}, mime...)
 	data = append(data, 0, 3, 0) // MIME terminator, front cover, empty description
-	data = append(data, img...)
-	n := len(data)
-	body := append([]byte("APIC"), byte(n>>21&0x7F), byte(n>>14&0x7F), byte(n>>7&0x7F), byte(n&0x7F), 0, 0)
-	body = append(body, data...)
-	tag := WithID3v2(nil, 4, len(body))
-	copy(tag[10:], body)
-	return append(tag, audio...)
+	return withTag(audio, 4, id3Frame("APIC", append(data, img...)))
 }
 
-// LowFrameSize is the byte length of a frame of SilentLow.
-const LowFrameSize = 104
-
-// SilentLow returns n silent frames at 32 kbps (header FF FB 10 00): frames
-// too small to hold a Xing header with its seek table.
+// SilentLow returns n silent 104-byte frames at 32 kbps (header FF FB 10 00):
+// frames too small to hold a Xing header with its seek table.
 func SilentLow(n int) []byte {
-	frame := make([]byte, LowFrameSize)
+	frame := make([]byte, 104)
 	copy(frame, []byte{0xFF, 0xFB, 0x10, 0x00})
 	return bytes.Repeat(frame, n)
 }

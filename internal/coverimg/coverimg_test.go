@@ -109,23 +109,15 @@ func TestAPNGBecomesABaselineJPEGWithAJFIFHeader(t *testing.T) {
 		t.Errorf("sampling %x, want 4:2:0 %x", s.sampling, want)
 	}
 	img, err := jpeg.Decode(bytes.NewReader(out))
-	if err != nil || img.Bounds().Dx() != 100 || img.Bounds().Dy() != 60 {
-		t.Errorf("decodes to %v, %v", img.Bounds(), err)
-	}
-}
-
-func TestSeeThroughAreasComeOutWhiteNotBlack(t *testing.T) {
-	out, err := coverimg.Baseline(pngOf(t, translucent(100, 60)), maxEdge, quality)
 	if err != nil {
 		t.Fatal(err)
 	}
-	img, err := jpeg.Decode(bytes.NewReader(out))
-	if err != nil {
-		t.Fatal(err)
+	if img.Bounds().Dx() != 100 || img.Bounds().Dy() != 60 {
+		t.Errorf("decodes to %v", img.Bounds())
 	}
 	r, g, b, _ := img.At(5, 5).RGBA() // inside the transparent corner
 	if r>>8 < 235 || g>>8 < 235 || b>>8 < 235 {
-		t.Errorf("transparent corner is (%d,%d,%d), want near white", r>>8, g>>8, b>>8)
+		t.Errorf("transparent corner is (%d,%d,%d), want white, not black", r>>8, g>>8, b>>8)
 	}
 }
 
@@ -212,49 +204,32 @@ func TestAwkwardJPEGsAreRewrittenTheWayThePlayerOpensThem(t *testing.T) {
 	}
 }
 
-func TestValidateSaysWhatKindOfPictureItIs(t *testing.T) {
+func TestValidateAndSniffSayWhatKindOfPictureItIs(t *testing.T) {
 	var asJPEG bytes.Buffer
 	if err := jpeg.Encode(&asJPEG, translucent(8, 8), nil); err != nil {
 		t.Fatal(err)
 	}
 	cases := []struct {
-		name string
-		data []byte
-		want string
-		ok   bool
+		name      string
+		data      []byte
+		validated string // "" when Validate refuses it
+		sniffed   string
 	}{
-		{"a JPEG", asJPEG.Bytes(), "image/jpeg", true},
-		{"a PNG", pngOf(t, translucent(8, 8)), "image/png", true},
-		{"text", []byte("just some text"), "", false},
-		{"a JPEG cut short", asJPEG.Bytes()[:len(asJPEG.Bytes())/2], "", false},
-		{"nothing", nil, "", false},
+		{"a JPEG", asJPEG.Bytes(), "image/jpeg", "image/jpeg"},
+		{"a PNG", pngOf(t, translucent(8, 8)), "image/png", "image/png"},
+		{"text", []byte("just some text"), "", ""},
+		{"a JPEG cut short", asJPEG.Bytes()[:asJPEG.Len()/2], "", "image/jpeg"},
+		{"nothing", nil, "", ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			got, err := coverimg.Validate(c.data)
-			if got != c.want || (err == nil) != c.ok {
-				t.Errorf("Validate = %q, %v; want %q, ok %v", got, err, c.want, c.ok)
+			if got != c.validated || (err == nil) != (c.validated != "") {
+				t.Errorf("Validate = %q, %v; want %q", got, err, c.validated)
+			}
+			if got := coverimg.Sniff(c.data); got != c.sniffed {
+				t.Errorf("Sniff = %q, want %q", got, c.sniffed)
 			}
 		})
-	}
-}
-
-func TestSniffReadsTheKindFromTheFirstBytes(t *testing.T) {
-	var asJPEG bytes.Buffer
-	if err := jpeg.Encode(&asJPEG, translucent(8, 8), nil); err != nil {
-		t.Fatal(err)
-	}
-	for name, c := range map[string]struct {
-		data []byte
-		want string
-	}{
-		"jpeg": {asJPEG.Bytes(), "image/jpeg"},
-		"png":  {pngOf(t, translucent(8, 8)), "image/png"},
-		"text": {[]byte("just some text"), ""},
-		"none": {nil, ""},
-	} {
-		if got := coverimg.Sniff(c.data); got != c.want {
-			t.Errorf("%s: Sniff = %q, want %q", name, got, c.want)
-		}
 	}
 }

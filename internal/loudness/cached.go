@@ -67,12 +67,8 @@ func (c cached) store(path string, e entry) {
 		return
 	}
 	defer os.Remove(tmp.Name())
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return
+	_, err = tmp.Write(data)
+	if closeErr := tmp.Close(); err == nil && closeErr == nil {
+		os.Rename(tmp.Name(), path)
 	}
-	if tmp.Close() != nil {
-		return
-	}
-	os.Rename(tmp.Name(), path)
 }

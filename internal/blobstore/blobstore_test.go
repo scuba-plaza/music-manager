@@ -2,7 +2,6 @@ package blobstore_test
 
 import (
 	"errors"
-	"io"
 	"os"
 	"slices"
 	"strings"
@@ -26,13 +25,8 @@ func TestPutStoresContentUnderItsHash(t *testing.T) {
 	if !s.Has(sha) || s.Has("0000") {
 		t.Error("Has should be true for the stored blob only")
 	}
-	r, err := s.Open(sha)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close()
-	if got, _ := io.ReadAll(r); string(got) != "hello" {
-		t.Errorf("content = %q", got)
+	if got, err := os.ReadFile(s.Path(sha)); err != nil || string(got) != "hello" {
+		t.Errorf("content = %q, %v", got, err)
 	}
 }
 

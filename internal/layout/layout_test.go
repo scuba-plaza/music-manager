@@ -25,6 +25,12 @@ func identified(artist, album, title string, n, total int) manifest.Track {
 	}
 }
 
+// added is t under id, added to the library at the given second.
+func added(t manifest.Track, id string, second int) manifest.Track {
+	t.ID, t.AddedAt = id, time.Unix(int64(second), 0)
+	return t
+}
+
 func TestPathFor(t *testing.T) {
 	cases := []struct {
 		name string
@@ -80,13 +86,6 @@ func TestPathForFoldsTheNamesWhenTheRulesSay(t *testing.T) {
 	}
 }
 
-func TestPathForKeepsTheTrueNamesWithoutAFold(t *testing.T) {
-	got := layout.PathFor(identified("فيروز", "روائع", "وطني", 3, 12), layout.Rules{})
-	if want := "فيروز/روائع/03 - وطني.mp3"; got != want {
-		t.Errorf("PathFor = %q, want %q", got, want)
-	}
-}
-
 func TestPathForNeverCutsACharacterInHalf(t *testing.T) {
 	long := strings.Repeat("ع", 200) // 400 bytes
 	for _, r := range []layout.Rules{{}, {ComponentMax: 101}} {
@@ -107,15 +106,9 @@ func TestPathForNeverCutsACharacterInHalf(t *testing.T) {
 }
 
 func TestAssignGivesCollidingTracksDistinctStablePaths(t *testing.T) {
-	mk := func(id string, added int) manifest.Track {
-		tr := identified("A", "B", "Same", 1, 2)
-		tr.ID = id
-		tr.AddedAt = time.Unix(int64(added), 0)
-		return tr
-	}
-	older, newer, third := mk("zzzzzz", 1), mk("aaaaaa", 2), mk("mmmmmm", 3)
-	other := identified("A", "B", "Different", 2, 2)
-	other.ID = "qqqqqq"
+	same := identified("A", "B", "Same", 1, 2)
+	older, newer, third := added(same, "zzzzzz", 1), added(same, "aaaaaa", 2), added(same, "mmmmmm", 3)
+	other := added(identified("A", "B", "Different", 2, 2), "qqqqqq", 0)
 
 	want := map[string]string{
 		"zzzzzz": "A/B/01 - Same.mp3", // the oldest keeps the plain name
@@ -130,16 +123,6 @@ func TestAssignGivesCollidingTracksDistinctStablePaths(t *testing.T) {
 				t.Errorf("Assign[%s] = %q, want %q", id, got[id], w)
 			}
 		}
-	}
-}
-
-func TestAssignTreatsPathsAsCaseInsensitive(t *testing.T) {
-	a, b := identified("Artist", "", "SONG", 0, 0), identified("artist", "", "song", 0, 0)
-	a.ID, b.ID = "aaaaaa", "bbbbbb"
-	a.AddedAt, b.AddedAt = time.Unix(1, 0), time.Unix(2, 0)
-	got := layout.Assign([]manifest.Track{a, b}, rules)
-	if strings.EqualFold(got["aaaaaa"], got["bbbbbb"]) {
-		t.Errorf("paths collide on a case-insensitive filesystem: %v", got)
 	}
 }
 
@@ -187,16 +170,10 @@ func TestFileNamesAreCutToWhatThePlayerShows(t *testing.T) {
 }
 
 func TestACollisionSuffixStaysWithinWhatThePlayerShows(t *testing.T) {
-	mk := func(id string, added int, title string) manifest.Track {
-		tr := identified("Artist", "", title, 0, 0)
-		tr.ID = id
-		tr.AddedAt = time.Unix(int64(added), 0)
-		return tr
-	}
 	got := layout.Assign([]manifest.Track{
-		mk("aaaaaa", 1, "A Very Long Song Title Indeed Yes"),
-		mk("bbbbbb", 2, "A Very Long Song Title Indeed No"),
-		mk("cccccc", 3, "A Very Long Song Title Indeed Maybe"),
+		added(identified("Artist", "", "A Very Long Song Title Indeed Yes", 0, 0), "aaaaaa", 1),
+		added(identified("Artist", "", "A Very Long Song Title Indeed No", 0, 0), "bbbbbb", 2),
+		added(identified("Artist", "", "A Very Long Song Title Indeed Maybe", 0, 0), "cccccc", 3),
 	}, rules)
 	want := map[string]string{
 		"aaaaaa": "Artist/A Very Long Song Tit.mp3",
@@ -214,10 +191,7 @@ func TestNoFileNameIsLongerThanThePlayerShows(t *testing.T) {
 	title := "Qasidat al-Hubb wa al-Hanin ila al-Watan al-Ghali (Live in Beirut)"
 	var tracks []manifest.Track
 	for i := 0; i < 12; i++ { // twelve that all shorten to the same name
-		tr := identified("Artist", "", fmt.Sprintf("%s %d", title, i), 0, 0)
-		tr.ID = fmt.Sprintf("id%04d", i)
-		tr.AddedAt = time.Unix(int64(i), 0)
-		tracks = append(tracks, tr)
+		tracks = append(tracks, added(identified("Artist", "", fmt.Sprintf("%s %d", title, i), 0, 0), fmt.Sprintf("id%04d", i), i))
 	}
 	tracks = append(tracks,
 		identified("Artist", "Album", title, 12, 120),
@@ -241,16 +215,6 @@ func TestPathForComposesTheNames(t *testing.T) {
 	}
 }
 
-func TestAssignFindsTwoSpellingsOfOneNameCollide(t *testing.T) {
-	a, b := identified("Artist", "", "Café", 0, 0), identified("Artist", "", "Café", 0, 0)
-	a.ID, b.ID = "aaaaaa", "bbbbbb"
-	a.AddedAt, b.AddedAt = time.Unix(1, 0), time.Unix(2, 0)
-	got := layout.Assign([]manifest.Track{a, b}, layout.Rules{})
-	if want := "Artist/Café (2).mp3"; got["bbbbbb"] != want {
-		t.Errorf("Assign[bbbbbb] = %q, want %q", got["bbbbbb"], want)
-	}
-}
-
 // A target that wants Latin names gets the ones set by hand, and the ones
 // worked out from the true names for the rest.
 
@@ -267,16 +231,6 @@ func TestPathForUsesTheLatinFormsWhenTheRulesWantThem(t *testing.T) {
 	}
 }
 
-func TestAssignKeepsTwoNamesApartThatShareALatinForm(t *testing.T) {
-	a, b := identified("فيروز", "", "وطني", 0, 0), identified("فيروز", "", "وطنى", 0, 0)
-	a.ID, b.ID = "aaaaaa", "bbbbbb"
-	a.TitleLatin, b.TitleLatin = "Watani", "Watani" // set to the same by hand
-	got := layout.Assign([]manifest.Track{a, b}, layout.Rules{Latin: true})
-	if got["aaaaaa"] == got["bbbbbb"] {
-		t.Errorf("both go to %q", got["aaaaaa"])
-	}
-}
-
 func TestFilesThatWouldBeTheSameFileGetANumberBeforeTheExtension(t *testing.T) {
 	taken := map[string]bool{}
 
@@ -290,5 +244,35 @@ func TestFilesThatWouldBeTheSameFileGetANumberBeforeTheExtension(t *testing.T) {
 	want := []string{"Playlists/Road.m3u", "Playlists/ROAD (2).m3u", "Playlists/road (3).m3u", "Playlists/Other.m3u"}
 	if !slices.Equal(got, want) {
 		t.Errorf("%q, want %q", got, want)
+	}
+}
+
+// Two names that a filesystem, or the Latin forms, would take for one are two
+// files: the newer track gets a number.
+func TestAssignNumbersTheNewerOfTwoTracksThatWouldShareAFile(t *testing.T) {
+	sameLatin := func(title string) manifest.Track {
+		tr := identified("فيروز", "", title, 0, 0)
+		tr.TitleLatin = "Watani" // set to the same by hand
+		return tr
+	}
+	for _, c := range []struct {
+		name  string
+		rules layout.Rules
+		a, b  manifest.Track
+		want  string
+	}{
+		{"names that differ only in case, as on FAT", rules,
+			identified("Artist", "", "SONG", 0, 0), identified("artist", "", "song", 0, 0), "song (2).mp3"},
+		{"two spellings of one accent", layout.Rules{},
+			identified("Artist", "", "Caf\u00e9", 0, 0), identified("Artist", "", "Cafe\u0301", 0, 0), "Caf\u00e9 (2).mp3"},
+		{"two names with one Latin form", layout.Rules{Latin: true},
+			sameLatin("وطني"), sameLatin("وطنى"), "Watani (2).mp3"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got := layout.Assign([]manifest.Track{added(c.a, "aaaaaa", 1), added(c.b, "bbbbbb", 2)}, c.rules)
+			if path.Base(got["bbbbbb"]) != c.want || got["aaaaaa"] == got["bbbbbb"] {
+				t.Errorf("Assign = %v, want the newer named %q", got, c.want)
+			}
+		})
 	}
 }

@@ -21,40 +21,33 @@ func xingFrame(audio []byte) []byte {
 
 	// The header frame takes the first frame's header, without padding and
 	// with the smallest bitrate whose frames are big enough to hold the table.
-	var frame []byte
+	var xing []byte
 	for br := byte(1); br < 15; br++ {
 		h := []byte{audio[0], audio[1], audio[2]&^0x02&0x0F | br<<4, audio[3]}
 		if f, ok := frameAt(h); ok && f.size >= need {
-			frame = make([]byte, f.size)
-			copy(frame, h)
+			xing = make([]byte, f.size)
+			copy(xing, h)
 			break
 		}
 	}
-	if frame == nil {
+	if xing == nil {
 		return nil
 	}
-	size := len(frame)
+	size := len(xing)
 
 	var offsets []int
-	for pos := 0; pos < len(audio); {
-		f, ok := frameAt(audio[pos:])
-		if !ok || f.size > len(audio)-pos {
-			break
-		}
-		offsets = append(offsets, pos)
-		pos += f.size
-	}
+	frames(audio, func(pos int, _ frame) { offsets = append(offsets, pos) })
 	total := len(audio) + size
 
-	copy(frame[off:], "Xing")
-	binary.BigEndian.PutUint32(frame[off+4:], xingFlagsAll)
-	binary.BigEndian.PutUint32(frame[off+8:], uint32(len(offsets)))
-	binary.BigEndian.PutUint32(frame[off+12:], uint32(total))
+	copy(xing[off:], "Xing")
+	binary.BigEndian.PutUint32(xing[off+4:], xingFlagsAll)
+	binary.BigEndian.PutUint32(xing[off+8:], uint32(len(offsets)))
+	binary.BigEndian.PutUint32(xing[off+12:], uint32(total))
 	// Entry i is how far into the stream, in 1/256ths, i% of the playing time
 	// lies. As encoders write it, entry 0 is the very start, header frame included.
 	for i := 1; i < tocEntries; i++ {
 		pos := size + offsets[i*len(offsets)/tocEntries]
-		frame[off+16+i] = byte(min(255, pos*256/total))
+		xing[off+16+i] = byte(min(255, pos*256/total))
 	}
-	return frame
+	return xing
 }

@@ -86,18 +86,18 @@ func WithGains(l Layout, gains [][]int) []byte {
 		rng = rng*1664525 + 1013904223
 		return byte(rng >> 24)
 	}
+	header, size := l.headerAndSize()
+	_, _, sideLen := l.side()
+	side := 4
+	if l.CRC {
+		side += 2
+	}
 	for first := 0; first < len(gains); first += l.Granules() {
-		header, size := l.headerAndSize()
 		frame := make([]byte, size)
 		for i := range frame {
 			frame[i] = next()
 		}
 		copy(frame, header)
-		_, _, sideLen := l.side()
-		side := 4
-		if l.CRC {
-			side += 2
-		}
 		for g := 0; g < l.Granules(); g++ {
 			for c := 0; c < l.Channels(); c++ {
 				v := gains[min(first+g, len(gains)-1)][c]

@@ -1,8 +1,7 @@
 // Package coverimg checks cover images and, for a device that is fussy about
 // them, makes them into a baseline JPEG with a JFIF header, 4:2:0, of a modest
 // size (the Wolfgang WMP01's "Photos" menu refuses progressive and 4:4:4
-// files, and does not list PNG files at all). It also scales pictures for the
-// terminal.
+// files, and does not list PNG files at all).
 package coverimg
 
 import (
@@ -94,12 +93,11 @@ func fitted(img *image.RGBA, maxEdge int) image.Image {
 	scale := float64(maxEdge) / float64(long)
 	w := max(int(math.Round(float64(b.Dx())*scale)), 1)
 	h := max(int(math.Round(float64(b.Dy())*scale)), 1)
-	return Resize(img, w, h)
+	return shrink(img, w, h)
 }
 
-// Resize scales img to w×h by averaging the pixels each new pixel covers
-// (or repeating pixels when it grows).
-func Resize(img image.Image, w, h int) *image.RGBA {
+// shrink scales img down to w×h by averaging the pixels each new pixel covers.
+func shrink(img *image.RGBA, w, h int) *image.RGBA {
 	b := img.Bounds()
 	sw, sh := b.Dx(), b.Dy()
 	out := image.NewRGBA(image.Rect(0, 0, w, h))
@@ -112,7 +110,7 @@ func Resize(img image.Image, w, h int) *image.RGBA {
 			var r, g, bl, n uint64
 			for sy := y0; sy < y1; sy++ {
 				for sx := x0; sx < x1; sx++ {
-					pr, pg, pb, _ := img.At(b.Min.X+sx, b.Min.Y+sy).RGBA() // premultiplied: transparent reads as black
+					pr, pg, pb, _ := img.At(b.Min.X+sx, b.Min.Y+sy).RGBA()
 					r, g, bl, n = r+uint64(pr>>8), g+uint64(pg>>8), bl+uint64(pb>>8), n+1
 				}
 			}

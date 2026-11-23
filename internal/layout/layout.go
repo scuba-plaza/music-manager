@@ -57,7 +57,7 @@ func pathFor(t manifest.Track, suffix string, r Rules) string {
 	}
 	if t.Status != manifest.Identified {
 		name := t.ID
-		if hint := clean(t.Hint.Filename, r); hint != "Unknown" {
+		if hint := Component(t.Hint.Filename, r); hint != "Unknown" {
 			name += " - " + hint
 		}
 		return path.Join(inbox, stem(name, room)+suffix+ext)
@@ -66,7 +66,7 @@ func pathFor(t manifest.Track, suffix string, r Rules) string {
 	if r.Latin {
 		artistName, albumName, titleName = t.LatinArtist(), t.LatinAlbum(), t.LatinTitle()
 	}
-	artist, title := clean(artistName, r), clean(titleName, r)
+	artist, title := Component(artistName, r), Component(titleName, r)
 	if t.Album == "" {
 		return path.Join(artist, stem(title, room)+suffix+ext)
 	}
@@ -75,13 +75,13 @@ func pathFor(t manifest.Track, suffix string, r Rules) string {
 		width := max(2, len(strconv.Itoa(t.TrackTotal)))
 		number = fmt.Sprintf("%0*d - ", width, t.TrackNumber)
 	}
-	return path.Join(artist, clean(albumName, r), number+stem(title, room-len(number))+suffix+ext)
+	return path.Join(artist, Component(albumName, r), number+stem(title, room-len(number))+suffix+ext)
 }
 
 // PlaylistPath is where the playlist with this name is rendered:
 // Playlists/<name><ext>, with the name made safe for a file name.
 func PlaylistPath(name, ext string, r Rules) string {
-	return path.Join(playlistDir, clean(name, r)+ext)
+	return path.Join(playlistDir, Component(name, r)+ext)
 }
 
 // Assign returns the path of every track by ID. Tracks that would share a
@@ -119,13 +119,11 @@ func Unique(taken map[string]bool, file string) string {
 	return candidate
 }
 
-// Component is s as one path component under the rules: what a folder or the
-// name of a file is made of it, "Unknown" if nothing is left.
-func Component(s string, r Rules) string { return clean(s, r) }
-
-// clean makes s usable as one path component on any filesystem, with its
-// accents composed so that one name has one spelling.
-func clean(s string, r Rules) string {
+// Component is s as one path component under the rules, usable on any
+// filesystem, with its accents composed so that one name has one spelling:
+// what a folder or the name of a file is made of it, "Unknown" if nothing is
+// left.
+func Component(s string, r Rules) string {
 	s = norm.NFC.String(s)
 	if r.Fold != nil {
 		s = r.Fold(s)

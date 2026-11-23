@@ -57,19 +57,36 @@ func xingOffset(mpeg1, mono bool) int {
 	return 4 + 32
 }
 
-// isInfoFrame looks for the Xing/Info marker after the side information,
-// whose length depends on MPEG version and channel mode, or a VBRI marker.
+// isInfoFrame looks for a Xing or Info marker after the side information, or
+// a VBRI marker at its fixed place.
 func isInfoFrame(b []byte, mpeg1, mono bool) bool {
-	off := xingOffset(mpeg1, mono)
-	has := func(at int, markers ...string) bool {
-		for _, m := range markers {
-			if len(b) >= at+len(m) && string(b[at:at+len(m)]) == m {
-				return true
-			}
+	markerAt := func(at int) string {
+		if len(b) < at+4 {
+			return ""
 		}
-		return false
+		return string(b[at : at+4])
 	}
-	return has(off, "Xing", "Info") || has(4+32, "VBRI")
+	xing := markerAt(xingOffset(mpeg1, mono))
+	return xing == "Xing" || xing == "Info" || markerAt(4+32) == "VBRI"
+}
+
+func (f frame) duration() time.Duration {
+	return time.Duration(f.samples) * time.Second / time.Duration(f.rate)
+}
+
+// frames calls fn for each whole frame at the start of audio, in order, and
+// returns where that run of frames ends.
+func frames(audio []byte, fn func(pos int, f frame)) int {
+	pos := 0
+	for pos < len(audio) {
+		f, ok := frameAt(audio[pos:])
+		if !ok || f.size > len(audio)-pos {
+			break
+		}
+		fn(pos, f)
+		pos += f.size
+	}
+	return pos
 }
 
 // verifiedFrameAt reports a frame at b that fits in b and is followed by
@@ -110,7 +127,7 @@ func Parse(data []byte) ([]byte, time.Duration, error) {
 		}
 		if !f.info {
 			audio = append(audio, data[pos:pos+f.size]...)
-			dur += time.Duration(f.samples) * time.Second / time.Duration(f.rate)
+			dur += f.duration()
 		}
 		pos += f.size
 		synced = true
