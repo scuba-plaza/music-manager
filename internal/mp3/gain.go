@@ -38,6 +38,14 @@ func (s Shape) at(t float64) (steps int, silent bool) {
 	return s.Steps + int(math.Round(4*math.Log2(f))), false
 }
 
+// Level is the share of the full amplitude that the fades leave at time at:
+// 1 outside them, 0 before a fade-in and after a fade-out.
+func (s Shape) Level(at time.Duration) float64 { return s.level(at.Seconds()) }
+
+func (s Shape) level(t float64) float64 {
+	return ramp(s.FadeIn, t, true) * ramp(s.FadeOut, t, false)
+}
+
 // ramp is the share of the full amplitude that a fade leaves at time t.
 func ramp(f Fade, t float64, in bool) float64 {
 	if f.End <= f.Start {
@@ -92,7 +100,7 @@ func granulesOf(header []byte) granules {
 // by Parse, with a value for each channel.
 func GlobalGains(audio []byte) ([][]int, error) {
 	var out [][]int
-	err := eachFrame(audio, func(frame []byte, g granules, _ frameInfo) {
+	err := eachFrame(audio, func(frame []byte, g granules, _, _ float64) {
 		for i := 0; i < g.count; i += g.channels {
 			row := make([]int, g.channels)
 			for c := range row {
@@ -109,11 +117,11 @@ func GlobalGains(audio []byte) ([][]int, error) {
 // differs from audio, which is left as it is.
 func Adjust(audio []byte, shape Shape) ([]byte, error) {
 	out := append([]byte(nil), audio...)
-	err := eachFrame(out, func(frame []byte, g granules, info frameInfo) {
+	err := eachFrame(out, func(frame []byte, g granules, start, granule float64) {
 		side := frame[g.side : g.side+g.sideLen]
 		for i := 0; i < g.count; i++ {
 			at := g.first + i*g.stride
-			steps, silent := shape.at(info.start + (float64(i/g.channels)+0.5)*info.granule)
+			steps, silent := shape.at(start + (float64(i/g.channels)+0.5)*granule)
 			gain := min(max(getBits(side, at, 8)+steps, 0), 255)
 			if silent {
 				gain = 0
@@ -125,25 +133,21 @@ func Adjust(audio []byte, shape Shape) ([]byte, error) {
 	return out, err
 }
 
-// frameInfo says where a frame is in the audio: when it starts and how long a
-// granule of it is, in seconds.
-type frameInfo struct{ start, granule float64 }
-
 // eachFrame calls fn for every frame of audio that carries sound, with the
-// frame as a slice of audio, so that it can be changed in place.
-func eachFrame(audio []byte, fn func(frame []byte, g granules, info frameInfo)) error {
+// frame as a slice of audio, so that it can be changed in place, and when the
+// frame starts and how long a granule of it is, in seconds.
+func eachFrame(audio []byte, fn func(frame []byte, g granules, start, granule float64)) error {
 	var elapsed float64
-	for pos := 0; pos < len(audio); {
-		f, ok := frameAt(audio[pos:])
-		if !ok || f.size > len(audio)-pos {
-			return fmt.Errorf("mp3: no frame at byte %d", pos)
+	end := frames(audio, func(pos int, f frame) {
+		if f.info {
+			return
 		}
-		if !f.info {
-			frame := audio[pos : pos+f.size]
-			fn(frame, granulesOf(frame), frameInfo{start: elapsed, granule: 576 / float64(f.rate)})
-			elapsed += float64(f.samples) / float64(f.rate)
-		}
-		pos += f.size
+		frame := audio[pos : pos+f.size]
+		fn(frame, granulesOf(frame), elapsed, 576/float64(f.rate))
+		elapsed += float64(f.samples) / float64(f.rate)
+	})
+	if end < len(audio) {
+		return fmt.Errorf("mp3: no frame at byte %d", end)
 	}
 	return nil
 }
@@ -193,12 +197,4 @@ func crc16(crc uint16, b []byte) uint16 {
 		}
 	}
 	return crc
-}
-
-// Level is the share of the full amplitude that the fades leave at time at:
-// 1 outside them, 0 before a fade-in and after a fade-out.
-func (s Shape) Level(at time.Duration) float64 { return s.level(at.Seconds()) }
-
-func (s Shape) level(t float64) float64 {
-	return ramp(s.FadeIn, t, true) * ramp(s.FadeOut, t, false)
 }
