@@ -1,7 +1,7 @@
 import { currentField, isTrack, nudgeable } from '../state/inspector';
 import type { AppState } from '../state/store';
 
-export type Scope = 'common' | 'tree' | 'inspector';
+type Scope = 'common' | 'tree' | 'inspector';
 
 export type KeyEventLike = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey' | 'isComposing'>;
 
@@ -10,7 +10,7 @@ export interface Hint {
   label: string;
 }
 
-export type HelpPage = 'Moving' | 'Editing' | 'Marking' | 'Library';
+type HelpPage = 'Moving' | 'Editing' | 'Marking' | 'Library';
 
 export type ActionName =
   | 'moveUp'
@@ -260,11 +260,11 @@ const editBindings: readonly { key: string; hint: string; second?: boolean }[] =
   { key: 'Escape', hint: 'cancel' },
 ];
 
-export function editHints(second: boolean): readonly { keys: string; label: string }[] {
+export function editHints(second: boolean): readonly Hint[] {
   return editBindings.flatMap((b) => (b.second === true && !second ? [] : [{ keys: keyLabel(b.key), label: b.hint }]));
 }
 
-export function filterHints(): readonly { keys: string; label: string }[] {
+export function filterHints(): readonly Hint[] {
   return filterBindings.flatMap((b) => (b.hint === undefined ? [] : [{ keys: keyLabel(b.key), label: b.hint }]));
 }
 
@@ -282,7 +282,7 @@ function grouped<T>(items: readonly T[], same: (a: T, b: T) => boolean): T[][] {
   return groups;
 }
 
-export function hintsFor(s: AppState): readonly { keys: string; label: string }[] {
+export function hintsFor(s: AppState): readonly Hint[] {
   if (s.overlay !== null || s.edit !== null) {
     return [];
   }

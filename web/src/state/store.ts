@@ -4,7 +4,7 @@ import type { Hint } from '../keys/keymap';
 
 export type Focus = 'tree' | 'inspector';
 
-export type OverlayState =
+type OverlayState =
   | { kind: 'ask'; head: string; body: string[]; yes: string; onYes: () => void }
   | { kind: 'help' }
   | { kind: 'sort' }
@@ -23,14 +23,6 @@ export interface EditState {
   note?: string;
   error?: string;
   wrong?: Readonly<Record<string, string>>;
-}
-
-export function closeOverlay(): void {
-  useApp.setState({ overlay: null });
-}
-
-export function ask(head: string, body: string[], yes: string, onYes: () => void): void {
-  useApp.setState({ overlay: { kind: 'ask', head, body, yes, onYes } });
 }
 
 export interface AppState {
@@ -113,3 +105,11 @@ useApp.subscribe((state, previous) => {
     remember(expandedKey, JSON.stringify([...state.expanded]));
   }
 });
+
+export function closeOverlay(): void {
+  useApp.setState({ overlay: null });
+}
+
+export function ask(head: string, body: string[], yes: string, onYes: () => void): void {
+  useApp.setState({ overlay: { kind: 'ask', head, body, yes, onYes } });
+}

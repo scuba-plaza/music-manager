@@ -11,7 +11,6 @@ import {
   fetchLink,
   leaveField,
   removeDraftCover,
-  retryAdd,
   saveAdd,
   setField,
   showDuplicate,
@@ -36,7 +35,7 @@ const fields: readonly { key: Exclude<AddKey, 'of'>; label: string }[] = [
 const enterActions: Partial<Record<AddPhase, () => void>> = {
   asking: fetchLink,
   duplicate: showDuplicate,
-  failed: retryAdd,
+  failed: fetchLink,
 };
 
 const hintsFor: Record<AddPhase, readonly Hint[]> = {

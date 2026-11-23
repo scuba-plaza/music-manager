@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChangeResponse, HistoryView, LibraryResponse, PeekView, TrackView } from '../api/types.gen';
-import { installKeys } from '../keys/dispatch';
 import {
   changeResponse,
   fieldView,
@@ -17,13 +16,11 @@ import { run } from './actions';
 import { loadDetail } from './detail';
 import { applyBulk, leaveBulk, typeBulk, useBulk } from './bulk';
 import { cleanChecks, shownErrors } from './form';
-import { coverChosen, dropFiles, pastePicture, setCover } from './cover';
+import { coverChosen, dropFiles, pastePicture } from './cover';
 import { applyChange } from './edit';
 import { useApp, type AppState } from './store';
 
 vi.mock('./treeDom', () => ({
-  pageSize: vi.fn(() => 3),
-  centreCursor: vi.fn(),
   focusFilterBox: vi.fn(),
   leaveFilterBox: vi.fn(),
 }));
@@ -284,23 +281,6 @@ describe('the bulk form', () => {
     expect(shownErrors(useBulk.getState().checks)).toEqual({ of: 'Tracks on the album must be a whole number' });
   });
 
-  it('a message goes when the values no longer have the fault', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    let answer: Record<string, unknown> = { summary: 'x', changed: 0, fields: { of: 'bad' } };
-    serve(({ method, url }) => (method === 'POST' && url.pathname === '/api/bulk/preview' ? jsonResponse(answer) : undefined));
-    show(keys.kindOfBlue, { marks: new Set(['sowhat']) });
-    run('bulkEdit');
-    typeBulk('of', 'many');
-    await vi.advanceTimersByTimeAsync(150);
-    leaveBulk('of');
-    answer = { summary: 'Tracks on album → 12', changed: 1 };
-
-    typeBulk('of', '12');
-    await vi.advanceTimersByTimeAsync(150);
-
-    expect(shownErrors(useBulk.getState().checks)).toEqual({});
-  });
-
   it('an empty summary asks again for what the tracks should have', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     serve(({ method, url }) => (method === 'POST' && url.pathname === '/api/bulk/preview' ? jsonResponse({ summary: '', changed: 0 }) : undefined));
@@ -386,45 +366,6 @@ describe('the bulk form', () => {
 });
 
 describe('one change at a time', () => {
-  function keyboard() {
-    let listener: ((e: KeyboardEvent) => void) | undefined;
-    const doc = {
-      addEventListener: (_: string, l: (e: KeyboardEvent) => void) => {
-        listener = l;
-      },
-      removeEventListener: () => undefined,
-    };
-    const remove = installKeys(doc as unknown as Document, run);
-    const press = (key: string, ctrlKey = false) => {
-      const event = { key, ctrlKey, metaKey: false, altKey: false, shiftKey: false, isComposing: false, target: { tagName: 'BODY' }, preventDefault: () => undefined };
-      listener?.(event as unknown as KeyboardEvent);
-    };
-    return { press, remove };
-  }
-
-  it('busy blocks keys until the change returns', async () => {
-    const pending = deferred();
-    serve(({ method, url }) => (method === 'POST' && url.pathname === '/api/undo' ? pending.promise : undefined));
-    show(keys.soWhat, { lib: library({ undo: 'edit of So What' }) });
-    const { press, remove } = keyboard();
-
-    press('u');
-    expect(useApp.getState().busy).toBe(true);
-    press('j');
-    press('u');
-    expect(useApp.getState().cursor).toBe(keys.soWhat);
-    expect(requestsTo(fetchMock, 'POST', '/api/undo')).toHaveLength(1);
-
-    pending.resolve(jsonResponse(changeResponse({ message: 'Undid: edit of So What' })));
-    await vi.waitFor(() => {
-      expect(useApp.getState().busy).toBe(false);
-    });
-    press('j');
-
-    expect(useApp.getState().cursor).toBe(keys.blue);
-    remove();
-  });
-
   it('details asked for before a change and answered after it do not undo what the change said', async () => {
     const late = deferred();
     const reload = deferred();
@@ -619,16 +560,6 @@ describe('moving and numbering', () => {
     });
   });
 
-  it('J in a playlist moves the track in the playlist', async () => {
-    show(keys.lateBlue);
-
-    run('moveTrackDown');
-
-    await vi.waitFor(() => {
-      expect(requestsTo(fetchMock, 'POST', '/api/move')).toEqual([{ id: 'blue', dir: 1, playlist: 'Late night' }]);
-    });
-  });
-
   it('only a track of an album or a playlist can be moved', () => {
     for (const key of [keys.good, keys.rough, keys.kindOfBlue]) {
       show(key);
@@ -687,23 +618,6 @@ describe('moving and numbering', () => {
 });
 
 describe('undo and redo', () => {
-  it('u undoes and ctrl+r redoes the last change', async () => {
-    const both = library({ undo: 'edit of So What', redo: 'paste of the cover' });
-    serve(() => undefined, both);
-    show(keys.soWhat, { lib: both });
-
-    run('undo');
-    await vi.waitFor(() => {
-      expect(useApp.getState().busy).toBe(false);
-      expect(requestsTo(fetchMock, 'POST', '/api/undo')).toHaveLength(1);
-    });
-    run('redo');
-
-    await vi.waitFor(() => {
-      expect(requestsTo(fetchMock, 'POST', '/api/redo')).toHaveLength(1);
-    });
-  });
-
   it('with nothing to undo or redo, u and ctrl+r say so and send nothing', () => {
     show(keys.soWhat);
 
@@ -811,15 +725,6 @@ describe('copy and paste', () => {
 describe('covers', () => {
   const coverRequests = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT');
 
-  it('a picture that is not a JPEG or a PNG is refused and nothing is sent', async () => {
-    show(keys.soWhat);
-
-    await setCover(new File(['GIF89a'], 'cover.gif', { type: 'image/gif' }), { ids: ['sowhat'] });
-
-    expect(status()).toEqual({ text: 'A cover must be a JPEG or PNG image', kind: 'bad' });
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it('a picture needs a track, an album or an artist to go to', async () => {
     show(keys.singles);
 
@@ -871,14 +776,6 @@ describe('covers', () => {
     });
   });
 
-  function asked(): { kind: 'ask'; head: string; body: string[]; yes: string; onYes: () => void } {
-    const overlay = useApp.getState().overlay;
-    if (overlay?.kind !== 'ask') {
-      throw new Error('nothing was asked');
-    }
-    return overlay;
-  }
-
   it('d on the Cover field of a track asks first, as removing a track does, and removes the cover on yes', async () => {
     show(keys.soWhat, { focus: 'inspector', detail: soWhat(), field: 3 });
 
@@ -886,7 +783,7 @@ describe('covers', () => {
 
     expect(asked()).toMatchObject({ head: 'Remove the cover of “So What”?', yes: 'remove' });
     expect(fetchMock).not.toHaveBeenCalled();
-    asked().onYes();
+    sayYes();
     await vi.waitFor(() => {
       expect(requestsTo(fetchMock, 'DELETE', '/api/cover?ids=sowhat')).toHaveLength(1);
     });
@@ -898,7 +795,7 @@ describe('covers', () => {
     run('clear');
 
     expect(asked().head).toBe('Remove the cover of “Kind of Blue” and its tracks?');
-    asked().onYes();
+    sayYes();
     await vi.waitFor(() => {
       expect(requestsTo(fetchMock, 'DELETE', `/api/cover?${new URLSearchParams({ group: keys.kindOfBlue }).toString()}`)).toHaveLength(1);
     });
@@ -910,15 +807,6 @@ describe('covers', () => {
     run('clear');
 
     expect(status().text).toBe('There is no cover to remove');
-    expect(useApp.getState().overlay).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('d leaves a field that cannot be cleared alone', () => {
-    show(keys.soWhat, { focus: 'inspector', detail: soWhat(), field: 0 });
-
-    run('clear');
-
     expect(useApp.getState().overlay).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });

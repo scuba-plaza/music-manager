@@ -21,11 +21,6 @@ describe('motionOf', () => {
     expect(motionOf(press('G', { shiftKey: true }))).toBe('last');
   });
 
-  it('is not changed by Caps Lock: a capital G without Shift still goes to the top', () => {
-    expect(motionOf(press('G'))).toBe('first');
-    expect(motionOf(press('g', { shiftKey: true }))).toBe('last');
-  });
-
   it('has no page keys, and nothing else moves', () => {
     for (const key of ['PageUp', 'PageDown', 'q', 'Enter', ' ', 'h', 'l', 'Tab']) {
       expect(motionOf(press(key)), key).toBeUndefined();

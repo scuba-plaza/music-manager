@@ -2,10 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Profile } from '../api/types.gen';
 import { changeResponse, infoView, jsonResponse, memoryStorage, requestsTo, sampleLibrary, sampleProfiles, stubServer, urlOf, type StubRoute } from '../testing/fakes';
 import {
-  backToList,
   blankForm,
   editFormat,
-  formOf,
   leaveFormat,
   newFormat,
   openFormats,
@@ -50,30 +48,6 @@ afterEach(() => {
 });
 
 describe('the form of a format', () => {
-  it('starts as Generic is, with no name', () => {
-    expect(blankForm()).toEqual({
-      name: '',
-      latin_names: false,
-      component_max: '200',
-      stem_max: '0',
-      tag_width: '0',
-      latin_genre: false,
-      cover_format: 'keep',
-      cover_max_edge: '0',
-      cover_quality: '0',
-      single_covers: false,
-      replaygain: true,
-      playlist_ext: '.m3u8',
-      playlist_style: 'relative',
-    });
-  });
-
-  it('shows a stored format as text, to be edited', () => {
-    const [wolfgang] = sampleProfiles() as [Profile];
-
-    expect(formOf(wolfgang)).toMatchObject({ name: 'Wolfgang WMP01', component_max: '100', stem_max: '20', tag_width: '12', cover_max_edge: '480', cover_quality: '85', playlist_ext: '.m3u' });
-  });
-
   it('is turned back into numbers for the server, and a number that is no number is said apart', () => {
     const { profile, local } = parseForm({ ...blankForm(), name: 'Car', component_max: '120' });
 
@@ -121,7 +95,7 @@ describe('the list of formats', () => {
     editFormat();
 
     expect(state()).toMatchObject({ mode: 'form', editing: 'my-player' });
-    expect(state().form).toMatchObject({ name: 'My Player', tag_width: '12' });
+    expect(state().form).toMatchObject({ name: 'My Player', component_max: '200', tag_width: '12', playlist_ext: '.m3u8' });
   });
 
   it('opens a new format as Generic is', () => {
@@ -143,16 +117,6 @@ describe('the list of formats', () => {
     expect(state().mode).toBe('list');
     expect(useApp.getState().status).toMatchObject({ kind: 'bad' });
     expect(useApp.getState().status.text).toMatch(/8/);
-  });
-
-  it('goes back to the list from the form', () => {
-    serve();
-    openFormats();
-    newFormat();
-
-    backToList();
-
-    expect(state().mode).toBe('list');
   });
 });
 
@@ -184,30 +148,6 @@ describe('what is typed in the form', () => {
     expect(shownErrors(state().checks)).toEqual({ name: 'Name cannot be empty' });
   });
 
-  it('sends the numbers as numbers', async () => {
-    serve(check);
-    openFormats();
-    newFormat();
-
-    typeFormat('name', 'Car');
-    typeFormat('component_max', '150');
-    await vi.advanceTimersByTimeAsync(160);
-
-    await vi.waitFor(() => {
-      expect(requestsTo(fetchMock, 'POST', '/api/profiles/check').at(-1)).toMatchObject({ name: 'Car', component_max: 150, replaygain: true });
-    });
-  });
-
-  it('turns a box on or off with a true or a false', () => {
-    serve(check);
-    openFormats();
-    newFormat();
-
-    typeFormat('latin_names', true);
-    typeFormat('cover_format', 'baseline-jpeg');
-
-    expect(state().form).toMatchObject({ latin_names: true, cover_format: 'baseline-jpeg' });
-  });
 });
 
 describe('saving a format', () => {

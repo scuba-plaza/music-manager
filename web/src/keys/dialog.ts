@@ -2,7 +2,7 @@ import { keyName, type KeyEventLike } from './keymap';
 
 export type Motion = 'up' | 'down' | 'first' | 'last';
 
-export type Answer = 'yes' | 'no';
+type Answer = 'yes' | 'no';
 
 const motions = new Map<string, Motion>([
   ['ArrowUp', 'up'],

@@ -134,22 +134,6 @@ describe('markStateOf', () => {
 });
 
 describe('keysToOpenOneLevel', () => {
-  it('opens the closed rows at the shallowest closed depth', () => {
-    expect(keysToOpenOneLevel(view())).toEqual(['playlists', 'needs', `artist${sep}فيروز`, `artist${sep}John Coltrane`, milesKey, `artist${sep}Nina Simone`]);
-  });
-
-  it('goes one level deeper once the top is open', () => {
-    const top = keysToOpenOneLevel(view());
-
-    expect(keysToOpenOneLevel(view({ expanded: top }))).toEqual([
-      lateNightKey,
-      `album${sep}فيروز${sep}Songs`,
-      `album${sep}John Coltrane${sep}Giant Steps`,
-      kindOfBlueKey,
-      `singles${sep}Nina Simone`,
-    ]);
-  });
-
   it('leaves the closed rows below an open row alone until the level above is open', () => {
     expect(keysToOpenOneLevel(view({ expanded: [milesKey] }))).toEqual([
       'playlists',

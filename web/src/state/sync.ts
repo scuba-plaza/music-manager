@@ -5,12 +5,12 @@ import { loadLibrary } from './library';
 import { fail, setStatus } from './status';
 import { follow, stopJob } from './jobs';
 import { formatChoices, genericId } from './profiles';
-import { useApp } from './store';
+import { closeOverlay, useApp } from './store';
 import { messageOf } from './text';
 
 export type SyncPhase = 'choosing' | 'typing' | 'planning' | 'reviewing' | 'confirming' | 'applying' | 'finished' | 'failed';
 
-export interface SyncState {
+interface SyncState {
   phase: SyncPhase;
   targets: TargetView[];
   cursor: number;
@@ -26,8 +26,6 @@ export interface SyncState {
   confirm: string;
 }
 
-export const genericProfile = genericId;
-
 const anotherFolder: TargetView = { label: 'Another folder…', path: '', kind: 'folder' };
 const stopped = 'The sync was stopped.';
 
@@ -36,7 +34,7 @@ function fresh(): SyncState {
     phase: 'choosing',
     targets: [],
     cursor: 0,
-    profile: genericProfile,
+    profile: genericId,
     folder: '',
     folderError: '',
     confirmError: '',
@@ -53,13 +51,12 @@ export const useSync = create<SyncState>()(fresh);
 
 let session = 0;
 
-
 function target(): TargetView | undefined {
   const { targets, cursor } = useSync.getState();
   return targets[cursor];
 }
 
-export function isLibraryTarget(): boolean {
+function isLibraryTarget(): boolean {
   return target()?.kind === 'library';
 }
 
@@ -211,7 +208,7 @@ export function applyPlan(): void {
     return;
   }
   if (plan.ops.length === 0) {
-    useApp.setState({ overlay: null });
+    closeOverlay();
     return;
   }
   if (plan.counts.remove > 0) {

@@ -3,12 +3,12 @@ import { get } from '../api/client';
 import { moveTo, type Motion } from '../keys/dialog';
 import type { DoctorView } from '../api/types.gen';
 import { loadLibrary } from './library';
-import { useApp } from './store';
+import { closeOverlay, useApp } from './store';
 import { messageOf } from './text';
 
-export type DoctorPhase = 'checking' | 'done' | 'failed';
+type DoctorPhase = 'checking' | 'done' | 'failed';
 
-export interface DoctorState {
+interface DoctorState {
   phase: DoctorPhase;
   result: DoctorView | null;
   error: string;
@@ -58,7 +58,7 @@ export function goToProblem(): void {
   if (problem === undefined) {
     return;
   }
-  useApp.setState({ overlay: null });
+  closeOverlay();
   void loadLibrary({ reveal: problem.trackId });
 }
 

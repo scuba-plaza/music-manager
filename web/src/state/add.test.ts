@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddForm, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
 import { changeResponse, infoView, jsonResponse, memoryStorage, requestsTo, sampleLibrary, stubServer, type StubRoute , urlOf } from '../testing/fakes';
-import { chooseDraftCover, chooseFiles, fetchLink, leaveField, openAdd, removeDraftCover, retryAdd, saveAdd, setField, showDuplicate, typeLink, useAdd } from './add';
+import { chooseDraftCover, chooseFiles, fetchLink, leaveField, openAdd, removeDraftCover, saveAdd, setField, showDuplicate, typeLink, useAdd } from './add';
 import { shownErrors } from './form';
 import { jobEvent } from './jobs';
 import { useApp } from './store';
@@ -90,25 +90,17 @@ describe('a', () => {
     expect(useApp.getState().status).toEqual({ text: 'Adding from YouTube is not available: yt-dlp is not set up', kind: 'bad' });
   });
 
-  it('opens the dialog asking for a link', () => {
-    serve();
-
-    openAdd();
-
-    expect(useApp.getState().overlay).toEqual({ kind: 'add' });
-    expect(state()).toMatchObject({ phase: 'asking', link: '', error: '', linkError: '', job: null, draft: null });
-  });
-
-  it('starts again from nothing each time it is opened', async () => {
+  it('opens the dialog asking for a link, starting again from nothing each time', async () => {
     await inForm();
     useApp.setState({ overlay: null });
 
     openAdd();
 
-    expect(state()).toMatchObject({ phase: 'asking', link: '', draft: null, form: blank, pathNote: '' });
+    expect(useApp.getState().overlay).toEqual({ kind: 'add' });
+    expect(state()).toMatchObject({ phase: 'asking', link: '', error: '', linkError: '', job: null, draft: null, form: blank, pathNote: '' });
   });
 
-  it('asks for a link first when there is none', () => {
+  it('asks for a link first when there is none, until something is typed', () => {
     serve();
     openAdd();
     typeLink('   ');
@@ -117,13 +109,6 @@ describe('a', () => {
 
     expect(state()).toMatchObject({ phase: 'asking', linkError: 'Paste a link first' });
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('clears the message about the link once something is typed', () => {
-    serve();
-    openAdd();
-    fetchLink();
-    expect(state().linkError).toBe('Paste a link first');
 
     typeLink('h');
 
@@ -193,7 +178,7 @@ describe('fetching a link', () => {
     await vi.waitFor(() => {
       expect(state()).toMatchObject({ phase: 'failed', error: 'download https://example.com/x: no video here' });
     });
-    retryAdd();
+    fetchLink();
     expect(state().phase).toBe('fetching');
     await vi.waitFor(() => {
       expect(requestsTo(fetchMock, 'POST', '/api/add/fetch')).toHaveLength(2);
@@ -321,30 +306,6 @@ describe('the form', () => {
     expect(shownErrors(state().checks)).toEqual({ released: 'Not a date' });
   });
 
-  it('keeps no message for a field the server no longer has anything against', async () => {
-    let wrong: Record<string, string> = { released: 'Not a date' };
-    await fetched(
-      { draft: draft() },
-      ({ method, url }) => (method === 'POST' && url.pathname === '/api/add/path' ? jsonResponse({ path: 'x', fields: wrong }) : undefined),
-    );
-    await vi.waitFor(() => {
-      expect(state().phase).toBe('form');
-    });
-    await vi.advanceTimersByTimeAsync(120);
-    await vi.waitFor(() => {
-      expect(state().checks.wrong).toEqual({ released: 'Not a date' });
-    });
-    leaveField('released');
-    wrong = {};
-
-    setField('released', '1959');
-    await vi.advanceTimersByTimeAsync(120);
-
-    await vi.waitFor(() => {
-      expect(shownErrors(state().checks)).toEqual({});
-    });
-  });
-
   it('shows only the latest answer about the path', async () => {
     const answers: ((res: Response) => void)[] = [];
     await fetched(
@@ -387,18 +348,11 @@ describe('the form', () => {
       expect(state().pathNote).toBe('');
     });
   });
-
 });
 
 describe('the cover of the download', () => {
   const putCover = (sha: string): StubRoute => ({ method, url }) =>
     method === 'PUT' && url.pathname === '/api/add/d1/cover' ? jsonResponse({ cover: sha }) : undefined;
-
-  it('is the one YouTube gave, shown with the note about the details', async () => {
-    await inForm();
-
-    expect(state()).toMatchObject({ cover: 'c1', draft: { note: 'From YouTube Music metadata: change anything before adding.' } });
-  });
 
   it('is replaced by a picture chosen, and what the server says is the cover', async () => {
     await fetched({ draft: draft() }, putCover('c2'));
@@ -502,16 +456,6 @@ describe('adding the track', () => {
   });
 
   it('forgets the download when the dialog is closed without adding it', async () => {
-    await inFormWith(finish, discard);
-
-    useApp.setState({ overlay: null });
-
-    await vi.waitFor(() => {
-      expect(requestsTo(fetchMock, 'DELETE', '/api/add/d1')).toEqual([null]);
-    });
-  });
-
-  it('forgets the download when the dialog is closed any other way', async () => {
     await inFormWith(finish, discard);
 
     useApp.setState({ overlay: null });

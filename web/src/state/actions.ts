@@ -204,7 +204,7 @@ export function composeFilter(active: boolean): void {
   }
 }
 
-export function setFilter(text: string): void {
+function setFilter(text: string): void {
   clearTimeout(filterTimer);
   change({ filter: text });
   void loadLibrary();
@@ -232,11 +232,13 @@ export function markRow(key: string): void {
   toggleMark();
 }
 
-function toggleFocus(focus: Focus): void {
-  const row = cursorRow();
-  if (focus === 'inspector') {
+function toggleFocus(): void {
+  if (useApp.getState().focus === 'inspector') {
     focusPane('tree');
-  } else if (row !== undefined) {
+    return;
+  }
+  const row = cursorRow();
+  if (row !== undefined) {
     enterFields(row);
   }
 }
@@ -252,6 +254,17 @@ function escape(): void {
     setFilter('');
   } else if (marks.size > 0) {
     useApp.setState({ marks: new Set() });
+  }
+}
+
+function runFilter(action: 'focusFilter' | 'filterAccept' | 'filterClear'): void {
+  if (action === 'focusFilter') {
+    focusFilterBox();
+    return;
+  }
+  leaveFilterBox();
+  if (action === 'filterClear') {
+    setFilter('');
   }
 }
 
@@ -361,7 +374,7 @@ export function run(action: ActionName): void {
       copyField();
       break;
     case 'toggleFocus':
-      toggleFocus(useApp.getState().focus);
+      toggleFocus();
       break;
     case 'focusFilter':
     case 'filterAccept':
@@ -400,17 +413,6 @@ export function run(action: ActionName): void {
       break;
     default:
       assertNever(action);
-  }
-}
-
-function runFilter(action: 'focusFilter' | 'filterAccept' | 'filterClear'): void {
-  if (action === 'focusFilter') {
-    focusFilterBox();
-    return;
-  }
-  leaveFilterBox();
-  if (action === 'filterClear') {
-    setFilter('');
   }
 }
 

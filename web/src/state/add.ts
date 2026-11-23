@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ApiError, send } from '../api/client';
+import { ApiError, fieldErrors, send } from '../api/client';
 import type { AddCheck, AddForm, ChangeResponse, DraftCoverView, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
 import { cleanChecks, firstWrong, left, tried, verdict, type FormChecks } from './form';
 import { loadLibrary } from './library';
@@ -7,14 +7,14 @@ import { setStatus } from './status';
 import { applyChange } from './edit';
 import { uploadFiles } from './ingest';
 import { follow, stopJob } from './jobs';
-import { useApp } from './store';
+import { closeOverlay, useApp } from './store';
 import { messageOf } from './text';
 
 export type AddPhase = 'asking' | 'fetching' | 'form' | 'saving' | 'duplicate' | 'failed';
 
 export type AddKey = keyof AddForm;
 
-export interface AddState {
+interface AddState {
   phase: AddPhase;
   link: string;
   error: string;
@@ -160,39 +160,30 @@ export function fetchLink(): void {
   );
 }
 
-export function retryAdd(): void {
-  fetchLink();
-}
-
 export function setField(key: AddKey, text: string): void {
   useAdd.setState((s) => ({ form: { ...s.form, [key]: text } }));
   askForPath();
 }
 
-export async function chooseDraftCover(file: File): Promise<void> {
+async function changeDraftCover(method: 'PUT' | 'DELETE', file?: File): Promise<void> {
   const { draft } = useAdd.getState();
   if (draft === null) {
     return;
   }
   try {
-    const res = await send<DraftCoverView>('PUT', `/api/add/${encodeURIComponent(draft.draft)}/cover`, file);
+    const res = await send<DraftCoverView>(method, `/api/add/${encodeURIComponent(draft.draft)}/cover`, file);
     useAdd.setState({ cover: res.cover, coverError: '' });
   } catch (err) {
     useAdd.setState({ coverError: messageOf(err) });
   }
 }
 
-export async function removeDraftCover(): Promise<void> {
-  const { draft } = useAdd.getState();
-  if (draft === null) {
-    return;
-  }
-  try {
-    const res = await send<DraftCoverView>('DELETE', `/api/add/${encodeURIComponent(draft.draft)}/cover`);
-    useAdd.setState({ cover: res.cover, coverError: '' });
-  } catch (err) {
-    useAdd.setState({ coverError: messageOf(err) });
-  }
+export function chooseDraftCover(file: File): Promise<void> {
+  return changeDraftCover('PUT', file);
+}
+
+export function removeDraftCover(): Promise<void> {
+  return changeDraftCover('DELETE');
 }
 
 export function leaveField(key: AddKey): void {
@@ -208,16 +199,16 @@ export async function saveAdd(): Promise<AddKey | undefined> {
   try {
     await applyChange(() => send<ChangeResponse>('POST', '/api/add/finish', { draft: draft.draft, form }));
   } catch (err) {
-    if (err instanceof ApiError && Object.keys(err.fields).length > 0) {
-      useAdd.setState((s) => ({ phase: 'form', checks: tried(verdict(s.checks, err.fields)) }));
-      const first = firstWrong(useAdd.getState().checks, addOrder);
-      return addOrder.find((key) => key === first);
+    const wrong = fieldErrors(err);
+    if (wrong !== undefined) {
+      useAdd.setState((s) => ({ phase: 'form', checks: tried(verdict(s.checks, wrong)) }));
+      return firstWrong(useAdd.getState().checks, addOrder);
     }
     useAdd.setState({ phase: 'form', error: messageOf(err) });
     return undefined;
   }
   finished = true;
-  useApp.setState({ overlay: null });
+  closeOverlay();
   return undefined;
 }
 
@@ -226,7 +217,7 @@ export function showDuplicate(): void {
   if (existing === null) {
     return;
   }
-  useApp.setState({ overlay: null });
+  closeOverlay();
   void loadLibrary({ reveal: existing.id });
 }
 
@@ -234,7 +225,7 @@ export function chooseFiles(files: readonly File[]): void {
   if (files.length === 0) {
     return;
   }
-  useApp.setState({ overlay: null });
+  closeOverlay();
   void uploadFiles(files);
 }
 

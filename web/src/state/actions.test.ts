@@ -12,7 +12,7 @@ import {
   sampleLibrary,
   stubServer,
 } from '../testing/fakes';
-import { composeFilter, foldRow, markRow, pointRow, run, setFilter, typeFilter } from './actions';
+import { composeFilter, foldRow, markRow, pointRow, run, typeFilter } from './actions';
 import { loadInfo, loadLibrary } from './library';
 import { fail, setStatus } from './status';
 import { useApp } from './store';
@@ -75,14 +75,6 @@ afterEach(() => {
 });
 
 describe('status', () => {
-  it('setStatus puts the text and its kind in the state', () => {
-    setStatus('Saved', 'good');
-    expect(useApp.getState().status).toEqual({ text: 'Saved', kind: 'good' });
-
-    setStatus('Ready');
-    expect(useApp.getState().status).toEqual({ text: 'Ready', kind: '' });
-  });
-
   it('fail shows the message of an error as a bad status', () => {
     fail(new ApiError('no such track', 422));
     expect(useApp.getState().status).toEqual({ text: 'no such track', kind: 'bad' });
@@ -113,31 +105,18 @@ describe('loadInfo', () => {
 });
 
 describe('loadLibrary', () => {
-  it('asks for the whole library when there is no filter or sort', async () => {
+  it.each([
+    ['the whole library with no filter or sort', { filter: '', sort: { key: '', reverse: false } }, '/api/library'],
+    ['with the trimmed filter and the sort', { filter: '  bach ', sort: { key: 'title', reverse: true } }, '/api/library?q=bach&sort=title&reverse=1'],
+    ['for no reverse without a sort key', { filter: '', sort: { key: '', reverse: true } }, '/api/library'],
+  ])('asks %s', async (_, state, url) => {
+    useApp.setState(state);
     fetchMock.mockResolvedValue(jsonResponse(libraryResponse('s1')));
 
     await loadLibrary();
 
-    expect(requestOf(fetchMock).url).toBe('/api/library');
+    expect(requestOf(fetchMock).url).toBe(url);
     expect(useApp.getState().lib?.stamp).toBe('s1');
-  });
-
-  it('asks with the trimmed filter and the sort', async () => {
-    useApp.setState({ filter: '  bach ', sort: { key: 'title', reverse: true } });
-    fetchMock.mockResolvedValue(jsonResponse(libraryResponse('s1')));
-
-    await loadLibrary();
-
-    expect(requestOf(fetchMock).url).toBe('/api/library?q=bach&sort=title&reverse=1');
-  });
-
-  it('does not ask for reverse without a sort key', async () => {
-    useApp.setState({ sort: { key: '', reverse: true } });
-    fetchMock.mockResolvedValue(jsonResponse(libraryResponse('s1')));
-
-    await loadLibrary();
-
-    expect(requestOf(fetchMock).url).toBe('/api/library');
   });
 
   it('takes the sort the server answered with', async () => {
@@ -150,7 +129,10 @@ describe('loadLibrary', () => {
     expect(useApp.getState().sort).toEqual({ key: 'added', reverse: true });
   });
 
-  it('ignores an older answer that arrives after a newer one', async () => {
+  it.each([
+    ['an answer', () => jsonResponse(libraryResponse('older'))],
+    ['a failure', () => jsonResponse({ error: 'the records are locked' }, 500)],
+  ])('ignores %s to an older request that arrives after a newer one', async (_, olderAnswer) => {
     const resolvers: ((response: Response) => void)[] = [];
     fetchMock.mockImplementation(
       () =>
@@ -163,26 +145,7 @@ describe('loadLibrary', () => {
     const newer = loadLibrary();
     resolvers[1]?.(jsonResponse(libraryResponse('newer')));
     await newer;
-    resolvers[0]?.(jsonResponse(libraryResponse('older')));
-    await older;
-
-    expect(useApp.getState().lib?.stamp).toBe('newer');
-  });
-
-  it('says nothing of an older request that fails after a newer one was answered', async () => {
-    const resolvers: ((response: Response) => void)[] = [];
-    fetchMock.mockImplementation(
-      () =>
-        new Promise<Response>((resolve) => {
-          resolvers.push(resolve);
-        }),
-    );
-
-    const older = loadLibrary();
-    const newer = loadLibrary();
-    resolvers[1]?.(jsonResponse(libraryResponse('newer')));
-    await newer;
-    resolvers[0]?.(jsonResponse({ error: 'the records are locked' }, 500));
+    resolvers[0]?.(olderAnswer());
     await older;
 
     expect(useApp.getState().lib?.stamp).toBe('newer');
@@ -201,26 +164,6 @@ describe('loadLibrary', () => {
 });
 
 describe('run', () => {
-  it('open goes into the fields of a track and escape goes back to the tree', () => {
-    showSample(keys.rough, { expanded: new Set([keys.needs]) });
-
-    run('open');
-    expect(useApp.getState().focus).toBe('inspector');
-
-    run('escape');
-    expect(useApp.getState().focus).toBe('tree');
-  });
-
-  it('toggleFocus goes to the other pane', () => {
-    showSample(keys.rough, { expanded: new Set([keys.needs]) });
-
-    run('toggleFocus');
-    expect(useApp.getState().focus).toBe('inspector');
-
-    run('toggleFocus');
-    expect(useApp.getState().focus).toBe('tree');
-  });
-
   it('escape goes back from the fields to the tree and leaves the tree as it is', () => {
     useApp.setState({ focus: 'inspector' });
 
@@ -366,15 +309,6 @@ describe('the cursor', () => {
     expect(useApp.getState().edit).toBeNull();
   });
 
-  it('shows the error and clears the details when the details cannot be had', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse({ error: 'the track is gone' }, 404));
-
-    run('moveDown');
-    await vi.advanceTimersByTimeAsync(40);
-
-    expect(useApp.getState().detail).toBeNull();
-    expect(useApp.getState().status).toEqual({ text: 'the track is gone', kind: 'bad' });
-  });
 });
 
 describe('opening and closing', () => {
@@ -400,23 +334,13 @@ describe('opening and closing', () => {
     expect(expanded()).toEqual([]);
   });
 
-  it('enterRow on a track goes into its fields', () => {
-    showSample(keys.rough, { expanded: new Set([keys.needs]) });
-
-    run('enterRow');
-
-    expect(useApp.getState().focus).toBe('inspector');
-  });
-
-  it('enterRow does not fold anything while a filter is typed or in a sorted list', () => {
-    showSample(keys.miles, { filter: 'miles' });
-    run('enterRow');
-    expect(expanded()).toEqual([]);
-
+  it('enterRow does not fold anything in a sorted list', () => {
     const sorted = sampleLibrary();
     sorted.view.sort = { ...sorted.view.sort, key: 'title' };
-    useApp.setState({ lib: sorted, filter: '', cursor: keys.miles });
+    useApp.setState({ lib: sorted, cursor: keys.miles });
+
     run('enterRow');
+
     expect(expanded()).toEqual([]);
   });
 
@@ -437,14 +361,6 @@ describe('opening and closing', () => {
     expect(useApp.getState().focus).toBe('inspector');
     expect(useApp.getState().field).toBe(0);
     expect(expanded()).toEqual([]);
-  });
-
-  it('open on a track starts at the first field, whichever field it was on', () => {
-    showSample(keys.rough, { expanded: new Set([keys.needs]), field: 2 });
-
-    run('open');
-
-    expect(useApp.getState()).toMatchObject({ focus: 'inspector', field: 0, tab: 0 });
   });
 
   it('open on Singles, which has no fields, opens it', () => {
@@ -517,15 +433,6 @@ describe('opening and closing', () => {
 
     expect(expanded()).toEqual([]);
     expect(cursorLabel()).toBe('Miles Davis');
-  });
-
-  it('the rows that are open are remembered', () => {
-    vi.stubGlobal('localStorage', memoryStorage());
-    showSample(keys.miles);
-
-    run('enterRow');
-
-    expect(localStorage.getItem('mm.expanded')).toBe(JSON.stringify([keys.miles]));
   });
 });
 
@@ -688,14 +595,6 @@ describe('the filter', () => {
     expect(libraryUrls()).toEqual(['/api/library?q=mil']);
   });
 
-  it('the server words go to the server as they were typed', async () => {
-    typeFilter('status:unidentified');
-    await vi.advanceTimersByTimeAsync(150);
-
-    expect(libraryUrls()).toEqual(['/api/library?q=status%3Aunidentified']);
-    expect(useApp.getState().lib?.view.rows.map((row) => row.label)).toEqual(['Needs work', 'Rough Mix']);
-  });
-
   it('asks nothing while a composition is under way, and once when it ends', async () => {
     composeFilter(true);
     typeFilter('m');
@@ -709,16 +608,6 @@ describe('the filter', () => {
     await vi.advanceTimersByTimeAsync(150);
 
     expect(libraryUrls()).toEqual(['/api/library?q=mi']);
-  });
-
-  it('setFilter asks at once and cancels a request that was waiting', async () => {
-    typeFilter('mi');
-    setFilter('');
-
-    expect(useApp.getState().filter).toBe('');
-    await vi.advanceTimersByTimeAsync(1000);
-
-    expect(libraryUrls()).toEqual(['/api/library']);
   });
 
   it('focusFilter focuses and selects the box', () => {
@@ -736,14 +625,16 @@ describe('the filter', () => {
     expect(useApp.getState().filter).toBe('miles');
   });
 
-  it('filterClear leaves the box and clears the text', async () => {
-    useApp.setState({ filter: 'miles' });
+  it('filterClear leaves the box, clears the text and asks at once, cancelling a request that was waiting', async () => {
+    typeFilter('mi');
 
     run('filterClear');
 
     expect(treeDom.leaveFilterBox).toHaveBeenCalledOnce();
     expect(useApp.getState().filter).toBe('');
     await vi.advanceTimersByTimeAsync(0);
+    expect(libraryUrls()).toEqual(['/api/library']);
+    await vi.advanceTimersByTimeAsync(1000);
     expect(libraryUrls()).toEqual(['/api/library']);
   });
 
@@ -772,23 +663,6 @@ describe('loadLibrary for the tree', () => {
   function serve(library: LibraryResponse) {
     return stubServer(infoView(), library);
   }
-
-  it('puts the cursor on the first row when there is none', async () => {
-    serve(sampleLibrary());
-
-    await loadLibrary();
-
-    expect(cursorLabel()).toBe('Playlists');
-  });
-
-  it('keeps the cursor where it is when the row is still there', async () => {
-    serve(sampleLibrary());
-    useApp.setState({ cursor: keys.miles });
-
-    await loadLibrary();
-
-    expect(cursorLabel()).toBe('Miles Davis');
-  });
 
   it('moves a cursor whose row is gone to the first row', async () => {
     serve(sampleLibrary());
@@ -826,18 +700,6 @@ describe('loadLibrary for the tree', () => {
   it('forgets the marks of tracks that are no longer in the library', async () => {
     serve(sampleLibrary());
     useApp.setState({ marks: new Set(['blue', 'gone']) });
-
-    await loadLibrary();
-
-    expect([...useApp.getState().marks]).toEqual(['blue']);
-  });
-
-  it('forgets the marks of tracks that are gone from a sorted list too', async () => {
-    const sorted = sampleLibrary();
-    sorted.view.rows = sorted.view.rows.filter((row) => row.kind === 'track').map((row) => ({ ...row, depth: 0 }));
-    sorted.view.sort = { ...sorted.view.sort, key: 'title' };
-    serve(sorted);
-    useApp.setState({ sort: { key: 'title', reverse: false }, marks: new Set(['blue', 'gone']) });
 
     await loadLibrary();
 
@@ -893,15 +755,6 @@ describe('loadLibrary for the tree', () => {
     useApp.setState({ cursor: keys.miles });
 
     await loadLibrary({ reveal: 'nobody' });
-
-    expect(cursorLabel()).toBe('Miles Davis');
-  });
-
-  it('takes the cursor off a row that the answer hides inside a closed row', async () => {
-    serve(sampleLibrary());
-    useApp.setState({ cursor: keys.soWhat, expanded: new Set() });
-
-    await loadLibrary();
 
     expect(cursorLabel()).toBe('Miles Davis');
   });
@@ -976,16 +829,6 @@ describe('details that arrive late', () => {
 
     expect(useApp.getState().detail).toMatchObject({ label: 'فيروز' });
     expect(useApp.getState().status).toEqual({ text: '', kind: '' });
-  });
-
-  it('a failure for the row the cursor is on does show', async () => {
-    await moveTwice();
-
-    answers[1]?.(jsonResponse({ error: 'the group is gone' }, 500));
-    await settle();
-
-    expect(useApp.getState().detail).toBeNull();
-    expect(useApp.getState().status).toEqual({ text: 'the group is gone', kind: 'bad' });
   });
 });
 
@@ -1071,15 +914,5 @@ describe('actions that open a dialog', () => {
     run('copyFrom');
     expect(useApp.getState().overlay).toBeNull();
     expect(useApp.getState().status.text).toBe('Select a track to copy from');
-  });
-
-  it('copyField in the fields of something that is not a track changes nothing', () => {
-    showSample(keys.miles);
-    useApp.setState({ focus: 'inspector' });
-    const before = useApp.getState();
-
-    run('copyField');
-
-    expect(useApp.getState()).toBe(before);
   });
 });

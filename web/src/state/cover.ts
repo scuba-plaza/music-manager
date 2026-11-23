@@ -7,7 +7,7 @@ import { currentField, isTrack } from './inspector';
 import { ask, useApp } from './store';
 import { isAlbum, markedIds, rowByKey } from './tree';
 
-export interface CoverTarget {
+interface CoverTarget {
   ids?: string[];
   group?: string;
 }
@@ -17,7 +17,7 @@ export const coverChooserAttribute = 'data-cover-chooser';
 const pictureType = /^image\/(jpeg|png)$/;
 const inputTags = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
 
-export function coverTarget(fromPane: boolean): CoverTarget | null {
+function coverTarget(fromPane: boolean): CoverTarget | null {
   const { lib, cursor, marks } = useApp.getState();
   if (!fromPane && lib !== null && marks.size > 0) {
     return { ids: markedIds(lib.view.rows, marks) };
@@ -36,7 +36,7 @@ function coverQuery(target: CoverTarget, extra: { paste?: boolean; name?: string
   return query({ ...extra, ids: target.ids?.join(',') ?? '', group: target.group ?? '' });
 }
 
-export async function setCover(file: File, target: CoverTarget | null, paste = false): Promise<void> {
+async function setCover(file: File, target: CoverTarget | null, paste = false): Promise<void> {
   if (target === null) {
     setStatus('Select a track, an album or an artist for the cover', 'bad');
     return;

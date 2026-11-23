@@ -129,25 +129,17 @@ describe('following a job', () => {
 });
 
 describe('stopping a job', () => {
-  it('asks the server to stop it', async () => {
-    serve(({ method, url }) => (method === 'DELETE' && url.pathname === '/api/jobs/j1' ? jsonResponse(job('stopped')) : undefined));
+  it('asks the server to stop it by its id, whatever is in it', async () => {
+    serve(() => jsonResponse(job('stopped')));
 
-    await stopJob('j1');
+    await stopJob('a b/c');
 
-    expect(requestsTo(fetchMock, 'DELETE', '/api/jobs/j1')).toEqual([null]);
+    expect(requestsTo(fetchMock, 'DELETE', '/api/jobs/a%20b%2Fc')).toEqual([null]);
   });
 
   it('says nothing when the server cannot', async () => {
     serve(({ method, url }) => (method === 'DELETE' && url.pathname === '/api/jobs/j1' ? jsonResponse({ error: 'gone' }, 404) : undefined));
 
     await expect(stopJob('j1')).resolves.toBeUndefined();
-  });
-
-  it('asks for a job by its id, whatever is in it', async () => {
-    serve(() => jsonResponse(job('stopped')));
-
-    await stopJob('a b/c');
-
-    expect(requestsTo(fetchMock, 'DELETE', '/api/jobs/a%20b%2Fc')).toEqual([null]);
   });
 });
