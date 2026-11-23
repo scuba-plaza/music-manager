@@ -1,38 +1,5 @@
-import type { APIRequestContext, JSHandle, Locator, Page } from '@playwright/test';
-import type { LibraryResponse } from '../src/api/types.gen.ts';
-import { expect, test } from './fixtures.ts';
-
-const pixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-
-async function openPage(page: Page): Promise<void> {
-  await page.goto('/');
-  await expect(page.getByRole('banner')).toContainText('6 tracks');
-  await expect(page.getByRole('treeitem').first()).toBeVisible();
-}
-
-async function openAll(page: Page): Promise<void> {
-  await openPage(page);
-  await page.keyboard.press('Shift+ArrowRight');
-  await page.keyboard.press('Shift+ArrowRight');
-  await expect(row(page, 'So What')).toBeVisible();
-}
-
-function items(page: Page): Locator {
-  return page.getByRole('tree').getByRole('treeitem');
-}
-
-function exactly(text: string): RegExp {
-  return new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
-}
-
-function row(page: Page, label: string): Locator {
-  return items(page).filter({ has: page.locator('.label bdi', { hasText: exactly(label) }) });
-}
-
-async function said(page: Page, text: string): Promise<void> {
-  await expect(page.getByRole('status')).toHaveText(text);
-  await expect(page.getByTestId('app')).not.toHaveAttribute('aria-busy');
-}
+import type { APIRequestContext, Page } from '@playwright/test';
+import { expect, filesOf, items, library, openAll, openPage, pane, pixel, row, said, test } from './fixtures.ts';
 
 async function labelsAfter(page: Page, label: string, n: number): Promise<string[]> {
   const labels = await items(page).locator('.label').allTextContents();
@@ -41,22 +8,11 @@ async function labelsAfter(page: Page, label: string, n: number): Promise<string
 }
 
 async function playlistCount(request: APIRequestContext, name: string): Promise<number | undefined> {
-  const { view } = (await (await request.get('/api/library')).json()) as LibraryResponse;
-  return view.playlists.find((p) => p.name === name)?.count;
-}
-
-async function filesOf(page: Page, files: { name: string; type: string; base64: string }[]): Promise<JSHandle<DataTransfer>> {
-  return page.evaluateHandle((list) => {
-    const data = new DataTransfer();
-    for (const f of list) {
-      data.items.add(new File([Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0))], f.name, { type: f.type }));
-    }
-    return data;
-  }, files);
+  return (await library(request)).view.playlists.find((p) => p.name === name)?.count;
 }
 
 async function coverShown(page: Page): Promise<void> {
-  const cover = page.getByRole('region', { name: 'Details' }).getByRole('img', { name: 'Cover' });
+  const cover = pane(page).getByRole('img', { name: 'Cover' });
   await expect(cover).toBeVisible();
   await expect.poll(() => cover.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 }
@@ -85,7 +41,7 @@ test('marking two tracks and e sets the album on both with one undo step', async
   await said(page, 'Undid: bulk edit of 2 tracks');
   await expect(row(page, 'Kind of Blue').locator('.right')).toHaveText('2');
   await expect(row(page, 'Kind of Blue (Legacy)')).toHaveCount(0);
-  const { history } = (await (await request.get('/api/library')).json()) as LibraryResponse;
+  const { history } = await library(request);
   expect(history.undo).toBeUndefined();
 });
 
@@ -266,14 +222,14 @@ test('pasting a copied cover', async ({ page }) => {
   await said(page, 'Pasted the cover on 1 track · u undoes it');
   await page.keyboard.press('Enter');
   await coverShown(page);
-  await expect(page.getByRole('region', { name: 'Details' }).getByTestId('value-artist')).toHaveText('John Coltrane');
+  await expect(pane(page).getByTestId('value-artist')).toHaveText('John Coltrane');
 });
 
 test('c on a field of a track copies that field, and v pastes it on an album', async ({ page }) => {
   await openAll(page);
   await row(page, 'So What').click();
   await page.keyboard.press('Enter');
-  await page.getByRole('region', { name: 'Details' }).getByTestId('value-cover').click();
+  await pane(page).getByTestId('value-cover').click();
 
   await page.keyboard.press('c');
 
@@ -336,7 +292,7 @@ test("renaming an artist to another artist's name says it joins them", async ({ 
   await page.keyboard.press('Shift+ArrowRight');
   await row(page, 'John Coltrane').click();
   await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('region', { name: 'Details' }).getByTestId('value-artist')).toHaveText('John Coltrane');
+  await expect(pane(page).getByTestId('value-artist')).toHaveText('John Coltrane');
 
   await page.keyboard.press('Enter');
   const name = page.getByRole('textbox', { name: 'Name' });
@@ -390,11 +346,11 @@ test('enter on the Cover field chooses a file, which becomes the cover', async (
   await openAll(page);
   await row(page, 'Giant Steps').last().click();
   await page.keyboard.press('Enter');
-  const pane = page.getByRole('region', { name: 'Details' });
-  await pane.getByTestId('value-cover').click();
+  const details = pane(page);
+  await details.getByTestId('value-cover').click();
   await expect(page.getByRole('list', { name: 'Keys' })).toContainText('enter choose');
 
-  await expect(pane.getByTestId('value-cover')).toHaveClass(/\bcur\b/);
+  await expect(details.getByTestId('value-cover')).toHaveClass(/\bcur\b/);
   await page.keyboard.press('Enter');
   await (await chooser).setFiles({ name: 'front.png', mimeType: 'image/png', buffer: Buffer.from(pixel, 'base64') });
 

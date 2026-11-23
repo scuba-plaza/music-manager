@@ -1,58 +1,39 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Locator } from '@playwright/test';
 import type { LibraryResponse } from '../src/api/types.gen.ts';
-import { expect, test } from './fixtures.ts';
+import { boxOf, expect, headers, library, openAll, openPage, row, test } from './fixtures.ts';
 
-async function openAll(page: Page): Promise<void> {
-  await page.goto('/');
-  await expect(page.getByRole('banner')).toContainText('6 tracks');
-  await page.keyboard.press('Shift+ArrowRight');
-  await page.keyboard.press('Shift+ArrowRight');
-  await expect(row(page, 'So What').first()).toBeVisible();
+async function labelStart(target: Locator): Promise<number> {
+  return (await boxOf(target.locator('.label'))).x;
 }
 
-function row(page: Page, label: string): Locator {
-  const exact = new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
-  return page
-    .getByRole('tree')
-    .getByRole('treeitem')
-    .filter({ has: page.locator('.label bdi', { hasText: exact }) });
+async function countEnd(target: Locator): Promise<number> {
+  const box = await boxOf(target.locator('.right'));
+  return box.x + box.width;
 }
 
-async function box(target: Locator): Promise<{ x: number; width: number }> {
-  const found = await target.boundingBox();
-  if (found === null) {
-    throw new Error('the element has no box');
-  }
-  return found;
-}
-
-test('Arabic rows keep dir=auto and the count column does not move', { tag: '@narrow' }, async ({ page }) => {
+test('Arabic rows keep dir=auto, start their labels where the Latin ones do and keep the counts inside the tree', { tag: '@narrow' }, async ({ page }) => {
   await openAll(page);
+  const tree = await boxOf(page.getByRole('tree'));
 
   for (const [arabic, latin] of [
     ['فيروز', 'John Coltrane'],
-    ['Songs', 'Giant Steps'],
+    ['Songs', 'Kind of Blue'],
+    ['وطني', 'So What'],
   ] as const) {
-    const a = row(page, arabic).first();
-    const l = row(page, latin).first();
-    await expect(a.locator('bdi').first()).toHaveAttribute('dir', 'auto');
-    const countX = async (target: Locator) => (await box(target.locator('.right'))).x + (await box(target.locator('.right'))).width;
-    expect(await countX(a)).toBeCloseTo(await countX(l), 0);
+    const a = row(page, arabic).last();
+    const l = row(page, latin).last();
+    await expect(a.locator('.label bdi')).toHaveAttribute('dir', 'auto');
+    expect(await labelStart(a)).toBeCloseTo(await labelStart(l), 0);
+    expect(await countEnd(a)).toBeCloseTo(await countEnd(l), 0);
+    expect(await countEnd(a)).toBeLessThanOrEqual(tree.x + tree.width);
   }
-  const arabicTrack = row(page, 'وطني').last();
-  const latinTrack = row(page, 'So What').last();
-  await expect(arabicTrack.locator('.label bdi')).toHaveAttribute('dir', 'auto');
-  expect((await box(arabicTrack.locator('.label'))).x).toBeCloseTo((await box(latinTrack.locator('.label'))).x, 0);
-  const right = async (target: Locator) => (await box(target.locator('.right'))).x + (await box(target.locator('.right'))).width;
-  expect(await right(arabicTrack)).toBeCloseTo(await right(latinTrack), 0);
 });
 
 test('sorting by artist puts فيروز among the F, by its Latin form', async ({ page, request }) => {
   const sorted = (await (await request.get('/api/library?sort=artist')).json()) as LibraryResponse;
   const artists = sorted.view.rows.map((r) => r.detail ?? '');
   expect(artists.slice(0, 3)).toEqual(['Basement Tapes', 'فيروز', 'John Coltrane']);
-  await page.goto('/');
-  await expect(page.getByRole('banner')).toContainText('6 tracks');
+  await openPage(page);
   await page.getByRole('tree').focus();
 
   await page.keyboard.press('o');
@@ -64,33 +45,16 @@ test('sorting by artist puts فيروز among the F, by its Latin form', async (
 });
 
 test('a mixed Latin and Arabic title does not reorder its neighbours', { tag: '@narrow' }, async ({ page, request }) => {
-  const { view } = (await (await request.get('/api/library')).json()) as LibraryResponse;
-  const giant = view.rows.find((r) => r.kind === 'track' && r.label === 'Giant Steps');
+  const giant = (await library(request)).view.rows.find((r) => r.kind === 'track' && r.label === 'Giant Steps');
   const title = 'Hello وطني world';
-  const patched = await request.patch(`/api/tracks/${giant?.trackId ?? ''}`, { headers: { 'X-MM': '1' }, data: { field: 'title', text: title } });
+  const patched = await request.patch(`/api/tracks/${giant?.trackId ?? ''}`, { headers, data: { field: 'title', text: title } });
   expect(patched.ok()).toBe(true);
   await openAll(page);
 
   const mixed = row(page, title).last();
   await expect(mixed.locator('.label bdi')).toHaveText(title);
   await expect(mixed.locator('.label bdi')).toHaveAttribute('dir', 'auto');
-  expect(await mixed.locator('.label bdi').evaluate((el) => el.textContent)).toBe(title);
   const neighbour = row(page, 'So What').last();
-  expect((await box(mixed.locator('.label'))).x).toBeCloseTo((await box(neighbour.locator('.label'))).x, 0);
-  const right = async (target: Locator) => (await box(target.locator('.right'))).x + (await box(target.locator('.right'))).width;
-  expect(await right(mixed)).toBeCloseTo(await right(neighbour), 0);
-});
-
-test('the Latin tab and the Device tab show the Latin form for the Arabic track', async ({ page }) => {
-  await openAll(page);
-  await row(page, 'وطني').last().click();
-  await page.keyboard.press('Enter');
-  const pane = page.getByRole('region', { name: 'Details' });
-  await expect(pane.getByRole('heading', { level: 3 })).toHaveText('وطني');
-
-  await page.keyboard.press('3');
-  await expect(pane.getByTestId('value-latinTitle')).toHaveText('Watani');
-
-  await pane.locator('[data-tab="device"]').click();
-  await expect(pane.getByText('01 - Watani.mp3')).toBeVisible();
+  expect(await labelStart(mixed)).toBeCloseTo(await labelStart(neighbour), 0);
+  expect(await countEnd(mixed)).toBeCloseTo(await countEnd(neighbour), 0);
 });

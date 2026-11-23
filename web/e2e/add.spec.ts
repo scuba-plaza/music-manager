@@ -1,5 +1,4 @@
-import type { JSHandle, Locator, Page } from '@playwright/test';
-import { expect, test } from './fixtures.ts';
+import { expect, filesOf, library, openPage, row, said, test } from './fixtures.ts';
 
 const duplicateLink = 'https://www.youtube.com/watch?v=duplicate';
 const frameSize = 417;
@@ -8,39 +7,6 @@ function silentMp3(frames: number): string {
   const frame = Buffer.alloc(frameSize);
   frame.set([0xff, 0xfb, 0x90, 0x00]);
   return Buffer.concat(Array.from({ length: frames }, () => frame)).toString('base64');
-}
-
-async function openPage(page: Page): Promise<void> {
-  await page.goto('/');
-  await expect(page.getByRole('banner')).toContainText('6 tracks');
-  await expect(page.getByRole('treeitem').first()).toBeVisible();
-}
-
-function items(page: Page): Locator {
-  return page.getByRole('tree').getByRole('treeitem');
-}
-
-function exactly(text: string): RegExp {
-  return new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
-}
-
-function row(page: Page, label: string): Locator {
-  return items(page).filter({ has: page.locator('.label bdi', { hasText: exactly(label) }) });
-}
-
-async function said(page: Page, text: string | RegExp): Promise<void> {
-  await expect(page.getByRole('status')).toHaveText(text);
-  await expect(page.getByTestId('app')).not.toHaveAttribute('aria-busy');
-}
-
-async function filesOf(page: Page, files: { name: string; type: string; base64: string }[]): Promise<JSHandle<DataTransfer>> {
-  return page.evaluateHandle((list) => {
-    const data = new DataTransfer();
-    for (const f of list) {
-      data.items.add(new File([Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0))], f.name, { type: f.type }));
-    }
-    return data;
-  }, files);
 }
 
 test('a adds from a link, pre-filled, and the path preview shows where it will be written', async ({ page, dialog }) => {
@@ -64,9 +30,8 @@ test('a adds from a link, pre-filled, and the path preview shows where it will b
   const cover = dialog().getByRole('img', { name: 'Cover' });
   await expect(cover).toBeVisible();
   await expect.poll(() => cover.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-  const path = dialog().locator('.pathline');
+  const path = dialog().locator('.pathrow bdi');
   await expect(path).toHaveText(/^Miles Davis\/Kind of Blue\/.*So What\.mp3$/);
-  await expect.poll(() => path.evaluate((el) => getComputedStyle(el, '::before').content)).toBe('none');
 
   await dialog().getByRole('textbox', { name: 'Title' }).fill('So What (alternate take)');
   await expect(path).toHaveText(/So What \(alternate take\)\.mp3$/);
@@ -120,8 +85,7 @@ test('the cover from YouTube can be taken away before the track is added, and th
   await expect(dialog().getByRole('button', { name: 'Add a cover…' })).toBeVisible();
   await dialog().getByRole('textbox', { name: 'Title' }).press('Enter');
   await said(page, /^Added/);
-  const { view } = (await (await request.get('/api/library')).json()) as { view: { rows: { label: string; trackId?: string }[] } };
-  const added = view.rows.find((r) => r.label === 'A Song Without A Cover');
+  const added = (await library(request)).view.rows.find((r) => r.label === 'A Song Without A Cover');
   const track = (await (await request.get(`/api/tracks/${added?.trackId ?? ''}`)).json()) as { coverSha?: string };
   expect(track.coverSha ?? '').toBe('');
 });

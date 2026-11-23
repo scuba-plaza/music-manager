@@ -1,7 +1,6 @@
-import type { Locator, Page } from '@playwright/test';
 import type { LibraryResponse } from '../src/api/types.gen.ts';
 import { helpPages } from '../src/keys/keymap.ts';
-import { expect, test } from './fixtures.ts';
+import { expect, items, openAll, openPage, row, test } from './fixtures.ts';
 
 const longName = 'A rather long playlist name that goes on and on and on for a while';
 
@@ -23,28 +22,6 @@ interface Layout {
   dialog: Box;
   columns: number;
   items: { selected: boolean; cells: Cell[] }[];
-}
-
-async function openPage(page: Page): Promise<void> {
-  await page.goto('/');
-  await expect(page.getByRole('banner')).toContainText('6 tracks');
-  await expect(page.getByRole('treeitem').first()).toBeVisible();
-}
-
-function items(page: Page): Locator {
-  return page.getByRole('tree').getByRole('treeitem');
-}
-
-function row(page: Page, label: string): Locator {
-  return items(page).filter({ has: page.locator('.label bdi', { hasText: new RegExp(`^${label}$`) }) });
-}
-
-async function onTrack(page: Page, label: string): Promise<void> {
-  await openPage(page);
-  await page.keyboard.press('Shift+ArrowRight');
-  await page.keyboard.press('Shift+ArrowRight');
-  await row(page, label).last().click();
-  await expect(row(page, label).last()).toHaveAttribute('aria-selected', 'true');
 }
 
 function measure(): Layout {
@@ -97,7 +74,9 @@ function near(a: number, b: number): boolean {
 }
 
 test('the playlist picker rows line up', { tag: '@narrow' }, async ({ page }) => {
-  await onTrack(page, 'So What');
+  await openAll(page);
+  await row(page, 'So What').click();
+  await expect(row(page, 'So What')).toHaveAttribute('aria-selected', 'true');
 
   await page.keyboard.press('p');
   const dialog = page.getByRole('dialog', { name: 'Add to a playlist' });
