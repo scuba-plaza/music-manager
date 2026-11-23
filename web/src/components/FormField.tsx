@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from 'react';
 
-export interface ControlProps {
+interface ControlProps {
   id: string;
   'aria-invalid': true | undefined;
   'aria-describedby': string | undefined;
@@ -15,13 +15,28 @@ interface FormFieldProps {
   children: (control: ControlProps) => ReactNode;
 }
 
-export function FormField({ name, label, error, hint, hideLabel = false, children }: FormFieldProps) {
+interface FieldErrorProps {
+  text: string;
+  id?: string | undefined;
+  span?: boolean;
+}
+
+export function FieldError({ text, id, span = false }: FieldErrorProps) {
+  return (
+    <div id={id} className={span ? 'span field-error' : 'field-error'} role="alert">
+      <span aria-hidden="true">✗ </span>
+      <bdi dir="auto">{text}</bdi>
+    </div>
+  );
+}
+
+export function FormField({ name, label, error = '', hint = '', hideLabel = false, children }: FormFieldProps) {
   const base = useId();
   const id = `${base}-${name}`;
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
-  const wrong = error !== undefined && error !== '';
-  const described = [hint === undefined || hint === '' ? '' : hintId, wrong ? errorId : ''].filter((s) => s !== '').join(' ');
+  const wrong = error !== '';
+  const described = [hint === '' ? '' : hintId, wrong ? errorId : ''].filter((s) => s !== '').join(' ');
 
   return (
     <div className={['field', wrong ? 'wrong' : '', hideLabel ? 'bare' : ''].filter((c) => c !== '').join(' ')}>
@@ -30,17 +45,12 @@ export function FormField({ name, label, error, hint, hideLabel = false, childre
       </label>
       <div className="control">
         {children({ id, 'aria-invalid': wrong ? true : undefined, 'aria-describedby': described === '' ? undefined : described })}
-        {hint !== undefined && hint !== '' && (
+        {hint !== '' && (
           <div id={hintId} className="hintline">
             <bdi dir="auto">{hint}</bdi>
           </div>
         )}
-        {wrong && (
-          <div id={errorId} className="field-error" role="alert">
-            <span aria-hidden="true">✗ </span>
-            <bdi dir="auto">{error}</bdi>
-          </div>
-        )}
+        {wrong && <FieldError id={errorId} text={error} />}
       </div>
     </div>
   );

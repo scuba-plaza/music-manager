@@ -1,15 +1,14 @@
 import { useEffect, useId, useRef } from 'react';
-import type { DeviceView, PeekView, Profile, TrackView } from '../api/types.gen';
+import type { DeviceRow, DeviceView, PeekView, TrackView } from '../api/types.gen';
 import { fail } from '../state/status';
 import { coverChooserAttribute, coverChosen } from '../state/cover';
 import { goToRow, stopPlaying } from '../state/edit';
 import { chooseTab, isTrack, tabIndex } from '../state/inspector';
-import { chooseProfile, formatChoices } from '../state/profiles';
+import { chooseProfile } from '../state/profiles';
 import { useApp } from '../state/store';
 import { Cover } from './Cover';
 import { Fields } from './Fields';
-
-const noFormats: Profile[] = [];
+import { FormatOptions } from './FormatOptions';
 
 function Name({ text }: { text: string }) {
   return <bdi dir="auto">{text}</bdi>;
@@ -17,7 +16,6 @@ function Name({ text }: { text: string }) {
 
 function Device({ view }: { view: DeviceView }) {
   const id = useId();
-  const stored = useApp((s) => s.lib?.profiles ?? noFormats);
   const profile = useApp((s) => s.profile);
   return (
     <div className="fields device">
@@ -33,16 +31,12 @@ function Device({ view }: { view: DeviceView }) {
             void chooseProfile(e.target.value);
           }}
         >
-          {formatChoices(stored).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
+          <FormatOptions />
         </select>
       </div>
       {view.notice !== undefined && view.notice !== '' && <div className="span warn">{view.notice}</div>}
       {view.rows.map((row) => (
-        <DeviceRowView key={row.label} label={row.label} value={row.value} tail={row.tail} hint={row.hint} />
+        <DeviceRowView key={row.label} row={row} />
       ))}
       {(view.warnings ?? []).map((warning) => (
         <div key={warning} className="span warn">
@@ -54,7 +48,7 @@ function Device({ view }: { view: DeviceView }) {
   );
 }
 
-function DeviceRowView({ label, value, tail, hint }: { label: string; value: string; tail?: string | undefined; hint?: string | undefined }) {
+function DeviceRowView({ row: { label, value, tail, hint } }: { row: DeviceRow }) {
   return (
     <>
       <div className="label">{label}</div>

@@ -3,7 +3,7 @@ import { closes } from '../keys/dialog';
 import type { Hint, KeyEventLike } from '../keys/keymap';
 import { closeOverlay, useApp } from '../state/store';
 
-export interface DialogProps {
+interface DialogProps {
   title: ReactNode;
   hints: readonly Hint[];
   onKey: (e: KeyEventLike) => boolean;

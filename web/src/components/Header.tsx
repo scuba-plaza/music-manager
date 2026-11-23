@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { recall, remember, useApp } from '../state/store';
 import { openSync } from '../state/sync';
+import { plural } from '../state/text';
 
 type Theme = 'dark' | 'light';
 
@@ -8,10 +9,6 @@ const themeKey = 'mm.theme';
 
 function recallTheme(): Theme {
   return recall(themeKey) === 'light' ? 'light' : 'dark';
-}
-
-function count(n: number, noun: string): string {
-  return `${String(n)} ${noun}${n === 1 ? '' : 's'}`;
 }
 
 export function Header() {
@@ -34,7 +31,7 @@ export function Header() {
     remember(themeKey, next);
   }
 
-  const parts = lib ? [count(lib.view.tracks, 'track')] : [];
+  const parts = lib ? [plural(lib.view.tracks, 'track')] : [];
   if (lib && lib.view.needWork > 0) {
     parts.push(`${String(lib.view.needWork)} need work`);
   }
