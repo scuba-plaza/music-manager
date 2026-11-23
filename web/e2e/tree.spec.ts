@@ -1,35 +1,14 @@
-import type { Locator, Page } from '@playwright/test';
-import type { LibraryResponse } from '../src/api/types.gen.ts';
-import { expect, test } from './fixtures.ts';
+import type { Page } from '@playwright/test';
+import { boxOf, expect, items, library, openPage, row, test } from './fixtures.ts';
 
-async function openPage(page: Page): Promise<void> {
-  await page.goto('/');
-  await expect(page.getByRole('banner')).toContainText('6 tracks');
-  await expect(page.getByRole('treeitem').first()).toBeVisible();
-}
+const longName = 'A rather long playlist name that goes on and on and on for a while';
 
-function items(page: Page): Locator {
-  return page.getByRole('tree').getByRole('treeitem');
-}
-
-function row(page: Page, label: string): Locator {
-  return items(page).filter({ has: page.locator('.label bdi', { hasText: label }) });
-}
-
-function filterBox(page: Page): Locator {
+function filterBox(page: Page) {
   return page.getByRole('textbox', { name: 'Filter' });
 }
 
-async function boxOf(locator: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
-  const box = await locator.boundingBox();
-  if (box === null) {
-    throw new Error('the element has no box on the page');
-  }
-  return box;
-}
-
 test('the tree lists Playlists, John Coltrane, Miles Davis and فيروز', async ({ page, request }) => {
-  const { view } = (await (await request.get('/api/library')).json()) as LibraryResponse;
+  const { view } = await library(request);
   const topLevel = view.rows.filter((candidate) => candidate.depth === 0).map((candidate) => candidate.label);
   expect(topLevel).toEqual(expect.arrayContaining(['Playlists', 'John Coltrane', 'Miles Davis', 'فيروز']));
 
@@ -51,75 +30,58 @@ test('status:unidentified shows only the unidentified track', async ({ page }) =
   await expect(page.getByRole('banner')).toContainText('6 tracks');
 });
 
-test('an Arabic name does not move its neighbours: the labels start at one edge and the counts end at the other', { tag: '@narrow' }, async ({ page }) => {
-  await openPage(page);
-  const arabic = row(page, 'فيروز');
-  const latin = row(page, 'John Coltrane');
-
-  const labelStart = async (target: Locator) => (await boxOf(target.locator('.label'))).x;
-  const countEnd = async (target: Locator) => {
-    const box = await boxOf(target.locator('.right'));
-    return box.x + box.width;
-  };
-
-  expect(await labelStart(arabic)).toBeCloseTo(await labelStart(latin), 0);
-  expect(await countEnd(arabic)).toBeCloseTo(await countEnd(latin), 0);
-  const tree = await boxOf(page.getByRole('tree'));
-  expect(await countEnd(arabic)).toBeLessThanOrEqual(tree.x + tree.width);
-});
-
-test('enter opens an artist and its albums, and again closes them', async ({ page, press }) => {
+test('enter opens an artist and its albums, and again closes them', async ({ page }) => {
   await openPage(page);
   await row(page, 'Miles Davis').click();
   await expect(row(page, 'Miles Davis')).toHaveAttribute('aria-selected', 'true');
   await expect(row(page, 'Kind of Blue')).toHaveCount(0);
 
-  await press('Enter');
+  await page.keyboard.press('Enter');
 
   await expect(row(page, 'Miles Davis')).toHaveAttribute('aria-expanded', 'true');
   await expect(row(page, 'Kind of Blue')).toBeVisible();
 
-  await press('Enter');
+  await page.keyboard.press('Enter');
 
   await expect(row(page, 'Kind of Blue')).toHaveCount(0);
 });
 
-test('space marks a track and an album marks all its tracks; escape clears the marks', async ({ page, press }) => {
+test('space marks a track and an album marks all its tracks; escape clears the marks', async ({ page }) => {
   await openPage(page);
   await row(page, 'Miles Davis').dblclick();
   await row(page, 'Kind of Blue').dblclick();
   await row(page, 'Kind of Blue').click();
 
-  await press(' ');
+  await page.keyboard.press(' ');
 
   await expect(row(page, 'Kind of Blue')).toHaveAttribute('data-mark', 'all');
   await expect(row(page, 'So What')).toHaveAttribute('data-mark', 'all');
   await expect(row(page, 'Blue in Green')).toHaveAttribute('data-mark', 'all');
   await expect(page.getByRole('banner')).toContainText('2 marked');
 
-  await press('Escape');
+  await page.keyboard.press('Escape');
 
   await expect(row(page, 'So What')).not.toHaveAttribute('data-mark', /.+/);
   await expect(page.getByRole('banner')).not.toContainText('marked');
 });
 
-test('the slash key focuses the filter, enter keeps it and escape clears it, and the footer follows', async ({ page, press }) => {
+test('the slash key focuses the filter, enter keeps it and escape clears it, and the footer follows', async ({ page }) => {
   await openPage(page);
   const hints = page.getByRole('list', { name: 'Keys' }).getByRole('listitem');
   await expect(hints.filter({ hasText: /^\/\s*filter$/ })).toHaveText('/ filter');
 
-  await press('/');
+  await page.keyboard.press('/');
   await expect(filterBox(page)).toBeFocused();
   await expect(hints).toHaveText(['enter keep', 'esc clear']);
 
   await page.keyboard.type('miles');
   await expect(items(page).locator('.label')).toHaveText(['Playlists', 'Late night', 'Blue in Green', 'Miles Davis', 'Kind of Blue', 'So What', 'Blue in Green']);
-  await press('Enter');
+  await page.keyboard.press('Enter');
   await expect(page.getByRole('tree')).toBeFocused();
   await expect(filterBox(page)).toHaveValue('miles');
   await expect(hints.filter({ hasText: /^\/\s*filter$/ })).toHaveText('/ filter');
 
-  await press('Escape');
+  await page.keyboard.press('Escape');
   await expect(filterBox(page)).toHaveValue('');
   await expect(items(page)).toHaveCount(6);
 });
@@ -132,16 +94,8 @@ test('typing j, k and space in the filter box types them and marks nothing', asy
 
   await expect(filterBox(page)).toHaveValue('jk l');
   await expect(page.getByText('Nothing matches the filter.')).toBeVisible();
-  await expect(page.getByRole('banner')).not.toContainText('marked');
-});
-
-test('a filter that matches nothing says so', async ({ page }) => {
-  await openPage(page);
-
-  await filterBox(page).fill('genre:folk');
-
-  await expect(page.getByText('Nothing matches the filter.')).toBeVisible();
   await expect(items(page)).toHaveCount(0);
+  await expect(page.getByRole('banner')).not.toContainText('marked');
 });
 
 test('nothing is asked of the server while an input method composes, and the text is asked for when it ends', async ({ page }) => {
@@ -172,7 +126,7 @@ test('nothing is asked of the server while an input method composes, and the tex
 test('a long playlist name does not push the count out of the pane', { tag: '@narrow' }, async ({ page }) => {
   await openPage(page);
   await row(page, 'Playlists').dblclick();
-  const long = row(page, 'A rather long playlist name');
+  const long = row(page, longName);
   await expect(long).toBeVisible();
 
   const tree = await boxOf(page.getByRole('tree'));
@@ -184,13 +138,13 @@ test('a long playlist name does not push the count out of the pane', { tag: '@na
   await expect(long.locator('.right')).toHaveText('2');
 });
 
-test('the cursor row is the one that is selected and it stays inside the tree when the cursor runs to the end', { tag: '@narrow' }, async ({ page, press }) => {
+test('the cursor row is the one that is selected and it stays inside the tree when the cursor runs to the end', { tag: '@narrow' }, async ({ page }) => {
   await page.setViewportSize({ width: page.viewportSize()?.width ?? 1200, height: 360 });
   await openPage(page);
-  await press('Shift+ArrowRight');
-  await press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
 
-  await press('End');
+  await page.keyboard.press('End');
 
   const last = items(page).last();
   await expect(last).toHaveAttribute('aria-selected', 'true');

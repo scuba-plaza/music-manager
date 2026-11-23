@@ -3,6 +3,7 @@ import type { BarView, FieldView } from '../api/types.gen';
 import { cancelEdit, chooseField, saveEdit, typeEdit } from '../state/edit';
 import { fieldIndex, nudgeable } from '../state/inspector';
 import { useApp, type EditState } from '../state/store';
+import { FieldError } from './FormField';
 
 interface EditorProps {
   field: FieldView;
@@ -165,12 +166,7 @@ export function Fields({ fields, bar, numbers }: FieldsProps) {
             )}
             {cur &&
               editing &&
-              said.map((message, n) => (
-                <div key={message} id={errorIds[n]} className="span field-error" role="alert">
-                  <span aria-hidden="true">✗ </span>
-                  <bdi dir="auto">{message}</bdi>
-                </div>
-              ))}
+              said.map((message, n) => <FieldError key={message} id={errorIds[n]} text={message} span />)}
             {f.key === 'cutEnd' && bar !== undefined && (
               <>
                 <div className="label">Kept</div>

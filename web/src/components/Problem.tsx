@@ -1,11 +1,6 @@
-interface ProblemProps {
-  text: string;
-  kind?: 'bad' | 'warn';
-}
-
-export function Problem({ text, kind = 'bad' }: ProblemProps) {
+export function Problem({ text }: { text: string }) {
   return (
-    <div className={kind} role="alert">
+    <div className="bad" role="alert">
       <bdi dir="auto">{text}</bdi>
     </div>
   );

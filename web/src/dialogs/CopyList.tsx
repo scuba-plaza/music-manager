@@ -82,9 +82,7 @@ export function CopyList({ id, title, choices }: CopyListProps) {
           toggle(i);
         }}
       />
-      {error !== '' && (
-        <Problem text={error} />
-      )}
+      {error !== '' && <Problem text={error} />}
     </Dialog>
   );
 }

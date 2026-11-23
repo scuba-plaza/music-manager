@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 
-export interface MenuRow {
+interface MenuRow {
   marker: string;
   label: string;
   detail: string;
@@ -31,7 +31,7 @@ export function MenuList({ label, rows, cursor, onChoose }: MenuListProps) {
           aria-selected={i === cursor}
           aria-disabled={row.off === true ? true : undefined}
           aria-checked={row.checked}
-          className={['item', i === cursor ? 'on' : '', row.off === true ? 'off' : ''].join(' ').trim()}
+          className={['item', i === cursor ? 'on' : '', row.off === true ? 'off' : ''].filter((c) => c !== '').join(' ')}
           onClick={() => {
             onChoose(i);
           }}
