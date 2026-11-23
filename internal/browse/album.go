@@ -3,6 +3,7 @@ package browse
 import (
 	"context"
 	"errors"
+	"fmt"
 	"maps"
 	"net/url"
 	"strings"
@@ -105,4 +106,67 @@ func (e *Editor) fetchAlbum(ctx context.Context, link string) (Fetched, error) {
 	defer e.mu.Unlock()
 	e.albums.put(id, al)
 	return Fetched{Album: albumView(id, al)}, nil
+}
+
+func (e *Editor) CheckAlbum(id string, f AlbumForm, numbers []int) error {
+	e.mu.Lock()
+	al, ok := e.albums.get(id)
+	e.mu.Unlock()
+	if !ok {
+		return ErrDraftGone
+	}
+	if _, err := f.Edit(); err != nil {
+		return err
+	}
+	return al.Check(numbers)
+}
+
+func (e *Editor) AddAlbum(ctx context.Context, id string, f AlbumForm, numbers []int, progress func(done, total int, title string)) (Result, error) {
+	if err := e.CheckAlbum(id, f, numbers); err != nil {
+		return Result{}, err
+	}
+	e.mu.Lock()
+	al, ok := e.albums.get(id)
+	e.mu.Unlock()
+	if !ok {
+		return Result{}, ErrDraftGone
+	}
+	shared, err := f.Edit()
+	if err != nil {
+		return Result{}, err
+	}
+	report, err := e.lib.AddAlbum(ctx, al, numbers, shared, e.downloader, progress)
+	if err != nil {
+		return Result{}, err
+	}
+	e.Discard(id)
+	e.Ingested(report.Added)
+	res := Result{Message: albumMessage(f.Album, report), Same: len(report.Added) == 0}
+	if len(report.Added) > 0 {
+		res.Reveal = report.Added[0].ID
+	}
+	return res, nil
+}
+
+func albumMessage(album string, r app.AlbumReport) string {
+	var b strings.Builder
+	if len(r.Added) == 0 {
+		b.WriteString("Nothing was added")
+	} else {
+		fmt.Fprintf(&b, "Added %s of %q", Plural(len(r.Added), "track"), strings.TrimSpace(album))
+	}
+	if r.Duplicates > 0 {
+		fmt.Fprintf(&b, " · %d already there", r.Duplicates)
+	}
+	if len(r.Failed) > 0 {
+		reasons := make([]string, 0, len(r.Failed))
+		for _, x := range r.Failed {
+			reasons = append(reasons, fmt.Sprintf("%s: %v", x.Title, x.Err))
+		}
+		fmt.Fprintf(&b, " · %d left out: %s", len(r.Failed), strings.Join(reasons, "; "))
+	}
+	if len(r.Added) > 0 {
+		b.WriteString(" · u undoes it")
+	}
+	return b.String()
 }
