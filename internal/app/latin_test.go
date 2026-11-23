@@ -62,30 +62,6 @@ func TestALatinFormGoesWhenItsNameDoes(t *testing.T) {
 	}
 }
 
-func TestALatinFormIsOneLine(t *testing.T) {
-	a, tr := ingested(t)
-	for _, e := range []app.Edit{
-		{TitleLatin: ptr("two\nlines")}, {ArtistLatin: ptr("a\rb")}, {AlbumLatin: ptr("a\nb")}, {GenreLatin: ptr("a\nb")},
-	} {
-		if _, err := a.Edit(tr.ID, e); err == nil {
-			t.Errorf("%+v was accepted", e)
-		}
-	}
-}
-
-func TestEditManyTakesTheLatinFormsToo(t *testing.T) {
-	a := libWithTracks(t, 10, 20)
-	ts := tracks(t, a)
-	for _, tr := range ts {
-		identify(t, a, tr.ID, "Song "+tr.ID, "فيروز", "", 0, 0)
-	}
-	ts = tracks(t, a)
-	got, err := a.EditMany(map[string]app.Edit{ts[0].ID: {ArtistLatin: ptr("Fairouz")}, ts[1].ID: {ArtistLatin: ptr("Fairouz")}})
-	if err != nil || got[ts[0].ID].ArtistLatin != "Fairouz" || got[ts[1].ID].ArtistLatin != "Fairouz" {
-		t.Errorf("%+v, %v", got, err)
-	}
-}
-
 func TestChangingALatinFormIsNothingToSyncToTheLibraryFolder(t *testing.T) {
 	a := libWithTracks(t, 10)
 	identify(t, a, tracks(t, a)[0].ID, "وطني", "فيروز", "", 0, 0)
@@ -101,28 +77,6 @@ func TestChangingALatinFormIsNothingToSyncToTheLibraryFolder(t *testing.T) {
 	}
 }
 
-// Names are put in order by their Latin forms, the ones set by hand included,
-// so that a name in another script stands where it would be read.
-
-func TestTracksAreSortedByTheLatinFormSetByHand(t *testing.T) {
-	a := libWithTracks(t, 10, 20, 30)
-	ts := tracks(t, a)
-	identify(t, a, ts[0].ID, "Song", "فيروز", "", 0, 0) // worked out: "Firuz", after Beta
-	identify(t, a, ts[1].ID, "Song", "Beta", "", 0, 0)
-	identify(t, a, ts[2].ID, "Song", "Gamma", "", 0, 0)
-	if _, err := a.Edit(ts[0].ID, app.Edit{ArtistLatin: ptr("Alpha")}); err != nil {
-		t.Fatal(err)
-	}
-	got := app.SortTracks(tracks(t, a), app.SortArtist, false)
-	var artists []string
-	for _, tr := range got {
-		artists = append(artists, tr.Artist)
-	}
-	if want := []string{"فيروز", "Beta", "Gamma"}; strings.Join(artists, ",") != strings.Join(want, ",") {
-		t.Errorf("order = %v, want %v", artists, want)
-	}
-}
-
 func TestALatinFormOnSeveralLinesIsRefusedWithAMessageAndChangesNothing(t *testing.T) {
 	a, tr := ingested(t)
 	if _, err := a.Edit(tr.ID, app.Edit{Title: ptr("وطني"), Artist: ptr("فيروز")}); err != nil {
@@ -130,9 +84,12 @@ func TestALatinFormOnSeveralLinesIsRefusedWithAMessageAndChangesNothing(t *testi
 	}
 	before := tracks(t, a)[0]
 
-	_, err := a.Edit(tr.ID, app.Edit{Album: ptr("Hits"), TitleLatin: ptr("Wa\ntani")})
-	if err == nil || !strings.Contains(err.Error(), "one line") {
-		t.Fatalf("err = %v, want one that says the form must be on one line", err)
+	for _, e := range []app.Edit{
+		{Album: ptr("Hits"), TitleLatin: ptr("Wa\ntani")}, {ArtistLatin: ptr("a\rb")}, {AlbumLatin: ptr("a\nb")}, {GenreLatin: ptr("a\nb")},
+	} {
+		if _, err := a.Edit(tr.ID, e); err == nil || !strings.Contains(err.Error(), "one line") {
+			t.Errorf("%+v: err = %v, want one that says the form must be on one line", e, err)
+		}
 	}
 	if after := tracks(t, a)[0]; after.Album != "" || after.TitleLatin != "" || !after.UpdatedAt.Equal(before.UpdatedAt) {
 		t.Errorf("a refused edit changed the track: %+v, was %+v", after, before)

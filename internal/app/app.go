@@ -58,6 +58,9 @@ func (a *App) UseLoudness(meter loudness.Analyzer) {
 	a.loudness = loudness.Cached(filepath.Join(a.root, ".mm", "loudness"), meter)
 }
 
+// Root is the library directory.
+func (a *App) Root() string { return a.root }
+
 // Manifest reads the records of the library as they are now.
 func (a *App) Manifest() (*manifest.Manifest, error) { return a.store.Load() }
 

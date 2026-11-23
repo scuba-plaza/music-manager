@@ -57,8 +57,8 @@ func TestEditManyAppliesEverythingOrNothing(t *testing.T) {
 	a := libWithTracks(t, 10, 20, 30)
 	ts := tracks(t, a)
 	got, err := a.EditMany(map[string]app.Edit{
-		ts[0].ID: {Title: strp("One"), Artist: strp("Band"), Album: strp("Album"), TrackNumber: ptr(1)},
-		ts[1].ID: {Title: strp("Two"), Artist: strp("Band"), Album: strp("Album"), TrackNumber: ptr(2)},
+		ts[0].ID: {Title: ptr("One"), Artist: ptr("Band"), Album: ptr("Album"), TrackNumber: ptr(1)},
+		ts[1].ID: {Title: ptr("Two"), Artist: ptr("Band"), Album: ptr("Album"), TrackNumber: ptr(2)},
 	})
 	if err != nil || len(got) != 2 || got[ts[1].ID].Title != "Two" {
 		t.Fatalf("%+v, %v", got, err)
@@ -69,8 +69,8 @@ func TestEditManyAppliesEverythingOrNothing(t *testing.T) {
 
 	before := tracks(t, a)
 	for name, edits := range map[string]map[string]app.Edit{
-		"unknown id":   {ts[0].ID: {Title: strp("X")}, "nope": {Title: strp("Y")}},
-		"invalid trim": {ts[0].ID: {Title: strp("X")}, ts[1].ID: {TrimStart: ptr(time.Hour)}},
+		"unknown id":   {ts[0].ID: {Title: ptr("X")}, "nope": {Title: ptr("Y")}},
+		"invalid trim": {ts[0].ID: {Title: ptr("X")}, ts[1].ID: {TrimStart: ptr(time.Hour)}},
 	} {
 		if _, err := a.EditMany(edits); err == nil {
 			t.Errorf("%s: accepted", name)

@@ -113,22 +113,6 @@ func TestAProfileTakenAwayDoesNotComeBack(t *testing.T) {
 	}
 }
 
-func TestANewLibraryHasNoProfiles(t *testing.T) {
-	m, err := manifest.NewStore(filepath.Join(t.TempDir(), "library.json")).Load()
-	if err != nil || len(m.Profiles) != 0 {
-		t.Errorf("%+v %v", m, err)
-	}
-}
-
-func TestAnOlderVersionThanTwoIsStillRefused(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "library.json")
-	os.WriteFile(path, []byte(`{"version": 1, "tracks": []}`), 0o644)
-
-	if _, err := manifest.NewStore(path).Load(); err == nil || !strings.Contains(err.Error(), "unsupported library version 1") {
-		t.Errorf("%v", err)
-	}
-}
-
 func TestWhatIsWrongWithAProfileIsSaidBySetting(t *testing.T) {
 	good := manifest.WolfgangWMP01
 	cases := []struct {

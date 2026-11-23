@@ -38,8 +38,8 @@ func TestAGainBeyondTwentyFourDecibelsIsRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, db := range []float64{25, -25, 40} {
-		if _, err := a.Edit(tr.ID, app.Edit{GainDB: ptr(db)}); err == nil {
-			t.Errorf("%v dB accepted", db)
+		if _, err := a.Edit(tr.ID, app.Edit{GainDB: ptr(db)}); err == nil || !strings.Contains(err.Error(), "24 dB") {
+			t.Errorf("%v dB: err = %v, want one that says 24 dB is the most", db, err)
 		}
 	}
 	if saved := tracks(t, a)[0]; saved.GainSteps != 2 {
@@ -67,21 +67,24 @@ func TestEditFades(t *testing.T) {
 	}
 }
 
-func TestFadesThatMakeNoSenseAreRefused(t *testing.T) {
-	a, tr := ingested(t)
+func TestFadesThatMakeNoSenseAreRefusedWithAMessageThatSaysWhy(t *testing.T) {
+	a, tr := ingested(t) // about 2.612s of audio
 	good := manifest.Span{End: time.Second}
 	if _, err := a.Edit(tr.ID, app.Edit{FadeIn: &good}); err != nil {
 		t.Fatal(err)
 	}
-	for name, e := range map[string]app.Edit{
-		"ends before it starts":   {FadeOut: &manifest.Span{Start: 2 * time.Second, End: time.Second}},
-		"is empty":                {FadeOut: &manifest.Span{Start: time.Second, End: time.Second}},
-		"starts before the track": {FadeOut: &manifest.Span{Start: -time.Second, End: time.Second}},
-		"ends after the track":    {FadeOut: &manifest.Span{Start: 2 * time.Second, End: time.Hour}},
-		"overlaps the fade-in":    {FadeOut: &manifest.Span{Start: 500 * time.Millisecond, End: 2 * time.Second}},
+	for name, c := range map[string]struct {
+		out  manifest.Span
+		want string
+	}{
+		"ends before it starts":   {manifest.Span{Start: 2 * time.Second, End: time.Second}, "fade-out"},
+		"is empty":                {manifest.Span{Start: time.Second, End: time.Second}, "fade-out"},
+		"starts before the track": {manifest.Span{Start: -time.Second, End: time.Second}, "fade-out"},
+		"ends after the track":    {manifest.Span{Start: 2 * time.Second, End: time.Hour}, "fade-out"},
+		"overlaps the fade-in":    {manifest.Span{Start: 500 * time.Millisecond, End: 2 * time.Second}, "must not start before"},
 	} {
-		if _, err := a.Edit(tr.ID, e); err == nil {
-			t.Errorf("a fade-out that %s was accepted", name)
+		if _, err := a.Edit(tr.ID, app.Edit{FadeOut: &c.out}); err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("a fade-out that %s: err = %v, want one that says %q", name, err, c.want)
 		}
 	}
 	if saved := tracks(t, a)[0]; saved.FadeOut != (manifest.Span{}) || saved.FadeIn != good {
@@ -150,23 +153,6 @@ func TestSyncWritesTheLoudnessInTheTimeOfTheOriginalAndThenCuts(t *testing.T) {
 	}
 }
 
-func TestChangingTheLoudnessMakesTheTrackNeedASync(t *testing.T) {
-	a, tr := loudTrack(t)
-	mustSync(t, a, app.SyncOptions{})
-	if n, _ := unsynced(t, a); n != 0 {
-		t.Fatalf("%d to sync after syncing", n)
-	}
-	if _, err := a.Edit(tr.ID, app.Edit{GainDB: ptr(-3.0)}); err != nil {
-		t.Fatal(err)
-	}
-	if n, _ := unsynced(t, a); n != 1 {
-		t.Errorf("%d to sync after a change of volume, want 1", n)
-	}
-	if ops := mustSync(t, a, app.SyncOptions{}); len(ops) != 1 {
-		t.Errorf("the change should rewrite the file: %v", ops)
-	}
-}
-
 func TestThePreviewOfACutSoundsAsTheSyncedFileWillWithItsLoudness(t *testing.T) {
 	a, tr := loudTrack(t)
 	if _, err := a.Edit(tr.ID, app.Edit{GainDB: ptr(-6.0), FadeOut: &manifest.Span{Start: 2 * time.Second, End: 2500 * time.Millisecond}}); err != nil {
@@ -218,6 +204,9 @@ func TestAFadeIsTypedAsALengthOrAsAStretch(t *testing.T) {
 			t.Errorf("ParseFade(%q) = %+v, want an error", bad, got)
 		}
 	}
+	if _, err := app.ParseFade("soon", true, tr); err == nil || !strings.Contains(err.Error(), "soon") {
+		t.Errorf("ParseFade(soon) = %v, want a message that names what was typed", err)
+	}
 }
 
 func TestAFadeIsShownTheWayItCanBeTypedAgain(t *testing.T) {
@@ -252,8 +241,8 @@ func TestAVolumeIsTypedAsANumberOfDecibels(t *testing.T) {
 		}
 	}
 	for _, bad := range []string{"loud", "3 dBs", "--3", "1,5"} {
-		if got, err := app.ParseGain(bad); err == nil {
-			t.Errorf("ParseGain(%q) = %v, want an error", bad, got)
+		if got, err := app.ParseGain(bad); err == nil || !strings.Contains(err.Error(), bad) {
+			t.Errorf("ParseGain(%q) = %v, %v; want an error that names what was typed", bad, got, err)
 		}
 	}
 }
@@ -263,63 +252,5 @@ func TestAVolumeIsWrittenAsDecibelsAndSteps(t *testing.T) {
 		if got := app.VolumeText(steps); got != want {
 			t.Errorf("VolumeText(%d) = %q, want %q", steps, got, want)
 		}
-	}
-}
-
-func TestAVolumeThatIsNotANumberIsRefusedWithAMessageThatNamesIt(t *testing.T) {
-	if _, err := app.ParseGain("loud"); err == nil || !strings.Contains(err.Error(), "loud") {
-		t.Errorf("ParseGain(loud) = %v, want a message that names what was typed", err)
-	}
-}
-
-func TestAVolumeBeyondTheLimitIsRefusedWithAMessageThatSaysTheLimit(t *testing.T) {
-	a, tr := ingested(t)
-	_, err := a.Edit(tr.ID, app.Edit{GainDB: ptr(40.0)})
-	if err == nil || !strings.Contains(err.Error(), "24 dB") {
-		t.Errorf("err = %v, want one that says 24 dB is the most", err)
-	}
-	if saved := tracks(t, a)[0]; saved.GainSteps != 0 {
-		t.Errorf("a refused edit changed the gain to %d steps", saved.GainSteps)
-	}
-}
-
-func TestAFadeThatIsNotATimeIsRefusedWithAMessageThatNamesIt(t *testing.T) {
-	_, tr := ingested(t)
-	if _, err := app.ParseFade("soon", true, tr); err == nil || !strings.Contains(err.Error(), "soon") {
-		t.Errorf("ParseFade(soon) = %v, want a message that names what was typed", err)
-	}
-}
-
-func TestAFadeLongerThanTheTrackIsRefusedWithAMessageThatNamesTheFade(t *testing.T) {
-	a, tr := ingested(t)
-	out, err := app.ParseFade("1:00", false, tr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = a.Edit(tr.ID, app.Edit{FadeOut: &out})
-	if err == nil || !strings.Contains(err.Error(), "fade-out") {
-		t.Errorf("err = %v, want one that names the fade-out", err)
-	}
-	if saved := tracks(t, a)[0]; saved.FadeOut != (manifest.Span{}) {
-		t.Errorf("a refused edit changed the fade-out to %+v", saved.FadeOut)
-	}
-}
-
-func TestFadesThatCrossAreRefusedWithAMessageThatSaysWhy(t *testing.T) {
-	a, tr := ingested(t)
-	in, err := app.ParseFade("2", true, tr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	out, err := app.ParseFade("2", false, tr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = a.Edit(tr.ID, app.Edit{FadeIn: &in, FadeOut: &out})
-	if err == nil || !strings.Contains(err.Error(), "must not start before") {
-		t.Errorf("err = %v, want one that says the fade-out must not start before the fade-in ends", err)
-	}
-	if saved := tracks(t, a)[0]; saved.FadeIn != (manifest.Span{}) || saved.FadeOut != (manifest.Span{}) {
-		t.Errorf("a refused edit changed the fades: %+v, %+v", saved.FadeIn, saved.FadeOut)
 	}
 }

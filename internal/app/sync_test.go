@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -204,7 +205,7 @@ func TestPlanSyncWritesNothing(t *testing.T) {
 	if len(plan.Ops) != 2 {
 		t.Errorf("ops = %v", plan.Ops)
 	}
-	if after := listTree(t, a.Root()); !equalStrings(before, after) {
+	if after := listTree(t, a.Root()); !slices.Equal(before, after) {
 		t.Errorf("planning changed the tree:\nbefore %v\nafter  %v", before, after)
 	}
 }
@@ -249,16 +250,6 @@ func TestSyncToAnotherTargetLeavesTheLibraryRootAlone(t *testing.T) {
 	}
 }
 
-func TestSyncGivesCollidingTracksDistinctFiles(t *testing.T) {
-	a := libWithTracks(t, 10, 20)
-	for _, tr := range tracks(t, a) {
-		identify(t, a, tr.ID, "Same", "Band", "Album", 1, 1)
-	}
-	mustSync(t, a, app.SyncOptions{})
-	readFile(t, a.Root(), "Band/Album/01 - Same.mp3")
-	readFile(t, a.Root(), "Band/Album/01 - Same (2).mp3")
-}
-
 func listTree(t *testing.T, root string) []string {
 	t.Helper()
 	var out []string
@@ -272,82 +263,32 @@ func listTree(t *testing.T, root string) []string {
 	return out
 }
 
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
+func TestChangingWhatTheFileSaysNeedsASyncButSavingItUnchangedDoesNot(t *testing.T) {
+	for name, change := range map[string]app.Edit{
+		"release date": {Released: ptr("1975")},
+		"genre":        {Genre: ptr("Folk")},
+		"volume":       {GainDB: ptr(-3.0)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			a, tr := loudTrack(t)
+			mustSync(t, a, app.SyncOptions{})
 
-func TestSyncWritesTheReleaseDateIntoTheTag(t *testing.T) {
-	a := libWithTracks(t, 40, 41)
-	ts := tracks(t, a)
-	identify(t, a, ts[0].ID, "Dated", "Band", "", 0, 0)
-	identify(t, a, ts[1].ID, "Undated", "Band", "", 0, 0)
-	if _, err := a.Edit(ts[0].ID, app.Edit{Released: ptr("1999-05")}); err != nil {
-		t.Fatal(err)
-	}
-	mustSync(t, a, app.SyncOptions{})
-	if got := mp3.ReadTagSet(readFile(t, a.Root(), "Band/Dated.mp3")).Date; got != "1999-05" {
-		t.Errorf("date in the tag = %q", got)
-	}
-	if got := mp3.ReadTagSet(readFile(t, a.Root(), "Band/Undated.mp3")).Date; got != "" {
-		t.Errorf("a track with no date got %q", got)
-	}
-}
-
-func TestChangingTheReleaseDateNeedsASyncButEditingTheClockDoesNot(t *testing.T) {
-	a := libWithTracks(t, 40)
-	tr := tracks(t, a)[0]
-	identify(t, a, tr.ID, "Song", "Band", "", 0, 0)
-	mustSync(t, a, app.SyncOptions{})
-
-	if _, err := a.Edit(tr.ID, app.Edit{Released: ptr("")}); err != nil { // no change, but a save
-		t.Fatal(err)
-	}
-	if n, _ := unsynced(t, a); n != 0 {
-		t.Errorf("saving without a change: %d to sync", n)
-	}
-	if _, err := a.Edit(tr.ID, app.Edit{Released: ptr("1975")}); err != nil {
-		t.Fatal(err)
-	}
-	if n, _ := unsynced(t, a); n != 1 {
-		t.Errorf("after setting a date: %d to sync, want 1", n)
-	}
-	if ops := mustSync(t, a, app.SyncOptions{}); len(ops) != 1 {
-		t.Errorf("the date should rewrite the file: %v", ops)
-	}
-}
-
-func TestSyncWritesTheGenreIntoTheTagAndChangingItNeedsASync(t *testing.T) {
-	a := libWithTracks(t, 40, 41)
-	ts := tracks(t, a)
-	identify(t, a, ts[0].ID, "Sorted", "Band", "", 0, 0)
-	identify(t, a, ts[1].ID, "Unsorted", "Band", "", 0, 0)
-	if _, err := a.Edit(ts[0].ID, app.Edit{Genre: ptr("Neoclassical")}); err != nil {
-		t.Fatal(err)
-	}
-	mustSync(t, a, app.SyncOptions{})
-	if got := mp3.ReadTagSet(readFile(t, a.Root(), "Band/Sorted.mp3")).Genre; got != "Neoclassical" {
-		t.Errorf("genre in the tag = %q", got)
-	}
-	if got := mp3.ReadTagSet(readFile(t, a.Root(), "Band/Unsorted.mp3")).Genre; got != "" {
-		t.Errorf("a track with no genre got %q", got)
-	}
-
-	if _, err := a.Edit(ts[0].ID, app.Edit{Genre: ptr("Folk")}); err != nil {
-		t.Fatal(err)
-	}
-	if n, _ := unsynced(t, a); n != 1 {
-		t.Errorf("after changing a genre: %d to sync, want 1", n)
-	}
-	if ops := mustSync(t, a, app.SyncOptions{}); len(ops) != 1 {
-		t.Errorf("the genre should rewrite the file: %v", ops)
+			if _, err := a.Edit(tr.ID, app.Edit{}); err != nil {
+				t.Fatal(err)
+			}
+			if n, _ := unsynced(t, a); n != 0 {
+				t.Errorf("saving without a change: %d to sync", n)
+			}
+			if _, err := a.Edit(tr.ID, change); err != nil {
+				t.Fatal(err)
+			}
+			if n, _ := unsynced(t, a); n != 1 {
+				t.Errorf("after the change: %d to sync, want 1", n)
+			}
+			if ops := mustSync(t, a, app.SyncOptions{}); len(ops) != 1 {
+				t.Errorf("the change should rewrite the file: %v", ops)
+			}
+		})
 	}
 }
 

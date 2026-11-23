@@ -39,8 +39,12 @@ func (t profileTarget) Layout() layout.Rules {
 }
 
 func (t profileTarget) Tags(tr manifest.Track) mp3.TagSet {
+	extra := map[string]string{"MM_ID": tr.ID}
 	if tr.Status != manifest.Identified {
-		return mp3.TagSet{Extra: extras(tr)}
+		return mp3.TagSet{Extra: extra}
+	}
+	if tr.SourceURL != "" {
+		extra["SOURCE_URL"] = tr.SourceURL
 	}
 	tags := mp3.TagSet{
 		Title: tr.Title, Artist: tr.Artist, Album: tr.Album,
@@ -48,7 +52,7 @@ func (t profileTarget) Tags(tr manifest.Track) mp3.TagSet {
 		Track: tr.TrackNumber, Total: tr.TrackTotal,
 		Date:   tr.Released,
 		Length: tr.PlayingLength(),
-		Extra:  extras(tr),
+		Extra:  extra,
 	}
 	if t.p.TagWidth > 0 {
 		tags.Artist, tags.Album = PlayerTags(tr, t.p.TagWidth)
@@ -91,10 +95,11 @@ func (t profileTarget) PlaylistFile(p manifest.Playlist) string {
 }
 
 func (t profileTarget) Playlist(p manifest.Playlist, tracks map[string]manifest.Track, paths map[string]string) (string, []byte) {
+	name := t.PlaylistFile(p)
 	if t.p.PlaylistStyle == "root-backslash" {
-		return t.PlaylistFile(p), rootBackslashPlaylist(p, paths)
+		return name, rootBackslashPlaylist(p, paths)
 	}
-	return t.PlaylistFile(p), relativePlaylist(p, tracks, paths)
+	return name, relativePlaylist(p, tracks, paths)
 }
 
 func rootBackslashPlaylist(p manifest.Playlist, paths map[string]string) []byte {

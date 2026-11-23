@@ -32,7 +32,7 @@ const lockPoll = 10 * time.Millisecond
 // must not change the records through the store again, which would wait for
 // itself: anything slow (a download, a lookup) is done before Update.
 func (s *Store) Update(change func(*Manifest) error) error {
-	return s.locked(func(m *Manifest) error {
+	return s.Hold(func(m *Manifest) error {
 		if err := change(m); err != nil {
 			return err
 		}
@@ -45,10 +45,6 @@ func (s *Store) Update(change func(*Manifest) error) error {
 // reading of the records and the end of what is done with it, like deleting the
 // files that no record names.
 func (s *Store) Hold(f func(*Manifest) error) error {
-	return s.locked(f)
-}
-
-func (s *Store) locked(f func(*Manifest) error) error {
 	unlock, err := s.lock()
 	if err != nil {
 		return err
