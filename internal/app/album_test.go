@@ -253,6 +253,27 @@ func TestAddAlbumAddsNothingWhenCancelled(t *testing.T) {
 	}
 }
 
+func TestAddAlbumTakesBackTheTracksAlreadyAddedWhenCancelledWhileFinishing(t *testing.T) {
+	a, dl, al := albumFixture(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	progress := func(done, total int, _ string) {
+		if done == total {
+			cancel()
+		}
+	}
+	rep, err := a.AddAlbum(ctx, al, []int{1, 2, 3}, app.Edit{Artist: ptr("X")}, dl, progress)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v", err)
+	}
+	if len(rep.Added) != 0 || rep.Duplicates != 0 || len(rep.Failed) != 0 {
+		t.Errorf("report = %+v", rep)
+	}
+	if saved := tracks(t, a); len(saved) != 0 {
+		t.Errorf("manifest = %+v", saved)
+	}
+}
+
 func TestAlbumCheckRefusesBadChoices(t *testing.T) {
 	_, _, al := albumFixture(t)
 	for _, c := range []struct {

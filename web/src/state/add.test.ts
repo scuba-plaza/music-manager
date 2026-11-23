@@ -744,7 +744,39 @@ describe('an album review', () => {
     await vi.waitFor(() => {
       expect(requestsTo(fetchMock, 'DELETE', '/api/jobs/b1')).toEqual([null]);
     });
-    expect(requestsTo(fetchMock, 'DELETE', '/api/add/al1')).toEqual([]);
+    await vi.waitFor(() => {
+      expect(requestsTo(fetchMock, 'DELETE', '/api/add/al1')).toEqual([null]);
+    });
+  });
+
+  it('closing before the save is answered stops the job once it starts and applies nothing', async () => {
+    await inAlbum(running, stopB1, discardAlbum);
+    const saving = saveAlbum();
+
+    useApp.setState({ overlay: null });
+    await saving;
+
+    await vi.waitFor(() => {
+      expect(requestsTo(fetchMock, 'DELETE', '/api/jobs/b1')).toEqual([null]);
+    });
+    expect(useApp.getState().status.text).toBe('');
+    expect(state().job).toBeNull();
+  });
+
+  it('closing after a failed save discards the album on the server', async () => {
+    await inAlbum(running, discardAlbum);
+    const saving = saveAlbum();
+    await vi.waitFor(() => {
+      expect(state().job?.id).toBe('b1');
+    });
+    jobEvent({ id: 'b1', kind: 'addalbum', state: 'failed', error: 'disk full' });
+    await saving;
+
+    useApp.setState({ overlay: null });
+
+    await vi.waitFor(() => {
+      expect(requestsTo(fetchMock, 'DELETE', '/api/add/al1')).toEqual([null]);
+    });
   });
 
   it('closing the review discards the album on the server', async () => {

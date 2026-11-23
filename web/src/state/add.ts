@@ -300,6 +300,7 @@ export async function saveAlbum(): Promise<AlbumKey | undefined> {
   try {
     const view = await send<JobView>('POST', '/api/add/album', { id: album.id, form: albumForm, tracks });
     if (mine !== attemptNo) {
+      void stopJob(view.id);
       return undefined;
     }
     useAdd.setState({ job: view, progress: progressOf(view.data) });
@@ -364,10 +365,13 @@ useApp.subscribe((state, previous) => {
   if ((phase === 'fetching' || phase === 'adding') && job !== null) {
     void stopJob(job.id);
   }
+  if (phase === 'adding' && job === null) {
+    attemptNo += 1;
+  }
   if (draft !== null && !finished) {
     send('DELETE', `/api/add/${encodeURIComponent(draft.draft)}`).catch(() => undefined);
   }
-  if (album !== null && phase === 'album' && !finished) {
+  if (album !== null && (phase === 'album' || phase === 'adding' || phase === 'failed') && !finished) {
     send('DELETE', `/api/add/${encodeURIComponent(album.id)}`).catch(() => undefined);
   }
   finished = true;

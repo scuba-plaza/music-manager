@@ -119,7 +119,23 @@ func (a *App) AddAlbum(ctx context.Context, al *Album, numbers []int, shared Edi
 	if err := ctx.Err(); err != nil {
 		return AlbumReport{}, err
 	}
+	undo := func() (AlbumReport, error) {
+		err := ctx.Err()
+		if len(rep.Added) > 0 {
+			ids := make([]string, len(rep.Added))
+			for i, t := range rep.Added {
+				ids[i] = t.ID
+			}
+			if _, rerr := a.RemoveMany(ids); rerr != nil {
+				err = errors.Join(err, rerr)
+			}
+		}
+		return AlbumReport{}, err
+	}
 	for _, p := range drafts {
+		if ctx.Err() != nil {
+			return undo()
+		}
 		t, err := a.Finish(p.draft, albumTrackEdit(shared, p.draft.Info, al.Tracks[p.n-1].Title, p.n, len(al.Tracks)))
 		var dup *DuplicateError
 		switch {
@@ -132,6 +148,9 @@ func (a *App) AddAlbum(ctx context.Context, al *Album, numbers []int, shared Edi
 		}
 	}
 	progress(len(numbers), len(numbers), "")
+	if ctx.Err() != nil {
+		return undo()
+	}
 	return rep, nil
 }
 
