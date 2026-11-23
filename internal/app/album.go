@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
+
+	"music-manager/internal/manifest"
 )
 
 const MaxAlbumTracks = 30
@@ -51,4 +54,99 @@ func (a *App) FetchAlbum(ctx context.Context, url string, dl Downloader) (*Album
 		al.coverSHA = sha
 	}
 	return al, nil
+}
+
+func (al *Album) Check(numbers []int) error {
+	if len(numbers) == 0 {
+		return errors.New("pick at least one track")
+	}
+	prev := 0
+	for _, n := range numbers {
+		if n < 1 || n > len(al.Tracks) || n <= prev {
+			return errors.New("the chosen tracks are not in this playlist")
+		}
+		prev = n
+	}
+	return nil
+}
+
+type AlbumFailure struct {
+	Title string
+	Err   error
+}
+
+type AlbumReport struct {
+	Added      []manifest.Track
+	Duplicates int
+	Failed     []AlbumFailure
+}
+
+func (a *App) AddAlbum(ctx context.Context, al *Album, numbers []int, shared Edit, dl Downloader, progress func(done, total int, title string)) (AlbumReport, error) {
+	if err := al.Check(numbers); err != nil {
+		return AlbumReport{}, err
+	}
+	type pending struct {
+		n     int
+		draft *Draft
+	}
+	var rep AlbumReport
+	var drafts []pending
+	for i, n := range numbers {
+		if err := ctx.Err(); err != nil {
+			return AlbumReport{}, err
+		}
+		lt := al.Tracks[n-1]
+		progress(i, len(numbers), lt.Title)
+		dctx, cancel := context.WithTimeout(ctx, DownloadTimeout)
+		d, err := a.Fetch(dctx, AddRequest{URL: lt.URL}, dl)
+		cancel()
+		var dup *DuplicateError
+		switch {
+		case errors.As(err, &dup):
+			rep.Duplicates++
+		case err != nil:
+			if ctx.Err() != nil {
+				return AlbumReport{}, ctx.Err()
+			}
+			rep.Failed = append(rep.Failed, AlbumFailure{Title: lt.Title, Err: err})
+		default:
+			if al.coverSHA != "" {
+				d.staged.coverSHA = al.coverSHA
+			}
+			drafts = append(drafts, pending{n, d})
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return AlbumReport{}, err
+	}
+	for _, p := range drafts {
+		t, err := a.Finish(p.draft, albumTrackEdit(shared, p.draft.Info, al.Tracks[p.n-1].Title, p.n, len(al.Tracks)))
+		var dup *DuplicateError
+		switch {
+		case errors.As(err, &dup):
+			rep.Duplicates++
+		case err != nil:
+			rep.Failed = append(rep.Failed, AlbumFailure{Title: al.Tracks[p.n-1].Title, Err: err})
+		default:
+			rep.Added = append(rep.Added, t)
+		}
+	}
+	progress(len(numbers), len(numbers), "")
+	return rep, nil
+}
+
+func albumTrackEdit(shared Edit, info Info, title string, number, total int) Edit {
+	e := shared
+	e.Title = &title
+	e.TrackNumber = &number
+	e.TrackTotal = &total
+	if e.Released == nil || *e.Released == "" {
+		r := info.Released
+		e.Released = &r
+	}
+	if e.Genre == nil || *e.Genre == "" {
+		g := info.Genre
+		e.Genre = &g
+	}
+	return e
 }
