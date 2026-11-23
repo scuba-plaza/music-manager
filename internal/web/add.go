@@ -1,7 +1,6 @@
 package web
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -15,7 +14,6 @@ import (
 
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
-	"music-manager/internal/coverimg"
 )
 
 // downloadTimeout bounds a download, in case it never ends.
@@ -50,20 +48,11 @@ func (s *Server) addFetch(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnprocessableEntity, err)
 		return
 	}
-	v, err := s.jobs.start("add", func(ctx context.Context, _ func(any)) (any, error) {
+	s.startJob(w, "add", "a download is going on already", func(ctx context.Context, _ func(any)) (any, error) {
 		ctx, cancel := context.WithTimeout(ctx, downloadTimeout)
 		defer cancel()
 		return s.ed.Fetch(ctx, in.URL)
 	})
-	if errors.Is(err, errBusy) {
-		fail(w, http.StatusConflict, errors.New("a download is going on already"))
-		return
-	}
-	if err != nil {
-		fail(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeJSON(w, v)
 }
 
 type AddCheck struct {
@@ -167,7 +156,7 @@ func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 	for _, f := range rep.Failed {
 		skipped = append(skipped, fmt.Sprintf("%s: %v", filepath.Base(f.Path), f.Err))
 	}
-	msg := "Added " + plural(len(rep.Added), "track")
+	msg := "Added " + browse.Plural(len(rep.Added), "track")
 	if n := len(rep.Duplicates); n > 0 {
 		msg += fmt.Sprintf(" · %d already there", n)
 	}
@@ -206,13 +195,6 @@ func cleanName(name string) string {
 	return name
 }
 
-func plural(n int, word string) string {
-	if n == 1 {
-		return "1 " + word
-	}
-	return fmt.Sprintf("%d %ss", n, word)
-}
-
 type DraftCoverView struct {
 	Cover string `json:"cover"`
 }
@@ -223,20 +205,7 @@ func (s *Server) draftCover(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, errNotFound)
 		return
 	}
-	data, err := os.ReadFile(s.app.CoverPath(sha))
-	if err != nil {
-		fail(w, http.StatusNotFound, errNotFound)
-		return
-	}
-	kind := coverimg.Sniff(data)
-	if kind == "" {
-		fail(w, http.StatusUnsupportedMediaType, errors.New("the cover is not a JPEG or PNG image"))
-		return
-	}
-	w.Header().Set("Content-Type", kind)
-	w.Header().Set("ETag", `"`+sha+`"`)
-	w.Header().Set("Cache-Control", "no-store")
-	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
+	s.serveCover(w, r, sha, "no-store")
 }
 
 func (s *Server) draftCoverPut(w http.ResponseWriter, r *http.Request) {

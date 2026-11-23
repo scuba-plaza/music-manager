@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -13,7 +12,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -168,12 +166,7 @@ func (l *seededServers) serveReset(w http.ResponseWriter, r *http.Request) {
 
 func loopbackOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		host := r.Host
-		if h, _, err := net.SplitHostPort(r.Host); err == nil {
-			host = h
-		}
-		host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
-		if ip := net.ParseIP(host); host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+		if !web.LocalHost(r.Host) {
 			http.Error(w, "this address is not allowed", http.StatusForbidden)
 			return
 		}

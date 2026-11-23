@@ -2,8 +2,6 @@ package web
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -169,7 +167,7 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 	if dev.ID() != device.Generic.ID() {
 		where += " · " + dev.Profile().Name
 	}
-	v, err := s.jobs.start("sync", func(ctx context.Context, report func(any)) (any, error) {
+	s.startJob(w, "sync", "a sync is going on already", func(ctx context.Context, report func(any)) (any, error) {
 		type made struct {
 			plan *app.SyncPlan
 			err  error
@@ -188,7 +186,7 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 			if m.err != nil {
 				return nil, m.err
 			}
-			id, err := newID()
+			id, err := randomID(8)
 			if err != nil {
 				return nil, err
 			}
@@ -204,33 +202,15 @@ func (s *Server) syncPlan(w http.ResponseWriter, r *http.Request) {
 			return SyncData{Phase: "plan", Where: where, Plan: &view}, nil
 		}
 	})
-	if errors.Is(err, errBusy) {
-		fail(w, http.StatusConflict, errors.New("a sync is going on already"))
-		return
-	}
-	if err != nil {
-		fail(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeJSON(w, v)
 }
 
+// syncDevice is the device a sync writes for: the library folder is always
+// written the generic way.
 func (s *Server) syncDevice(isLibrary bool, profile string) (device.Target, error) {
-	switch {
-	case isLibrary:
+	if isLibrary || profile == "" {
 		return device.Generic, nil
-	case profile != "":
-		return s.app.Format(profile)
 	}
-	return device.Generic, nil
-}
-
-func newID() (string, error) {
-	var raw [8]byte
-	if _, err := rand.Read(raw[:]); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(raw[:]), nil
+	return s.app.Format(profile)
 }
 
 func (s *Server) planView(e *syncEntry) (browse.PlanView, error) {
@@ -282,10 +262,10 @@ func (s *Server) syncApply(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnprocessableEntity, errors.New("there is nothing to write"))
 		return
 	case counts.Remove > 0 && strings.TrimSpace(in.Confirm) != "delete":
-		fail(w, http.StatusUnprocessableEntity, fmt.Errorf("type delete to remove %s", plural(counts.Remove, "file")))
+		fail(w, http.StatusUnprocessableEntity, fmt.Errorf("type delete to remove %s", browse.Plural(counts.Remove, "file")))
 		return
 	}
-	v, err := s.jobs.start("sync", func(_ context.Context, report func(any)) (any, error) {
+	s.startJob(w, "sync", "a sync is going on already", func(_ context.Context, report func(any)) (any, error) {
 		err := plan.ApplyWith(func(done, total int) {
 			report(SyncData{Phase: "apply", Done: done, Total: total, Where: where})
 		})
@@ -298,15 +278,6 @@ func (s *Server) syncApply(w http.ResponseWriter, r *http.Request) {
 		}
 		return SyncData{Phase: "apply", Where: where, Summary: browse.Summary(counts, plan.Collected)}, nil
 	})
-	if errors.Is(err, errBusy) {
-		fail(w, http.StatusConflict, errors.New("a sync is going on already"))
-		return
-	}
-	if err != nil {
-		fail(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeJSON(w, v)
 }
 
 func (s *Server) syncDrop(w http.ResponseWriter, r *http.Request) {

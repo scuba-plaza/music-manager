@@ -22,7 +22,7 @@ import (
 //     none is ever answered.
 func guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !localHost(r.Host) {
+		if !LocalHost(r.Host) {
 			fail(w, http.StatusForbidden, errors.New("this address is not allowed"))
 			return
 		}
@@ -45,8 +45,8 @@ func guard(next http.Handler) http.Handler {
 	})
 }
 
-// localHost reports whether the Host header names this computer.
-func localHost(hostport string) bool {
+// LocalHost reports whether a Host header names this computer.
+func LocalHost(hostport string) bool {
 	host := hostport
 	if h, _, err := net.SplitHostPort(hostport); err == nil {
 		host = h
