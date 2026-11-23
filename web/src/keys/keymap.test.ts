@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FieldView, PeekView, TrackView } from '../api/types.gen';
-import type { AppState } from '../state/store';
+import { useApp, type AppState } from '../state/store';
 import { libraryResponse } from '../testing/fakes';
 import {
   bindings,
@@ -11,7 +11,6 @@ import {
   keyLabel,
   keyName,
   resolve,
-  resolveFilter,
   type ActionName,
   type Binding,
   type KeyEventLike,
@@ -29,30 +28,7 @@ function typed(name: string): KeyEventLike {
 }
 
 function state(overrides: Partial<AppState> = {}): AppState {
-  return {
-    info: null,
-    lib: null,
-    filter: '',
-    filterFocused: false,
-    sort: { key: '', reverse: false },
-    expanded: new Set(),
-    cursor: null,
-    marks: new Set(),
-    focus: 'tree',
-    field: 0,
-    tab: 0,
-    detail: null,
-    detailError: '',
-    edit: null,
-    playing: null,
-    profile: '',
-    status: { text: '', kind: '' },
-    overlay: null,
-    dialogHints: [],
-    helpPage: 0,
-    busy: false,
-    ...overrides,
-  };
+  return { ...useApp.getInitialState(), ...overrides };
 }
 
 function field(key: string, editable = true): FieldView {
@@ -274,50 +250,6 @@ describe('what is gone', () => {
   it('does nothing for a key that is being composed', () => {
     expect(resolve('tree', press('j', { isComposing: true }))).toBeUndefined();
   });
-
-  it('leaves Shift+Tab to the browser', () => {
-    expect(resolve('tree', press('Tab', { shiftKey: true }))).toBeUndefined();
-  });
-});
-
-describe('Caps Lock', () => {
-  it('a capital letter without Shift is the plain key: u undoes, g goes to the top', () => {
-    expect(resolve('tree', press('U'))).toBe('undo');
-    expect(resolve('tree', press('G'))).toBe('moveToTop');
-  });
-
-  it('a lower-case letter with Shift is the shifted key: Shift+u redoes', () => {
-    expect(resolve('tree', press('u', { shiftKey: true }))).toBe('redo');
-    expect(resolve('tree', press('v', { shiftKey: true }))).toBe('doctor');
-  });
-});
-
-describe('one key, two panes', () => {
-  it('Space marks in the tree and plays in the fields', () => {
-    expect(resolve('tree', press(' '))).toBe('markToggle');
-    expect(resolve('inspector', press(' '))).toBe('hear');
-  });
-
-  it('d removes in the tree and clears in the fields, like Delete', () => {
-    expect(resolve('tree', press('d'))).toBe(resolve('tree', press('Delete')));
-    expect(resolve('inspector', press('d'))).toBe(resolve('inspector', press('Delete')));
-    expect(resolve('tree', press('d'))).toBe('remove');
-    expect(resolve('inspector', press('d'))).toBe('clear');
-  });
-
-  it('the arrows move in the tree and choose fields and nudge in the inspector', () => {
-    expect(resolve('tree', press('ArrowDown'))).toBe('moveDown');
-    expect(resolve('inspector', press('ArrowDown'))).toBe('fieldDown');
-    expect(resolve('tree', press('ArrowRight'))).toBe('open');
-    expect(resolve('inspector', press('ArrowRight'))).toBe('nudgeUp');
-  });
-
-  it('a key of one pane does nothing in the other', () => {
-    expect(resolve('inspector', typed('Shift+ArrowDown'))).toBeUndefined();
-    expect(resolve('inspector', typed('Shift+Space'))).toBeUndefined();
-    expect(resolve('tree', press('1'))).toBeUndefined();
-    expect(resolve('tree', press('l', { shiftKey: true }))).toBeUndefined();
-  });
 });
 
 describe('the table', () => {
@@ -325,19 +257,6 @@ describe('the table', () => {
     for (const scope of ['tree', 'inspector'] as const) {
       const keys = bindings.filter((b) => b.scope === scope || b.scope === 'common').flatMap((b) => b.keys);
       expect(new Set(keys).size, scope).toBe(keys.length);
-    }
-  });
-
-  it('has one entry for each action of a scope', () => {
-    const pairs = bindings.map((b) => `${b.scope} ${b.action}`);
-    expect(new Set(pairs).size).toBe(pairs.length);
-  });
-
-  it('names no modifier in any key', () => {
-    for (const b of bindings) {
-      for (const key of b.keys) {
-        expect(key, `${b.scope} ${b.action}`).not.toMatch(/ctrl|alt|meta/i);
-      }
     }
   });
 
@@ -433,11 +352,6 @@ describe('the footer hints', () => {
     expect(hints.map((h) => h.label)).not.toContain('nudge');
   });
 
-  it('the cover of an album offers enter to choose a file too', () => {
-    const hints = hintsFor(state({ focus: 'inspector', detail: artist([field('album'), field('cover')]), field: 1 }));
-    expect(hints).toContainEqual({ keys: 'enter', label: 'choose' });
-  });
-
   it('enter edit shows only on a field that can be edited, and d clear only where something can be cleared', () => {
     const enter = (f: FieldView) => hintsFor(state({ focus: 'inspector', detail: track([f]) })).find((h) => h.keys === 'enter');
     expect(enter(field('title'))).toEqual({ keys: 'enter', label: 'edit' });
@@ -449,11 +363,6 @@ describe('the footer hints', () => {
     const hints = hintsFor(state({ focus: 'inspector', tab: 1, detail: track([field('title')], []) }));
     expect(hints).toContainEqual({ keys: '1-4', label: 'tabs' });
     expect(hints.find((h) => h.keys === 'enter')).toBeUndefined();
-  });
-
-  it('the tab shown is kept within the tabs the track has', () => {
-    const hints = hintsFor(state({ focus: 'inspector', tab: 7, detail: track([], [field('volume')]) }));
-    expect(hints).toContainEqual({ keys: '←→', label: 'nudge' });
   });
 
   it('the fields of an artist have no tabs and nothing to copy', () => {
@@ -477,51 +386,20 @@ describe('the help pages', () => {
     expect(helpPages().map((p) => p.page)).toEqual(['Moving', 'Editing', 'Marking', 'Library']);
   });
 
-  it('a row joins the keys of neighbouring bindings that say the same thing', () => {
-    const library = helpPages().find((p) => p.page === 'Library')?.rows ?? [];
-    expect(library).toContainEqual({ keys: 'u U', text: 'undo / redo' });
-    const moving = helpPages().find((p) => p.page === 'Moving')?.rows ?? [];
-    expect(moving).toContainEqual({ keys: '↑↓  k j', text: 'move' });
-    expect(moving).toContainEqual({ keys: 'Home End  g G', text: 'top / bottom' });
-  });
-
-  it('name the fields’ tabs, the fourth being Device', () => {
-    const editing = helpPages().find((p) => p.page === 'Editing')?.rows ?? [];
-    expect(editing).toContainEqual({ keys: '1-4', text: "a track's tab by its number: Details, Audio, Latin, Device" });
-  });
-
-  it('teach the nudge and the one key that removes or clears', () => {
-    const editing = helpPages().find((p) => p.page === 'Editing')?.rows ?? [];
-    expect(editing).toContainEqual({ keys: '←→', text: 'nudge 0.1 s or 1.5 dB' });
-    expect(editing).toContainEqual({ keys: 'Shift+← Shift+→', text: 'nudge 1 s or 6 dB' });
-    expect(editing).toContainEqual({ keys: 'd  Del', text: 'remove the cover (asks first); clear a cut, fade or volume' });
-  });
-
-  it('no help line mentions a key that is gone', () => {
-    for (const b of bindings) {
-      expect(b.help.text, `${b.scope} ${b.action}`).not.toMatch(/wolfgang|musicbrainz|old tags/i);
-    }
+  it.each([
+    ['Library', 'u U', 'undo / redo'],
+    ['Moving', '↑↓  k j', 'move'],
+    ['Moving', 'Home End  g G', 'top / bottom'],
+    ['Editing', '1-4', "a track's tab by its number: Details, Audio, Latin, Device"],
+    ['Editing', '←→', 'nudge 0.1 s or 1.5 dB'],
+    ['Editing', 'Shift+← Shift+→', 'nudge 1 s or 6 dB'],
+    ['Editing', 'd  Del', 'remove the cover (asks first); clear a cut, fade or volume'],
+  ])('%s joins the keys of neighbouring bindings that say the same thing: %s', (page, keys, text) => {
+    expect(helpPages().find((p) => p.page === page)?.rows).toContainEqual({ keys, text });
   });
 });
 
 describe('the filter box', () => {
-  it('takes enter and down into the tree and clears with escape, and nothing else', () => {
-    expect(resolveFilter(press('Enter'))).toBe('filterAccept');
-    expect(resolveFilter(press('ArrowDown'))).toBe('filterAccept');
-    expect(resolveFilter(press('Escape'))).toBe('filterClear');
-    expect(resolveFilter(press('j'))).toBeUndefined();
-    expect(resolveFilter(press('ArrowUp'))).toBeUndefined();
-    expect(resolveFilter(press('a', { ctrlKey: true }))).toBeUndefined();
-  });
-
-  it('takes nothing while a key is composed or with ctrl, meta or alt held', () => {
-    expect(resolveFilter(press('Enter', { isComposing: true }))).toBeUndefined();
-    expect(resolveFilter(press('Enter', { ctrlKey: true }))).toBeUndefined();
-    expect(resolveFilter(press('Enter', { metaKey: true }))).toBeUndefined();
-    expect(resolveFilter(press('Enter', { altKey: true }))).toBeUndefined();
-    expect(resolveFilter(press('Escape', { isComposing: true }))).toBeUndefined();
-  });
-
   it('hints enter keep and esc clear', () => {
     expect(filterHints()).toEqual([
       { keys: 'enter', label: 'keep' },

@@ -1,4 +1,4 @@
-import { ApiError, getBlob, query, send } from '../api/client';
+import { fieldErrors, getBlob, query, send } from '../api/client';
 import type { ChangeResponse, FieldView, HintView, PathView } from '../api/types.gen';
 import { dropDetail, loadDetail } from './detail';
 import { loadLibrary } from './library';
@@ -144,8 +144,9 @@ export async function saveEdit(): Promise<void> {
   try {
     await applyChange(saveCall(f, edit));
   } catch (err) {
-    if (err instanceof ApiError && Object.keys(err.fields).length > 0) {
-      updateEdit({ wrong: err.fields });
+    const wrong = fieldErrors(err);
+    if (wrong !== undefined) {
+      updateEdit({ wrong });
     } else if (err instanceof Error && err.message !== '') {
       updateEdit({ error: err.message });
     }

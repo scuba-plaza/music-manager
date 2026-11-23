@@ -1,6 +1,7 @@
 import type { ErrorView } from './types.gen';
 
 const unreachable = 'Cannot reach mm. Is it still running?';
+const unreadable = 'mm gave an answer the page cannot read.';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -36,8 +37,6 @@ function fieldsOf(data: ErrorView): Record<string, string> {
   }
   return out;
 }
-
-const unreadable = 'mm gave an answer the page cannot read.';
 
 async function readBody(res: Response): Promise<unknown> {
   const type = res.headers.get('Content-Type') ?? '';
@@ -111,8 +110,12 @@ export function get<T>(path: string, init?: { signal?: AbortSignal }): Promise<T
   return call<T>('GET', path, undefined, init?.signal);
 }
 
-export function send<T>(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body?: unknown, init?: { signal?: AbortSignal }): Promise<T> {
-  return call<T>(method, path, body, init?.signal);
+export function send<T>(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body?: unknown): Promise<T> {
+  return call<T>(method, path, body);
+}
+
+export function fieldErrors(err: unknown): Readonly<Record<string, string>> | undefined {
+  return err instanceof ApiError && Object.keys(err.fields).length > 0 ? err.fields : undefined;
 }
 
 export function query(params: Record<string, string | number | boolean | null | undefined>): string {

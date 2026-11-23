@@ -15,7 +15,12 @@ export async function loadInfo(): Promise<void> {
   }
 }
 
-function followMoves(expanded: Set<string>, cursor: string | null, moves: Record<string, string>) {
+interface Placement {
+  expanded: Set<string>;
+  cursor: string | null;
+}
+
+function followMoves({ expanded, cursor }: Placement, moves: Record<string, string>): Placement {
   const next = new Set(expanded);
   let at = cursor;
   for (const [from, to] of Object.entries(moves)) {
@@ -29,7 +34,7 @@ function followMoves(expanded: Set<string>, cursor: string | null, moves: Record
   return { expanded: next, cursor: at };
 }
 
-function revealTrack(lib: LibraryResponse, expanded: Set<string>, cursor: string | null, id: string) {
+function revealTrack(lib: LibraryResponse, { expanded, cursor }: Placement, id: string): Placement {
   const current = rowByKey(lib, cursor);
   const row = current?.trackId === id ? current : rowByKey(lib, trackRowKey(id));
   if (row === undefined) {
@@ -46,7 +51,7 @@ function withoutGoneTracks(marks: Set<string>, lib: LibraryResponse): Set<string
 
 let librarySeq = 0;
 
-export interface LibraryOptions {
+interface LibraryOptions {
   moves?: Record<string, string> | undefined;
   reveal?: string | undefined;
 }
@@ -63,8 +68,8 @@ export async function loadLibrary(options: LibraryOptions = {}): Promise<void> {
       return;
     }
     const state = useApp.getState();
-    const followed = options.moves === undefined ? state : followMoves(state.expanded, state.cursor, options.moves);
-    const revealed = options.reveal === undefined ? followed : revealTrack(lib, followed.expanded, followed.cursor, options.reveal);
+    const followed = options.moves === undefined ? state : followMoves(state, options.moves);
+    const revealed = options.reveal === undefined ? followed : revealTrack(lib, followed, options.reveal);
     change({
       lib,
       profile: previewChoice(lib.profiles, state.profile),

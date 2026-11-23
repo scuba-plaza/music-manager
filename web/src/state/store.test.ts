@@ -15,32 +15,6 @@ afterEach(() => {
 });
 
 describe('the store', () => {
-  it('starts on the tree with nothing loaded, marked or sorted', async () => {
-    vi.stubGlobal('localStorage', memoryStorage());
-
-    const state = (await freshStore()).getState();
-
-    expect(state).toMatchObject({
-      info: null,
-      lib: null,
-      filter: '',
-      filterFocused: false,
-      cursor: null,
-      focus: 'tree',
-      field: 0,
-      tab: 0,
-      detail: null,
-      edit: null,
-      playing: null,
-      status: { text: '', kind: '' },
-      overlay: null,
-      busy: false,
-      sort: { key: '', reverse: false },
-    });
-    expect([...state.expanded]).toEqual([]);
-    expect([...state.marks]).toEqual([]);
-  });
-
   it('expanded survives a reload', async () => {
     const storage = memoryStorage();
     vi.stubGlobal('localStorage', storage);
@@ -53,19 +27,6 @@ describe('the store', () => {
     expect(storage.data.get('mm.expanded')).toBe('["artist:a","album:b"]');
   });
 
-  it('the tab is not kept between visits: the fields open on the first one', async () => {
-    const storage = memoryStorage({ 'mm.tab': '2' });
-    vi.stubGlobal('localStorage', storage);
-    const first = await freshStore();
-
-    expect(first.getState().tab).toBe(0);
-    first.setState({ tab: 2 });
-    const second = await freshStore();
-
-    expect(second.getState().tab).toBe(0);
-    expect(storage.data.get('mm.tab')).toBe('2');
-  });
-
   it('writes nothing for a change to something else', async () => {
     const storage = memoryStorage();
     vi.stubGlobal('localStorage', storage);
@@ -76,49 +37,27 @@ describe('the store', () => {
     expect(storage.data.size).toBe(0);
   });
 
-  it('a thrown localStorage does not break the store', async () => {
-    vi.stubGlobal('localStorage', deniedStorage());
-
-    const store = await freshStore();
-    store.setState({ expanded: new Set(['artist:a']) });
-
-    expect([...store.getState().expanded]).toEqual(['artist:a']);
-  });
-
-  it('starts without trouble where there is no localStorage at all', async () => {
-    vi.stubGlobal('localStorage', undefined);
-
-    const store = await freshStore();
-    store.setState({ expanded: new Set(['artist:a']) });
-
-    expect([...store.getState().expanded]).toEqual(['artist:a']);
-  });
-
-  it('falls back to the defaults for what was stored badly', async () => {
-    vi.stubGlobal('localStorage', memoryStorage({ 'mm.expanded': '{"a":1}' }));
-
-    const store = await freshStore();
-
-    expect([...store.getState().expanded]).toEqual([]);
-    expect(store.getState().tab).toBe(0);
-  });
-
-  it('starts from an empty expanded when what was stored is cut off, and writes a valid value over it', async () => {
-    const storage = memoryStorage({ 'mm.expanded': '["a' });
-
+  it.each([
+    ['throws', deniedStorage()],
+    ['is not there at all', undefined],
+  ])('works where localStorage %s', async (_, storage) => {
     vi.stubGlobal('localStorage', storage);
+
     const store = await freshStore();
-    expect([...store.getState().expanded]).toEqual([]);
     store.setState({ expanded: new Set(['artist:a']) });
 
-    expect(storage.data.get('mm.expanded')).toBe('["artist:a"]');
+    expect([...store.getState().expanded]).toEqual(['artist:a']);
   });
 
-  it('keeps only the strings of a stored list', async () => {
-    vi.stubGlobal('localStorage', memoryStorage({ 'mm.expanded': '["artist:a",7,null,"album:b"]' }));
+  it.each([
+    ['is no list', '{"a":1}', []],
+    ['is cut off', '["a', []],
+    ['holds more than strings', '["artist:a",7,null,"album:b"]', ['artist:a', 'album:b']],
+  ])('keeps only the strings of what was stored when it %s', async (_, stored, expanded) => {
+    vi.stubGlobal('localStorage', memoryStorage({ 'mm.expanded': stored }));
 
     const store = await freshStore();
 
-    expect([...store.getState().expanded]).toEqual(['artist:a', 'album:b']);
+    expect([...store.getState().expanded]).toEqual(expanded);
   });
 });

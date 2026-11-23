@@ -30,7 +30,7 @@ export function shownErrors(checks: FormChecks): Record<string, string> {
   return shown;
 }
 
-export function firstWrong(checks: FormChecks, order: readonly string[]): string | undefined {
+export function firstWrong<K extends string>(checks: FormChecks, order: readonly K[]): K | undefined {
   const shown = shownErrors(checks);
   return order.find((key) => key in shown);
 }

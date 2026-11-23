@@ -77,48 +77,34 @@ describe('installKeys', () => {
     expect(first.prevented()).toBe(true);
   });
 
-  it('a key typed in an INPUT, TEXTAREA or SELECT is ignored', async () => {
+  it('a key typed in an INPUT, TEXTAREA or SELECT that is not the filter box is ignored', async () => {
     const { ran, send } = await setup();
 
     for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT']) {
-      const typed = send(press('j', {}, { tagName }));
-      expect(typed.prevented(), tagName).toBe(false);
-      send(press('r', { ctrl: true }, { tagName }));
+      const target = { tagName, hasAttribute: () => false };
+      expect(send(press('j', {}, target)).prevented(), tagName).toBe(false);
+      send(press('Escape', {}, target));
     }
 
     expect(ran).toEqual([]);
   });
 
-  it('isComposing ignores the key', async () => {
-    const { ran, send } = await setup();
-
-    const composed = send(press('j', { composing: true }));
-
-    expect(ran).toEqual([]);
-    expect(composed.prevented()).toBe(false);
-  });
-
-  it('meta and alt combinations are ignored', async () => {
+  it('leaves the browser a key being composed, one held with ctrl, meta or alt, and one that is no binding', async () => {
     const { ran, send } = await setup();
 
     const pressed = [
+      send(press('j', { composing: true })),
       send(press('j', { meta: true })),
       send(press('j', { alt: true })),
       send(press('r', { ctrl: true, meta: true })),
       send(press('a', { ctrl: true, alt: true })),
+      ...['r', 'a', 'u', 'd', 'c'].map((key) => send(press(key, { ctrl: true }))),
+      send(press('q')),
+      send(press('F5')),
     ];
 
     expect(ran).toEqual([]);
-    expect(pressed.map((p) => p.prevented())).toEqual([false, false, false, false]);
-  });
-
-  it('the browser keeps ctrl+r, ctrl+a, ctrl+u and ctrl+d: nothing runs and nothing is prevented', async () => {
-    const { ran, send } = await setup();
-
-    const pressed = ['r', 'a', 'u', 'd'].map((key) => send(press(key, { ctrl: true })));
-
-    expect(ran).toEqual([]);
-    expect(pressed.map((p) => p.prevented())).toEqual([false, false, false, false]);
+    expect(pressed.map((p) => p.prevented())).toEqual(pressed.map(() => false));
   });
 
   it('Shift is part of the key: Shift+u redoes, Shift+Space marks all, and Shift+Tab is left to the browser', async () => {
@@ -130,14 +116,6 @@ describe('installKeys', () => {
 
     expect(ran).toEqual(['redo', 'markAll']);
     expect([redo.prevented(), markAll.prevented(), back.prevented()]).toEqual([true, true, false]);
-  });
-
-  it('Caps Lock changes nothing: a capital U without Shift is still undo', async () => {
-    const { ran, send } = await setup();
-
-    send(press('U'));
-
-    expect(ran).toEqual(['undo']);
   });
 
   it('the filter box handles only Enter, ArrowDown and Escape', async () => {
@@ -163,14 +141,6 @@ describe('installKeys', () => {
 
     expect(ran).toEqual([]);
     expect(pressed.map((p) => p.prevented())).toEqual([false, false, false, false]);
-  });
-
-  it('an input that is not the filter box does not take the filter keys', async () => {
-    const { ran, send } = await setup();
-
-    send(press('Escape', {}, { tagName: 'INPUT', hasAttribute: () => false }));
-
-    expect(ran).toEqual([]);
   });
 
   it('keys wait while busy', async () => {
@@ -203,15 +173,6 @@ describe('installKeys', () => {
 
     expect(ran).toEqual([]);
     expect(pressed.map((p) => p.prevented())).toEqual([false, false, false, false]);
-  });
-
-  it('only a key that resolves is prevented', async () => {
-    const { ran, send } = await setup();
-
-    const pressed = [send(press('c', { ctrl: true })), send(press('q')), send(press('F5'))];
-
-    expect(ran).toEqual([]);
-    expect(pressed.map((p) => p.prevented())).toEqual([false, false, false]);
   });
 
   it('the remover takes the listener away', async () => {

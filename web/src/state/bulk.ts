@@ -1,10 +1,9 @@
 import { create } from 'zustand';
-import { send } from '../api/client';
+import { fieldErrors, send } from '../api/client';
 import type { BulkPreview, ChangeResponse } from '../api/types.gen';
-import { ApiError } from '../api/client';
 import { applyChange } from './edit';
 import { cleanChecks, firstWrong, left, tried, verdict, type FormChecks } from './form';
-import { useApp } from './store';
+import { closeOverlay, useApp } from './store';
 import { messageOf } from './text';
 
 export const bulkFields = [
@@ -20,11 +19,11 @@ export const bulkFields = [
   { key: 'cutEnd', label: 'Cut end' },
 ] as const;
 
-export type BulkKey = (typeof bulkFields)[number]['key'];
+type BulkKey = (typeof bulkFields)[number]['key'];
 
-export type BulkValues = Record<BulkKey, string>;
+type BulkValues = Record<BulkKey, string>;
 
-export interface BulkSummary {
+interface BulkSummary {
   text: string;
   bad: boolean;
 }
@@ -48,7 +47,7 @@ function fresh(): BulkState {
 
 export const useBulk = create<BulkState>()(fresh);
 
-const order: readonly string[] = bulkFields.map((f) => f.key);
+const order: readonly BulkKey[] = bulkFields.map((f) => f.key);
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let seq = 0;
@@ -104,7 +103,7 @@ export function leaveBulk(key: BulkKey): void {
   useBulk.setState((s) => ({ checks: left(s.checks, key) }));
 }
 
-export async function applyBulk(): Promise<string | undefined> {
+export async function applyBulk(): Promise<BulkKey | undefined> {
   const ids = shownIds();
   if (ids === undefined) {
     return undefined;
@@ -113,8 +112,9 @@ export async function applyBulk(): Promise<string | undefined> {
   try {
     await applyChange(() => send<ChangeResponse>('POST', '/api/bulk', { ids, values }));
   } catch (err) {
-    if (err instanceof ApiError && Object.keys(err.fields).length > 0) {
-      useBulk.setState((s) => ({ checks: tried(verdict(s.checks, err.fields)) }));
+    const wrong = fieldErrors(err);
+    if (wrong !== undefined) {
+      useBulk.setState((s) => ({ checks: tried(verdict(s.checks, wrong)) }));
       return firstWrong(useBulk.getState().checks, order);
     }
     if (err instanceof Error && err.message !== '') {
@@ -122,7 +122,7 @@ export async function applyBulk(): Promise<string | undefined> {
     }
     return undefined;
   }
-  useApp.setState({ overlay: null });
+  closeOverlay();
   return undefined;
 }
 

@@ -1,6 +1,6 @@
 import type { JobView } from './types.gen';
 
-export interface Handlers {
+interface Handlers {
   library(stamp: string): void;
   job(e: JobView): void;
   open(): void;

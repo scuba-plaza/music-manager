@@ -1,13 +1,13 @@
 import { create } from 'zustand';
-import { ApiError, send } from '../api/client';
+import { fieldErrors, send } from '../api/client';
 import type { Profile, ProfileCheck } from '../api/types.gen';
 import { cleanChecks, firstWrong, left, tried, verdict, type FormChecks } from './form';
 import { loadLibrary } from './library';
-import { setStatus } from './status';
+import { fail, setStatus } from './status';
 import { ask, useApp } from './store';
 import { messageOf } from './text';
 
-export type FormatsMode = 'list' | 'form';
+type FormatsMode = 'list' | 'form';
 
 export interface FormatForm {
   name: string;
@@ -27,7 +27,7 @@ export interface FormatForm {
 
 export type FormatKey = keyof FormatForm;
 
-export const formatOrder: readonly FormatKey[] = [
+const formatOrder: readonly FormatKey[] = [
   'name',
   'latin_names',
   'component_max',
@@ -43,9 +43,9 @@ export const formatOrder: readonly FormatKey[] = [
   'playlist_style',
 ];
 
-export const maxFormats = 8;
+const maxFormats = 8;
 
-export interface FormatsState {
+interface FormatsState {
   mode: FormatsMode;
   cursor: number;
   editing: string | null;
@@ -75,7 +75,7 @@ export function blankForm(): FormatForm {
   };
 }
 
-export function formOf(p: Profile): FormatForm {
+function formOf(p: Profile): FormatForm {
   return {
     name: p.name,
     latin_names: p.latin_names,
@@ -225,11 +225,6 @@ export function leaveFormat(key: FormatKey): void {
   useFormats.setState((s) => ({ checks: left(s.checks, key) }));
 }
 
-function firstKey(): FormatKey | undefined {
-  const first = firstWrong(useFormats.getState().checks, formatOrder);
-  return formatOrder.find((key) => key === first);
-}
-
 export async function saveFormat(): Promise<FormatKey | undefined> {
   const { editing, form, saving, cursor } = useFormats.getState();
   if (saving) {
@@ -238,7 +233,7 @@ export async function saveFormat(): Promise<FormatKey | undefined> {
   const { profile, local } = parseForm(form);
   if (Object.keys(local).length > 0) {
     useFormats.setState((s) => ({ checks: tried(verdict(s.checks, { ...s.checks.wrong, ...local })) }));
-    return firstKey();
+    return firstWrong(useFormats.getState().checks, formatOrder);
   }
   useFormats.setState({ saving: true, error: '' });
   try {
@@ -249,10 +244,10 @@ export async function saveFormat(): Promise<FormatKey | undefined> {
     const at = stored().findIndex((p) => p.id === made.id);
     open(at < 0 ? cursor : at + 1);
   } catch (err) {
-    if (err instanceof ApiError && Object.keys(err.fields).length > 0) {
-      const fields = err.fields;
-      useFormats.setState((s) => ({ saving: false, checks: tried(verdict(s.checks, fields)) }));
-      return firstKey();
+    const wrong = fieldErrors(err);
+    if (wrong !== undefined) {
+      useFormats.setState((s) => ({ saving: false, checks: tried(verdict(s.checks, wrong)) }));
+      return firstWrong(useFormats.getState().checks, formatOrder);
     }
     useFormats.setState({ saving: false, error: messageOf(err) });
   }
@@ -282,7 +277,7 @@ async function deleteFormat(chosen: Profile, at: number): Promise<void> {
     await loadLibrary();
     setStatus(`Deleted the format “${chosen.name}”`, 'good');
   } catch (err) {
-    setStatus(messageOf(err), 'bad');
+    fail(err);
   }
   open(Math.max(at - 1, 0));
 }

@@ -11,7 +11,6 @@ import {
   fetchLink,
   leaveField,
   removeDraftCover,
-  retryAdd,
   saveAdd,
   setField,
   showDuplicate,
@@ -118,7 +117,7 @@ export function Add() {
         if (e.key !== 'Enter') {
           return false;
         }
-        retryAdd();
+        fetchLink();
         return true;
       case 'form':
         if (e.key === 'Enter' && document.activeElement instanceof HTMLButtonElement) {

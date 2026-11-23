@@ -4,7 +4,7 @@ import { useApp } from './store';
 
 export const genericId = 'generic';
 
-export interface FormatChoice {
+interface FormatChoice {
   id: string;
   name: string;
 }
