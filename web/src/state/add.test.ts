@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AddForm, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
+import type { AddForm, AlbumView, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
 import { changeResponse, infoView, jsonResponse, memoryStorage, requestsTo, sampleLibrary, stubServer, type StubRoute , urlOf } from '../testing/fakes';
-import { chooseDraftCover, chooseFiles, fetchLink, leaveField, openAdd, removeDraftCover, saveAdd, setField, showDuplicate, typeLink, useAdd } from './add';
+import { chooseDraftCover, chooseFiles, fetchLink, leaveField, openAdd, pickAll, removeDraftCover, saveAdd, saveAlbum, setAlbumField, setField, togglePick, showDuplicate, typeLink, useAdd } from './add';
 import { shownErrors } from './form';
 import { jobEvent } from './jobs';
 import { useApp } from './store';
@@ -578,5 +578,167 @@ describe('with nothing to act on', () => {
     showDuplicate();
 
     expect(useApp.getState().overlay).toEqual({ kind: 'add' });
+  });
+});
+
+const sampleAlbum: AlbumView = {
+  id: 'al1',
+  form: { album: 'Kind of Blue', artist: 'Miles Davis', released: '1959', genre: 'Jazz' },
+  note: 'From a playlist',
+  cover: 'c9',
+  tracks: [
+    { number: 1, title: 'So What', seconds: 545 },
+    { number: 2, title: 'Freddie Freeloader', seconds: 589 },
+    { number: 3, title: 'Blue in Green', seconds: 337 },
+  ],
+};
+
+describe('an album review', () => {
+  const addAlbum = (answer: () => Response): StubRoute => ({ method, url }) =>
+    method === 'POST' && url.pathname === '/api/add/album' ? answer() : undefined;
+  const running = addAlbum(() => jsonResponse({ id: 'b1', kind: 'addalbum', state: 'running' }));
+  const discardAlbum: StubRoute = ({ method, url }) => (method === 'DELETE' && url.pathname === '/api/add/al1' ? new Response(null, { status: 204 }) : undefined);
+  const stopB1: StubRoute = ({ method, url }) => (method === 'DELETE' && url.pathname === '/api/jobs/b1' ? jsonResponse({ id: 'b1', kind: 'addalbum', state: 'stopped' }) : undefined);
+
+  async function inAlbum(...extra: StubRoute[]): Promise<void> {
+    await fetched({ album: sampleAlbum }, routes(...extra));
+    await vi.waitFor(() => {
+      expect(state().phase).toBe('album');
+    });
+  }
+
+  it('receiving an album fills the review and picks every track', async () => {
+    await inAlbum();
+
+    expect(state()).toMatchObject({ album: sampleAlbum, albumForm: sampleAlbum.form, picked: [1, 2, 3], cover: 'c9' });
+  });
+
+  it('togglePick unticks and reticks, keeping the picks in order', async () => {
+    await inAlbum();
+
+    togglePick(2);
+    expect(state().picked).toEqual([1, 3]);
+    togglePick(2);
+    expect(state().picked).toEqual([1, 2, 3]);
+  });
+
+  it('pickAll(false) then pickAll(true)', async () => {
+    await inAlbum();
+
+    pickAll(false);
+    expect(state().picked).toEqual([]);
+    pickAll(true);
+    expect(state().picked).toEqual([1, 2, 3]);
+  });
+
+  it('typing a field clears that field error only', async () => {
+    await inAlbum();
+    useAdd.setState({ albumErrors: { album: 'x', artist: 'y' } });
+
+    setAlbumField('album', 'Other');
+
+    expect(state().albumForm.album).toBe('Other');
+    expect(state().albumErrors).toEqual({ artist: 'y' });
+  });
+
+  it('saving with nothing picked says so and sends nothing', async () => {
+    await inAlbum(running);
+    pickAll(false);
+
+    await saveAlbum();
+
+    expect(state()).toMatchObject({ phase: 'album', error: 'Pick at least one track' });
+    expect(requestsTo(fetchMock, 'POST', '/api/add/album')).toEqual([]);
+  });
+
+  it('saving sends the id, the form and only the picked numbers in ascending order', async () => {
+    await inAlbum(running);
+    pickAll(false);
+    togglePick(3);
+    togglePick(1);
+    setAlbumField('genre', 'Cool');
+
+    void saveAlbum();
+
+    await vi.waitFor(() => {
+      expect(state().phase).toBe('adding');
+      expect(state().job?.id).toBe('b1');
+    });
+    expect(requestsTo(fetchMock, 'POST', '/api/add/album')).toEqual([{ id: 'al1', form: { ...sampleAlbum.form, genre: 'Cool' }, tracks: [1, 3] }]);
+  });
+
+  it('progress from the job shows while adding', async () => {
+    await inAlbum(running);
+    void saveAlbum();
+    await vi.waitFor(() => {
+      expect(state().job?.id).toBe('b1');
+    });
+
+    jobEvent({ id: 'b1', kind: 'addalbum', state: 'running', data: { done: 1, total: 3, title: 'So What' } });
+
+    expect(state()).toMatchObject({ phase: 'adding', progress: { done: 1, total: 3, title: 'So What' } });
+  });
+
+  it('a finished job applies its message and closes the dialog', async () => {
+    await inAlbum(running, discardAlbum);
+    const saving = saveAlbum();
+    await vi.waitFor(() => {
+      expect(state().job?.id).toBe('b1');
+    });
+
+    jobEvent({ id: 'b1', kind: 'addalbum', state: 'done', data: changeResponse({ message: 'Added 3 tracks', reveal: 'n1' }) });
+    await saving;
+
+    expect(useApp.getState().overlay).toBeNull();
+    expect(useApp.getState().status.text).toBe('Added 3 tracks');
+    expect(requestsTo(fetchMock, 'DELETE', '/api/add/al1')).toEqual([]);
+    expect(requestsTo(fetchMock, 'DELETE', '/api/jobs/b1')).toEqual([]);
+  });
+
+  it('a failed job shows its error', async () => {
+    await inAlbum(running);
+    const saving = saveAlbum();
+    await vi.waitFor(() => {
+      expect(state().job?.id).toBe('b1');
+    });
+
+    jobEvent({ id: 'b1', kind: 'addalbum', state: 'failed', error: 'disk full' });
+    await saving;
+
+    expect(state()).toMatchObject({ phase: 'failed', error: 'disk full' });
+  });
+
+  it('a field error returns to the review and names the field', async () => {
+    await inAlbum(addAlbum(() => jsonResponse({ error: '1 field needs fixing', fields: { released: 'Not a date' } }, 422)));
+
+    const wrong = await saveAlbum();
+
+    expect(wrong).toBe('released');
+    expect(state()).toMatchObject({ phase: 'album', albumErrors: { released: 'Not a date' } });
+  });
+
+  it('closing while adding stops the job', async () => {
+    await inAlbum(running, stopB1, discardAlbum);
+    void saveAlbum();
+    await vi.waitFor(() => {
+      expect(state().job?.id).toBe('b1');
+    });
+
+    useApp.setState({ overlay: null });
+
+    await vi.waitFor(() => {
+      expect(requestsTo(fetchMock, 'DELETE', '/api/jobs/b1')).toEqual([null]);
+    });
+    expect(requestsTo(fetchMock, 'DELETE', '/api/add/al1')).toEqual([]);
+  });
+
+  it('closing the review discards the album on the server', async () => {
+    await inAlbum(discardAlbum);
+
+    useApp.setState({ overlay: null });
+
+    await vi.waitFor(() => {
+      expect(requestsTo(fetchMock, 'DELETE', '/api/add/al1')).toEqual([null]);
+    });
   });
 });

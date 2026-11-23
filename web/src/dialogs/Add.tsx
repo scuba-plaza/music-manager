@@ -53,6 +53,11 @@ const hintsFor: Record<AddPhase, readonly Hint[]> = {
     { keys: 'enter', label: 'tries again' },
     { keys: 'esc', label: 'close' },
   ],
+  album: [
+    { keys: 'enter', label: 'add' },
+    { keys: 'esc', label: 'close' },
+  ],
+  adding: [{ keys: 'esc', label: 'cancel' }],
   form: [
     { keys: 'enter', label: 'add' },
     { keys: 'tab', label: 'next field' },
