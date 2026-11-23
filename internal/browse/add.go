@@ -35,7 +35,7 @@ type AddForm struct {
 func addDefaults(info app.Info) AddForm {
 	artist := info.Artist
 	if artist == "" {
-		artist = strings.TrimSuffix(info.Uploader, " - Topic")
+		artist = strings.TrimSuffix(info.Uploader, topicSuffix)
 	}
 	return AddForm{
 		Title: info.Title, Artist: artist, Album: info.Album,
@@ -154,6 +154,7 @@ type DuplicateView struct {
 type Fetched struct {
 	Draft     *DraftView     `json:"draft,omitempty"`
 	Duplicate *DuplicateView `json:"duplicate,omitempty"`
+	Album     *AlbumView     `json:"album,omitempty"`
 }
 
 var ErrDraftGone = errors.New("That download is gone: fetch the link again")
@@ -188,6 +189,9 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 	if err != nil {
 		return Fetched{}, err
 	}
+	if IsPlaylistLink(link) {
+		return e.fetchAlbum(ctx, link)
+	}
 	d, err := e.lib.Fetch(ctx, app.AddRequest{URL: link}, e.downloader)
 	var dup *app.DuplicateError
 	if errors.As(err, &dup) {
@@ -217,6 +221,9 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 func (e *Editor) DraftCover(draft string) (string, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if al, ok := e.albums.get(draft); ok {
+		return al.CoverSHA(), true
+	}
 	d, ok := e.drafts.get(draft)
 	if !ok {
 		return "", false
@@ -255,6 +262,7 @@ func (e *Editor) Discard(draft string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.drafts.drop(draft)
+	e.albums.drop(draft)
 }
 
 // Finish adds a downloaded track to the library with the details of the form.
