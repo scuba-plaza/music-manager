@@ -27,7 +27,7 @@ func IsPlaylistLink(link string) bool {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 		return false
 	}
-	return playlistHosts[u.Host] && u.Path == "/playlist" && u.Query().Get("list") != ""
+	return playlistHosts[strings.ToLower(u.Hostname())] && u.Path == "/playlist" && u.Query().Get("list") != ""
 }
 
 type AlbumForm struct {

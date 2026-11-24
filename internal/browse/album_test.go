@@ -66,6 +66,8 @@ func TestOnlyAPlaylistPageIsAPlaylistLink(t *testing.T) {
 		"https://music.youtube.com/playlist?list=PLabc",
 		"https://youtube.com/playlist?list=PLabc&si=zz",
 		"https://m.youtube.com/playlist?list=PLabc",
+		"https://WWW.YouTube.com/playlist?list=PLabc",
+		"https://music.youtube.com:443/playlist?list=PLabc",
 	}
 	no := []string{
 		"https://www.youtube.com/watch?v=abc&list=PLabc",
