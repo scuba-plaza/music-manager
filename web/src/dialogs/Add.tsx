@@ -4,14 +4,17 @@ import { FormField } from '../components/FormField';
 import { Problem } from '../components/Problem';
 import { Dialog } from '../overlay/Dialog';
 import { ringKey } from '../overlay/focusRing';
+import { AlbumProgressView, AlbumReview, albumControls } from './AddAlbum';
 import {
   addOrder,
+  albumOrder,
   chooseDraftCover,
   chooseFiles,
   fetchLink,
   leaveField,
   removeDraftCover,
   saveAdd,
+  saveAlbum,
   setField,
   showDuplicate,
   typeLink,
@@ -53,6 +56,13 @@ const hintsFor: Record<AddPhase, readonly Hint[]> = {
     { keys: 'enter', label: 'tries again' },
     { keys: 'esc', label: 'close' },
   ],
+  album: [
+    { keys: 'space', label: 'toggle' },
+    { keys: 'tab', label: 'next field' },
+    { keys: 'enter', label: 'add' },
+    { keys: 'esc', label: 'close' },
+  ],
+  adding: [{ keys: 'esc', label: 'cancel' }],
   form: [
     { keys: 'enter', label: 'add' },
     { keys: 'tab', label: 'next field' },
@@ -114,6 +124,20 @@ export function Add() {
       });
       return true;
     }
+    if (phase === 'album') {
+      if (e.key !== 'Enter') {
+        return ringKey(e, albumControls(whole.current), false);
+      }
+      if (document.activeElement instanceof HTMLButtonElement) {
+        return false;
+      }
+      void saveAlbum().then((wrong) => {
+        if (wrong !== undefined) {
+          whole.current?.querySelectorAll<HTMLElement>('.form input')[albumOrder.indexOf(wrong)]?.focus();
+        }
+      });
+      return true;
+    }
     const enter = enterActions[phase];
     if (e.key !== 'Enter' || enter === undefined) {
       return false;
@@ -134,7 +158,7 @@ export function Add() {
     <Dialog title="Add from YouTube" hints={hintsFor[phase]} onKey={onKey}>
       {phase === 'asking' && (
         <>
-          <div className="ask-body">Paste a link to a video or a track:</div>
+          <div className="ask-body">Paste a link to a video, a track or a playlist:</div>
           <div className="form">
             <FormField name="link" label="Link" error={linkError} hideLabel>
               {(control) => (
@@ -188,6 +212,12 @@ export function Add() {
           <div className="ask-body">esc cancels.</div>
         </>
       )}
+      {phase === 'album' && (
+        <div ref={whole}>
+          <AlbumReview />
+        </div>
+      )}
+      {phase === 'adding' && <AlbumProgressView />}
       {phase === 'saving' && <div className="busy">Adding to the library…</div>}
       {phase === 'duplicate' && existing !== null && (
         <>

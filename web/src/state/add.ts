@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { ApiError, fieldErrors, send } from '../api/client';
-import type { AddCheck, AddForm, ChangeResponse, DraftCoverView, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
+import type { AddCheck, AddForm, AlbumForm, AlbumProgress, AlbumView, ChangeResponse, DraftCoverView, DraftView, DuplicateView, Fetched, JobView } from '../api/types.gen';
 import { cleanChecks, firstWrong, left, tried, verdict, type FormChecks } from './form';
 import { loadLibrary } from './library';
 import { setStatus } from './status';
@@ -10,9 +10,11 @@ import { follow, stopJob } from './jobs';
 import { closeOverlay, useApp } from './store';
 import { messageOf } from './text';
 
-export type AddPhase = 'asking' | 'fetching' | 'form' | 'saving' | 'duplicate' | 'failed';
+export type AddPhase = 'asking' | 'fetching' | 'form' | 'saving' | 'duplicate' | 'failed' | 'album' | 'adding';
 
 export type AddKey = keyof AddForm;
+
+export type AlbumKey = keyof AlbumForm;
 
 interface AddState {
   phase: AddPhase;
@@ -28,9 +30,22 @@ interface AddState {
   form: AddForm;
   existing: DuplicateView | null;
   pathNote: string;
+  album: AlbumView | null;
+  albumForm: AlbumForm;
+  albumErrors: Record<string, string>;
+  picked: readonly number[];
+  progress: AlbumProgress | null;
 }
 
 const pathPause = 120;
+
+const pickOne = 'Pick at least one track';
+
+export const albumOrder: readonly AlbumKey[] = ['album', 'artist', 'released', 'genre'];
+
+function blankAlbum(): AlbumForm {
+  return { album: '', artist: '', released: '', genre: '' };
+}
 
 export const addOrder: readonly AddKey[] = ['title', 'artist', 'album', 'track', 'of', 'released', 'genre', 'cutStart', 'cutEnd'];
 
@@ -53,6 +68,11 @@ function fresh(): AddState {
     form: blank(),
     existing: null,
     pathNote: '',
+    album: null,
+    albumForm: blankAlbum(),
+    albumErrors: {},
+    picked: [],
+    progress: null,
   };
 }
 
@@ -116,6 +136,18 @@ function receive(ended: JobView): void {
   const out = fetchedOf(ended.data);
   if (out.duplicate !== undefined) {
     useAdd.setState({ phase: 'duplicate', existing: out.duplicate });
+    return;
+  }
+  if (out.album !== undefined) {
+    useAdd.setState({
+      phase: 'album',
+      album: out.album,
+      picked: out.album.tracks.map((t) => t.number),
+      albumForm: out.album.form,
+      albumErrors: {},
+      cover: out.album.cover,
+      coverError: '',
+    });
     return;
   }
   const draft = out.draft;
@@ -212,6 +244,101 @@ export async function saveAdd(): Promise<AddKey | undefined> {
   return undefined;
 }
 
+function progressOf(data: unknown): AlbumProgress | null {
+  if (typeof data !== 'object' || data === null) {
+    return null;
+  }
+  if ('done' in data && 'total' in data && 'title' in data) {
+    const { done, total, title } = data;
+    return typeof done === 'number' && typeof total === 'number' && typeof title === 'string' ? { done, total, title } : null;
+  }
+  return null;
+}
+
+function changeOf(data: unknown): ChangeResponse {
+  if (typeof data === 'object' && data !== null && 'history' in data && typeof data.history === 'object' && data.history !== null) {
+    return { ...data, history: data.history };
+  }
+  return { history: {} };
+}
+
+export function setAlbumField(key: AlbumKey, text: string): void {
+  useAdd.setState((s) => ({
+    albumForm: { ...s.albumForm, [key]: text },
+    albumErrors: Object.fromEntries(Object.entries(s.albumErrors).filter(([name]) => name !== key)),
+  }));
+}
+
+export function togglePick(number: number): void {
+  useAdd.setState((s) => {
+    const picked = s.picked.includes(number) ? s.picked.filter((n) => n !== number) : [...s.picked, number].sort((a, b) => a - b);
+    return { picked, error: picked.length > 0 && s.error === pickOne ? '' : s.error };
+  });
+}
+
+export function pickAll(all: boolean): void {
+  useAdd.setState((s) => {
+    const picked = all && s.album !== null ? s.album.tracks.map((t) => t.number) : [];
+    return { picked, error: picked.length > 0 && s.error === pickOne ? '' : s.error };
+  });
+}
+
+export async function saveAlbum(): Promise<AlbumKey | undefined> {
+  const { album, albumForm, picked } = useAdd.getState();
+  if (album === null) {
+    return undefined;
+  }
+  if (picked.length === 0) {
+    useAdd.setState({ error: pickOne });
+    return undefined;
+  }
+  attemptNo += 1;
+  const mine = attemptNo;
+  const tracks = [...picked].sort((a, b) => a - b);
+  useAdd.setState({ phase: 'adding', error: '', albumErrors: {}, progress: null, job: null, started: Date.now() });
+  let ended: JobView;
+  try {
+    const view = await send<JobView>('POST', '/api/add/album', { id: album.id, form: albumForm, tracks });
+    if (mine !== attemptNo) {
+      void stopJob(view.id);
+      return undefined;
+    }
+    useAdd.setState({ job: view, progress: progressOf(view.data) });
+    ended = await follow(view, (v) => {
+      if (mine === attemptNo) {
+        useAdd.setState({ job: v, progress: progressOf(v.data) });
+      }
+    });
+  } catch (err) {
+    if (mine !== attemptNo) {
+      return undefined;
+    }
+    const wrong = fieldErrors(err);
+    if (wrong !== undefined) {
+      useAdd.setState({ phase: 'album', albumErrors: { ...wrong } });
+      return albumOrder.find((key) => wrong[key] !== undefined);
+    }
+    useAdd.setState({ phase: 'album', error: messageOf(err) });
+    return undefined;
+  }
+  if (mine !== attemptNo || !addOpen()) {
+    return undefined;
+  }
+  if (ended.state !== 'done') {
+    useAdd.setState({ phase: 'failed', error: ended.error ?? '' });
+    return undefined;
+  }
+  finished = true;
+  useAdd.setState({ job: null });
+  try {
+    await applyChange(() => Promise.resolve(changeOf(ended.data)));
+  } catch {
+    useAdd.setState({ error: '' });
+  }
+  closeOverlay();
+  return undefined;
+}
+
 export function showDuplicate(): void {
   const { existing } = useAdd.getState();
   if (existing === null) {
@@ -234,12 +361,18 @@ useApp.subscribe((state, previous) => {
     return;
   }
   clearTimeout(pathTimer);
-  const { phase, job, draft } = useAdd.getState();
-  if (phase === 'fetching' && job !== null) {
+  const { phase, job, draft, album } = useAdd.getState();
+  if ((phase === 'fetching' || phase === 'adding') && job !== null) {
     void stopJob(job.id);
+  }
+  if (phase === 'adding' && job === null) {
+    attemptNo += 1;
   }
   if (draft !== null && !finished) {
     send('DELETE', `/api/add/${encodeURIComponent(draft.draft)}`).catch(() => undefined);
+  }
+  if (album !== null && (phase === 'album' || phase === 'adding' || phase === 'failed') && !finished) {
+    send('DELETE', `/api/add/${encodeURIComponent(album.id)}`).catch(() => undefined);
   }
   finished = true;
 });

@@ -2,8 +2,6 @@ package browse
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
@@ -37,7 +35,7 @@ type AddForm struct {
 func addDefaults(info app.Info) AddForm {
 	artist := info.Artist
 	if artist == "" {
-		artist = strings.TrimSuffix(info.Uploader, " - Topic")
+		artist = strings.TrimSuffix(info.Uploader, topicSuffix)
 	}
 	return AddForm{
 		Title: info.Title, Artist: artist, Album: info.Album,
@@ -156,6 +154,7 @@ type DuplicateView struct {
 type Fetched struct {
 	Draft     *DraftView     `json:"draft,omitempty"`
 	Duplicate *DuplicateView `json:"duplicate,omitempty"`
+	Album     *AlbumView     `json:"album,omitempty"`
 }
 
 var ErrDraftGone = errors.New("That download is gone: fetch the link again")
@@ -190,6 +189,9 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 	if err != nil {
 		return Fetched{}, err
 	}
+	if IsPlaylistLink(link) {
+		return e.fetchAlbum(ctx, link)
+	}
 	d, err := e.lib.Fetch(ctx, app.AddRequest{URL: link}, e.downloader)
 	var dup *app.DuplicateError
 	if errors.As(err, &dup) {
@@ -204,22 +206,14 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 	if err != nil {
 		return Fetched{}, err
 	}
-	var raw [8]byte
-	if _, err := rand.Read(raw[:]); err != nil {
+	id, err := newID()
+	if err != nil {
 		return Fetched{}, err
 	}
-	v := DraftView{Draft: hex.EncodeToString(raw[:]), Form: addDefaults(d.Info), Note: addNote(d.Info), Cover: d.CoverSHA()}
+	v := DraftView{Draft: id, Form: addDefaults(d.Info), Note: addNote(d.Info), Cover: d.CoverSHA()}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.drafts == nil {
-		e.drafts = map[string]*app.Draft{}
-	}
-	if len(e.draftOrder) >= maxDrafts {
-		delete(e.drafts, e.draftOrder[0])
-		e.draftOrder = e.draftOrder[1:]
-	}
-	e.drafts[v.Draft] = d
-	e.draftOrder = append(e.draftOrder, v.Draft)
+	e.drafts.put(id, d)
 	return Fetched{Draft: &v}, nil
 }
 
@@ -227,7 +221,10 @@ func (e *Editor) Fetch(ctx context.Context, link string) (Fetched, error) {
 func (e *Editor) DraftCover(draft string) (string, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	d, ok := e.drafts[draft]
+	if al, ok := e.albums.get(draft); ok {
+		return al.CoverSHA(), true
+	}
+	d, ok := e.drafts.get(draft)
 	if !ok {
 		return "", false
 	}
@@ -238,7 +235,7 @@ func (e *Editor) DraftCover(draft string) (string, bool) {
 func (e *Editor) ReplaceDraftCover(draft string, image []byte) (string, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	d, ok := e.drafts[draft]
+	d, ok := e.drafts.get(draft)
 	if !ok {
 		return "", ErrDraftGone
 	}
@@ -252,7 +249,7 @@ func (e *Editor) ReplaceDraftCover(draft string, image []byte) (string, error) {
 func (e *Editor) RemoveDraftCover(draft string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	d, ok := e.drafts[draft]
+	d, ok := e.drafts.get(draft)
 	if !ok {
 		return ErrDraftGone
 	}
@@ -264,19 +261,14 @@ func (e *Editor) RemoveDraftCover(draft string) error {
 func (e *Editor) Discard(draft string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	delete(e.drafts, draft)
-	for i, id := range e.draftOrder {
-		if id == draft {
-			e.draftOrder = append(e.draftOrder[:i:i], e.draftOrder[i+1:]...)
-			break
-		}
-	}
+	e.drafts.drop(draft)
+	e.albums.drop(draft)
 }
 
 // Finish adds a downloaded track to the library with the details of the form.
 func (e *Editor) Finish(draft string, f AddForm) (Result, error) {
 	e.mu.Lock()
-	d, ok := e.drafts[draft]
+	d, ok := e.drafts.get(draft)
 	e.mu.Unlock()
 	if !ok {
 		return Result{}, ErrDraftGone

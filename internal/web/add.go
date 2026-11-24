@@ -10,14 +10,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"music-manager/internal/app"
 	"music-manager/internal/browse"
 )
-
-// downloadTimeout bounds a download, in case it never ends.
-const downloadTimeout = 10 * time.Minute
 
 // maxUpload is the most audio one request may bring.
 const maxUpload = 2 << 30
@@ -26,6 +22,7 @@ func (s *Server) addRoutes() {
 	s.mux.HandleFunc("POST /api/add/fetch", s.addFetch)
 	s.mux.HandleFunc("POST /api/add/path", s.addPath)
 	s.mux.HandleFunc("POST /api/add/finish", s.addFinish)
+	s.mux.HandleFunc("POST /api/add/album", s.addAlbum)
 	s.mux.HandleFunc("DELETE /api/add/{draft}", s.addDiscard)
 	s.mux.HandleFunc("GET /api/add/{draft}/cover", s.draftCover)
 	s.mux.HandleFunc("PUT /api/add/{draft}/cover", s.draftCoverPut)
@@ -49,7 +46,7 @@ func (s *Server) addFetch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.startJob(w, "add", "a download is going on already", func(ctx context.Context, _ func(any)) (any, error) {
-		ctx, cancel := context.WithTimeout(ctx, downloadTimeout)
+		ctx, cancel := context.WithTimeout(ctx, app.DownloadTimeout)
 		defer cancel()
 		return s.ed.Fetch(ctx, in.URL)
 	})

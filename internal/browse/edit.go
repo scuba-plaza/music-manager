@@ -18,6 +18,8 @@ import (
 type Store interface {
 	Manifest() (*manifest.Manifest, error)
 	Fetch(ctx context.Context, req app.AddRequest, dl app.Downloader) (*app.Draft, error)
+	FetchAlbum(ctx context.Context, url string, dl app.Downloader) (*app.Album, error)
+	AddAlbum(ctx context.Context, al *app.Album, numbers []int, shared app.Edit, dl app.Downloader, progress func(done, total int, title string)) (app.AlbumReport, error)
 	Finish(d *app.Draft, e app.Edit) (manifest.Track, error)
 	SetDraftCover(d *app.Draft, image []byte) error
 	RemoveDraftCover(d *app.Draft)
@@ -86,8 +88,8 @@ type Editor struct {
 	nudgeKey string
 	clip     *clipContents
 
-	drafts     map[string]*app.Draft // downloads waiting for their details, by name
-	draftOrder []string
+	drafts shelf[*app.Draft]
+	albums shelf[*app.Album]
 }
 
 // EditorOption adds a capability to an editor.

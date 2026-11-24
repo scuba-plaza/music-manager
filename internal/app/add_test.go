@@ -22,19 +22,56 @@ type fakeDownloader struct {
 	err   error
 	calls []string // URLs asked for
 	dirs  []string // where the file was put
+
+	audioFor   func(url string) []byte
+	errFor     map[string]error
+	infoFor    map[string]app.Info
+	onDownload func(url string)
+
+	listing   app.Listing
+	listErr   error
+	listCalls []struct {
+		url   string
+		limit int
+	}
+}
+
+func (f *fakeDownloader) List(ctx context.Context, url, dir string, limit int) (app.Listing, error) {
+	f.listCalls = append(f.listCalls, struct {
+		url   string
+		limit int
+	}{url, limit})
+	if f.listErr != nil {
+		return app.Listing{}, f.listErr
+	}
+	return f.listing, nil
 }
 
 func (f *fakeDownloader) Download(ctx context.Context, url, dir string) (app.Downloaded, error) {
 	f.calls = append(f.calls, url)
 	f.dirs = append(f.dirs, dir)
+	if f.onDownload != nil {
+		f.onDownload(url)
+	}
+	if err := f.errFor[url]; err != nil {
+		return app.Downloaded{}, err
+	}
 	if f.err != nil {
 		return app.Downloaded{}, f.err
 	}
+	audio := f.audio
+	if f.audioFor != nil {
+		audio = f.audioFor(url)
+	}
+	info := f.info
+	if i, ok := f.infoFor[url]; ok {
+		info = i
+	}
 	path := filepath.Join(dir, "vid123.mp3")
-	if err := os.WriteFile(path, f.audio, 0o644); err != nil {
+	if err := os.WriteFile(path, audio, 0o644); err != nil {
 		return app.Downloaded{}, err
 	}
-	return app.Downloaded{Path: path, Info: f.info, Cover: f.cover}, nil
+	return app.Downloaded{Path: path, Info: info, Cover: f.cover}, nil
 }
 
 func newDownloader() *fakeDownloader {

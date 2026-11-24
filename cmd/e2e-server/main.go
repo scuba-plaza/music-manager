@@ -96,8 +96,9 @@ func (l *seededServers) reset() error {
 	}
 	server := web.New(a,
 		web.WithDownloader(&webtest.FakeDownloader{
-			Info:  app.Info{Title: "So What", Artist: "Miles Davis", Album: "Kind of Blue", TrackNumber: 1, TrackTotal: 5, Released: "1959-08-17", Genre: "Jazz", Source: app.FromMetadata},
-			Cover: testmp3.JPEG,
+			Info:    app.Info{Title: "So What", Artist: "Miles Davis", Album: "Kind of Blue", TrackNumber: 1, TrackTotal: 5, Released: "1959-08-17", Genre: "Jazz", Source: app.FromMetadata},
+			Cover:   testmp3.JPEG,
+			Listing: webtest.KindOfBlue(),
 		}),
 		web.WithFrontend(l.frontend),
 	)
