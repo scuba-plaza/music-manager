@@ -22,12 +22,21 @@ var playlistHosts = map[string]bool{
 	"music.youtube.com": true,
 }
 
-func IsPlaylistLink(link string) bool {
+func playlistID(link string) string {
 	u, err := url.Parse(link)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		return false
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || !playlistHosts[strings.ToLower(u.Hostname())] {
+		return ""
 	}
-	return playlistHosts[strings.ToLower(u.Hostname())] && u.Path == "/playlist" && u.Query().Get("list") != ""
+	if u.Path != "/playlist" && u.Path != "/watch" {
+		return ""
+	}
+	return u.Query().Get("list")
+}
+
+func IsPlaylistLink(link string) bool { return playlistID(link) != "" }
+
+func playlistURL(link string) string {
+	return "https://www.youtube.com/playlist?list=" + url.QueryEscape(playlistID(link))
 }
 
 type AlbumForm struct {
@@ -94,7 +103,7 @@ func albumView(id string, al *app.Album) *AlbumView {
 }
 
 func (e *Editor) fetchAlbum(ctx context.Context, link string) (Fetched, error) {
-	al, err := e.lib.FetchAlbum(ctx, link, e.downloader)
+	al, err := e.lib.FetchAlbum(ctx, playlistURL(link), e.downloader)
 	if err != nil {
 		return Fetched{}, err
 	}

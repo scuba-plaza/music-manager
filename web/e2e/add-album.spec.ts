@@ -71,15 +71,12 @@ test('a playlist of more than 30 tracks is refused on the link step', async ({ p
   await expect(page.getByRole('banner')).toContainText('6 tracks');
 });
 
-test('a watch link with a list in it still adds one track', async ({ page, dialog }) => {
+test('a watch link with a list in it opens the album review', async ({ page, dialog }) => {
   await openPage(page);
   await page.keyboard.press('a');
-  await dialog().getByRole('textbox', { name: 'Link' }).fill('https://www.youtube.com/watch?v=abc&list=PLsomething');
+  await dialog().getByRole('textbox', { name: 'Link' }).fill('https://music.youtube.com/watch?v=abc&list=OLAK5uy_kindofblue');
   await page.keyboard.press('Enter');
 
-  await expect(dialog().getByRole('textbox', { name: 'Title' })).toHaveValue('So What');
-  await page.keyboard.press('Enter');
-  await expect(dialog()).toHaveCount(0);
-  await said(page, /^Added/);
-  await expect(page.getByRole('banner')).toContainText('7 tracks');
+  await expect(dialog().getByRole('textbox', { name: 'Album', exact: true })).toHaveValue('Kind of Blue');
+  await expect(dialog().getByRole('checkbox')).toHaveCount(5);
 });

@@ -101,14 +101,14 @@ func TestAnAlbumNeedsAnArtistAnAlbumAndATrack(t *testing.T) {
 	}
 }
 
-func TestAWatchLinkWithAListStillAddsOneTrack(t *testing.T) {
+func TestAWatchLinkWithAListIsTheWholePlaylist(t *testing.T) {
 	a, _ := seed(t, sample...)
 	dl := &webtest.FakeDownloader{Listing: webtest.KindOfBlue()}
 	srv := start(t, a, WithDownloader(dl))
-	if out := fetched(t, srv, "https://www.youtube.com/watch?v=1&list=PLx"); out.Draft == nil {
-		t.Fatal("no draft")
+	if al := fetchedAlbum(t, srv.URL, "https://www.youtube.com/watch?v=1&list=PLx&index=2"); len(al.Tracks) != 5 {
+		t.Fatalf("%+v", al)
 	}
-	if got := dl.ListCalls(); len(got) != 0 {
+	if got := dl.ListCalls(); len(got) != 1 || got[0] != "https://www.youtube.com/playlist?list=PLx" {
 		t.Errorf("listed %v", got)
 	}
 }

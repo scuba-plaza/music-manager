@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -14,12 +15,13 @@ import (
 )
 
 type listingDownloader struct {
-	listing app.Listing
-	calls   []string
-	lists   int
-	audio   map[string][]byte
-	errs    map[string]error
-	infos   map[string]app.Info
+	listing  app.Listing
+	calls    []string
+	lists    int
+	listURLs []string
+	audio    map[string][]byte
+	errs     map[string]error
+	infos    map[string]app.Info
 }
 
 func (d *listingDownloader) Download(ctx context.Context, url, dir string) (app.Downloaded, error) {
@@ -40,6 +42,7 @@ func (d *listingDownloader) Download(ctx context.Context, url, dir string) (app.
 
 func (d *listingDownloader) List(ctx context.Context, url, dir string, limit int) (app.Listing, error) {
 	d.lists++
+	d.listURLs = append(d.listURLs, url)
 	return d.listing, nil
 }
 
@@ -68,9 +71,14 @@ func TestOnlyAPlaylistPageIsAPlaylistLink(t *testing.T) {
 		"https://m.youtube.com/playlist?list=PLabc",
 		"https://WWW.YouTube.com/playlist?list=PLabc",
 		"https://music.youtube.com:443/playlist?list=PLabc",
+		"https://www.youtube.com/watch?v=abc&list=PLabc",
+		"https://music.youtube.com/watch?v=abc&list=OLAK5uy_x&index=3",
+		"https://www.youtube.com/watch?list=PLabc",
 	}
 	no := []string{
-		"https://www.youtube.com/watch?v=abc&list=PLabc",
+		"https://www.youtube.com/watch?v=abc",
+		"https://www.youtube.com/watch?v=abc&list=",
+		"https://www.youtube.com/shorts/abc?list=PLabc",
 		"https://www.youtube.com/playlist",
 		"https://www.youtube.com/playlist?list=",
 		"https://example.org/playlist?list=PLabc",
@@ -152,14 +160,17 @@ func TestFetchingAPlaylistLinkGivesAnAlbumToReview(t *testing.T) {
 	}
 }
 
-func TestAWatchLinkWithAListIsStillOneTrack(t *testing.T) {
-	ed, dl := albumEditor(t, app.Listing{})
-	_, err := ed.Fetch(context.Background(), "https://www.youtube.com/watch?v=abc&list=PLx")
-	if dl.lists != 0 {
-		t.Errorf("the playlist was listed %d times", dl.lists)
+func TestAWatchLinkWithAListIsTheWholePlaylist(t *testing.T) {
+	ed, dl := albumEditor(t, app.Listing{Title: "Kind of Blue", Tracks: tracksOf(2)})
+	f, err := ed.Fetch(context.Background(), "https://www.youtube.com/watch?v=abc&list=PLx&index=2")
+	if err != nil || f.Album == nil || f.Draft != nil {
+		t.Fatalf("%+v %v", f, err)
 	}
-	if len(dl.calls) != 1 {
-		t.Errorf("downloads = %v, err = %v", dl.calls, err)
+	if len(dl.calls) != 0 {
+		t.Errorf("tracks were downloaded: %v", dl.calls)
+	}
+	if want := []string{"https://www.youtube.com/playlist?list=PLx"}; !slices.Equal(dl.listURLs, want) {
+		t.Errorf("listed %v, want %v", dl.listURLs, want)
 	}
 }
 

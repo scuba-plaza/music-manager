@@ -17,7 +17,7 @@ const defaultAudioFrames = 700
 
 const DuplicateLink = "https://www.youtube.com/watch?v=duplicate"
 
-const TooLongLink = "https://music.youtube.com/playlist?list=toolong"
+const TooLongLink = "https://www.youtube.com/playlist?list=toolong"
 
 func KindOfBlue() app.Listing {
 	titles := []string{"So What", "Freddie Freeloader", "Blue in Green", "All Blues", "Flamenco Sketches"}
