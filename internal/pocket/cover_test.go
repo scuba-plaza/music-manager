@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"slices"
 	"testing"
+	"time"
 )
 
 func solid(t *testing.T, c color.RGBA, w, h int) []byte {
@@ -75,5 +76,23 @@ func TestAPlaylistMosaicTakesFourCoversOfItsSongs(t *testing.T) {
 	blue565 := uint16(0x9D>>3)<<11 | uint16(0xB4>>2)<<5 | uint16(0xD1>>3)
 	if pixel(0, 0) != blue565 || pixel(20, 0) != 0xF2A9 || pixel(0, 20) != blue565 || pixel(37, 37) != 0xF2A9 {
 		t.Errorf("mosaic corners = %#x %#x %#x %#x", pixel(0, 0), pixel(20, 0), pixel(0, 20), pixel(37, 37))
+	}
+}
+
+func TestLargeCoversAreProcessedQuickly(t *testing.T) {
+	lib := sample()
+	lib.Covers = map[string][]byte{}
+	for i := range lib.Tracks {
+		sha := string(rune('a' + i))
+		lib.Tracks[i].CoverSHA256 = sha
+		lib.Covers[sha] = solid(t, color.RGBA{uint8(40 * i), 90, 200, 255}, 1500, 1500)
+	}
+	start := time.Now()
+	files := Files(lib)
+	if took := time.Since(start); took > time.Duration(len(lib.Tracks))*60*time.Millisecond {
+		t.Fatalf("%d covers of 1500 px took %v", len(lib.Tracks), took)
+	}
+	if got := len(files["PLAYER/TINTS.BIN"]); got != 4*len(lib.Tracks) {
+		t.Fatalf("TINTS holds %d bytes", got)
 	}
 }

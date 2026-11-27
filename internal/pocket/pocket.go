@@ -233,7 +233,7 @@ func build(lib Library) *index {
 		})
 	}
 	for _, p := range lib.Playlists {
-		g := &group{name: p.Name, sort: sortKey(p.LatinName()), artist: none}
+		g := &group{name: p.Name, artist: none}
 		for _, id := range p.Tracks {
 			if i, ok := byID[id]; ok {
 				g.songs = append(g.songs, i)
@@ -372,8 +372,9 @@ func (w *writer) ref(b []byte, s string) []byte {
 	if !ok {
 		at = uint32(len(w.pool))
 		w.strings[s] = at
-		w.pool = append(w.pool, byte(len(s)))
-		w.pool = append(w.pool, s...)
+		cut := clip(s)
+		w.pool = append(w.pool, byte(len(cut)))
+		w.pool = append(w.pool, cut...)
 	}
 	return binary.LittleEndian.AppendUint32(b, at)
 }

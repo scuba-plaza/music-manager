@@ -44,7 +44,7 @@ var WolfgangWMP01 = Profile{
 
 var PocketPlayer = Profile{
 	ID: "pocket-player", Name: "Pocket player",
-	LatinNames: true, ComponentMax: 100, CoverFormat: "keep", ReplayGain: true,
+	LatinNames: true, ComponentMax: 80, CoverFormat: "keep", ReplayGain: true,
 	PlaylistExt: ".m3u8", PlaylistStyle: "relative", CardIndex: true,
 }
 

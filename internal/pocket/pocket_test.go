@@ -3,8 +3,10 @@ package pocket
 import (
 	"encoding/binary"
 	"slices"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"music-manager/internal/manifest"
 )
@@ -199,4 +201,16 @@ func equal(a, b []any) bool {
 		}
 	}
 	return true
+}
+
+func TestTextLongerThanALengthByteIsCutOnACharacter(t *testing.T) {
+	lib := sample()
+	lib.Paths["t1"] = strings.Repeat("é", 150)
+	files := Files(lib)
+	r := record(files, "TRACKS.BIN", 24, 0)
+	r.str()
+	got := r.str()
+	if len(got) > 255 || len(got) < 254 || !utf8.ValidString(got) || !strings.HasPrefix(lib.Paths["t1"], got) {
+		t.Fatalf("stored path is %d bytes, valid %v", len(got), utf8.ValidString(got))
+	}
 }

@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"image"
-	"image/color"
+	"image/draw"
 	_ "image/jpeg"
 	_ "image/png"
 
@@ -22,7 +22,7 @@ const (
 func coverFile(size int) string { return fmt.Sprintf("%s/COV%d.BIN", Folder, size) }
 
 func writeCovers(lib Library, x *index, files map[string][]byte) {
-	var images []image.Image
+	var images []*image.RGBA
 	indexOf := map[string]int{}
 	trackCover := make([]int, len(lib.Tracks))
 	for i, t := range lib.Tracks {
@@ -38,7 +38,7 @@ func writeCovers(lib Library, x *index, files map[string][]byte) {
 			}
 			at = len(images)
 			indexOf[t.CoverSHA256] = at
-			images = append(images, square(img))
+			images = append(images, prepare(img))
 		}
 		trackCover[i] = at
 	}
@@ -112,43 +112,44 @@ func contains(xs []int, v int) bool {
 	return false
 }
 
-func square(img image.Image) image.Image {
+const workSize = 208
+
+func prepare(img image.Image) *image.RGBA {
 	b := img.Bounds()
 	side := min(b.Dx(), b.Dy())
-	x0 := b.Min.X + (b.Dx()-side)/2
-	y0 := b.Min.Y + (b.Dy()-side)/2
-	out := image.NewRGBA(image.Rect(0, 0, side, side))
-	for y := range side {
-		for x := range side {
-			out.Set(x, y, img.At(x0+x, y0+y))
-		}
+	crop := image.Rect(0, 0, side, side).Add(image.Pt(b.Min.X+(b.Dx()-side)/2, b.Min.Y+(b.Dy()-side)/2))
+	square := image.NewRGBA(image.Rect(0, 0, side, side))
+	draw.Draw(square, square.Bounds(), img, crop.Min, draw.Src)
+	if side <= workSize {
+		return square
 	}
-	return out
+	return resize(square, workSize)
 }
 
-func resize(img image.Image, size int) *image.RGBA {
+func resize(img *image.RGBA, size int) *image.RGBA {
 	b := img.Bounds()
 	out := image.NewRGBA(image.Rect(0, 0, size, size))
 	for y := range size {
-		y0, y1 := b.Min.Y+y*b.Dy()/size, b.Min.Y+max((y+1)*b.Dy()/size, y*b.Dy()/size+1)
+		y0, y1 := y*b.Dy()/size, max((y+1)*b.Dy()/size, y*b.Dy()/size+1)
 		for x := range size {
-			x0, x1 := b.Min.X+x*b.Dx()/size, b.Min.X+max((x+1)*b.Dx()/size, x*b.Dx()/size+1)
+			x0, x1 := x*b.Dx()/size, max((x+1)*b.Dx()/size, x*b.Dx()/size+1)
 			var r, g, bl, n uint32
 			for sy := y0; sy < y1; sy++ {
+				row := img.Pix[img.PixOffset(b.Min.X, b.Min.Y+sy):]
 				for sx := x0; sx < x1; sx++ {
-					c := color.RGBAModel.Convert(img.At(sx, sy)).(color.RGBA)
-					r += uint32(c.R)
-					g += uint32(c.G)
-					bl += uint32(c.B)
+					p := row[4*sx : 4*sx+3]
+					r += uint32(p[0])
+					g += uint32(p[1])
+					bl += uint32(p[2])
 					n++
 				}
 			}
-			out.SetRGBA(x, y, color.RGBA{uint8(r / n), uint8(g / n), uint8(bl / n), 255})
+			o := out.PixOffset(x, y)
+			out.Pix[o], out.Pix[o+1], out.Pix[o+2], out.Pix[o+3] = uint8(r/n), uint8(g/n), uint8(bl/n), 255
 		}
 	}
 	return out
 }
-
 func rgb565(data []byte, img *image.RGBA) []byte {
 	b := img.Bounds()
 	for y := b.Min.Y; y < b.Max.Y; y++ {

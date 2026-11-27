@@ -1,9 +1,11 @@
 package device_test
 
 import (
+	"strings"
 	"testing"
 
 	"music-manager/internal/device"
+	"music-manager/internal/layout"
 	"music-manager/internal/manifest"
 )
 
@@ -26,6 +28,16 @@ func TestOtherTargetsWriteNoIndex(t *testing.T) {
 	for _, target := range []device.Target{device.Generic, device.TargetOf(manifest.WolfgangWMP01)} {
 		if _, ok := target.(device.Indexer); ok {
 			t.Errorf("%s writes a card index", target.ID())
+		}
+	}
+}
+
+func TestEveryPocketPlayerPathFitsTheCardIndex(t *testing.T) {
+	long := strings.Repeat("Wonderful Long Name ", 20)
+	tracks := []manifest.Track{{ID: "t1", Status: manifest.Identified, Title: long, Artist: long, Album: long, TrackNumber: 1}}
+	for _, p := range layout.Assign(tracks, device.TargetOf(manifest.PocketPlayer).Layout()) {
+		if len(p) > 255 {
+			t.Fatalf("path is %d bytes: %s", len(p), p)
 		}
 	}
 }
