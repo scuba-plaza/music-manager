@@ -111,7 +111,19 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 	indexFolder := ""
 	if ix, ok := dev.(device.Indexer); ok {
 		indexFolder = ix.IndexFolder()
-		for name, data := range ix.Index(m.Tracks, m.Playlists, paths) {
+		coverData := map[string][]byte{}
+		for _, t := range m.Tracks {
+			if t.CoverSHA256 == "" {
+				continue
+			}
+			if _, ok := coverData[t.CoverSHA256]; ok {
+				continue
+			}
+			if data, err := os.ReadFile(a.covers.Path(t.CoverSHA256)); err == nil {
+				coverData[t.CoverSHA256] = data
+			}
+		}
+		for name, data := range ix.Index(m.Tracks, m.Playlists, paths, coverData) {
 			build[name] = func() ([]byte, error) { return data, nil }
 			desired[name] = fingerprint(data)
 		}

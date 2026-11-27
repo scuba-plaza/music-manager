@@ -13,7 +13,7 @@ func TestThePocketPlayerTargetWritesTheCardIndex(t *testing.T) {
 		t.Fatal("the Pocket player target writes no index")
 	}
 	tracks := []manifest.Track{{ID: "t1", Status: manifest.Identified, Title: "Song", Artist: "Someone"}}
-	files := pocket.Index(tracks, nil, map[string]string{"t1": "Someone/Song.mp3"})
+	files := pocket.Index(tracks, nil, map[string]string{"t1": "Someone/Song.mp3"}, nil)
 	if _, ok := files["PLAYER/HEADER.BIN"]; !ok {
 		t.Fatalf("index files = %v, want PLAYER/HEADER.BIN among them", len(files))
 	}

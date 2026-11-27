@@ -16,7 +16,7 @@ import (
 const (
 	Folder = "PLAYER"
 	Major  = 1
-	Minor  = 0
+	Minor  = 1
 	none   = 0xFFFF
 )
 
@@ -24,6 +24,7 @@ type Library struct {
 	Tracks    []manifest.Track
 	Playlists []manifest.Playlist
 	Paths     map[string]string
+	Covers    map[string][]byte
 }
 
 type song struct {
@@ -157,6 +158,7 @@ func Files(lib Library) map[string][]byte {
 	put("GENMOST.ORD", u16(nil, groups(x.genres, most)...))
 
 	put("STRINGS.BIN", w.pool)
+	writeCovers(lib, x, files)
 	return files
 }
 

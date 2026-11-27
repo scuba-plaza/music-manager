@@ -7,13 +7,13 @@ import (
 
 type Indexer interface {
 	IndexFolder() string
-	Index(tracks []manifest.Track, playlists []manifest.Playlist, paths map[string]string) map[string][]byte
+	Index(tracks []manifest.Track, playlists []manifest.Playlist, paths map[string]string, covers map[string][]byte) map[string][]byte
 }
 
 type indexedTarget struct{ profileTarget }
 
 func (indexedTarget) IndexFolder() string { return pocket.Folder }
 
-func (indexedTarget) Index(tracks []manifest.Track, playlists []manifest.Playlist, paths map[string]string) map[string][]byte {
-	return pocket.Files(pocket.Library{Tracks: tracks, Playlists: playlists, Paths: paths})
+func (indexedTarget) Index(tracks []manifest.Track, playlists []manifest.Playlist, paths map[string]string, covers map[string][]byte) map[string][]byte {
+	return pocket.Files(pocket.Library{Tracks: tracks, Playlists: playlists, Paths: paths, Covers: covers})
 }

@@ -66,7 +66,7 @@ func TestHeaderCountsEveryKindOfRecord(t *testing.T) {
 	if string(h[:4]) != "PKPL" {
 		t.Fatalf("magic %q", h[:4])
 	}
-	if got, want := u16s(h[4:]), []int{1, 0, 5, 3, 3, 3, 1}; !slices.Equal(got, want) {
+	if got, want := u16s(h[4:]), []int{1, 1, 5, 3, 3, 3, 1}; !slices.Equal(got, want) {
 		t.Fatalf("header = %v, want %v", got, want)
 	}
 }

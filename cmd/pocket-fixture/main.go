@@ -66,7 +66,11 @@ func generate(card string) error {
 
 	ids := map[string]string{}
 	var order []string
-	for _, al := range albums {
+	for at, al := range albums {
+		cover, err := standIn(float64(at) * 47)
+		if err != nil {
+			return err
+		}
 		for n, title := range al.titles {
 			file := filepath.Join(source, fmt.Sprintf("%02d.mp3", len(order)))
 			if err := os.WriteFile(file, testmp3.Silent(100+len(order)), 0o644); err != nil {
@@ -90,6 +94,9 @@ func generate(card string) error {
 				Genre: &al.genre, Released: &al.released,
 			}
 			if _, err := a.Edit(id, edit); err != nil {
+				return err
+			}
+			if err := a.SetCover(id, cover); err != nil {
 				return err
 			}
 			ids[title] = id
