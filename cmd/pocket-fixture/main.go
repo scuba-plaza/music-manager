@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"music-manager/internal/app"
@@ -28,6 +29,11 @@ var albums = []album{
 	{"Bruno Castell", "", "Jazz", "2023", []string{"Brooklyn"}},
 }
 
+var arabicAlbums = []album{
+	{"ليلى نور", "ليالي القاهرة", "طرب", "1998", []string{"ألف ليلة وليلة (تسجيل حفل حي)", "نسيم الليل", "قمر"}},
+	{"سامي الحداد", "على الطريق", "طرب", "2005", []string{"بحر", "مدينة الضوء", "رسالة"}},
+}
+
 var playlists = []struct {
 	name   string
 	titles []string
@@ -38,17 +44,22 @@ var playlists = []struct {
 }
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: pocket-fixture <card folder>")
+	args := os.Args[1:]
+	arabic := len(args) == 2 && args[0] == "-arabic"
+	if arabic {
+		args = args[1:]
+	}
+	if len(args) != 1 {
+		fmt.Fprintln(os.Stderr, "usage: pocket-fixture [-arabic] <card folder>")
 		os.Exit(2)
 	}
-	if err := generate(os.Args[1]); err != nil {
+	if err := generate(args[0], arabic); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func generate(card string) error {
+func generate(card string, arabic bool) error {
 	work, err := os.MkdirTemp("", "pocket-fixture-")
 	if err != nil {
 		return err
@@ -64,9 +75,13 @@ func generate(card string) error {
 		return err
 	}
 
+	all := albums
+	if arabic {
+		all = append(slices.Clone(albums), arabicAlbums...)
+	}
 	ids := map[string]string{}
 	var order []string
-	for at, al := range albums {
+	for at, al := range all {
 		cover, err := standIn(float64(at) * 47)
 		if err != nil {
 			return err
