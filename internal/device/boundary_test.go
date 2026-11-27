@@ -91,6 +91,7 @@ func TestOnlyTheNamedPlacesMakeLatinForms(t *testing.T) {
 		"internal/app/sort.go", // names sort by their Latin form
 		"internal/app/profile.go",
 		"internal/browse/rows.go", // and so do the lists
+		"internal/pocket/text.go", // a letter the player cannot draw becomes its ASCII form
 	})
 }
 

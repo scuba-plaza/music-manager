@@ -184,7 +184,7 @@ func build(lib Library) *index {
 			sort = title
 		}
 		s := song{
-			title: clip(title), sort: sortKey(sort), file: lib.Paths[t.ID],
+			title: display(title), sort: sortKey(sort), file: lib.Paths[t.ID],
 			number: min(t.TrackNumber, 255), total: min(t.TrackTotal, 255),
 			length: uint32(t.PlayingLength() / time.Millisecond),
 			year:   yearOf(t.Released), added: int(t.AddedAt.Unix() / 86400),
@@ -243,7 +243,7 @@ func build(lib Library) *index {
 	}
 	for _, gs := range [][]*group{x.albums, x.artists, x.genres, x.playlists} {
 		for _, g := range gs {
-			g.name = clip(g.name)
+			g.name = display(g.name)
 		}
 	}
 	return x
@@ -346,6 +346,8 @@ func yearOf(released string) int {
 	}
 	return y
 }
+
+func display(s string) string { return clip(clean(s)) }
 
 func clip(s string) string {
 	for len(s) > 255 {
