@@ -89,24 +89,19 @@ func mosaics(groups []*group, images []*image.RGBA, trackCover []int) []byte {
 }
 
 func mosaic(covers []int, images []*image.RGBA) *image.RGBA {
-	tile := image.NewRGBA(image.Rect(0, 0, mosaicSize, mosaicSize))
-	place := func(cover, x0, y0, x1, y1 int) {
-		draw.Draw(tile, image.Rect(x0, y0, x1, y1), fit(images[cover], x1-x0, y1-y0), image.Point{}, draw.Src)
-	}
-	switch n := len(covers); n {
-	case 0:
+	if len(covers) == 0 {
+		tile := image.NewRGBA(image.Rect(0, 0, mosaicSize, mosaicSize))
 		draw.Draw(tile, tile.Bounds(), image.NewUniform(tint.Mix(tint.Neutral, tint.Ground, 0.20)), image.Point{}, draw.Src)
-	case 1:
-		place(covers[0], 0, 0, mosaicSize, mosaicSize)
-	case 2, 3:
-		for i, c := range covers {
-			place(c, (i*mosaicSize+n/2)/n, 0, ((i+1)*mosaicSize+n/2)/n, mosaicSize)
-		}
-	default:
-		half := mosaicSize / 2
-		for i, c := range covers {
-			place(c, (i%2)*half, (i/2)*half, (i%2+1)*half, (i/2+1)*half)
-		}
+		return tile
+	}
+	if len(covers) < 4 {
+		return resize(images[covers[0]], mosaicSize)
+	}
+	tile := image.NewRGBA(image.Rect(0, 0, mosaicSize, mosaicSize))
+	half := mosaicSize / 2
+	for i, c := range covers {
+		x, y := (i%2)*half, (i/2)*half
+		draw.Draw(tile, image.Rect(x, y, x+half, y+half), resize(images[c], half), image.Point{}, draw.Src)
 	}
 	return tile
 }
@@ -135,23 +130,12 @@ func prepare(img image.Image) *image.RGBA {
 }
 
 func resize(img *image.RGBA, size int) *image.RGBA {
-	return fit(img, size, size)
-}
-
-func fit(img *image.RGBA, w, h int) *image.RGBA {
 	b := img.Bounds()
-	cw, ch := b.Dx(), b.Dy()
-	if cw*h > ch*w {
-		cw = ch * w / h
-	} else {
-		ch = cw * h / w
-	}
-	left, top := b.Min.X+(b.Dx()-cw)/2, b.Min.Y+(b.Dy()-ch)/2
-	out := image.NewRGBA(image.Rect(0, 0, w, h))
-	for y := range h {
-		y0, y1 := top+y*ch/h, top+max((y+1)*ch/h, y*ch/h+1)
-		for x := range w {
-			x0, x1 := left+x*cw/w, left+max((x+1)*cw/w, x*cw/w+1)
+	out := image.NewRGBA(image.Rect(0, 0, size, size))
+	for y := range size {
+		y0, y1 := b.Min.Y+y*b.Dy()/size, b.Min.Y+max((y+1)*b.Dy()/size, y*b.Dy()/size+1)
+		for x := range size {
+			x0, x1 := b.Min.X+x*b.Dx()/size, b.Min.X+max((x+1)*b.Dx()/size, x*b.Dx()/size+1)
 			var r, g, bl, n uint32
 			for sy := y0; sy < y1; sy++ {
 				for sx := x0; sx < x1; sx++ {
@@ -168,6 +152,7 @@ func fit(img *image.RGBA, w, h int) *image.RGBA {
 	}
 	return out
 }
+
 func rgb565(data []byte, img *image.RGBA) []byte {
 	b := img.Bounds()
 	for y := b.Min.Y; y < b.Max.Y; y++ {

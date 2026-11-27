@@ -67,7 +67,7 @@ func TestCoversArePreRenderedAsRGB565AtEverySize(t *testing.T) {
 	}
 }
 
-func TestAMosaicShowsEachCoverOnceInColumnsOrAGrid(t *testing.T) {
+func TestFourCoversMakeAMosaicAndFewerShowTheFirstCover(t *testing.T) {
 	yellow, purple := color.RGBA{0xE8, 0xC8, 0x40, 255}, color.RGBA{0x70, 0x40, 0x90, 255}
 	red, blue, green := color.RGBA{0xF0, 0x56, 0x4D, 255}, color.RGBA{0x9D, 0xB4, 0xD1, 255}, color.RGBA{0x50, 0xA0, 0x60, 255}
 	split := image.NewRGBA(image.Rect(0, 0, 64, 64))
@@ -97,8 +97,8 @@ func TestAMosaicShowsEachCoverOnceInColumnsOrAGrid(t *testing.T) {
 	c565 := func(c color.RGBA) uint16 { return uint16(c.R>>3)<<11 | uint16(c.G>>2)<<5 | uint16(c.B>>3) }
 	type at struct{ x, y int }
 	cases := []map[at]color.RGBA{
-		{{0, 0}: yellow, {0, 17}: yellow, {0, 21}: purple, {0, 37}: purple, {18, 37}: purple, {19, 0}: red, {37, 37}: red},
-		{{0, 0}: red, {12, 37}: red, {13, 0}: blue, {24, 37}: blue, {25, 0}: green, {37, 37}: green},
+		{{0, 0}: yellow, {37, 17}: yellow, {0, 21}: purple, {37, 37}: purple},
+		{{0, 0}: red, {37, 0}: red, {0, 37}: red, {37, 37}: red},
 		{{0, 0}: red, {37, 0}: blue, {0, 37}: green, {19, 19}: yellow, {37, 37}: purple},
 	}
 	for i, want := range cases {
@@ -141,12 +141,12 @@ func TestArtistsAndGenresGetAMosaicOfTheirSongsCovers(t *testing.T) {
 		corners          map[string][]uint16
 	}{
 		{"ARTMOS.BIN", "ARTISTS.BIN", 24, map[string][]uint16{
-			"Leon Bridges":        {red, blue, red, blue},
+			"Leon Bridges":        {red, red, red, red},
 			"Gustavo Santaolalla": {blue, blue, blue, blue},
 			"عبد الحليم حافظ":     nil,
 		}},
 		{"GENMOS.BIN", "GENRES.BIN", 20, map[string][]uint16{
-			"Soul":       {red, blue, red, blue},
+			"Soul":       {red, red, red, red},
 			"Soundtrack": {blue, blue, blue, blue},
 			"طرب":        nil,
 		}},
