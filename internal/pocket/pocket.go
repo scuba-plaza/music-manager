@@ -16,7 +16,7 @@ import (
 const (
 	Folder = "PLAYER"
 	Major  = 1
-	Minor  = 1
+	Minor  = 2
 	none   = 0xFFFF
 )
 

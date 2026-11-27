@@ -14,10 +14,7 @@ import (
 
 var CoverSizes = []int{22, 32, 36, 38, 104}
 
-const (
-	mosaicSize = 38
-	mosaicPart = 19
-)
+const mosaicSize = 38
 
 func coverFile(size int) string { return fmt.Sprintf("%s/COV%d.BIN", Folder, size) }
 
@@ -72,35 +69,46 @@ func writeCovers(lib Library, x *index, files map[string][]byte) {
 		files[coverFile(size)] = data
 	}
 
-	var mosaics []byte
-	for _, p := range x.playlists {
+	files[Folder+"/MOSAIC.BIN"] = mosaics(x.playlists, images, trackCover)
+	files[Folder+"/ARTMOS.BIN"] = mosaics(x.artists, images, trackCover)
+	files[Folder+"/GENMOS.BIN"] = mosaics(x.genres, images, trackCover)
+}
+
+func mosaics(groups []*group, images []*image.RGBA, trackCover []int) []byte {
+	var data []byte
+	for _, g := range groups {
 		var covers []int
-		for _, s := range p.songs {
+		for _, s := range g.songs {
 			if c := trackCover[s]; c != none && !contains(covers, c) && len(covers) < 4 {
 				covers = append(covers, c)
 			}
 		}
-		tile := image.NewRGBA(image.Rect(0, 0, mosaicSize, mosaicSize))
-		for y := range mosaicSize {
-			for x := range mosaicSize {
-				tile.SetRGBA(x, y, tint.Mix(tint.Neutral, tint.Ground, 0.20))
-			}
-		}
-		for part := range 4 {
-			if len(covers) == 0 {
-				break
-			}
-			small := resize(images[covers[part%len(covers)]], mosaicPart)
-			ox, oy := (part%2)*mosaicPart, (part/2)*mosaicPart
-			for y := range mosaicPart {
-				for x := range mosaicPart {
-					tile.Set(ox+x, oy+y, small.At(x, y))
-				}
-			}
-		}
-		mosaics = rgb565(mosaics, tile)
+		data = rgb565(data, mosaic(covers, images))
 	}
-	files[Folder+"/MOSAIC.BIN"] = mosaics
+	return data
+}
+
+func mosaic(covers []int, images []*image.RGBA) *image.RGBA {
+	tile := image.NewRGBA(image.Rect(0, 0, mosaicSize, mosaicSize))
+	place := func(cover, x0, y0, x1, y1 int) {
+		draw.Draw(tile, image.Rect(x0, y0, x1, y1), fit(images[cover], x1-x0, y1-y0), image.Point{}, draw.Src)
+	}
+	switch n := len(covers); n {
+	case 0:
+		draw.Draw(tile, tile.Bounds(), image.NewUniform(tint.Mix(tint.Neutral, tint.Ground, 0.20)), image.Point{}, draw.Src)
+	case 1:
+		place(covers[0], 0, 0, mosaicSize, mosaicSize)
+	case 2, 3:
+		for i, c := range covers {
+			place(c, (i*mosaicSize+n/2)/n, 0, ((i+1)*mosaicSize+n/2)/n, mosaicSize)
+		}
+	default:
+		half := mosaicSize / 2
+		for i, c := range covers {
+			place(c, (i%2)*half, (i/2)*half, (i%2+1)*half, (i/2+1)*half)
+		}
+	}
+	return tile
 }
 
 func contains(xs []int, v int) bool {
@@ -127,17 +135,27 @@ func prepare(img image.Image) *image.RGBA {
 }
 
 func resize(img *image.RGBA, size int) *image.RGBA {
+	return fit(img, size, size)
+}
+
+func fit(img *image.RGBA, w, h int) *image.RGBA {
 	b := img.Bounds()
-	out := image.NewRGBA(image.Rect(0, 0, size, size))
-	for y := range size {
-		y0, y1 := y*b.Dy()/size, max((y+1)*b.Dy()/size, y*b.Dy()/size+1)
-		for x := range size {
-			x0, x1 := x*b.Dx()/size, max((x+1)*b.Dx()/size, x*b.Dx()/size+1)
+	cw, ch := b.Dx(), b.Dy()
+	if cw*h > ch*w {
+		cw = ch * w / h
+	} else {
+		ch = cw * h / w
+	}
+	left, top := b.Min.X+(b.Dx()-cw)/2, b.Min.Y+(b.Dy()-ch)/2
+	out := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := range h {
+		y0, y1 := top+y*ch/h, top+max((y+1)*ch/h, y*ch/h+1)
+		for x := range w {
+			x0, x1 := left+x*cw/w, left+max((x+1)*cw/w, x*cw/w+1)
 			var r, g, bl, n uint32
 			for sy := y0; sy < y1; sy++ {
-				row := img.Pix[img.PixOffset(b.Min.X, b.Min.Y+sy):]
 				for sx := x0; sx < x1; sx++ {
-					p := row[4*sx : 4*sx+3]
+					p := img.Pix[img.PixOffset(sx, sy):]
 					r += uint32(p[0])
 					g += uint32(p[1])
 					bl += uint32(p[2])
