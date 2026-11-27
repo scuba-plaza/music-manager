@@ -108,7 +108,15 @@ func (a *App) PlanSync(opts SyncOptions) (*SyncPlan, error) {
 		build[name] = func() ([]byte, error) { return data, nil }
 		desired[name] = fingerprint(data)
 	}
-	existing, err := scanTree(target, desired)
+	indexFolder := ""
+	if ix, ok := dev.(device.Indexer); ok {
+		indexFolder = ix.IndexFolder()
+		for name, data := range ix.Index(m.Tracks, m.Playlists, paths) {
+			build[name] = func() ([]byte, error) { return data, nil }
+			desired[name] = fingerprint(data)
+		}
+	}
+	existing, err := scanTree(target, desired, indexFolder)
 	if err != nil {
 		return nil, err
 	}
@@ -245,10 +253,11 @@ func fingerprint(data []byte) render.File {
 
 var mediaExts = map[string]bool{".mp3": true, ".jpg": true, ".jpeg": true, ".png": true, ".m3u": true, ".m3u8": true}
 
-// scanTree fingerprints the media files under dir, ignoring the library's own
+// scanTree fingerprints the media files under dir, and every file in the
+// target's index folder when it has one, ignoring the library's own
 // .mm directory. Only files that are also wanted and have the wanted size
 // are hashed; for the rest the size alone already shows they differ.
-func scanTree(dir string, desired render.Tree) (render.Tree, error) {
+func scanTree(dir string, desired render.Tree, indexFolder string) (render.Tree, error) {
 	tree := render.Tree{}
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -263,18 +272,19 @@ func scanTree(dir string, desired render.Tree) (render.Tree, error) {
 			}
 			return nil
 		}
-		if !mediaExts[strings.ToLower(filepath.Ext(path))] {
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		indexed := indexFolder != "" && strings.HasPrefix(rel, indexFolder+"/")
+		if !indexed && !mediaExts[strings.ToLower(filepath.Ext(path))] {
 			return nil
 		}
 		info, err := d.Info()
 		if err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(dir, path)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
 		f := render.File{Size: info.Size()}
 		if want, ok := desired[rel]; ok && want.Size == f.Size {
 			data, err := os.ReadFile(path)

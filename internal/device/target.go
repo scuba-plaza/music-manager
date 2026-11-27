@@ -24,7 +24,12 @@ var Generic = TargetOf(GenericProfile)
 
 type profileTarget struct{ p manifest.Profile }
 
-func TargetOf(p manifest.Profile) Target { return profileTarget{p} }
+func TargetOf(p manifest.Profile) Target {
+	if p.CardIndex {
+		return indexedTarget{profileTarget{p}}
+	}
+	return profileTarget{p}
+}
 
 func (t profileTarget) ID() string { return t.p.ID }
 

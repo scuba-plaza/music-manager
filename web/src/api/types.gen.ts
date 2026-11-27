@@ -254,6 +254,7 @@ export interface Profile {
   replaygain: boolean;
   playlist_ext: string;
   playlist_style: string;
+  card_index?: boolean;
 }
 
 export interface ProfileCheck {

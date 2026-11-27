@@ -21,6 +21,7 @@ type Profile struct {
 	ReplayGain    bool   `json:"replaygain"`
 	PlaylistExt   string `json:"playlist_ext"`
 	PlaylistStyle string `json:"playlist_style"`
+	CardIndex     bool   `json:"card_index,omitempty"`
 }
 
 const (
@@ -39,6 +40,12 @@ var WolfgangWMP01 = Profile{
 	LatinNames: true, ComponentMax: 100, StemMax: 20, TagWidth: 12, LatinGenre: true,
 	CoverFormat: "baseline-jpeg", CoverMaxEdge: 480, CoverQuality: 85, SingleCovers: true,
 	ReplayGain: false, PlaylistExt: ".m3u", PlaylistStyle: "root-backslash",
+}
+
+var PocketPlayer = Profile{
+	ID: "pocket-player", Name: "Pocket player",
+	LatinNames: true, ComponentMax: 100, CoverFormat: "keep", ReplayGain: true,
+	PlaylistExt: ".m3u8", PlaylistStyle: "relative", CardIndex: true,
 }
 
 func (p Profile) Problems() map[string]string {
